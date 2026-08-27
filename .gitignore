@@ -1,0 +1,10 @@
+﻿*.exe
+*.dll
+*.obj
+*.pdb
+*.lock
+*.ilk
+*.exp
+*.lib
+core-master/
+PDF_Editor-main/

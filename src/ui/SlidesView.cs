@@ -1,0 +1,19675 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+using GenOffice.Core;
+
+namespace GenOffice.UI
+{
+    public class SmartGuideLine
+    {
+        public bool IsVertical;
+        public float Position;
+        public float Min;
+        public float Max;
+    }
+
+    public class SmartSpacingIndicator
+    {
+        public bool IsHorizontal;
+        public float Start1;
+        public float End1;
+        public float Start2;
+        public float End2;
+        public float CrossPos;
+        public float GapSize;
+    }
+
+    public class SlidesView
+    {
+        public PresentationRoot Presentation { get; set; }
+        public int ActiveSlideIndex { get; set; }
+        public int SelectedShapeIndex { get; set; }
+        public List<int> SelectedShapeIndices { get; set; }
+
+        public ImpressViewMode ViewMode { get; set; }
+        public SidebarPanelType SidebarPanel { get; set; }
+        public bool IsSidebarOpen { get; set; }
+
+        public bool IsPresenting { get; set; }
+        public float ZoomLevel { get; set; }
+
+        public event Action<bool> RequestStartSlideShow;
+        public event Action RequestStopSlideShow;
+
+        // Infinite Workspace & Zoom Pan Offsets
+        public int CanvasScrollX { get; set; }
+        public int CanvasScrollY { get; set; }
+        public bool IsPanningCanvas { get; set; }
+        public Point PanStartMouse { get; set; }
+        public Point PanStartScroll { get; set; }
+
+        // Workspace Scrollbar Dragging & Hover State
+        public bool IsDraggingHScrollBar { get; set; }
+        public bool IsDraggingVScrollBar { get; set; }
+        public int ScrollBarDragStartMouseX { get; set; }
+        public int ScrollBarDragStartScrollX { get; set; }
+        public int ScrollBarDragStartMouseY { get; set; }
+        public int ScrollBarDragStartScrollY { get; set; }
+        public bool IsHoverHScrollBarThumb { get; set; }
+        public bool IsHoverVScrollBarThumb { get; set; }
+
+        // Scroll Offsets for Sidebars
+        public int ThumbScrollY { get; set; }
+        public int SidebarScrollY { get; set; }
+
+        // Shape Drawing & Creation State
+        public bool IsDrawingShapeMode { get; set; }
+        public ShapeType PendingShapeType { get; set; }
+        public Point ShapeDrawStart { get; set; }
+        public Point ShapeDrawCurrent { get; set; }
+        public bool IsDrawingActive { get; set; }
+
+        // Shape Drag & Resize State
+        public bool IsDraggingShape { get; set; }
+        public bool IsResizingShape { get; set; }
+        public bool IsRotatingShape { get; set; }
+        public int DragResizeHandleIndex { get; set; } // 0-7 handles, 8 rotation
+        public Point DragStartMouse { get; set; }
+        public Transform2D DragStartTransform { get; set; }
+
+        // Inline Text Editing State
+        public bool IsInlineEditing { get; set; }
+        public ShapeNode EditingShape { get; set; }
+        public string EditingTextBuffer { get; set; }
+        public int CaretIndex { get; set; }
+
+        // Table Cell Inline Editing & Range Selection State
+        public bool IsEditingTableCell { get; set; }
+        public ShapeNode EditingTableShape { get; set; }
+        public int EditingTableRow { get; set; }
+        public int EditingTableCol { get; set; }
+        public string EditingTableCellBuffer { get; set; }
+        public int TableCaretIndex { get; set; }
+        public bool IsSelectingTableCells { get; set; }
+        public int TableDragStartRow { get; set; }
+        public int TableDragStartCol { get; set; }
+
+        // Smart Snap Alignment Guides & Equidistant Spacing State
+        public bool ShowSnapGuideX { get; set; }
+        public bool ShowSnapGuideY { get; set; }
+        public float SnapGuideXPos { get; set; }
+        public float SnapGuideYPos { get; set; }
+        public List<SmartGuideLine> ActiveSmartGuides { get; set; }
+        public List<SmartSpacingIndicator> ActiveSpacingIndicators { get; set; }
+
+        // Selection Pane Drag & Drop Reorder State
+        public int DraggingSelectionPaneIndex { get; set; }
+        public int DraggingSelectionPaneTargetIndex { get; set; }
+        public Action InvalidateCallback;
+
+        // Background Removal & Color Picker (Chroma Keying) State
+        public bool IsRemovingBackground { get; set; }
+        public string BgRemovalTool { get; set; } // "Keep", "Remove", "PickColor", "None"
+        public Image OriginalImageBeforeRemoval { get; set; }
+        public List<BgRemovalStroke> BgRemovalStrokes { get; set; }
+        public BgRemovalStroke CurrentDrawingStroke { get; set; }
+        public bool IsDrawingBgStroke { get; set; }
+        public float BgBrushRadius { get; set; }
+        public PointF CurrentMouseHoverNorm { get; set; }
+        public Bitmap BgRemovalMaskBitmap { get; set; }
+        private bool[,] _bgRemovalMask;
+
+        // Chroma Key / Color Picker (Phông xanh CapCut) State
+        public bool IsColorPickingMode { get; set; }
+        public Color ColorPickHoverColor { get; set; }
+        public bool HasColorPickHover { get; set; }
+        public PointF ColorPickMouseCanvasPos { get; set; }
+
+        // AI Laser Scanning Animation State (Hiệu ứng quét sáng Laser đa lớp chuyên nghiệp)
+        public bool IsScanningActive { get; set; }
+        public float ScanProgress { get; set; }
+        public ShapeNode ScanTargetShape { get; set; }
+        public Bitmap ScanSourceOriginalBitmap { get; set; }
+        public Bitmap ScanPendingResultBitmap { get; set; }
+
+        // Interactive Crop State (Chế độ Cắt ảnh Tương tác)
+        public bool IsCropping { get; set; }
+        public CropHandleType ActiveCropHandle { get; set; }
+        public Point CropDragStartMouse { get; set; }
+        public float CropInitialLeft { get; set; }
+        public float CropInitialTop { get; set; }
+        public float CropInitialRight { get; set; }
+        public float CropInitialBottom { get; set; }
+        public float CropInitialShapeX { get; set; }
+        public float CropInitialShapeY { get; set; }
+        public float CropInitialShapeW { get; set; }
+        public float CropInitialShapeH { get; set; }
+
+        // Presentation Undo/Redo Stacks (Hỗ trợ Ctrl+Z / Ctrl+Y)
+        private readonly List<PresentationRoot> _undoStack = new List<PresentationRoot>();
+        private readonly List<PresentationRoot> _redoStack = new List<PresentationRoot>();
+        private const int MaxUndoHistory = 50;
+
+        // Animation Pane Drag & Drop Reorder State
+        public int DraggingAnimationPaneIndex { get; set; }
+        public int DraggingAnimationPaneTargetIndex { get; set; }
+
+        // Format Background Drag State
+        public bool IsDraggingGradientStop { get; set; }
+        public int DraggingBgSliderType { get; set; }
+
+        // Ruler & Dynamic Guidelines State
+        public bool ShowRuler { get; set; }
+        public bool ShowMouseGuides { get; set; }
+        public bool ShowGrid { get; set; }
+        public bool SnapToGrid { get; set; }
+        public bool ShowSmartGuides { get; set; }
+        public Point CurrentMouseCanvasPos { get; set; }
+
+        // Home Tab Shape Gallery State
+        public int ShapeGalleryScrollRow { get; set; }
+        public bool IsShapeGalleryPopupOpen { get; set; }
+
+        // Motion Path Interactive Freehand Drawing & Endpoint Handle Dragging State
+        public bool IsDrawingMotionPathMode { get; set; }
+        public bool IsDrawingMotionPathActive { get; set; }
+        public ShapeNode ActiveDrawingMotionShape { get; set; }
+        public List<PointF> CurrentDrawingMotionPoints = new List<PointF>();
+        public bool IsDraggingMotionEndDot { get; set; }
+        public ShapeAnimation DraggingMotionAnim { get; set; }
+        public ShapeNode DraggingMotionShape { get; set; }
+        public Point DraggingMotionStartMouse { get; set; }
+
+        // Design Tab Theme Gallery State
+        public int ThemeGalleryScrollOffset { get; set; }
+
+        // Presenter & Annotation State
+        public bool LaserPointerMode { get; set; }
+        public bool AnnotationPenMode { get; set; }
+        public bool BlackScreenMode { get; set; }
+        public bool WhiteScreenMode { get; set; }
+        public Point CurrentLaserPoint { get; set; }
+        public List<List<Point>> PenStrokes { get; set; }
+        public List<Point> CurrentStroke { get; set; }
+        public Color AnnotationColor { get; set; }
+        public float AnnotationWidth { get; set; }
+        public bool IsHighlighter { get; set; }
+
+        // Presenter View & Multi-Monitor State
+        public bool IsPresenterViewMode { get; set; }
+        public bool IsEndSlideShowScreen { get; set; }
+        public bool IsSlideSorterModalOpen { get; set; }
+        public bool IsSlideZoomActive { get; set; }
+        public float SlideZoomFactor { get; set; }
+        public Point SlideZoomCenter { get; set; }
+        public DateTime PresentationStartTime { get; set; }
+        public TimeSpan PresentationPausedElapsed { get; set; }
+        public bool IsPresentationTimerPaused { get; set; }
+        public DateTime LastPresentationPauseTime { get; set; }
+        public int PresenterNotesFontSize { get; set; }
+        public int HoverToolbarButtonIndex { get; set; }
+        public Point LastPresenterMouseMovePos { get; set; }
+        public DateTime LastPresenterMouseMoveTime { get; set; }
+        public int LastViewedSlideIndex { get; set; }
+
+        // Transition Engine & Live Preview State (60 FPS)
+        public bool IsTransitioning { get; set; }
+        public float TransitionProgress { get; set; } // 0.0f to 1.0f
+        public int TransitionFromSlideIndex { get; set; }
+        public int TransitionToSlideIndex { get; set; }
+        public bool IsPreviewingTransition { get; set; }
+
+        // Animations Engine State
+        public int CurrentAnimationStep { get; set; }
+        public bool IsPlayingAnimationPreview { get; set; }
+        public float AnimationProgress { get; set; }
+        public int ActivePlayingAnimIndex { get; set; }
+
+        // Theme Gallery & Variant State
+        public int SelectedVariantIndex { get; set; }
+
+        // Slide Show Options & Setup State
+        public bool PlayNarrations { get; set; }
+        public bool UseTimings { get; set; }
+        public bool ShowMediaControls { get; set; }
+        public bool UsePresenterView { get; set; }
+        public int SelectedMonitorIndex { get; set; }
+        public bool LoopUntilEsc { get; set; }
+        public bool ShowWithoutNarration { get; set; }
+        public bool ShowWithoutAnimation { get; set; }
+        public int ShowSlideRangeStart { get; set; }
+        public int ShowSlideRangeEnd { get; set; }
+        public int ShowType { get; set; } // 0: Speaker FullScreen, 1: Window, 2: Kiosk
+        public bool IsRehearsingTimings { get; set; }
+        public DateTime RehearsalSlideStartTime { get; set; }
+        public DateTime RehearsalTotalStartTime { get; set; }
+        public TimeSpan RehearsalSlideElapsed { get; set; }
+        public TimeSpan RehearsalTotalElapsed { get; set; }
+        public bool IsRehearsalPaused { get; set; }
+        public Dictionary<int, float> RehearsedSlideTimes { get; set; }
+        public List<string> CustomShowNames { get; set; }
+        public Dictionary<string, List<int>> CustomShows { get; set; }
+
+        public SlidesView()
+        {
+            Presentation = new PresentationRoot();
+            ActiveSlideIndex = 0;
+            SelectedShapeIndex = -1;
+            SelectedShapeIndices = new List<int>();
+
+            ViewMode = ImpressViewMode.Normal;
+            SidebarPanel = SidebarPanelType.None;
+            IsSidebarOpen = false;
+            ShowRuler = false;
+            ShowMouseGuides = true;
+            ShowGrid = false;
+            SnapToGrid = true;
+            ShowSmartGuides = true;
+            ShapeGalleryScrollRow = 0;
+            IsShapeGalleryPopupOpen = false;
+
+            IsPresenting = false;
+            IsEndSlideShowScreen = false;
+            ZoomLevel = 1.0f;
+
+            IsRemovingBackground = false;
+            BgRemovalTool = "Keep";
+            BgRemovalStrokes = new List<BgRemovalStroke>();
+            BgBrushRadius = 14f;
+            CurrentMouseHoverNorm = new PointF(-1, -1);
+
+            PlayNarrations = true;
+            UseTimings = true;
+            ShowMediaControls = true;
+            UsePresenterView = true;
+            SelectedMonitorIndex = 0;
+            LoopUntilEsc = false;
+            ShowWithoutNarration = false;
+            ShowWithoutAnimation = false;
+            ShowSlideRangeStart = 1;
+            ShowSlideRangeEnd = 0;
+            ShowType = 0;
+            IsRehearsingTimings = false;
+            RehearsedSlideTimes = new Dictionary<int, float>();
+            CustomShowNames = new List<string>();
+            CustomShows = new Dictionary<string, List<int>>();
+
+            CanvasScrollX = 0;
+            CanvasScrollY = 0;
+            IsPanningCanvas = false;
+
+            ThumbScrollY = 0;
+            SidebarScrollY = 0;
+
+            IsDrawingShapeMode = false;
+            PendingShapeType = ShapeType.Rectangle;
+            IsDrawingActive = false;
+
+            IsDraggingShape = false;
+            IsResizingShape = false;
+            IsRotatingShape = false;
+            DragResizeHandleIndex = -1;
+
+            IsInlineEditing = false;
+            EditingShape = null;
+            EditingTextBuffer = "";
+            CaretIndex = 0;
+
+            IsEditingTableCell = false;
+            EditingTableShape = null;
+            EditingTableRow = -1;
+            EditingTableCol = -1;
+            EditingTableCellBuffer = "";
+            TableCaretIndex = 0;
+            IsSelectingTableCells = false;
+            TableDragStartRow = -1;
+            TableDragStartCol = -1;
+
+            ShowSnapGuideX = false;
+            ShowSnapGuideY = false;
+            ActiveSmartGuides = new List<SmartGuideLine>();
+            ActiveSpacingIndicators = new List<SmartSpacingIndicator>();
+            DraggingSelectionPaneIndex = -1;
+            DraggingSelectionPaneTargetIndex = -1;
+            DraggingAnimationPaneIndex = -1;
+            DraggingAnimationPaneTargetIndex = -1;
+
+            LaserPointerMode = false;
+            AnnotationPenMode = false;
+            BlackScreenMode = false;
+            WhiteScreenMode = false;
+            PenStrokes = new List<List<Point>>();
+            CurrentStroke = new List<Point>();
+            CurrentLaserPoint = Point.Empty;
+            AnnotationColor = Color.FromArgb(220, 230, 0, 0);
+            AnnotationWidth = 4.0f;
+            IsHighlighter = false;
+
+            IsPresenterViewMode = false;
+            IsSlideSorterModalOpen = false;
+            IsSlideZoomActive = false;
+            SlideZoomFactor = 1.8f;
+            SlideZoomCenter = Point.Empty;
+            PresentationStartTime = DateTime.Now;
+            PresentationPausedElapsed = TimeSpan.Zero;
+            IsPresentationTimerPaused = false;
+            PresenterNotesFontSize = 14;
+            HoverToolbarButtonIndex = -1;
+            LastViewedSlideIndex = -1;
+            LastPresenterMouseMovePos = Point.Empty;
+            LastPresenterMouseMoveTime = DateTime.Now;
+
+            IsTransitioning = false;
+            TransitionProgress = 1.0f;
+            TransitionFromSlideIndex = 0;
+            TransitionToSlideIndex = 0;
+            IsPreviewingTransition = false;
+
+            CurrentAnimationStep = 0;
+            IsPlayingAnimationPreview = false;
+            AnimationProgress = 0.0f;
+            ActivePlayingAnimIndex = -1;
+            IsPlayingSlideAnimation = false;
+            SelectedAnimationIndex = -1;
+
+            SelectedVariantIndex = 0;
+            ApplyTheme(Presentation.CurrentTheme ?? "Office");
+        }
+
+        public bool IsPlayingSlideAnimation { get; set; }
+        public int SelectedAnimationIndex { get; set; }
+
+        public ShapeAnimation SelectedAnimation
+        {
+            get
+            {
+                SlideNode slide = ActiveSlide;
+                if (slide == null || slide.Animations == null || slide.Animations.Count == 0) return null;
+                if (SelectedShape != null)
+                {
+                    if (SelectedAnimationIndex >= 0 && SelectedAnimationIndex < slide.Animations.Count &&
+                        slide.Animations[SelectedAnimationIndex].ShapeId == SelectedShape.Id)
+                    {
+                        return slide.Animations[SelectedAnimationIndex];
+                    }
+
+                    for (int i = 0; i < slide.Animations.Count; i++)
+                    {
+                        if (slide.Animations[i].ShapeId == SelectedShape.Id)
+                        {
+                            SelectedAnimationIndex = i;
+                            return slide.Animations[i];
+                        }
+                    }
+                    return null;
+                }
+                if (SelectedAnimationIndex >= 0 && SelectedAnimationIndex < slide.Animations.Count)
+                    return slide.Animations[SelectedAnimationIndex];
+                return null;
+            }
+        }
+
+        public void SyncSelectedAnimationWithShape()
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations == null || slide.Animations.Count == 0 || SelectedShape == null)
+            {
+                SelectedAnimationIndex = -1;
+                return;
+            }
+            for (int i = 0; i < slide.Animations.Count; i++)
+            {
+                if (slide.Animations[i].ShapeId == SelectedShape.Id)
+                {
+                    SelectedAnimationIndex = i;
+                    return;
+                }
+            }
+            SelectedAnimationIndex = -1;
+        }
+
+        public SlideNode ActiveSlide
+        {
+            get
+            {
+                if (Presentation != null && ActiveSlideIndex >= 0 && ActiveSlideIndex < Presentation.Slides.Count)
+                    return Presentation.Slides[ActiveSlideIndex];
+                return null;
+            }
+        }
+
+        public ShapeNode SelectedShape
+        {
+            get
+            {
+                SlideNode slide = ActiveSlide;
+                if (slide != null && SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
+                    return slide.Shapes[SelectedShapeIndex];
+                return null;
+            }
+        }
+
+        #region Presentation & Theme Controls
+        public void SetLayout(SlideLayoutType layout)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+            slide.Layout = layout;
+            slide.Shapes.Clear();
+
+            ShapeNode titleShape = new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D(100f, 60f, 1720f, 120f),
+                Text = "Nhấp để thêm tiêu đề...",
+                FontName = "Segoe UI",
+                FontSize = 36.0f,
+                Bold = true,
+                TextColor = 0x111111,
+                FillColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                PlaceholderType = "Title",
+                IsPlaceholder = true
+            };
+            slide.AddShape(titleShape);
+
+            if (layout == SlideLayoutType.TitleAndContent)
+            {
+                ShapeNode contentShape = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(100f, 220f, 1720f, 760f),
+                    Text = "• Nhấp để thêm nội dung văn bản hoặc danh sách...",
+                    FontName = "Segoe UI",
+                    FontSize = 22.0f,
+                    TextColor = 0x555555,
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    PlaceholderType = "Body",
+                    IsPlaceholder = true
+                };
+                slide.AddShape(contentShape);
+            }
+            else if (layout == SlideLayoutType.TwoContent)
+            {
+                ShapeNode col1 = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(100f, 220f, 830f, 760f),
+                    Text = "• Cột nội dung bên trái...",
+                    FontName = "Segoe UI",
+                    FontSize = 20.0f,
+                    TextColor = 0x555555,
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    PlaceholderType = "Body",
+                    IsPlaceholder = true
+                };
+                ShapeNode col2 = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(970f, 220f, 850f, 760f),
+                    Text = "• Cột nội dung bên phải...",
+                    FontName = "Segoe UI",
+                    FontSize = 20.0f,
+                    TextColor = 0x555555,
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    PlaceholderType = "Body",
+                    IsPlaceholder = true
+                };
+                slide.AddShape(col1);
+                slide.AddShape(col2);
+            }
+            SelectedShapeIndex = -1;
+        }
+
+        public void ApplyTheme(string themeName)
+        {
+            if (Presentation == null) return;
+            Presentation.CurrentTheme = themeName;
+            PresentationTheme theme = Presentation.Themes.Find(t => t.Name == themeName);
+            if (theme == null) return;
+
+            Presentation.ThemePrimaryColor = theme.PrimaryColor;
+
+            foreach (SlideNode slide in Presentation.Slides)
+            {
+                ApplyThemeToSlide(slide, themeName);
+            }
+        }
+
+        public void ApplyThemeToSlide(SlideNode slide, string themeName)
+        {
+            if (slide == null || Presentation == null) return;
+            PresentationTheme theme = Presentation.Themes.Find(t => t.Name == themeName);
+            if (theme == null) return;
+
+            slide.BgColor = theme.LightColor;
+            slide.BgColor2 = theme.LightColor2;
+            slide.IsGradientBg = theme.IsGradient;
+            slide.BgGradientAngle = theme.GradientAngle;
+            slide.BgFillType = theme.IsGradient ? BackgroundFillType.Gradient : BackgroundFillType.Solid;
+            slide.BgGradientType = GradientType.Linear;
+
+            if (theme.Stops != null && theme.Stops.Count > 0)
+            {
+                slide.BgGradientStops = new List<GradientStop>();
+                foreach (GradientStop gs in theme.Stops)
+                {
+                    slide.BgGradientStops.Add(gs.Clone());
+                }
+            }
+
+            // Xóa bỏ các hình trang trí của theme cũ
+            slide.Shapes.RemoveAll(s => s.PlaceholderType == "ThemeDecoration" || s.IsDecorative);
+
+            // Tạo tổ hợp hình vẽ đồ họa thiết kế nghệ thuật mới cho theme
+            List<ShapeNode> decorations = GenerateThemeArtwork(themeName, Presentation.CanvasWidth, Presentation.CanvasHeight);
+            if (decorations != null && decorations.Count > 0)
+            {
+                for (int i = decorations.Count - 1; i >= 0; i--)
+                {
+                    slide.Shapes.Insert(0, decorations[i]);
+                }
+            }
+
+            foreach (ShapeNode shape in slide.Shapes)
+            {
+                if (shape.PlaceholderType == "Title")
+                {
+                    shape.TextColor = theme.PrimaryColor;
+                    shape.FontName = theme.TitleFont;
+                }
+                else if (shape.PlaceholderType == "Body")
+                {
+                    shape.TextColor = theme.DarkColor;
+                    shape.FontName = theme.BodyFont;
+                }
+                else if (shape.PlaceholderType == "Subtitle")
+                {
+                    shape.TextColor = theme.AccentColor;
+                    shape.FontName = theme.BodyFont;
+                }
+            }
+        }
+
+        public static ShapeNode CreatePolygonShape(string name, PointF[] points, int fillColor, int strokeColor = 0, float strokeWidth = 0f, float fillOpacity = 1.0f)
+        {
+            GraphicsPath path = new GraphicsPath();
+            path.AddPolygon(points);
+            RectangleF b = path.GetBounds();
+            float pw = Math.Max(1f, b.Width);
+            float ph = Math.Max(1f, b.Height);
+
+            using (Matrix m = new Matrix())
+            {
+                m.Translate(-b.X, -b.Y);
+                path.Transform(m);
+            }
+
+            return new ShapeNode
+            {
+                Name = name,
+                Type = ShapeType.CustomPath,
+                CustomPath = path,
+                PathWidth = pw,
+                PathHeight = ph,
+                Transform = new Transform2D(b.X, b.Y, pw, ph),
+                FillColor = fillColor,
+                StrokeColor = strokeColor,
+                StrokeWidth = strokeWidth,
+                FillOpacity = fillOpacity,
+                PlaceholderType = "ThemeDecoration",
+                IsDecorative = true
+            };
+        }
+
+        public static ShapeNode CreatePathShape(string name, GraphicsPath path, int fillColor, int strokeColor = 0, float strokeWidth = 0f, float fillOpacity = 1.0f)
+        {
+            RectangleF b = path.GetBounds();
+            float pw = Math.Max(1f, b.Width);
+            float ph = Math.Max(1f, b.Height);
+
+            using (Matrix m = new Matrix())
+            {
+                m.Translate(-b.X, -b.Y);
+                path.Transform(m);
+            }
+
+            return new ShapeNode
+            {
+                Name = name,
+                Type = ShapeType.CustomPath,
+                CustomPath = path,
+                PathWidth = pw,
+                PathHeight = ph,
+                Transform = new Transform2D(b.X, b.Y, pw, ph),
+                FillColor = fillColor,
+                StrokeColor = strokeColor,
+                StrokeWidth = strokeWidth,
+                FillOpacity = fillOpacity,
+                PlaceholderType = "ThemeDecoration",
+                IsDecorative = true
+            };
+        }
+
+        public static List<ShapeNode> GenerateThemeArtwork(string themeName, float canvasW = 1920f, float canvasH = 1080f)
+        {
+            List<ShapeNode> list = new List<ShapeNode>();
+            float sx = canvasW / 1920f;
+            float sy = canvasH / 1080f;
+
+            switch (themeName)
+            {
+                case "Organic":
+                    // 1. Theme "Organic" Chuẩn PowerPoint (Ảnh 3: Cột sống ô-liu, Nhánh cỏ lau thảo mộc & Thẻ điều hướng đỏ)
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Organic_LeftSpine",
+                        Type = ShapeType.Rectangle,
+                        Transform = new Transform2D(0f, 0f, 18f * sx, canvasH),
+                        FillColor = 0x585E4B,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+
+                    // Cụm nhánh cỏ lau / thân cây thảo mộc uốn lượn
+                    GraphicsPath reed1 = new GraphicsPath();
+                    reed1.AddBezier(140f * sx, canvasH, 120f * sx, 800f * sy, 80f * sx, 550f * sy, 60f * sx, 350f * sy);
+                    list.Add(CreatePathShape("Organic_Reed1", reed1, 0x00FFFFFF, 0x585E4B, 2.8f, 0.85f));
+
+                    GraphicsPath reed2 = new GraphicsPath();
+                    reed2.AddBezier(155f * sx, canvasH, 135f * sx, 850f * sy, 110f * sx, 600f * sy, 180f * sx, 480f * sy);
+                    list.Add(CreatePathShape("Organic_Reed2", reed2, 0x00FFFFFF, 0x787D65, 2.2f, 0.80f));
+
+                    GraphicsPath reed3 = new GraphicsPath();
+                    reed3.AddBezier(165f * sx, canvasH, 150f * sx, 780f * sy, 170f * sx, 520f * sy, 240f * sx, 380f * sy);
+                    list.Add(CreatePathShape("Organic_Reed3", reed3, 0x00FFFFFF, 0x9BA088, 1.6f, 0.75f));
+
+                    GraphicsPath reed4 = new GraphicsPath();
+                    reed4.AddBezier(130f * sx, canvasH, 100f * sx, 880f * sy, 70f * sx, 750f * sy, 90f * sx, 660f * sy);
+                    list.Add(CreatePathShape("Organic_Reed4", reed4, 0x00FFFFFF, 0xB5B9A4, 1.2f, 0.65f));
+
+                    // Thẻ điều hướng đỏ gạch nung (Crimson Block Arrow Bookmark Tab)
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Organic_CrimsonTab",
+                        Type = ShapeType.Chevron,
+                        Transform = new Transform2D(0f, 580f * sy, 175f * sx, 68f * sy),
+                        FillColor = 0x991B1B,
+                        StrokeWidth = 0f,
+                        HasShadow = true,
+                        ShadowColor = 0x30000000,
+                        ShadowOffsetX = 3f,
+                        ShadowOffsetY = 3f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Floral Pastel":
+                    // 2. Nhóm Hoa anh đào & Hoa lá hẹ thơ mộng
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sakura_Bloom_Large",
+                        Type = ShapeType.Flower,
+                        Transform = new Transform2D(1560f * sx, 30f * sy, 300f * sx, 300f * sy, 15f),
+                        FillColor = 0xFDA4AF,
+                        StrokeColor = 0xE11D48,
+                        StrokeWidth = 2f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sakura_Bloom_Inner",
+                        Type = ShapeType.Flower,
+                        Transform = new Transform2D(1620f * sx, 90f * sy, 180f * sx, 180f * sy, 45f),
+                        FillColor = 0xFFE4E6,
+                        StrokeColor = 0xE11D48,
+                        StrokeWidth = 1.5f,
+                        FillOpacity = 0.95f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sakura_Leaf",
+                        Type = ShapeType.Leaf,
+                        Transform = new Transform2D(1480f * sx, 170f * sy, 150f * sx, 150f * sy, -50f),
+                        FillColor = 0x10B981,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.85f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sakura_Bloom_Small",
+                        Type = ShapeType.Flower,
+                        Transform = new Transform2D(50f * sx, canvasH - 220f * sy, 170f * sx, 170f * sy, -20f),
+                        FillColor = 0xFECDD3,
+                        StrokeColor = 0xE11D48,
+                        StrokeWidth = 1.5f,
+                        FillOpacity = 0.80f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Cyber Wave":
+                case "Cyber Neon":
+                    // 3. Theme "Cyber Wave" Chuẩn PowerPoint (Ảnh 2: Sóng lụa quang phổ đỏ - vàng - xanh trên nền đen)
+                    // Dải lụa quang phổ phía trên (Top Ribbon Flow)
+                    GraphicsPath topRubyFlow = new GraphicsPath();
+                    topRubyFlow.AddBezier(0f, 60f * sy, 350f * sx, 15f * sy, 900f * sx, -10f * sy, canvasW, 35f * sy);
+                    topRubyFlow.AddLine(canvasW, 35f * sy, canvasW, 110f * sy);
+                    topRubyFlow.AddBezier(canvasW, 110f * sy, 950f * sx, 15f * sy, 350f * sx, 80f * sy, 0f, 175f * sy);
+                    topRubyFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_TopRubyWave", topRubyFlow, 0xDC2626, 0, 0f, 0.90f));
+
+                    GraphicsPath topAmberFlow = new GraphicsPath();
+                    topAmberFlow.AddBezier(0f, 40f * sy, 400f * sx, 5f * sy, 800f * sx, 5f * sy, 1100f * sx, 30f * sy);
+                    topAmberFlow.AddLine(1100f * sx, 30f * sy, 1100f * sx, 65f * sy);
+                    topAmberFlow.AddBezier(1100f * sx, 65f * sy, 750f * sx, 25f * sy, 350f * sx, 30f * sy, 0f, 95f * sy);
+                    topAmberFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_TopAmberWave", topAmberFlow, 0xF59E0B, 0, 0f, 0.85f));
+
+                    GraphicsPath topCyanFlow = new GraphicsPath();
+                    topCyanFlow.AddBezier(1000f * sx, 25f * sy, 1300f * sx, 5f * sy, 1650f * sx, 15f * sy, canvasW, 35f * sy);
+                    topCyanFlow.AddLine(canvasW, 35f * sy, canvasW, 95f * sy);
+                    topCyanFlow.AddBezier(canvasW, 95f * sy, 1650f * sx, 45f * sy, 1300f * sx, 35f * sy, 1000f * sx, 65f * sy);
+                    topCyanFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_TopCyanWave", topCyanFlow, 0x06B6D4, 0, 0f, 0.88f));
+
+                    // Cụm sóng lụa đa tầng phía dưới (Bottom Flow Waves)
+                    GraphicsPath botRubyFlow = new GraphicsPath();
+                    botRubyFlow.AddBezier(0f, 620f * sy, 80f * sx, 600f * sy, 180f * sx, 720f * sy, 260f * sx, 820f * sy);
+                    botRubyFlow.AddBezier(260f * sx, 820f * sy, 380f * sx, 960f * sy, 550f * sx, 1050f * sy, 680f * sx, canvasH);
+                    botRubyFlow.AddLine(680f * sx, canvasH, 0f, canvasH);
+                    botRubyFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_BotRubyWave", botRubyFlow, 0xDC2626, 0, 0f, 0.90f));
+
+                    GraphicsPath botTealFlow = new GraphicsPath();
+                    botTealFlow.AddBezier(480f * sx, canvasH, 700f * sx, 980f * sy, 920f * sx, 780f * sy, 1140f * sx, 720f * sy);
+                    botTealFlow.AddBezier(1140f * sx, 720f * sy, 1360f * sx, 670f * sy, 1550f * sx, 760f * sy, 1720f * sx, 840f * sy);
+                    botTealFlow.AddLine(1720f * sx, 840f * sy, 1720f * sx, canvasH);
+                    botTealFlow.AddLine(1720f * sx, canvasH, 480f * sx, canvasH);
+                    botTealFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_BotTealWave", botTealFlow, 0x0D9488, 0, 0f, 0.82f));
+
+                    GraphicsPath botCyanFlow = new GraphicsPath();
+                    botCyanFlow.AddBezier(880f * sx, 880f * sy, 1150f * sx, 800f * sy, 1400f * sx, 680f * sy, 1680f * sx, 630f * sy);
+                    botCyanFlow.AddBezier(1680f * sx, 630f * sy, 1780f * sx, 610f * sy, 1850f * sx, 615f * sy, canvasW, 625f * sy);
+                    botCyanFlow.AddLine(canvasW, 625f * sy, canvasW, canvasH);
+                    botCyanFlow.AddLine(canvasW, canvasH, 880f * sx, canvasH);
+                    botCyanFlow.CloseFigure();
+                    list.Add(CreatePathShape("Cyber_BotCyanWave", botCyanFlow, 0x06B6D4, 0, 0f, 0.86f));
+                    break;
+
+                case "Gold Luxury":
+                    // 4. Nhóm Hoàng gia & Kim cương sang trọng
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Luxury_Arch",
+                        Type = ShapeType.Arch,
+                        Transform = new Transform2D(1540f * sx, 30f * sy, 300f * sx, 380f * sy),
+                        FillColor = 0x1F1D1B,
+                        StrokeColor = 0xD97706,
+                        StrokeWidth = 2.5f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Royal_Shield",
+                        Type = ShapeType.Shield,
+                        Transform = new Transform2D(1610f * sx, 110f * sy, 160f * sx, 200f * sy),
+                        FillColor = 0x92400E,
+                        StrokeColor = 0xFBBF24,
+                        StrokeWidth = 2f,
+                        FillOpacity = 0.95f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Diamond_Gem",
+                        Type = ShapeType.Gem,
+                        Transform = new Transform2D(1655f * sx, 175f * sy, 70f * sx, 70f * sy),
+                        FillColor = 0xFDE68A,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Gold_Banner",
+                        Type = ShapeType.Banner,
+                        Transform = new Transform2D(120f * sx, 70f * sy, 280f * sx, 45f * sy),
+                        FillColor = 0xD97706,
+                        StrokeWidth = 0f,
+                        Text = "GENOFFICE LUXURY",
+                        TextColor = 0xFFFFFF,
+                        FontSize = 12f,
+                        Bold = true,
+                        Alignment = TextAlignment.Center,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Starburst_Seal",
+                        Type = ShapeType.Starburst,
+                        Transform = new Transform2D(1730f * sx, canvasH - 180f * sy, 130f * sx, 130f * sy),
+                        FillColor = 0xD97706,
+                        StrokeColor = 0xFBBF24,
+                        StrokeWidth = 1.5f,
+                        FillOpacity = 0.75f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Damask":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Damask_Starburst",
+                        Type = ShapeType.Starburst,
+                        Transform = new Transform2D(1560f * sx, 40f * sy, 300f * sx, 300f * sy),
+                        FillColor = 0x581C87,
+                        StrokeColor = 0x9333EA,
+                        StrokeWidth = 2.5f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Damask_Heart",
+                        Type = ShapeType.Heart,
+                        Transform = new Transform2D(1620f * sx, 100f * sy, 180f * sx, 180f * sy),
+                        FillColor = 0xDB2777,
+                        StrokeColor = 0xFDF4FF,
+                        StrokeWidth = 2f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Damask_Arch",
+                        Type = ShapeType.Arch,
+                        Transform = new Transform2D(1700f * sx, canvasH - 220f * sy, 160f * sx, 200f * sy),
+                        FillColor = 0x581C87,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.50f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Wisp":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Wisp_Hex",
+                        Type = ShapeType.LuxuryHexagon,
+                        Transform = new Transform2D(1560f * sx, 50f * sy, 280f * sx, 280f * sy, 10f),
+                        FillColor = 0x0D9488,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.85f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Wisp_Sprout",
+                        Type = ShapeType.Sprout,
+                        Transform = new Transform2D(1610f * sx, 100f * sy, 180f * sx, 180f * sy),
+                        FillColor = 0xCCFBF1,
+                        StrokeColor = 0x059669,
+                        StrokeWidth = 1.5f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Wisp_Bar",
+                        Type = ShapeType.RoundedRectangle,
+                        Transform = new Transform2D(120f * sx, 210f * sy, 140f * sx, 6f * sy),
+                        FillColor = 0x0D9488,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Celestial":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Celestial_Wave",
+                        Type = ShapeType.Cloud,
+                        Transform = new Transform2D(1480f * sx, -30f * sy, 460f * sx, 340f * sy),
+                        FillColor = 0x2563EB,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.75f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Celestial_Hex",
+                        Type = ShapeType.LuxuryHexagon,
+                        Transform = new Transform2D(1590f * sx, 90f * sy, 220f * sx, 220f * sy, 30f),
+                        FillColor = 0x06B6D4,
+                        StrokeColor = 0xFFFFFF,
+                        StrokeWidth = 2f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Celestial_BottomWave",
+                        Type = ShapeType.Cloud,
+                        Transform = new Transform2D(-90f * sx, canvasH - 240f * sy, 380f * sx, 250f * sy),
+                        FillColor = 0x06B6D4,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.50f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Facet":
+                    // 1. Theme "Facet" Chuẩn PowerPoint (Ảnh 1: Lát cắt đa giác xếp tầng xanh lá & Đường chỉ giao thoa)
+                    // Dải vát góc bên trái (Left vertical angled slice)
+                    list.Add(CreatePolygonShape("Facet_LeftSlice", new PointF[] {
+                        new PointF(0f, 0f),
+                        new PointF(110f * sx, 0f),
+                        new PointF(35f * sx, canvasH),
+                        new PointF(0f, canvasH)
+                    }, 0x84CC16, 0, 0f, 0.92f));
+
+                    // Lát cắt góc phải ngoài cùng (Right edge lime slice)
+                    list.Add(CreatePolygonShape("Facet_RightLimeSlice", new PointF[] {
+                        new PointF(1380f * sx, 0f),
+                        new PointF(canvasW, 0f),
+                        new PointF(canvasW, canvasH),
+                        new PointF(1310f * sx, canvasH)
+                    }, 0x84CC16, 0, 0f, 0.90f));
+
+                    // Lát cắt xanh rêu sẫm trên (Deep forest green wedge)
+                    list.Add(CreatePolygonShape("Facet_DeepForestWedge", new PointF[] {
+                        new PointF(1190f * sx, 0f),
+                        new PointF(canvasW, 0f),
+                        new PointF(canvasW, 680f * sy),
+                        new PointF(1390f * sx, 580f * sy)
+                    }, 0x3F6212, 0, 0f, 0.85f));
+
+                    // Tam giác xanh ngọc bích ở giữa (Emerald green center slice)
+                    list.Add(CreatePolygonShape("Facet_EmeraldSlice", new PointF[] {
+                        new PointF(1190f * sx, 0f),
+                        new PointF(1430f * sx, 0f),
+                        new PointF(1410f * sx, 640f * sy),
+                        new PointF(1240f * sx, 480f * sy)
+                    }, 0x15803D, 0, 0f, 0.80f));
+
+                    // Mảng vát xanh non mờ (Pale lime slanted wedge)
+                    list.Add(CreatePolygonShape("Facet_PaleLimeWedge", new PointF[] {
+                        new PointF(1260f * sx, 220f * sy),
+                        new PointF(1410f * sx, 560f * sy),
+                        new PointF(1290f * sx, 840f * sy),
+                        new PointF(1190f * sx, 820f * sy)
+                    }, 0xBEF264, 0, 0f, 0.55f));
+
+                    // Mảng vát xanh cỏ dưới (Grass green bottom wedge)
+                    list.Add(CreatePolygonShape("Facet_GrassBottomWedge", new PointF[] {
+                        new PointF(1140f * sx, canvasH),
+                        new PointF(1500f * sx, 520f * sy),
+                        new PointF(1420f * sx, canvasH)
+                    }, 0x65A30D, 0, 0f, 0.88f));
+
+                    // Đường chỉ vector giao thoa (Diagonal vector accent lines)
+                    GraphicsPath facetLine1 = new GraphicsPath();
+                    facetLine1.AddLine(1190f * sx, 0f, 1350f * sx, canvasH);
+                    list.Add(CreatePathShape("Facet_Line1", facetLine1, 0x00FFFFFF, 0x4B5563, 1.5f, 0.50f));
+
+                    GraphicsPath facetLine2 = new GraphicsPath();
+                    facetLine2.AddLine(960f * sx, canvasH, 1380f * sx, 600f * sy);
+                    list.Add(CreatePathShape("Facet_Line2", facetLine2, 0x00FFFFFF, 0x65A30D, 1.5f, 0.45f));
+                    break;
+
+                case "Slice":
+                    // Theme "Slice" Chuẩn PowerPoint (Ảnh 1 & 2: Header xanh đen, tam giác đỏ, khối nghiêng teal/cyan & khung thẻ wireframe trắng)
+                    // 1. Top dark navy banner
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Slice_TopNavyBanner",
+                        Type = ShapeType.Rectangle,
+                        Transform = new Transform2D(0f, 0f, canvasW, 460f * sy),
+                        FillColor = 0x0F172A,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+
+                    // 2. Crimson Red triangle on the left
+                    list.Add(CreatePolygonShape("Slice_RedTriangle", new PointF[] {
+                        new PointF(0f, 220f * sy),
+                        new PointF(380f * sx, 460f * sy),
+                        new PointF(0f, 460f * sy)
+                    }, 0xDC2626, 0, 0f, 0.95f));
+
+                    // 3. Teal / Pine Green diagonal trapezoid in center
+                    list.Add(CreatePolygonShape("Slice_TealPoly", new PointF[] {
+                        new PointF(280f * sx, 460f * sy),
+                        new PointF(1020f * sx, 0f),
+                        new PointF(1340f * sx, 0f),
+                        new PointF(740f * sx, 460f * sy)
+                    }, 0x0D9488, 0, 0f, 0.92f));
+
+                    // 4. Electric Cyan slanted block on the right
+                    list.Add(CreatePolygonShape("Slice_CyanBlock", new PointF[] {
+                        new PointF(1120f * sx, 220f * sy),
+                        new PointF(canvasW, 0f),
+                        new PointF(canvasW, 460f * sy),
+                        new PointF(1120f * sx, 460f * sy)
+                    }, 0x06B6D4, 0, 0f, 0.92f));
+
+                    // 5. White Rounded Card Wireframe Outlines (Khung thẻ wireframe viền trắng bo tròn không bị cắt)
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Slice_CardFrame_Left",
+                        Type = ShapeType.RoundedRectangle,
+                        Transform = new Transform2D(100f * sx, 40f * sy, 480f * sx, 380f * sy),
+                        FillColor = 0x00FFFFFF,
+                        StrokeColor = 0xFFFFFF,
+                        StrokeWidth = 1.8f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Slice_CardFrame_Right",
+                        Type = ShapeType.RoundedRectangle,
+                        Transform = new Transform2D(620f * sx, 40f * sy, 1200f * sx, 380f * sy),
+                        FillColor = 0x00FFFFFF,
+                        StrokeColor = 0xFFFFFF,
+                        StrokeWidth = 1.8f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Ion":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Ion_Starburst",
+                        Type = ShapeType.Starburst,
+                        Transform = new Transform2D(1560f * sx, 50f * sy, 280f * sx, 280f * sy),
+                        FillColor = 0xEA580C,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Ion_Chevron",
+                        Type = ShapeType.Chevron,
+                        Transform = new Transform2D(1630f * sx, 110f * sy, 150f * sx, 150f * sy),
+                        FillColor = 0xF59E0B,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Bauhaus":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Bauhaus_RedCircle",
+                        Type = ShapeType.Ellipse,
+                        Transform = new Transform2D(1540f * sx, -70f * sy, 400f * sx, 400f * sy),
+                        FillColor = 0xDC2626,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Bauhaus_BlueTriangle",
+                        Type = ShapeType.Triangle,
+                        Transform = new Transform2D(1640f * sx, 130f * sy, 240f * sx, 240f * sy, -20f),
+                        FillColor = 0x2563EB,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Bauhaus_BlackBar",
+                        Type = ShapeType.Rectangle,
+                        Transform = new Transform2D(1480f * sx, 170f * sy, 60f * sx, 250f * sy),
+                        FillColor = 0x111827,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Bauhaus_YellowStripe",
+                        Type = ShapeType.Rectangle,
+                        Transform = new Transform2D(120f * sx, canvasH - 120f * sy, 320f * sx, 14f * sy),
+                        FillColor = 0xF59E0B,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Warm Sunset":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sunset_Sun",
+                        Type = ShapeType.Sun,
+                        Transform = new Transform2D(1560f * sx, 50f * sy, 280f * sx, 280f * sy),
+                        FillColor = 0xF97316,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.90f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Sunset_Banner",
+                        Type = ShapeType.Banner,
+                        Transform = new Transform2D(1440f * sx, 210f * sy, 400f * sx, 75f * sy),
+                        FillColor = 0xEAB308,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.85f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Watercolor":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Watercolor_Cloud",
+                        Type = ShapeType.Cloud,
+                        Transform = new Transform2D(1500f * sx, 30f * sy, 380f * sx, 280f * sy),
+                        FillColor = 0x0284C7,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.60f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Watercolor_Flower",
+                        Type = ShapeType.Flower,
+                        Transform = new Transform2D(1600f * sx, 110f * sy, 220f * sx, 220f * sy),
+                        FillColor = 0xF472B6,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.70f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Slate":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Slate_Arch",
+                        Type = ShapeType.Arch,
+                        Transform = new Transform2D(1540f * sx, 30f * sy, 300f * sx, 340f * sy),
+                        FillColor = 0x4F46E5,
+                        StrokeWidth = 0f,
+                        FillOpacity = 0.80f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Slate_Gem",
+                        Type = ShapeType.Gem,
+                        Transform = new Transform2D(1620f * sx, 110f * sy, 150f * sx, 150f * sy),
+                        FillColor = 0x7C3AED,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                case "Blank":
+                    // Blank presentation has no decorative shapes
+                    break;
+
+                case "Office":
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Office_Frame",
+                        Type = ShapeType.RoundedRectangle,
+                        Transform = new Transform2D(1600f * sx, 50f * sy, 260f * sx, 260f * sy),
+                        FillColor = 0x00FFFFFF,
+                        StrokeColor = 0xD24726,
+                        StrokeWidth = 2.5f,
+                        HasShadow = true,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    list.Add(new ShapeNode
+                    {
+                        Name = "Art_Office_TopBar",
+                        Type = ShapeType.Rectangle,
+                        Transform = new Transform2D(0f, 0f, canvasW, 6f * sy),
+                        FillColor = 0xD24726,
+                        StrokeWidth = 0f,
+                        PlaceholderType = "ThemeDecoration",
+                        IsDecorative = true
+                    });
+                    break;
+
+                default:
+                    break;
+            }
+
+            return list;
+        }
+
+        public void ToggleFormatBackgroundPane()
+        {
+            if (SidebarPanel == SidebarPanelType.FormatBackground && IsSidebarOpen)
+            {
+                IsSidebarOpen = false;
+            }
+            else
+            {
+                SidebarPanel = SidebarPanelType.FormatBackground;
+                IsSidebarOpen = true;
+            }
+        }
+
+        public void ApplyThemeVariant(int variantIdx)
+        {
+            SelectedVariantIndex = variantIdx;
+            int[] variantColors = new int[] { 0xD24726, 0x0D9488, 0x2563EB, 0x9333EA };
+            if (variantIdx >= 0 && variantIdx < variantColors.Length)
+            {
+                Presentation.ThemePrimaryColor = variantColors[variantIdx];
+                if (ActiveSlide != null)
+                {
+                    foreach (ShapeNode shape in ActiveSlide.Shapes)
+                    {
+                        if (shape.PlaceholderType == "Title" || shape.StrokeWidth > 1.0f)
+                        {
+                            shape.TextColor = variantColors[variantIdx];
+                            shape.StrokeColor = variantColors[variantIdx];
+                        }
+                    }
+                }
+            }
+        }
+
+        public void SetSlideSize(bool widescreen)
+        {
+            if (Presentation != null)
+            {
+                Presentation.SetSlideSize(widescreen);
+            }
+        }
+        #endregion
+
+        #region Transition & Morph Engine
+        public void SetTransition(TransitionType transType)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                slide.Transition = transType;
+                if (transType == TransitionType.GenOffice_CanvaFlow)
+                {
+                    slide.TransitionDuration = 2.20f; // Mặc định 2.20s chuẩn xác cho hiệu ứng Chảy tràn Canva
+                }
+                else if (transType == TransitionType.Morph && slide.TransitionDuration <= 1.0f)
+                {
+                    slide.TransitionDuration = 2.0f;
+                }
+            }
+        }
+
+        public void SetTransitionDuration(float duration)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                slide.TransitionDuration = Math.Max(0.1f, Math.Min(10.0f, duration));
+            }
+        }
+
+        public void SetTransitionDirection(TransitionDirection direction)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                slide.TransitionDirection = direction;
+            }
+        }
+
+        public void SetMorphMode(MorphType mode)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                slide.MorphMode = mode;
+                slide.Transition = TransitionType.Morph;
+            }
+        }
+
+        public void ApplyTransitionToAll()
+        {
+            SlideNode active = ActiveSlide;
+            if (active == null || Presentation == null) return;
+            foreach (SlideNode s in Presentation.Slides)
+            {
+                s.Transition = active.Transition;
+                s.TransitionDuration = active.TransitionDuration;
+                s.TransitionDirection = active.TransitionDirection;
+                s.MorphMode = active.MorphMode;
+                s.AdvanceOnClick = active.AdvanceOnClick;
+                s.AutoAdvance = active.AutoAdvance;
+                s.AutoAdvanceSeconds = active.AutoAdvanceSeconds;
+            }
+        }
+
+        private System.Diagnostics.Stopwatch _transitionStopwatch = new System.Diagnostics.Stopwatch();
+        private System.Diagnostics.Stopwatch _animStopwatch = new System.Diagnostics.Stopwatch();
+        private Dictionary<ShapeNode, Bitmap> _morphShapeTextureCache = new Dictionary<ShapeNode, Bitmap>();
+
+        public void ClearMorphTextureCache()
+        {
+            foreach (KeyValuePair<ShapeNode, Bitmap> kvp in _morphShapeTextureCache)
+            {
+                try
+                {
+                    if (kvp.Value != null)
+                    {
+                        kvp.Value.Dispose();
+                    }
+                }
+                catch { }
+            }
+            _morphShapeTextureCache.Clear();
+        }
+
+        public void TriggerTransition(int fromIdx, int toIdx, bool isPreview = false)
+        {
+            if (Presentation == null || Presentation.Slides.Count == 0) return;
+            ClearMorphTextureCache();
+            TransitionFromSlideIndex = fromIdx;
+            TransitionToSlideIndex = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, toIdx));
+
+            SlideNode toSlide = Presentation.Slides[TransitionToSlideIndex];
+            if (toSlide != null && toSlide.Transition != TransitionType.None)
+            {
+                IsTransitioning = true;
+                IsPreviewingTransition = isPreview;
+                TransitionProgress = 0.0f;
+                _transitionStopwatch.Restart();
+            }
+            else
+            {
+                IsTransitioning = false;
+                IsPreviewingTransition = false;
+                TransitionProgress = 1.0f;
+            }
+        }
+
+        public void PlayTransitionPreview()
+        {
+            if (Presentation == null || Presentation.Slides.Count == 0) return;
+            SelectedShapeIndex = -1;
+            EndInlineEditing();
+            int fromIdx = (ActiveSlideIndex > 0) ? (ActiveSlideIndex - 1) : -1;
+            TriggerTransition(fromIdx, ActiveSlideIndex, true);
+        }
+        #endregion
+
+        #region Animations Engine
+        public void AddShapeAnimation(AnimationType animType)
+        {
+            ApplyOrAddShapeAnimation(animType, false);
+        }
+
+        public void AddNewAdditionalShapeAnimation(AnimationType animType)
+        {
+            ApplyOrAddShapeAnimation(animType, true);
+        }
+
+        public void StartFreehandMotionPathDrawing(ShapeNode shape)
+        {
+            if (shape == null && SelectedShape != null) shape = SelectedShape;
+            if (shape == null)
+            {
+                MessageBox.Show("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "GenOffice Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            IsDrawingMotionPathMode = true;
+            IsDrawingMotionPathActive = false;
+            ActiveDrawingMotionShape = shape;
+            CurrentDrawingMotionPoints.Clear();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ApplyOrAddShapeAnimation(AnimationType animType, bool isAddAdditional)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            List<string> targetShapeIds = new List<string>();
+
+            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+            {
+                foreach (int idx in SelectedShapeIndices)
+                {
+                    if (idx >= 0 && idx < slide.Shapes.Count)
+                    {
+                        targetShapeIds.Add(slide.Shapes[idx].Id);
+                    }
+                }
+            }
+            else if (SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
+            {
+                targetShapeIds.Add(slide.Shapes[SelectedShapeIndex].Id);
+            }
+            else if (SelectedShape != null)
+            {
+                targetShapeIds.Add(SelectedShape.Id);
+            }
+
+            if (targetShapeIds.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "GenOffice Hoạt họa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Xóa hiệu ứng nếu chọn None
+            if (animType == AnimationType.None)
+            {
+                foreach (string shapeId in targetShapeIds)
+                {
+                    slide.Animations.RemoveAll(a => a.ShapeId == shapeId);
+                }
+                SelectedAnimationIndex = -1;
+                return;
+            }
+
+            // Nếu người dùng chọn nhiều vật phẩm (bằng Ctrl+Click): vật phẩm đầu tiên kích hoạt OnClick, các vật phẩm tiếp theo chung tầng WithPrevious
+            for (int k = 0; k < targetShapeIds.Count; k++)
+            {
+                string shapeId = targetShapeIds[k];
+
+                // Nếu không phải là nút 'Thêm Hoạt Họa' (Add Animation) và hình này đã có hoạt họa trên slide -> Cập nhật/Thay thế hiệu ứng hiện có của hình (không tạo thêm hàng loạt không xác định)
+                if (!isAddAdditional)
+                {
+                    bool replaced = false;
+                    for (int aIdx = 0; aIdx < slide.Animations.Count; aIdx++)
+                    {
+                        if (slide.Animations[aIdx].ShapeId == shapeId)
+                        {
+                            slide.Animations[aIdx].Type = animType;
+                            SelectedAnimationIndex = aIdx;
+                            replaced = true;
+                            break;
+                        }
+                    }
+                    if (replaced) continue;
+                }
+
+                AnimationTrigger trigger = (k == 0) ? AnimationTrigger.OnClick : AnimationTrigger.WithPrevious;
+
+                ShapeAnimation anim = new ShapeAnimation
+                {
+                    ShapeId = shapeId,
+                    Type = animType,
+                    Trigger = trigger,
+                    Duration = 0.5f,
+                    Delay = 0.0f,
+                    OrderIndex = slide.Animations.Count
+                };
+                slide.Animations.Add(anim);
+                SelectedAnimationIndex = slide.Animations.Count - 1;
+            }
+
+            // Lưu ý: Không tự động mở khung hoạt họa (Animation Pane), chỉ mở khi người dùng chủ động bấm nút mở
+        }
+
+        public void SetSelectedAnimationTrigger(AnimationTrigger trigger)
+        {
+            ShapeAnimation anim = SelectedAnimation;
+            if (anim != null)
+            {
+                anim.Trigger = trigger;
+            }
+        }
+
+        public void SetSelectedAnimationDirection(TransitionDirection direction)
+        {
+            ShapeAnimation anim = SelectedAnimation;
+            if (anim != null)
+            {
+                anim.Direction = direction;
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+        }
+
+        public void SetSelectedAnimationDuration(float duration)
+        {
+            ShapeAnimation anim = SelectedAnimation;
+            if (anim != null)
+            {
+                anim.Duration = Math.Max(0.1f, Math.Min(60.0f, duration));
+            }
+        }
+
+        public void SetSelectedAnimationDelay(float delay)
+        {
+            ShapeAnimation anim = SelectedAnimation;
+            if (anim != null)
+            {
+                anim.Delay = Math.Max(0.0f, Math.Min(60.0f, delay));
+            }
+        }
+
+        public void MoveAnimationEarlier(int animIndex = -1)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations.Count <= 1) return;
+            int idx = (animIndex >= 0) ? animIndex : SelectedAnimationIndex;
+            if (idx > 0 && idx < slide.Animations.Count)
+            {
+                ShapeAnimation a = slide.Animations[idx];
+                slide.Animations.RemoveAt(idx);
+                slide.Animations.Insert(idx - 1, a);
+                SelectedAnimationIndex = idx - 1;
+            }
+        }
+
+        public void MoveAnimationLater(int animIndex = -1)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations.Count <= 1) return;
+            int idx = (animIndex >= 0) ? animIndex : SelectedAnimationIndex;
+            if (idx >= 0 && idx < slide.Animations.Count - 1)
+            {
+                ShapeAnimation a = slide.Animations[idx];
+                slide.Animations.RemoveAt(idx);
+                slide.Animations.Insert(idx + 1, a);
+                SelectedAnimationIndex = idx + 1;
+            }
+        }
+
+        public void RemoveAnimation(int animIndex = -1)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations.Count == 0) return;
+            int idx = (animIndex >= 0) ? animIndex : SelectedAnimationIndex;
+            if (idx >= 0 && idx < slide.Animations.Count)
+            {
+                slide.Animations.RemoveAt(idx);
+                SelectedAnimationIndex = Math.Min(slide.Animations.Count - 1, idx);
+            }
+        }
+
+        public void GetAnimationTimeline(SlideNode slide, out float[] startOffsets, out float[] durations, out int[] stepIndices)
+        {
+            if (slide == null || slide.Animations == null || slide.Animations.Count == 0)
+            {
+                startOffsets = new float[0];
+                durations = new float[0];
+                stepIndices = new int[0];
+                return;
+            }
+
+            int n = slide.Animations.Count;
+            startOffsets = new float[n];
+            durations = new float[n];
+            stepIndices = new int[n];
+
+            int currentStep = 0;
+
+            for (int i = 0; i < n; i++)
+            {
+                ShapeAnimation a = slide.Animations[i];
+                float dur = (a.Duration > 0.05f) ? a.Duration : 0.5f;
+                durations[i] = dur;
+
+                if (a.Trigger == AnimationTrigger.OnClick || (i == 0 && a.Trigger != AnimationTrigger.WithPrevious && a.Trigger != AnimationTrigger.AfterPrevious))
+                {
+                    currentStep++;
+                    stepIndices[i] = currentStep;
+                    startOffsets[i] = a.Delay;
+                }
+                else if (a.Trigger == AnimationTrigger.WithPrevious)
+                {
+                    stepIndices[i] = Math.Max(1, currentStep);
+                    float prevStart = (i > 0) ? startOffsets[i - 1] : 0f;
+                    startOffsets[i] = prevStart + a.Delay;
+                }
+                else // AfterPrevious
+                {
+                    stepIndices[i] = Math.Max(1, currentStep);
+                    float prevEnd = (i > 0) ? (startOffsets[i - 1] + durations[i - 1]) : 0f;
+                    startOffsets[i] = prevEnd + a.Delay;
+                }
+            }
+        }
+
+        public int GetTotalAnimationSteps(SlideNode slide)
+        {
+            if (slide == null || slide.Animations == null || slide.Animations.Count == 0) return 0;
+            float[] startOffsets, durations;
+            int[] stepIndices;
+            GetAnimationTimeline(slide, out startOffsets, out durations, out stepIndices);
+            int maxStep = 0;
+            for (int i = 0; i < stepIndices.Length; i++)
+            {
+                if (stepIndices[i] > maxStep) maxStep = stepIndices[i];
+            }
+            return maxStep;
+        }
+
+        public int GetAnimationStepIndex(SlideNode slide, int animIndex)
+        {
+            if (slide == null || slide.Animations == null || animIndex < 0 || animIndex >= slide.Animations.Count) return 0;
+            float[] startOffsets, durations;
+            int[] stepIndices;
+            GetAnimationTimeline(slide, out startOffsets, out durations, out stepIndices);
+            return (animIndex < stepIndices.Length) ? stepIndices[animIndex] : 0;
+        }
+
+        public float GetCurrentStepMaxDuration(SlideNode slide, int step)
+        {
+            if (slide == null || slide.Animations == null || slide.Animations.Count == 0 || step <= 0) return 0.5f;
+            float[] startOffsets, durations;
+            int[] stepIndices;
+            GetAnimationTimeline(slide, out startOffsets, out durations, out stepIndices);
+
+            float maxEndTime = 0.5f;
+            for (int i = 0; i < stepIndices.Length; i++)
+            {
+                if (stepIndices[i] == step)
+                {
+                    float endTime = startOffsets[i] + durations[i];
+                    if (endTime > maxEndTime) maxEndTime = endTime;
+                }
+            }
+            return Math.Max(0.2f, maxEndTime);
+        }
+
+        public void PlayCurrentStepAnimation(int step)
+        {
+            IsPlayingSlideAnimation = true;
+            AnimationProgress = 0.0f;
+            _animStopwatch.Restart();
+        }
+
+        public void PlayAnimationPreview()
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations.Count == 0) return;
+
+            IsPlayingAnimationPreview = true;
+            ActivePlayingAnimIndex = 0;
+            AnimationProgress = 0.0f;
+            _animStopwatch.Restart();
+        }
+
+        public void ToggleAnimationPane()
+        {
+            if (SidebarPanel == SidebarPanelType.AnimationPane && IsSidebarOpen)
+            {
+                IsSidebarOpen = false;
+            }
+            else
+            {
+                SidebarPanel = SidebarPanelType.AnimationPane;
+                IsSidebarOpen = true;
+            }
+        }
+        #endregion
+
+        #region 60 FPS Update Loop (High Precision Stopwatch Delta-Time)
+        public bool UpdateAnimationAndTransition()
+        {
+            bool needRedraw = false;
+
+            // 1. Update Slide Transition Progress (High Precision Stopwatch Timing)
+            if (IsTransitioning)
+            {
+                SlideNode targetSlide = (TransitionToSlideIndex >= 0 && TransitionToSlideIndex < Presentation.Slides.Count)
+                    ? Presentation.Slides[TransitionToSlideIndex] : ActiveSlide;
+                float duration = 1.0f;
+                if (targetSlide != null)
+                {
+                    if (targetSlide.Transition == TransitionType.GenOffice_CanvaFlow && targetSlide.TransitionDuration <= 1.0f)
+                        duration = 2.20f;
+                    else if (targetSlide.Transition == TransitionType.Morph && targetSlide.TransitionDuration <= 1.0f)
+                        duration = 2.0f;
+                    else if (targetSlide.TransitionDuration > 0.05f)
+                        duration = targetSlide.TransitionDuration;
+                }
+
+                float elapsedSec = (float)_transitionStopwatch.Elapsed.TotalSeconds;
+                float rawProgress = elapsedSec / duration;
+
+                if (rawProgress >= 1.0f)
+                {
+                    TransitionProgress = 1.0f;
+                    IsTransitioning = false;
+                    IsPreviewingTransition = false;
+                    _transitionStopwatch.Stop();
+                    ClearMorphTextureCache();
+                }
+                else
+                {
+                    TransitionProgress = rawProgress;
+                }
+                needRedraw = true;
+            }
+
+            // 2. Update Animation Preview or Slide Show Step Progress
+            if ((IsPlayingAnimationPreview || (IsPresenting && IsPlayingSlideAnimation)) && ActiveSlide != null && ActiveSlide.Animations.Count > 0)
+            {
+                if (!_animStopwatch.IsRunning) _animStopwatch.Restart();
+
+                float elapsedSec = (float)_animStopwatch.Elapsed.TotalSeconds;
+
+                if (IsPlayingAnimationPreview)
+                {
+                    if (ActivePlayingAnimIndex >= 0 && ActivePlayingAnimIndex < ActiveSlide.Animations.Count)
+                    {
+                        ShapeAnimation currentAnim = ActiveSlide.Animations[ActivePlayingAnimIndex];
+                        float duration = (currentAnim.Duration > 0.05f) ? currentAnim.Duration : 0.5f;
+                        AnimationProgress = Math.Min(1.0f, elapsedSec / duration);
+
+                        if (AnimationProgress >= 1.0f)
+                        {
+                            AnimationProgress = 0.0f;
+                            _animStopwatch.Restart();
+                            ActivePlayingAnimIndex++;
+                            if (ActivePlayingAnimIndex >= ActiveSlide.Animations.Count)
+                            {
+                                IsPlayingAnimationPreview = false;
+                                ActivePlayingAnimIndex = -1;
+                                _animStopwatch.Stop();
+                            }
+                        }
+                        needRedraw = true;
+                    }
+                    else
+                    {
+                        IsPlayingAnimationPreview = false;
+                        ActivePlayingAnimIndex = -1;
+                        _animStopwatch.Stop();
+                    }
+                }
+                else if (IsPresenting && IsPlayingSlideAnimation)
+                {
+                    float duration = GetCurrentStepMaxDuration(ActiveSlide, CurrentAnimationStep);
+                    AnimationProgress = Math.Min(1.0f, elapsedSec / duration);
+
+                    if (AnimationProgress >= 1.0f)
+                    {
+                        AnimationProgress = 1.0f;
+                        IsPlayingSlideAnimation = false;
+                        _animStopwatch.Stop();
+                    }
+                    needRedraw = true;
+                }
+            }
+
+            // 3. Update Background Removal AI Laser Scan Animation (Hiệu ứng quét sáng Laser đa lớp chuyên nghiệp)
+            if (IsScanningActive)
+            {
+                ScanProgress += 0.024f; // Quét mượt mà liên tục ~42 frames (khoảng 0.7s)
+                if (ScanProgress >= 1.0f)
+                {
+                    ScanProgress = 1.0f;
+                    IsScanningActive = false;
+
+                    // Quét xong là áp dụng kết quả xóa nền hoàn tất vào hình ảnh
+                    if (ScanTargetShape != null && ScanPendingResultBitmap != null)
+                    {
+                        if (ScanTargetShape.CachedImage != null)
+                        {
+                            try { ScanTargetShape.CachedImage.Dispose(); } catch { }
+                        }
+                        ScanTargetShape.CachedImage = ScanPendingResultBitmap;
+                        ScanPendingResultBitmap = null;
+                    }
+                    if (ScanSourceOriginalBitmap != null)
+                    {
+                        try { ScanSourceOriginalBitmap.Dispose(); } catch { }
+                        ScanSourceOriginalBitmap = null;
+                    }
+                    ScanTargetShape = null;
+                }
+                needRedraw = true;
+            }
+            // 4. Update Video Playback Time
+            if (ActiveSlide != null && ActiveSlide.Shapes != null)
+            {
+                foreach (ShapeNode shape in ActiveSlide.Shapes)
+                {
+                    if (shape.Type == ShapeType.Video && shape.IsVideoPlaying)
+                    {
+                        shape.VideoCurrentTime += 0.016f; // approx 16ms frame
+                        if (shape.VideoCurrentTime >= shape.VideoTotalTime)
+                        {
+                            shape.VideoCurrentTime = shape.VideoTotalTime;
+                            shape.IsVideoPlaying = false; // Auto pause/stop at end
+                        }
+                        needRedraw = true;
+                    }
+                }
+            }
+
+            // 5. Update Ambient Infinite Animations (e.g. Neon Pulse Infinite Breathing Loop)
+            if (ActiveSlide != null && ActiveSlide.Animations != null)
+            {
+                foreach (ShapeAnimation anim in ActiveSlide.Animations)
+                {
+                    if (anim.Type == AnimationType.GenOffice_NeonPulse && anim.NeonInfiniteLoop)
+                    {
+                        needRedraw = true;
+                        break;
+                    }
+                }
+            }
+
+            return needRedraw;
+        }
+        #endregion
+
+        #region Transition Sub-Routines
+        private void RenderTransitionFrame(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, TransitionType type, float progress, float scale)
+        {
+            GraphicsState gState = g.Save();
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            float t = SmoothEase(progress);
+
+            switch (type)
+            {
+                case TransitionType.Morph:
+                    RenderMorphTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Fade:
+                    RenderFadeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Push:
+                    RenderPushTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Wipe:
+                    RenderWipeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Split:
+                    RenderSplitTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Reveal:
+                    RenderRevealTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Cut:
+                    RenderCutTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.RandomBars:
+                    RenderRandomBarsTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Shape:
+                    RenderShapeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Uncover:
+                    RenderUncoverTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Cover:
+                    RenderCoverTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Flash:
+                    RenderFlashTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.FallOver:
+                    RenderFallOverTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Curtains:
+                    RenderCurtainsTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Wind:
+                    RenderWindTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Prestige:
+                    RenderPrestigeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Fracture:
+                    RenderFractureTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Crush:
+                    RenderCrushTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.PeelOff:
+                    RenderPeelOffTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.PageCurl:
+                    RenderPageCurlTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Airplane:
+                    RenderAirplaneTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Origami:
+                    RenderOrigamiTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Dissolve:
+                    RenderDissolveTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Checker:
+                    RenderCheckerTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Blinds:
+                    RenderBlindsTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Clock:
+                case TransitionType.Wheel:
+                    RenderClockTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Ripple:
+                    RenderRippleTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Honeycomb:
+                    RenderHoneycombTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Glitter:
+                    RenderGlitterTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Vortex:
+                    RenderVortexTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Shred:
+                    RenderShredTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Switch:
+                    RenderSwitchTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Flip:
+                    RenderFlipTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Gallery:
+                    RenderGalleryTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Cube:
+                    RenderCubeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Doors:
+                    RenderDoorsTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Box:
+                    RenderBoxTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Comb:
+                    RenderCombTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Zoom:
+                    RenderZoomTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Pan:
+                    RenderPanTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.FerrisWheel:
+                    RenderFerrisWheelTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Conveyor:
+                    RenderConveyorTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Rotate:
+                    RenderRotateTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Window:
+                    RenderWindowTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.Orbit:
+                    RenderOrbitTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.FlyThrough:
+                    RenderFlyThroughTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                // ==================== 10 Hiệu ứng Chuyển cảnh Độc quyền GenOffice ====================
+                case TransitionType.GenOffice_CinematicPrism:
+                    RenderCinematicPrismTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_LiquidFluid:
+                    RenderLiquidFluidTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_MatrixRain:
+                    RenderMatrixRainTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_NeonPulse:
+                    RenderNeonPulseTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_PortalWarp:
+                    RenderPortalWarpTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_Supernova:
+                    RenderSupernovaTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_HologramGlitch:
+                    RenderHologramGlitchTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_Kaleidoscope:
+                    RenderKaleidoscopeTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_Starlight:
+                    RenderStarlightTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_GoldenRibbon:
+                    RenderGoldenRibbonTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.GenOffice_CanvaFlow:
+                    RenderCanvaFlowTransition(g, rect, fromSlide, toSlide, t, scale);
+                    break;
+                case TransitionType.None:
+                default:
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    break;
+            }
+
+            g.Restore(gState);
+        }
+
+        private void RenderMorphTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t >= 0.999f)
+            {
+                DrawSlideFull(g, rect, toSlide, scale);
+                return;
+            }
+            if (t <= 0.001f)
+            {
+                DrawSlideFull(g, rect, fromSlide, scale);
+                return;
+            }
+
+            // Background morph
+            if (toSlide.IsGradientBg || fromSlide.IsGradientBg)
+            {
+                Color bgA1 = Color.FromArgb(fromSlide.BgColor | unchecked((int)0xFF000000));
+                Color bgA2 = fromSlide.IsGradientBg ? Color.FromArgb(fromSlide.BgColor2 | unchecked((int)0xFF000000)) : bgA1;
+                Color bgB1 = Color.FromArgb(toSlide.BgColor | unchecked((int)0xFF000000));
+                Color bgB2 = toSlide.IsGradientBg ? Color.FromArgb(toSlide.BgColor2 | unchecked((int)0xFF000000)) : bgB1;
+
+                Color currBg1 = InterpolateColor(bgA1, bgB1, t);
+                Color currBg2 = InterpolateColor(bgA2, bgB2, t);
+                float angle = fromSlide.BgGradientAngle + (toSlide.BgGradientAngle - fromSlide.BgGradientAngle) * t;
+
+                using (LinearGradientBrush lgb = new LinearGradientBrush(rect, currBg1, currBg2, angle))
+                {
+                    g.FillRectangle(lgb, rect);
+                }
+            }
+            else
+            {
+                Color bgA = Color.FromArgb(fromSlide.BgColor | unchecked((int)0xFF000000));
+                Color bgB = Color.FromArgb(toSlide.BgColor | unchecked((int)0xFF000000));
+                Color currBg = InterpolateColor(bgA, bgB, t);
+                using (SolidBrush bgBrush = new SolidBrush(currBg))
+                {
+                    g.FillRectangle(bgBrush, rect);
+                }
+            }
+
+            // Pair matching shapes between fromSlide and toSlide (PowerPoint 365 Morph Matching Rules)
+            HashSet<ShapeNode> usedFromShapes = new HashSet<ShapeNode>();
+            HashSet<ShapeNode> usedToShapes = new HashSet<ShapeNode>();
+            List<KeyValuePair<ShapeNode, ShapeNode>> pairs = new List<KeyValuePair<ShapeNode, ShapeNode>>();
+
+            // Priority 1: Match by explicit MorphName (starts with !!)
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (!string.IsNullOrEmpty(shapeB.MorphName) && shapeB.MorphName.StartsWith("!!"))
+                {
+                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                    {
+                        ShapeNode shapeA = fromSlide.Shapes[a];
+                        if (!usedFromShapes.Contains(shapeA) && shapeA.MorphName == shapeB.MorphName)
+                        {
+                            pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                            usedFromShapes.Add(shapeA);
+                            usedToShapes.Add(shapeB);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Priority 2: Match by exact non-empty Text (identical text moving or resizing)
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (usedToShapes.Contains(shapeB)) continue;
+                if (string.IsNullOrWhiteSpace(shapeB.Text)) continue;
+
+                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                {
+                    ShapeNode shapeA = fromSlide.Shapes[a];
+                    if (usedFromShapes.Contains(shapeA)) continue;
+
+                    if (string.Equals(shapeA.Text != null ? shapeA.Text.Trim() : "", shapeB.Text != null ? shapeB.Text.Trim() : "", StringComparison.Ordinal))
+                    {
+                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                        usedFromShapes.Add(shapeA);
+                        usedToShapes.Add(shapeB);
+                        break;
+                    }
+                }
+            }
+
+            // Priority 3: Match by ImagePath / CachedImage
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (usedToShapes.Contains(shapeB)) continue;
+                if (shapeB.Type != ShapeType.Image && shapeB.CachedImage == null && string.IsNullOrEmpty(shapeB.ImagePath)) continue;
+
+                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                {
+                    ShapeNode shapeA = fromSlide.Shapes[a];
+                    if (usedFromShapes.Contains(shapeA)) continue;
+
+                    if ((!string.IsNullOrEmpty(shapeA.ImagePath) && shapeA.ImagePath == shapeB.ImagePath) ||
+                        (shapeA.CachedImage != null && shapeA.CachedImage == shapeB.CachedImage) ||
+                        (shapeA.Type == ShapeType.Image && shapeB.Type == ShapeType.Image && !string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name))
+                    {
+                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                        usedFromShapes.Add(shapeA);
+                        usedToShapes.Add(shapeB);
+                        break;
+                    }
+                }
+            }
+
+            // Priority 4: Match by Name (if user gave matching custom names)
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (usedToShapes.Contains(shapeB)) continue;
+                if (string.IsNullOrEmpty(shapeB.Name)) continue;
+
+                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                {
+                    ShapeNode shapeA = fromSlide.Shapes[a];
+                    if (usedFromShapes.Contains(shapeA)) continue;
+
+                    if (!string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name)
+                    {
+                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                        usedFromShapes.Add(shapeA);
+                        usedToShapes.Add(shapeB);
+                        break;
+                    }
+                }
+            }
+
+            // Priority 5: Cloned/Duplicated Pure Geometric Shapes without text
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (usedToShapes.Contains(shapeB)) continue;
+                if (!string.IsNullOrEmpty(shapeB.Text)) continue;
+
+                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                {
+                    ShapeNode shapeA = fromSlide.Shapes[a];
+                    if (usedFromShapes.Contains(shapeA)) continue;
+                    if (!string.IsNullOrEmpty(shapeA.Text)) continue;
+
+                    if (shapeA.Id == shapeB.Id && shapeA.Type == shapeB.Type)
+                    {
+                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                        usedFromShapes.Add(shapeA);
+                        usedToShapes.Add(shapeB);
+                        break;
+                    }
+                }
+            }
+
+            // Render Unpaired shapes from Slide A (Smooth continuous Fade Out)
+            for (int a = 0; a < fromSlide.Shapes.Count; a++)
+            {
+                ShapeNode shapeA = fromSlide.Shapes[a];
+                if (!usedFromShapes.Contains(shapeA))
+                {
+                    float fadeOut = Math.Max(0.0f, 1.0f - t) * shapeA.FillOpacity;
+                    if (fadeOut > 0.005f)
+                    {
+                        ShapeNode morphedA = shapeA.Clone();
+                        morphedA.FillOpacity = fadeOut;
+                        DrawShape(g, rect.X, rect.Y, scale, morphedA, false);
+                    }
+                }
+            }
+
+            // Render Paired Shapes with Pure Vector Matrix Interpolation
+            foreach (KeyValuePair<ShapeNode, ShapeNode> pair in pairs)
+            {
+                ShapeNode sA = pair.Key;
+                ShapeNode sB = pair.Value;
+
+                if (IsPresenting || IsPreviewingTransition)
+                {
+                    bool isVis;
+                    float offX, offY, scX, scY, rDelta, opMul;
+                    GetShapeAnimationTransform(sB, toSlide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                    if (!isVis)
+                    {
+                        // sB có hiệu ứng Entrance trên toSlide -> không morph thành sB mà sA chỉ fade out
+                        float fadeOut = Math.Max(0.0f, 1.0f - t) * sA.FillOpacity;
+                        if (fadeOut > 0.005f)
+                        {
+                            ShapeNode morphedA = sA.Clone();
+                            morphedA.FillOpacity = fadeOut;
+                            DrawShape(g, rect.X, rect.Y, scale, morphedA, false);
+                        }
+                        continue;
+                    }
+                }
+
+                DrawMorphingShape(g, rect.X, rect.Y, scale, sA, sB, t);
+            }
+
+            // Render Unpaired shapes from Slide B (Fade In synchronized with movement)
+            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            {
+                ShapeNode shapeB = toSlide.Shapes[b];
+                if (!usedToShapes.Contains(shapeB))
+                {
+                    if (IsPresenting || IsPreviewingTransition)
+                    {
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        GetShapeAnimationTransform(shapeB, toSlide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                        if (!isVis) continue;
+                    }
+
+                    float fadeIn = Math.Max(0.0f, Math.Min(1.0f, t)) * shapeB.FillOpacity;
+                    if (fadeIn > 0.005f)
+                    {
+                        ShapeNode morphedB = shapeB.Clone();
+                        morphedB.FillOpacity = fadeIn;
+                        DrawShape(g, rect.X, rect.Y, scale, morphedB, false);
+                    }
+                }
+            }
+        }
+
+        public static float SmoothEase(float p)
+        {
+            if (p <= 0.0f) return 0.0f;
+            if (p >= 1.0f) return 1.0f;
+            // PowerPoint 365 Standard Smooth Sine Deceleration Easing (Cubic-Bezier 0.25, 0.1, 0.25, 1.0)
+            return (float)Math.Sin(p * Math.PI / 2.0);
+        }
+
+        private void DrawMorphingShape(Graphics g, float slideX, float slideY, float scale, ShapeNode sA, ShapeNode sB, float t)
+        {
+            if (t >= 0.999f)
+            {
+                DrawShape(g, slideX, slideY, scale, sB, false);
+                return;
+            }
+            if (t <= 0.001f)
+            {
+                DrawShape(g, slideX, slideY, scale, sA, false);
+                return;
+            }
+
+            bool sameText = string.Equals(sA.Text, sB.Text, StringComparison.Ordinal);
+
+            ShapeNode morphed = new ShapeNode
+            {
+                Id = sB.Id,
+                Type = (t < 0.5f) ? sA.Type : sB.Type,
+                FontName = (t < 0.5f) ? sA.FontName : sB.FontName,
+                Bold = (t < 0.5f) ? sA.Bold : sB.Bold,
+                Italic = (t < 0.5f) ? sA.Italic : sB.Italic,
+                Underline = (t < 0.5f) ? sA.Underline : sB.Underline,
+                Text = "", // Background container drawn without text first
+                Alignment = (t < 0.5f) ? sA.Alignment : sB.Alignment,
+                VerticalAlignment = (t < 0.5f) ? sA.VerticalAlignment : sB.VerticalAlignment,
+                StrokeWidth = sA.StrokeWidth + (sB.StrokeWidth - sA.StrokeWidth) * t,
+                FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t,
+                FillOpacity = sA.FillOpacity + (sB.FillOpacity - sA.FillOpacity) * t,
+                CustomPath = (t < 0.5f) ? (sA.CustomPath ?? sB.CustomPath) : (sB.CustomPath ?? sA.CustomPath),
+                PathWidth = sA.PathWidth + (sB.PathWidth - sA.PathWidth) * t,
+                PathHeight = sA.PathHeight + (sB.PathHeight - sA.PathHeight) * t,
+                CachedImage = sB.CachedImage ?? sA.CachedImage,
+                ImagePath = !string.IsNullOrEmpty(sB.ImagePath) ? sB.ImagePath : sA.ImagePath,
+                DashStyle = (t < 0.5f) ? sA.DashStyle : sB.DashStyle
+            };
+
+            morphed.Transform.X = sA.Transform.X + (sB.Transform.X - sA.Transform.X) * t;
+            morphed.Transform.Y = sA.Transform.Y + (sB.Transform.Y - sA.Transform.Y) * t;
+            morphed.Transform.Width = sA.Transform.Width + (sB.Transform.Width - sA.Transform.Width) * t;
+            morphed.Transform.Height = sA.Transform.Height + (sB.Transform.Height - sA.Transform.Height) * t;
+            morphed.Transform.Rotation = sA.Transform.Rotation + (sB.Transform.Rotation - sA.Transform.Rotation) * t;
+
+            Color cFillA = Color.FromArgb(sA.FillColor | unchecked((int)0xFF000000));
+            Color cFillB = Color.FromArgb(sB.FillColor | unchecked((int)0xFF000000));
+            morphed.FillColor = InterpolateColor(cFillA, cFillB, t).ToArgb() & 0xFFFFFF;
+
+            Color cStrokeA = Color.FromArgb(sA.StrokeColor | unchecked((int)0xFF000000));
+            Color cStrokeB = Color.FromArgb(sB.StrokeColor | unchecked((int)0xFF000000));
+            morphed.StrokeColor = InterpolateColor(cStrokeA, cStrokeB, t).ToArgb() & 0xFFFFFF;
+
+            Color cTextA = Color.FromArgb(sA.TextColor | unchecked((int)0xFF000000));
+            Color cTextB = Color.FromArgb(sB.TextColor | unchecked((int)0xFF000000));
+            morphed.TextColor = InterpolateColor(cTextA, cTextB, t).ToArgb() & 0xFFFFFF;
+
+            // 1. Draw morphing base container (Fill + Stroke + CustomPath)
+            DrawShape(g, slideX, slideY, scale, morphed, false);
+
+            // 2. Render Text
+            if (sameText && !string.IsNullOrEmpty(sB.Text))
+            {
+                // When identical text, render text formatted with target width to prevent line-wrapping reflow
+                ShapeNode txtSame = morphed.Clone();
+                txtSame.FillColor = 0x00FFFFFF;
+                txtSame.StrokeWidth = 0;
+                txtSame.Text = sB.Text;
+                txtSame.Transform.Width = sB.Transform.Width;
+                txtSame.Transform.Height = sB.Transform.Height;
+                txtSame.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
+                txtSame.FillOpacity = sA.FillOpacity + (sB.FillOpacity - sA.FillOpacity) * t;
+                txtSame.TextColor = morphed.TextColor;
+                DrawShape(g, slideX, slideY, scale, txtSame, false);
+            }
+            else
+            {
+                // Text A smoothly fades out with its original width (no line jump)
+                float fadeOutText = Math.Max(0.0f, 1.0f - t) * sA.FillOpacity;
+                if (fadeOutText > 0.005f && !string.IsNullOrEmpty(sA.Text))
+                {
+                    ShapeNode txtA = morphed.Clone();
+                    txtA.FillColor = 0x00FFFFFF;
+                    txtA.StrokeWidth = 0;
+                    txtA.Text = sA.Text;
+                    txtA.Transform.Width = sA.Transform.Width;
+                    txtA.Transform.Height = sA.Transform.Height;
+                    txtA.FontName = sA.FontName;
+                    txtA.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
+                    txtA.Bold = sA.Bold;
+                    txtA.Italic = sA.Italic;
+                    txtA.Underline = sA.Underline;
+                    txtA.Alignment = sA.Alignment;
+                    txtA.VerticalAlignment = sA.VerticalAlignment;
+                    txtA.FillOpacity = fadeOutText;
+                    txtA.TextColor = sA.TextColor;
+                    DrawShape(g, slideX, slideY, scale, txtA, false);
+                }
+
+                // Text B smoothly fades in with its target width (no line jump)
+                float fadeInText = Math.Max(0.0f, t) * sB.FillOpacity;
+                if (fadeInText > 0.005f && !string.IsNullOrEmpty(sB.Text))
+                {
+                    ShapeNode txtB = morphed.Clone();
+                    txtB.FillColor = 0x00FFFFFF;
+                    txtB.StrokeWidth = 0;
+                    txtB.Text = sB.Text;
+                    txtB.Transform.Width = sB.Transform.Width;
+                    txtB.Transform.Height = sB.Transform.Height;
+                    txtB.FontName = sB.FontName;
+                    txtB.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
+                    txtB.Bold = sB.Bold;
+                    txtB.Italic = sB.Italic;
+                    txtB.Underline = sB.Underline;
+                    txtB.Alignment = sB.Alignment;
+                    txtB.VerticalAlignment = sB.VerticalAlignment;
+                    txtB.FillOpacity = fadeInText;
+                    txtB.TextColor = sB.TextColor;
+                    DrawShape(g, slideX, slideY, scale, txtB, false);
+                }
+            }
+        }
+        #endregion
+
+        #region Model Actions
+        public void AddSlide(SlideLayoutType layout = SlideLayoutType.TitleAndContent)
+        {
+            SaveUndoState();
+            SlideNode slide = Presentation.AddSlide(layout);
+            ActiveSlideIndex = Presentation.Slides.Count - 1;
+            SelectedShapeIndex = -1;
+            CurrentAnimationStep = 0;
+            if (Presentation != null && !string.IsNullOrEmpty(Presentation.CurrentTheme))
+            {
+                ApplyThemeToSlide(slide, Presentation.CurrentTheme);
+            }
+        }
+
+        public void DuplicateActiveSlide()
+        {
+            if (ActiveSlideIndex >= 0 && ActiveSlideIndex < Presentation.Slides.Count)
+            {
+                SaveUndoState();
+                Presentation.DuplicateSlide(ActiveSlideIndex);
+                ActiveSlideIndex++;
+                SelectedShapeIndex = -1;
+                CurrentAnimationStep = 0;
+            }
+        }
+
+        public void DeleteActiveSlide()
+        {
+            if (Presentation.Slides.Count > 1 && ActiveSlideIndex >= 0)
+            {
+                SaveUndoState();
+                Presentation.DeleteSlide(ActiveSlideIndex);
+                if (ActiveSlideIndex >= Presentation.Slides.Count)
+                    ActiveSlideIndex = Presentation.Slides.Count - 1;
+                SelectedShapeIndex = -1;
+                CurrentAnimationStep = 0;
+            }
+        }
+
+        public void StartShapeDrawMode(ShapeType shapeType)
+        {
+            IsDrawingShapeMode = true;
+            PendingShapeType = shapeType;
+            SelectedShapeIndex = -1;
+            EndInlineEditing();
+        }
+
+        public void StartDrawingCustomMotionPath(ShapeNode shape = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null && ActiveSlide != null && ActiveSlide.Shapes.Count > 0)
+            {
+                shape = ActiveSlide.Shapes[ActiveSlide.Shapes.Count - 1];
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            }
+            if (shape == null)
+            {
+                MessageBox.Show("Vui lòng chọn một hình vẽ hoặc hộp văn bản trước khi vẽ đường chuyển động.", "Đường chuyển động tự vẽ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            IsDrawingMotionPathMode = true;
+            IsDrawingMotionPathActive = false;
+            ActiveDrawingMotionShape = shape;
+            CurrentDrawingMotionPoints.Clear();
+            EndInlineEditing();
+        }
+
+        public void StartInlineEditing(ShapeNode shape)
+        {
+            if (shape == null) return;
+            if (shape.Type == ShapeType.Image) return;
+            IsInlineEditing = true;
+            EditingShape = shape;
+            if (shape.Type != ShapeType.TextBox && shape.Alignment != TextAlignment.Left && shape.Alignment != TextAlignment.Right)
+            {
+                shape.Alignment = TextAlignment.Center;
+                shape.VerticalAlignment = VerticalTextAlignment.Middle;
+            }
+            EditingTextBuffer = shape.Text ?? "";
+            CaretIndex = EditingTextBuffer.Length;
+            shape.IsEditingText = true;
+        }
+
+        public void EndInlineEditing()
+        {
+            if (IsInlineEditing && EditingShape != null)
+            {
+                EditingShape.Text = EditingTextBuffer;
+                EditingShape.IsEditingText = false;
+            }
+            IsInlineEditing = false;
+            EditingShape = null;
+            EditingTextBuffer = "";
+
+            EndTableInlineEditing();
+        }
+
+        public void StartTableInlineEditing(ShapeNode shape, int r, int c)
+        {
+            if (shape == null || shape.Type != ShapeType.Table) return;
+            EndInlineEditing();
+
+            if (shape.TableData == null) shape.TableData = new List<List<string>>();
+            while (shape.TableData.Count <= r) shape.TableData.Add(new List<string>());
+            while (shape.TableData[r].Count <= c) shape.TableData[r].Add("");
+
+            IsEditingTableCell = true;
+            EditingTableShape = shape;
+            EditingTableRow = r;
+            EditingTableCol = c;
+            EditingTableCellBuffer = shape.TableData[r][c] ?? "";
+            TableCaretIndex = EditingTableCellBuffer.Length;
+
+            shape.TableSelectedCellRow = r;
+            shape.TableSelectedCellCol = c;
+            shape.TableSelectedEndRow = r;
+            shape.TableSelectedEndCol = c;
+        }
+
+        public void EndTableInlineEditing()
+        {
+            if (IsEditingTableCell && EditingTableShape != null && EditingTableShape.TableData != null)
+            {
+                int r = EditingTableRow;
+                int c = EditingTableCol;
+                if (r >= 0 && r < EditingTableShape.TableRows && c >= 0 && c < EditingTableShape.TableColumns)
+                {
+                    while (EditingTableShape.TableData.Count <= r) EditingTableShape.TableData.Add(new List<string>());
+                    while (EditingTableShape.TableData[r].Count <= c) EditingTableShape.TableData[r].Add("");
+                    EditingTableShape.TableData[r][c] = EditingTableCellBuffer ?? "";
+                }
+            }
+            IsEditingTableCell = false;
+            EditingTableShape = null;
+            EditingTableRow = -1;
+            EditingTableCol = -1;
+            EditingTableCellBuffer = "";
+            TableCaretIndex = 0;
+        }
+
+        public void SetSelectedTableCellFillColor(int argbColor)
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.TableCellFillColors == null) shape.TableCellFillColors = new Dictionary<string, int>();
+
+            int minR = Math.Max(0, Math.Min(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int maxR = Math.Min(shape.TableRows - 1, Math.Max(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int minC = Math.Max(0, Math.Min(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+            int maxC = Math.Min(shape.TableColumns - 1, Math.Max(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+
+            if (shape.TableSelectedCellRow < 0)
+            {
+                minR = 0; maxR = shape.TableRows - 1;
+                minC = 0; maxC = shape.TableColumns - 1;
+            }
+
+            for (int r = minR; r <= maxR; r++)
+            {
+                for (int c = minC; c <= maxC; c++)
+                {
+                    shape.TableCellFillColors[r + "," + c] = argbColor;
+                }
+            }
+        }
+
+        public void SetSelectedTableCellTextColor(int argbColor)
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.TableCellTextColors == null) shape.TableCellTextColors = new Dictionary<string, int>();
+
+            int minR = Math.Max(0, Math.Min(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int maxR = Math.Min(shape.TableRows - 1, Math.Max(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int minC = Math.Max(0, Math.Min(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+            int maxC = Math.Min(shape.TableColumns - 1, Math.Max(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+
+            if (shape.TableSelectedCellRow < 0)
+            {
+                minR = 0; maxR = shape.TableRows - 1;
+                minC = 0; maxC = shape.TableColumns - 1;
+            }
+
+            for (int r = minR; r <= maxR; r++)
+            {
+                for (int c = minC; c <= maxC; c++)
+                {
+                    shape.TableCellTextColors[r + "," + c] = argbColor;
+                }
+            }
+        }
+
+        public void SetSelectedTableCellBold(bool bold)
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.TableCellBolds == null) shape.TableCellBolds = new Dictionary<string, bool>();
+
+            int minR = Math.Max(0, Math.Min(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int maxR = Math.Min(shape.TableRows - 1, Math.Max(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+            int minC = Math.Max(0, Math.Min(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+            int maxC = Math.Min(shape.TableColumns - 1, Math.Max(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+
+            for (int r = minR; r <= maxR; r++)
+            {
+                for (int c = minC; c <= maxC; c++)
+                {
+                    shape.TableCellBolds[r + "," + c] = bold;
+                }
+            }
+        }
+
+        public void InsertTableRow(bool above)
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table) return;
+            ShapeNode shape = SelectedShape;
+            int targetR = shape.TableSelectedCellRow >= 0 ? shape.TableSelectedCellRow : shape.TableRows - 1;
+            if (!above) targetR++;
+            targetR = Math.Max(0, Math.Min(shape.TableRows, targetR));
+
+            List<string> newRow = new List<string>();
+            for (int c = 0; c < shape.TableColumns; c++) newRow.Add("");
+
+            if (shape.TableData == null) shape.TableData = new List<List<string>>();
+            while (shape.TableData.Count < shape.TableRows)
+            {
+                List<string> r = new List<string>();
+                for (int c = 0; c < shape.TableColumns; c++) r.Add("");
+                shape.TableData.Add(r);
+            }
+
+            shape.TableData.Insert(targetR, newRow);
+            shape.TableRows++;
+            shape.Transform.Height += 40f;
+            shape.TableSelectedCellRow = targetR;
+            shape.TableSelectedEndRow = targetR;
+        }
+
+        public void InsertTableColumn(bool left)
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table) return;
+            ShapeNode shape = SelectedShape;
+            int targetC = shape.TableSelectedCellCol >= 0 ? shape.TableSelectedCellCol : shape.TableColumns - 1;
+            if (!left) targetC++;
+            targetC = Math.Max(0, Math.Min(shape.TableColumns, targetC));
+
+            if (shape.TableData == null) shape.TableData = new List<List<string>>();
+            for (int r = 0; r < shape.TableRows; r++)
+            {
+                while (shape.TableData.Count <= r) shape.TableData.Add(new List<string>());
+                while (shape.TableData[r].Count < shape.TableColumns) shape.TableData[r].Add("");
+                shape.TableData[r].Insert(targetC, "");
+            }
+            shape.TableColumns++;
+            shape.Transform.Width += 120f;
+            shape.TableSelectedCellCol = targetC;
+            shape.TableSelectedEndCol = targetC;
+        }
+
+        public void DeleteTableRow()
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table || SelectedShape.TableRows <= 1) return;
+            ShapeNode shape = SelectedShape;
+            int r = shape.TableSelectedCellRow >= 0 ? shape.TableSelectedCellRow : shape.TableRows - 1;
+            if (r >= 0 && r < shape.TableRows)
+            {
+                if (shape.TableData != null && r < shape.TableData.Count)
+                {
+                    shape.TableData.RemoveAt(r);
+                }
+                shape.TableRows--;
+                shape.Transform.Height = Math.Max(60f, shape.Transform.Height - 40f);
+                shape.TableSelectedCellRow = Math.Min(shape.TableRows - 1, r);
+                shape.TableSelectedEndRow = shape.TableSelectedCellRow;
+            }
+        }
+
+        public void DeleteTableColumn()
+        {
+            if (SelectedShape == null || SelectedShape.Type != ShapeType.Table || SelectedShape.TableColumns <= 1) return;
+            ShapeNode shape = SelectedShape;
+            int c = shape.TableSelectedCellCol >= 0 ? shape.TableSelectedCellCol : shape.TableColumns - 1;
+            if (c >= 0 && c < shape.TableColumns)
+            {
+                if (shape.TableData != null)
+                {
+                    for (int r = 0; r < shape.TableData.Count; r++)
+                    {
+                        if (c < shape.TableData[r].Count)
+                        {
+                            shape.TableData[r].RemoveAt(c);
+                        }
+                    }
+                }
+                shape.TableColumns--;
+                shape.Transform.Width = Math.Max(120f, shape.Transform.Width - 100f);
+                shape.TableSelectedCellCol = Math.Min(shape.TableColumns - 1, c);
+                shape.TableSelectedEndCol = shape.TableSelectedCellCol;
+            }
+        }
+
+        public void ShowTableContextMenu(Control parentControl, Point screenPos, int shapeIndex, int cellR, int cellC)
+        {
+            if (ActiveSlide == null || shapeIndex < 0 || shapeIndex >= ActiveSlide.Shapes.Count) return;
+            ShapeNode shape = ActiveSlide.Shapes[shapeIndex];
+            if (shape.Type != ShapeType.Table) return;
+
+            if (cellR >= 0 && cellC >= 0)
+            {
+                shape.TableSelectedCellRow = cellR;
+                shape.TableSelectedCellCol = cellC;
+                shape.TableSelectedEndRow = cellR;
+                shape.TableSelectedEndCol = cellC;
+            }
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.0f);
+
+            // 1. Tô màu nền ô (Cell Fill Color)
+            ToolStripMenuItem miFill = new ToolStripMenuItem("🎨 Tô màu nền ô (Cell Fill)");
+            int[] fillPalette = new int[] {
+                0x00FFFFFF, // Không màu
+                0x2563EB, // Xanh dương
+                0x38BDF8, // Xanh da trời
+                0x10B981, // Xanh lá
+                0x84CC16, // Xanh cốm
+                0xEF4444, // Đỏ tươi
+                0xF43F5E, // Hồng
+                0xF59E0B, // Vàng hổ phách
+                0xFB923C, // Cam
+                0x8B5CF6, // Tím
+                0x64748B, // Xám đá
+                0xF1F5F9, // Xám nhạt
+                0x0F172A  // Đen than
+            };
+            string[] fillNames = new string[] {
+                "Không màu (Trong suốt)", "Xanh Dương (Blue)", "Xanh Da Trời (Sky)", "Xanh Lá (Emerald)",
+                "Xanh Cốm (Lime)", "Đỏ (Red)", "Hồng (Rose)", "Vàng (Amber)", "Cam (Orange)",
+                "Tím (Purple)", "Xám Đá (Slate)", "Xám Nhạt (Light Gray)", "Đen Than (Dark)"
+            };
+            for (int i = 0; i < fillPalette.Length; i++)
+            {
+                int colVal = fillPalette[i];
+                string colName = fillNames[i];
+                ToolStripMenuItem item = new ToolStripMenuItem(colName, null, (s, e) => {
+                    SetSelectedTableCellFillColor(colVal);
+                    if (parentControl != null) parentControl.Invalidate();
+                });
+                miFill.DropDownItems.Add(item);
+            }
+            menu.Items.Add(miFill);
+
+            // 2. Màu chữ (Text Color)
+            ToolStripMenuItem miTextCol = new ToolStripMenuItem("🔤 Màu chữ (Text Color)");
+            int[] textPalette = new int[] {
+                0x0F172A, // Đen
+                0xFFFFFF, // Trắng
+                0x2563EB, // Xanh dương
+                0x10B981, // Xanh lá
+                0xEF4444, // Đỏ
+                0xF59E0B, // Vàng
+                0x8B5CF6, // Tím
+                0x64748B  // Xám
+            };
+            string[] textNames = new string[] {
+                "Đen (Black)", "Trắng (White)", "Xanh Dương (Blue)", "Xanh Lá (Green)",
+                "Đỏ (Red)", "Vàng (Yellow)", "Tím (Purple)", "Xám (Gray)"
+            };
+            for (int i = 0; i < textPalette.Length; i++)
+            {
+                int colVal = textPalette[i];
+                string colName = textNames[i];
+                ToolStripMenuItem item = new ToolStripMenuItem(colName, null, (s, e) => {
+                    SetSelectedTableCellTextColor(colVal);
+                    if (parentControl != null) parentControl.Invalidate();
+                });
+                miTextCol.DropDownItems.Add(item);
+            }
+            menu.Items.Add(miTextCol);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 3. Hàng & Cột (Rows & Columns)
+            menu.Items.Add(new ToolStripMenuItem("➕ Chèn hàng phía trên (Insert Row Above)", null, (s, e) => {
+                InsertTableRow(true);
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(new ToolStripMenuItem("➕ Chèn hàng phía dưới (Insert Row Below)", null, (s, e) => {
+                InsertTableRow(false);
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(new ToolStripMenuItem("➕ Chèn cột bên trái (Insert Column Left)", null, (s, e) => {
+                InsertTableColumn(true);
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(new ToolStripMenuItem("➕ Chèn cột bên phải (Insert Column Right)", null, (s, e) => {
+                InsertTableColumn(false);
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem("❌ Xóa hàng này (Delete Row)", null, (s, e) => {
+                DeleteTableRow();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(new ToolStripMenuItem("❌ Xóa cột này (Delete Column)", null, (s, e) => {
+                DeleteTableColumn();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(new ToolStripMenuItem("🗑️ Xóa toàn bộ bảng (Delete Table)", null, (s, e) => {
+                ActiveSlide.Shapes.Remove(shape);
+                SelectedShapeIndex = -1;
+                EndTableInlineEditing();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+
+            menu.Show(parentControl, screenPos);
+        }
+
+        private static ShapeNode _slidesClipboardShape = null;
+        private static int _slidesClipboardSourceIndex = -1;
+
+        public void Copy()
+        {
+            if (IsInlineEditing && EditingShape != null)
+            {
+                if (!string.IsNullOrEmpty(EditingTextBuffer))
+                {
+                    try { Clipboard.SetText(EditingTextBuffer); } catch { }
+                }
+                return;
+            }
+
+            if (SelectedShape != null)
+            {
+                _slidesClipboardShape = SelectedShape.Clone();
+                _slidesClipboardSourceIndex = ActiveSlideIndex;
+                if (!string.IsNullOrEmpty(SelectedShape.Text))
+                {
+                    try { Clipboard.SetText(SelectedShape.Text); } catch { }
+                }
+            }
+        }
+
+        public void Cut()
+        {
+            if (IsInlineEditing && EditingShape != null)
+            {
+                if (!string.IsNullOrEmpty(EditingTextBuffer))
+                {
+                    try { Clipboard.SetText(EditingTextBuffer); } catch { }
+                    EditingTextBuffer = "";
+                    CaretIndex = 0;
+                    EditingShape.Text = "";
+                }
+                return;
+            }
+
+            if (SelectedShape != null && ActiveSlide != null && SelectedShapeIndex >= 0)
+            {
+                _slidesClipboardShape = SelectedShape.Clone();
+                _slidesClipboardSourceIndex = ActiveSlideIndex;
+                if (!string.IsNullOrEmpty(SelectedShape.Text))
+                {
+                    try { Clipboard.SetText(SelectedShape.Text); } catch { }
+                }
+                ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+                SelectedShapeIndex = -1;
+                EndInlineEditing();
+            }
+        }
+
+        public void Paste()
+        {
+            if (IsInlineEditing && EditingShape != null)
+            {
+                if (Clipboard.ContainsText())
+                {
+                    string clip = Clipboard.GetText();
+                    if (!string.IsNullOrEmpty(clip))
+                    {
+                        EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, clip);
+                        CaretIndex += clip.Length;
+                        EditingShape.Text = EditingTextBuffer;
+                    }
+                }
+                return;
+            }
+
+            if (_slidesClipboardShape != null && ActiveSlide != null)
+            {
+                ShapeNode pasteShape = _slidesClipboardShape.Clone();
+                // Giữ nguyên 100% vị trí khi dán qua slide khác!
+                if (ActiveSlideIndex == _slidesClipboardSourceIndex)
+                {
+                    // Dán trên cùng slide thì dịch nhẹ 20px để không đè lên hình cũ
+                    pasteShape.Transform.X += 20f;
+                    pasteShape.Transform.Y += 20f;
+                    _slidesClipboardShape.Transform.X += 20f;
+                    _slidesClipboardShape.Transform.Y += 20f;
+                }
+                else
+                {
+                    // Dán qua slide khác: vị trí tuyệt đối giữ nguyên 100%
+                    pasteShape.Transform.X = _slidesClipboardShape.Transform.X;
+                    pasteShape.Transform.Y = _slidesClipboardShape.Transform.Y;
+                }
+
+                ActiveSlide.AddShape(pasteShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                return;
+            }
+
+            // Dán đoạn text từ ngoài vào thành TextBox mới
+            if (Clipboard.ContainsText() && ActiveSlide != null)
+            {
+                string text = Clipboard.GetText();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    ShapeNode tb = new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Transform = new Transform2D(150f, 150f, 450f, 120f),
+                        Text = text,
+                        FontSize = 18.0f,
+                        TextColor = 0x1E293B,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    };
+                    ActiveSlide.AddShape(tb);
+                    SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                }
+            }
+        }
+
+        public void Duplicate()
+        {
+            if (SelectedShape != null && ActiveSlide != null)
+            {
+                ShapeNode dup = SelectedShape.Clone();
+                dup.Transform.X += 20f;
+                dup.Transform.Y += 20f;
+                ActiveSlide.AddShape(dup);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            }
+        }
+
+        public void StartPresenting(bool fromBeginning = false)
+        {
+            if (fromBeginning)
+            {
+                if (ShowSlideRangeStart > 1 && Presentation != null && ShowSlideRangeStart <= Presentation.Slides.Count)
+                    ActiveSlideIndex = ShowSlideRangeStart - 1;
+                else
+                    ActiveSlideIndex = 0;
+            }
+            else
+            {
+                if (ShowSlideRangeEnd > 0 && (ActiveSlideIndex < ShowSlideRangeStart - 1 || ActiveSlideIndex > ShowSlideRangeEnd - 1))
+                {
+                    ActiveSlideIndex = Math.Max(0, ShowSlideRangeStart - 1);
+                }
+            }
+            IsPresenting = true;
+            IsEndSlideShowScreen = false;
+            CurrentAnimationStep = 0;
+            IsPlayingSlideAnimation = false;
+            IsPlayingAnimationPreview = false;
+            AnimationProgress = 0.0f;
+            _animStopwatch.Stop();
+            IsTransitioning = false;
+            TransitionProgress = 1.0f;
+            _transitionStopwatch.Stop();
+            ClearMorphTextureCache();
+            BlackScreenMode = false;
+            WhiteScreenMode = false;
+            IsSlideSorterModalOpen = false;
+            IsSlideZoomActive = false;
+            PenStrokes.Clear();
+            CurrentStroke.Clear();
+            PresentationStartTime = DateTime.Now;
+            PresentationPausedElapsed = TimeSpan.Zero;
+            IsPresentationTimerPaused = false;
+            SlideVideoPlayerManager.Instance.Stop();
+
+            if (RequestStartSlideShow != null)
+            {
+                RequestStartSlideShow(fromBeginning);
+            }
+        }
+
+        public void StopPresenting()
+        {
+            if (IsRehearsingTimings && RehearsedSlideTimes != null && RehearsedSlideTimes.Count > 0)
+            {
+                TimeSpan totalTime = DateTime.Now - RehearsalTotalStartTime;
+                string totalStr = string.Format("{0:D2}:{1:D2}:{2:D2}", (int)totalTime.TotalHours, totalTime.Minutes, totalTime.Seconds);
+                DialogResult res = MessageBox.Show(
+                    "Tổng thời gian cho bài thuyết trình là " + totalStr + ".\n\nBạn có muốn lưu các mốc thời gian trình chiếu mới này để tự động chuyển tiếp slide không?",
+                    "Tập dượt thời gian (Rehearse Timings)",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information);
+
+                if (res == DialogResult.Yes)
+                {
+                    UseTimings = true;
+                }
+            }
+
+            IsRehearsingTimings = false;
+            IsPresenting = false;
+            IsEndSlideShowScreen = false;
+            IsSlideSorterModalOpen = false;
+            IsSlideZoomActive = false;
+            PenStrokes.Clear();
+            CurrentStroke.Clear();
+            AnnotationPenMode = false;
+            LaserPointerMode = false;
+            SlideVideoPlayerManager.Instance.Stop();
+
+            if (RequestStopSlideShow != null)
+            {
+                RequestStopSlideShow();
+            }
+        }
+
+        public void ShowSetUpSlideShowDialog(Control parent)
+        {
+            int totalSlides = Presentation != null ? Presentation.Slides.Count : 1;
+            using (SetUpSlideShowForm dlg = new SetUpSlideShowForm(totalSlides, ShowType, LoopUntilEsc, ShowWithoutNarration, ShowWithoutAnimation, UseTimings, UsePresenterView, SelectedMonitorIndex, ShowSlideRangeStart, ShowSlideRangeEnd))
+            {
+                if (dlg.ShowDialog(parent) == DialogResult.OK)
+                {
+                    ShowType = dlg.ShowType;
+                    LoopUntilEsc = dlg.LoopUntilEsc;
+                    ShowWithoutNarration = dlg.ShowWithoutNarration;
+                    ShowWithoutAnimation = dlg.ShowWithoutAnimation;
+                    UseTimings = dlg.AdvanceWithTimings;
+                    SelectedMonitorIndex = dlg.MonitorIndex;
+                    UsePresenterView = dlg.UsePresenterView;
+                    if (dlg.ShowAllSlides)
+                    {
+                        ShowSlideRangeStart = 1;
+                        ShowSlideRangeEnd = 0;
+                    }
+                    else
+                    {
+                        ShowSlideRangeStart = dlg.SlideFrom;
+                        ShowSlideRangeEnd = dlg.SlideTo;
+                    }
+                    if (parent != null) parent.Invalidate();
+                }
+            }
+        }
+
+        public void StartRehearsingTimings()
+        {
+            IsRehearsingTimings = true;
+            RehearsalSlideStartTime = DateTime.Now;
+            RehearsalTotalStartTime = DateTime.Now;
+            RehearsalSlideElapsed = TimeSpan.Zero;
+            RehearsalTotalElapsed = TimeSpan.Zero;
+            IsRehearsalPaused = false;
+            if (RehearsedSlideTimes == null) RehearsedSlideTimes = new Dictionary<int, float>();
+            RehearsedSlideTimes.Clear();
+            StartPresenting(true);
+        }
+
+        public void ShowCustomSlideShowManager(Control parent)
+        {
+            ContextMenuStrip customMenu = new ContextMenuStrip();
+            ToolStripMenuItem miNew = new ToolStripMenuItem("➕ Trình chiếu tùy chỉnh mới (New Custom Show)...");
+            miNew.Click += (s, e) =>
+            {
+                string showName = "Custom Show " + ((CustomShowNames != null ? CustomShowNames.Count : 0) + 1);
+                List<int> slideList = new List<int>();
+                for (int i = 0; i < (Presentation != null ? Presentation.Slides.Count : 0); i++)
+                {
+                    slideList.Add(i);
+                }
+                if (CustomShowNames == null) CustomShowNames = new List<string>();
+                if (CustomShows == null) CustomShows = new Dictionary<string, List<int>>();
+                CustomShowNames.Add(showName);
+                CustomShows[showName] = slideList;
+                MessageBox.Show("Đã tạo trình chiếu tùy chỉnh: " + showName + "\nBao gồm tất cả " + slideList.Count + " slide.", "Trình chiếu Tùy chỉnh (Custom Slide Show)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+            customMenu.Items.Add(miNew);
+
+            if (CustomShowNames != null && CustomShowNames.Count > 0)
+            {
+                customMenu.Items.Add(new ToolStripSeparator());
+                foreach (string cName in CustomShowNames)
+                {
+                    string capturedName = cName;
+                    ToolStripMenuItem miShow = new ToolStripMenuItem("▶ " + capturedName);
+                    miShow.Click += (s, e) =>
+                    {
+                        StartPresenting(true);
+                    };
+                    customMenu.Items.Add(miShow);
+                }
+            }
+
+            if (parent != null) customMenu.Show(parent, parent.PointToClient(Cursor.Position));
+            else customMenu.Show(Cursor.Position);
+        }
+        #endregion
+
+        #region Coordinate Conversion & Workspace Panning
+        public void GetActiveSlideWorkspaceBounds(out float minX, out float minY, out float maxX, out float maxY)
+        {
+            minX = 0f;
+            minY = 0f;
+            maxX = Presentation.CanvasWidth; // 960
+            maxY = Presentation.CanvasHeight; // 540
+
+            SlideNode slide = ActiveSlide;
+            if (slide != null && slide.Shapes != null)
+            {
+                for (int i = 0; i < slide.Shapes.Count; i++)
+                {
+                    ShapeNode s = slide.Shapes[i];
+                    if (s.Transform != null)
+                    {
+                        if (s.Transform.X < minX) minX = s.Transform.X;
+                        if (s.Transform.Y < minY) minY = s.Transform.Y;
+                        if (s.Transform.Right > maxX) maxX = s.Transform.Right;
+                        if (s.Transform.Bottom > maxY) maxY = s.Transform.Bottom;
+                    }
+                }
+            }
+
+            // Margins around items
+            minX -= 120f;
+            minY -= 120f;
+            maxX += 120f;
+            maxY += 120f;
+        }
+
+        public void GetScrollLimits(int canvasW, int canvasH, out int minScrollX, out int maxScrollX, out int minScrollY, out int maxScrollY)
+        {
+            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
+            float scale = ZoomLevel * 0.58f;
+            int slideW = (int)(Presentation.CanvasWidth * scale);
+            int slideH = (int)(slideW / targetRatio);
+
+            float wsMinX, wsMinY, wsMaxX, wsMaxY;
+            GetActiveSlideWorkspaceBounds(out wsMinX, out wsMinY, out wsMaxX, out wsMaxY);
+
+            int wsPxMinX = (int)(wsMinX * scale);
+            int wsPxMinY = (int)(wsMinY * scale);
+            int wsPxMaxX = (int)(wsMaxX * scale);
+            int wsPxMaxY = (int)(wsMaxY * scale);
+
+            int totalWsW = wsPxMaxX - wsPxMinX;
+            int totalWsH = wsPxMaxY - wsPxMinY;
+
+            // Khoảng không gian cuộn thoáng trên và dưới (Headroom margin) chuẩn PowerPoint
+            int verticalHeadroom = Math.Max(350, (int)(slideH * 0.85f));
+            int horizontalHeadroom = Math.Max(250, (int)(slideW * 0.6f));
+
+            int spanX = Math.Max(horizontalHeadroom, (totalWsW - canvasW) / 2 + horizontalHeadroom);
+            int spanY = Math.Max(verticalHeadroom, (totalWsH - canvasH) / 2 + verticalHeadroom);
+
+            int offLeft = Math.Max(0, -wsPxMinX);
+            int offRight = Math.Max(0, wsPxMaxX - slideW);
+            int offTop = Math.Max(0, -wsPxMinY);
+            int offBottom = Math.Max(0, wsPxMaxY - slideH);
+
+            minScrollX = -Math.Max(spanX, offRight + horizontalHeadroom);
+            maxScrollX = Math.Max(spanX, offLeft + horizontalHeadroom);
+            minScrollY = -Math.Max(spanY, offBottom + verticalHeadroom);
+            maxScrollY = Math.Max(spanY, offTop + verticalHeadroom);
+        }
+
+        public void ClampScroll(int canvasW, int canvasH)
+        {
+            int minX, maxX, minY, maxY;
+            GetScrollLimits(canvasW, canvasH, out minX, out maxX, out minY, out maxY);
+            CanvasScrollX = Math.Max(minX, Math.Min(maxX, CanvasScrollX));
+            CanvasScrollY = Math.Max(minY, Math.Min(maxY, CanvasScrollY));
+        }
+
+        public void ZoomAt(Point mousePos, int delta, int width, int height)
+        {
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            int oldSlideX, oldSlideY, oldSlideW, oldSlideH;
+            float oldScale;
+            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out oldSlideX, out oldSlideY, out oldSlideW, out oldSlideH, out oldScale);
+
+            float normX = (oldScale > 0) ? (mousePos.X - oldSlideX) / oldScale : 0;
+            float normY = (oldScale > 0) ? (mousePos.Y - oldSlideY) / oldScale : 0;
+
+            float step = (ZoomLevel >= 1.5f) ? 0.25f : 0.10f;
+            float newZoom = (delta > 0) ? Math.Min(5.0f, ZoomLevel + step) : Math.Max(0.10f, ZoomLevel - step);
+            if (Math.Abs(newZoom - ZoomLevel) < 0.001f) return;
+
+            ZoomLevel = newZoom;
+
+            int newSlideX, newSlideY, newSlideW, newSlideH;
+            float newScale;
+            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out newSlideX, out newSlideY, out newSlideW, out newSlideH, out newScale);
+
+            if (ZoomLevel > 1.0f)
+            {
+                int targetSlideX = (int)(mousePos.X - normX * newScale);
+                int targetSlideY = (int)(mousePos.Y - normY * newScale);
+
+                int centerOffsetX = leftSidebarW + (canvasW - newSlideW) / 2;
+                int centerOffsetY = contentY + (contentH - newSlideH) / 2;
+
+                CanvasScrollX = centerOffsetX - targetSlideX;
+                CanvasScrollY = centerOffsetY - targetSlideY;
+                ClampScroll(canvasW, contentH);
+            }
+            else
+            {
+                CanvasScrollX = 0;
+                CanvasScrollY = 0;
+            }
+        }
+
+        public void GetSlideCanvasBounds(int canvasX, int canvasY, int canvasW, int canvasH, out int slideX, out int slideY, out int slideW, out int slideH, out float scale)
+        {
+            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
+            scale = ZoomLevel * 0.58f;
+            slideW = (int)(Presentation.CanvasWidth * scale);
+            slideH = (int)(slideW / targetRatio);
+
+            int centerOffsetX = canvasX + (canvasW - slideW) / 2;
+            int centerOffsetY = canvasY + (canvasH - slideH) / 2;
+
+            slideX = centerOffsetX - CanvasScrollX;
+            slideY = centerOffsetY - CanvasScrollY;
+            scale = (float)slideW / Presentation.CanvasWidth;
+        }
+        #endregion
+
+        #region Main Workspace Drawing Logic
+        public void Draw(Graphics g, int width, int height)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            if (IsPresenting)
+            {
+                DrawFullscreenPresenter(g, width, height);
+                return;
+            }
+
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+
+            int canvasX = leftSidebarW;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+            Rectangle centerViewportRect = new Rectangle(canvasX, contentY, canvasW, contentH);
+
+            // 1. Draw Center Viewport with Clipping
+            GraphicsState origState = g.Save();
+            g.SetClip(centerViewportRect);
+
+            switch (ViewMode)
+            {
+                case ImpressViewMode.Normal:
+                case ImpressViewMode.ReadingView:
+                    DrawNormalCanvasView(g, canvasX, contentY, canvasW, contentH);
+                    break;
+                case ImpressViewMode.Outline:
+                    DrawOutlineView(g, canvasX, contentY, canvasW, contentH);
+                    break;
+                case ImpressViewMode.Notes:
+                    DrawNotesView(g, canvasX, contentY, canvasW, contentH);
+                    break;
+                case ImpressViewMode.SlideSorter:
+                    DrawSlideSorterView(g, 0, contentY, width - rightSidebarW, contentH);
+                    break;
+                case ImpressViewMode.SlideMaster:
+                    DrawSlideMasterView(g, canvasX, contentY, canvasW, contentH);
+                    break;
+            }
+
+            g.Restore(origState);
+
+            // 2. Draw Left Slide Pane ON TOP
+            if (leftSidebarW > 0)
+            {
+                DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+            }
+
+            // 3. Draw Right Sidebar Task Pane (Animation Pane / Properties) ON TOP
+            if (rightSidebarW > 0)
+            {
+                DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, contentH);
+            }
+        }
+
+        private void DrawNormalCanvasView(Graphics g, int x, int y, int w, int h)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
+            {
+                g.FillRectangle(stageBg, x, y, w, h);
+            }
+
+            int slideX, slideY, slideW, slideH;
+            float scale;
+            GetSlideCanvasBounds(x, y, w, h, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape != null)
+            {
+                ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
+                int vsx = slideX + (int)(vs.Transform.X * scale);
+                int vsy = slideY + (int)(vs.Transform.Y * scale);
+                int vsw = (int)(vs.Transform.Width * scale);
+                int vsh = (int)(vs.Transform.Height * scale);
+                SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
+            }
+
+            Rectangle slideRect = new Rectangle(slideX, slideY, slideW, slideH);
+
+            // Realistic PowerPoint Drop Shadow
+            using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+            {
+                g.FillRectangle(shadowBrush, slideX + 6, slideY + 6, slideW, slideH);
+            }
+
+            // If Transition Preview is running in normal canvas
+            if (IsPreviewingTransition && IsTransitioning)
+            {
+                SlideNode toSlide = (TransitionToSlideIndex >= 0 && TransitionToSlideIndex < Presentation.Slides.Count) ? Presentation.Slides[TransitionToSlideIndex] : ActiveSlide;
+                SlideNode fromSlide = (TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count && TransitionFromSlideIndex != TransitionToSlideIndex)
+                    ? Presentation.Slides[TransitionFromSlideIndex]
+                    : new SlideNode { BgColor = toSlide.BgColor, IsGradientBg = toSlide.IsGradientBg, BgColor2 = toSlide.BgColor2 };
+                RenderTransitionFrame(g, slideRect, fromSlide, toSlide, toSlide.Transition, TransitionProgress, scale);
+            }
+            else
+            {
+                // Slide Background
+                SlideNode slide = ActiveSlide;
+                if (slide != null)
+                {
+                    DrawSlideBackground(g, slideRect, slide);
+                }
+                else
+                {
+                    g.FillRectangle(Brushes.White, slideRect);
+                }
+
+                // Render Shapes
+                if (slide != null)
+                {
+                    for (int i = 0; i < slide.Shapes.Count; i++)
+                    {
+                        ShapeNode shape = slide.Shapes[i];
+                        bool isSel = (i == SelectedShapeIndex) || (SelectedShapeIndices != null && SelectedShapeIndices.Contains(i));
+
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        ShapeAnimation activeAnim;
+                        float activeP;
+                        GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, false, IsPlayingAnimationPreview, ActivePlayingAnimIndex, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
+
+                        if (isVis)
+                        {
+                            DrawShape(g, slideX, slideY, scale, shape, isSel, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                        }
+                    }
+
+                    // Render Motion Paths Trajectory & Ghost Silhouettes in Design Mode
+                    DrawMotionPathsOverlay(g, slideX, slideY, scale, slide);
+                }
+
+                // Render Table Insert Live Preview (Ghost Overlay)
+                DrawTableInsertPreviewOverlay(g, slideX, slideY, scale);
+            }
+
+            // Border around slide canvas
+            using (Pen borderPen = new Pen(Color.FromArgb(215, 215, 215), 1.0f))
+            {
+                g.DrawRectangle(borderPen, slideRect);
+            }
+
+            // Render Pending Drawing Overlay
+            if (IsDrawingActive)
+            {
+                DrawPendingShapeOverlay(g);
+            }
+
+            // Render Smart Snap Guides & Equidistant Spacing Indicators
+            DrawSmartGuidesAndSpacingIndicators(g, slideX, slideY, scale);
+
+            // Render Rulers
+            if (ShowRuler)
+            {
+                DrawSlideRulers(g, x, y, w, h, slideX, slideY, slideW, slideH, scale);
+            }
+
+            // Draw Workspace Scrollbars (Thanh cuộn ngang & dọc chuẩn PowerPoint / Office 365)
+            int minScrollX, maxScrollX, minScrollY, maxScrollY;
+            GetScrollLimits(w, h, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+
+            bool hasVScroll = (minScrollY < maxScrollY);
+            bool hasHScroll = (minScrollX < maxScrollX);
+            int sbH = 14;
+            int sbW = 14;
+
+            if (hasHScroll)
+            {
+                int hTrackW = hasVScroll ? (w - sbW) : w;
+                int hTrackX = x;
+                int hTrackY = y + h - sbH;
+                Rectangle hTrackRect = new Rectangle(hTrackX, hTrackY, hTrackW, sbH);
+
+                // Track Background & Top subtle border
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
+                using (Pen trackBorder = new Pen(Color.FromArgb(226, 226, 226), 1.0f))
+                {
+                    g.FillRectangle(trackBg, hTrackRect);
+                    g.DrawLine(trackBorder, hTrackX, hTrackY, hTrackX + hTrackW, hTrackY);
+                }
+
+                // Thumb Pill Calculation
+                int totalW = maxScrollX - minScrollX + w;
+                int thumbW = Math.Max(40, (int)((float)w / totalW * hTrackW));
+                thumbW = Math.Min(thumbW, hTrackW);
+                float fracX = (float)(CanvasScrollX - minScrollX) / Math.Max(1, maxScrollX - minScrollX);
+                int thumbX = hTrackX + (int)(fracX * (hTrackW - thumbW));
+                Rectangle hThumbRect = new Rectangle(thumbX + 2, hTrackY + 2, Math.Max(20, thumbW - 4), sbH - 4);
+
+                // Thumb Colors (Active Drag / Hover / Default)
+                Color thumbCol = IsDraggingHScrollBar ? Color.FromArgb(100, 100, 100) : (IsHoverHScrollBarThumb ? Color.FromArgb(145, 145, 145) : Color.FromArgb(188, 188, 188));
+                using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                {
+                    FillRoundedPill(g, thumbBrush, hThumbRect);
+                }
+            }
+
+            if (hasVScroll)
+            {
+                int vTrackH = hasHScroll ? (h - sbH) : h;
+                int vTrackX = x + w - sbW;
+                int vTrackY = y;
+                Rectangle vTrackRect = new Rectangle(vTrackX, vTrackY, sbW, vTrackH);
+
+                // Track Background & Left subtle border
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
+                using (Pen trackBorder = new Pen(Color.FromArgb(226, 226, 226), 1.0f))
+                {
+                    g.FillRectangle(trackBg, vTrackRect);
+                    g.DrawLine(trackBorder, vTrackX, vTrackY, vTrackX, vTrackY + vTrackH);
+                }
+
+                // Thumb Pill Calculation
+                int totalH = maxScrollY - minScrollY + h;
+                int thumbH = Math.Max(40, (int)((float)h / totalH * vTrackH));
+                thumbH = Math.Min(thumbH, vTrackH);
+                float fracY = (float)(CanvasScrollY - minScrollY) / Math.Max(1, maxScrollY - minScrollY);
+                int thumbY = vTrackY + (int)(fracY * (vTrackH - thumbH));
+                Rectangle vThumbRect = new Rectangle(vTrackX + 2, thumbY + 2, sbW - 4, Math.Max(20, thumbH - 4));
+
+                // Thumb Colors (Active Drag / Hover / Default)
+                Color thumbCol = IsDraggingVScrollBar ? Color.FromArgb(100, 100, 100) : (IsHoverVScrollBarThumb ? Color.FromArgb(145, 145, 145) : Color.FromArgb(188, 188, 188));
+                using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                {
+                    FillRoundedPill(g, thumbBrush, vThumbRect);
+                }
+            }
+
+            if (hasHScroll && hasVScroll)
+            {
+                Rectangle cornerRect = new Rectangle(x + w - sbW, y + h - sbH, sbW, sbH);
+                using (SolidBrush cornerBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
+                {
+                    g.FillRectangle(cornerBg, cornerRect);
+                }
+            }
+
+            // Render Chroma Key Eyedropper Loupe on Top
+            if (IsColorPickingMode && HasColorPickHover)
+            {
+                DrawColorPickLoupe(g, ColorPickMouseCanvasPos, ColorPickHoverColor);
+            }
+        }
+
+        private static void FillRoundedPill(Graphics g, Brush brush, Rectangle r)
+        {
+            if (r.Width <= 0 || r.Height <= 0) return;
+            int radius = Math.Min(r.Width, r.Height) / 2;
+            if (radius <= 1)
+            {
+                g.FillRectangle(brush, r);
+                return;
+            }
+            int d = radius * 2;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddArc(r.X, r.Y, d, d, 180, 90);
+                path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+                path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+                path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+                path.CloseFigure();
+                g.FillPath(brush, path);
+            }
+        }
+
+        private void DrawLeftSlidePane(Graphics g, int sidebarW, int y, int h)
+        {
+            using (SolidBrush leftBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+            {
+                g.FillRectangle(leftBg, 0, y, sidebarW, h);
+            }
+            using (Pen borderPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+            {
+                g.DrawLine(borderPen, sidebarW, y, sidebarW, y + h);
+            }
+
+            // 1. Scrollable Thumbnail & Section Region (Clipped from y + 44 to y + h)
+            GraphicsState paneState = g.Save();
+            Rectangle scrollClipRect = new Rectangle(0, y + 44, sidebarW, Math.Max(10, h - 44));
+            g.SetClip(scrollClipRect);
+
+            int thumbY = y + 44 - ThumbScrollY;
+            int thumbW = 150;
+            int thumbH = Presentation.IsWidescreen ? (thumbW * 9 / 16) : (thumbW * 3 / 4);
+            int thumbX = 38;
+
+            bool currentSectionCollapsed = false;
+
+            using (Font numFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font secFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font starFont = new Font("Segoe UI Emoji", 8.0f, FontStyle.Regular))
+            {
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    SlideNode s = Presentation.Slides[i];
+
+                    // Section Header Check & Render
+                    if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                    {
+                        string secName = !string.IsNullOrEmpty(s.SectionName) ? s.SectionName : "Default Section";
+
+                        // Check if active slide is in this section
+                        int nextSecIdx = i + 1;
+                        while (nextSecIdx < Presentation.Slides.Count && !Presentation.Slides[nextSecIdx].IsSectionHeader)
+                        {
+                            nextSecIdx++;
+                        }
+                        bool isCurrentSectionActive = (ActiveSlideIndex >= i && ActiveSlideIndex < nextSecIdx);
+
+                        if (thumbY + 22 >= y + 40 && thumbY <= y + h + 20)
+                        {
+                            Color secCol = isCurrentSectionActive ? Color.FromArgb(185, 28, 28) : Color.FromArgb(51, 65, 85);
+                            using (SolidBrush secBrush = new SolidBrush(secCol))
+                            {
+                                string tri = s.IsSectionCollapsed ? "▶" : "▲";
+                                string countSuffix = s.IsSectionCollapsed ? (" (" + (nextSecIdx - i) + ")") : "";
+                                g.DrawString(tri, secFont, secBrush, 8, thumbY + 1);
+                                g.DrawString(secName + countSuffix, secFont, secBrush, 22, thumbY + 1);
+                            }
+                        }
+
+                        currentSectionCollapsed = s.IsSectionCollapsed;
+                        thumbY += 24;
+                    }
+
+                    if (currentSectionCollapsed)
+                    {
+                        continue;
+                    }
+
+                    Rectangle frameRect = new Rectangle(thumbX, thumbY, thumbW, thumbH);
+
+                    if (thumbY + thumbH >= y + 40 && thumbY <= y + h + 20)
+                    {
+                        // Slide number badge
+                        Brush numBrush = (i == ActiveSlideIndex) ? new SolidBrush(Color.FromArgb(210, 71, 38)) : Brushes.Gray;
+                        g.DrawString((i + 1).ToString(), numFont, numBrush, 12, thumbY + thumbH / 2 - 8);
+
+                        // Hidden Slide Number Slashed Box (chuẩn PowerPoint)
+                        if (s.IsHidden)
+                        {
+                            Rectangle numBox = new Rectangle(7, thumbY + thumbH / 2 - 10, 20, 18);
+                            using (Pen slashPen = new Pen(Color.FromArgb(140, 140, 140), 1.2f))
+                            {
+                                g.DrawRectangle(slashPen, numBox);
+                                g.DrawLine(slashPen, numBox.Left + 2, numBox.Bottom - 2, numBox.Right - 2, numBox.Top + 2);
+                            }
+                        }
+
+                        // Star badge if transition is set
+                        if (s.Transition != TransitionType.None)
+                        {
+                            g.DrawString("⭐", starFont, Brushes.Goldenrod, 10, thumbY + thumbH / 2 + 8);
+                        }
+
+                        // Thumbnail slide canvas
+                        g.FillRectangle((i == ActiveSlideIndex) ? Brushes.White : Brushes.WhiteSmoke, frameRect);
+
+                        // Active PowerPoint Orange Border
+                        Color frameCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
+                        using (Pen framePen = new Pen(frameCol, (i == ActiveSlideIndex) ? 2.5f : 1.0f))
+                        {
+                            g.DrawRectangle(framePen, frameRect);
+                        }
+
+                        // Mini shape rendering chuẩn 100% như slide chính
+                        float miniScale = (float)thumbW / Presentation.CanvasWidth;
+                        GraphicsState state = g.Save();
+                        g.SetClip(frameRect);
+
+                        // Background
+                        DrawSlideBackground(g, frameRect, s);
+
+                        foreach (ShapeNode shape in s.Shapes)
+                        {
+                            DrawShape(g, thumbX, thumbY, miniScale, shape, false);
+                        }
+                        g.Restore(state);
+
+                        // Hidden Slide Badge & Dimming
+                        if (s.IsHidden)
+                        {
+                            using (Pen slashPen = new Pen(Color.FromArgb(220, 239, 68, 68), 2.0f))
+                            {
+                                g.DrawLine(slashPen, 8, thumbY + thumbH / 2 - 8, 24, thumbY + thumbH / 2 + 8);
+                            }
+                            using (SolidBrush dimBg = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
+                            {
+                                g.FillRectangle(dimBg, frameRect);
+                            }
+                        }
+                    }
+
+                    thumbY += thumbH + 14;
+                }
+            }
+
+            g.Restore(paneState);
+
+            // 2. Fixed Top Header Bar with "+ Slide Mới" & "Nhân Bản" (Drawn ON TOP of scrolling thumbnails)
+            using (SolidBrush topHeaderBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+            {
+                g.FillRectangle(topHeaderBg, 0, y, sidebarW, 44);
+            }
+            using (Pen sepPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+            {
+                g.DrawLine(sepPen, 0, y + 43, sidebarW, y + 43);
+            }
+
+            Rectangle btnAdd = new Rectangle(8, y + 8, 92, 28);
+            Rectangle btnDup = new Rectangle(106, y + 8, 92, 28);
+
+            using (SolidBrush orangeBrush = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            {
+                g.FillRectangle(orangeBrush, btnAdd);
+            }
+            using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            {
+                g.DrawString("➕ Slide Mới", btnFont, Brushes.White, btnAdd.X + 8, btnAdd.Y + 5);
+            }
+
+            g.FillRectangle(Brushes.White, btnDup);
+            g.DrawRectangle(Pens.Silver, btnDup);
+            using (Font btnFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
+            {
+                g.DrawString("📋 Nhân Bản", btnFont, Brushes.DimGray, btnDup.X + 12, btnDup.Y + 6);
+            }
+        }
+
+        public bool HasAnySections()
+        {
+            if (Presentation == null) return false;
+            for (int i = 0; i < Presentation.Slides.Count; i++)
+            {
+                if (Presentation.Slides[i].IsSectionHeader) return true;
+            }
+            return false;
+        }
+
+        private void DrawRightSidebarPanel(Graphics g, int x, int y, int w, int h)
+        {
+            if (!IsSidebarOpen) return;
+
+            // Task pane background
+            using (SolidBrush sbBg = new SolidBrush(Color.FromArgb(250, 250, 250)))
+            {
+                g.FillRectangle(sbBg, x, y, w, h);
+            }
+            using (Pen borderPen = new Pen(Color.FromArgb(220, 220, 220), 1.0f))
+            {
+                g.DrawLine(borderPen, x, y, x, y + h);
+            }
+
+            // Microsoft PowerPoint Task Pane Header:
+            string paneTitle = "Khung Hoạt Họa";
+            if (SidebarPanel == SidebarPanelType.Properties) paneTitle = "Định Dạng Hình Dạng";
+            else if (SidebarPanel == SidebarPanelType.SlideTransitions) paneTitle = "Chuyển Tiếp Trang Chiếu";
+            else if (SidebarPanel == SidebarPanelType.Navigator) paneTitle = "Bộ Chọn Đối Tượng";
+            else if (SidebarPanel == SidebarPanelType.FormatBackground) paneTitle = "Format Background";
+            else if (SidebarPanel == SidebarPanelType.SelectionPane) paneTitle = "Lựa chọn (Selection)";
+
+            Rectangle headerRect = new Rectangle(x, y, w, 36);
+            using (SolidBrush headerBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
+            {
+                g.FillRectangle(headerBg, headerRect);
+            }
+            using (Pen headerBorder = new Pen(Color.FromArgb(225, 225, 225), 1.0f))
+            {
+                g.DrawLine(headerBorder, x, y + 36, x + w, y + 36);
+            }
+
+            using (Font titleHeaderFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            {
+                g.DrawString(paneTitle, titleHeaderFont, Brushes.Black, x + 12, y + 9);
+            }
+
+            // Close button '✕' on top-right
+            Rectangle closeBtnRect = new Rectangle(x + w - 28, y + 7, 22, 22);
+            using (Font closeFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            {
+                g.DrawString("✕", closeFont, Brushes.Gray, closeBtnRect.X + 4, closeBtnRect.Y + 2);
+            }
+
+            int panelY = y + 42 + SidebarScrollY;
+
+            using (Font titleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (Font labelFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+            using (Font boldFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            {
+                switch (SidebarPanel)
+                {
+                    case SidebarPanelType.AnimationPane:
+                        DrawAnimationPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+
+                    case SidebarPanelType.SlideTransitions:
+                        DrawTransitionsPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+
+                    case SidebarPanelType.Properties:
+                        DrawFormatPropertiesPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+
+                    case SidebarPanelType.Navigator:
+                        DrawNavigatorPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+
+                    case SidebarPanelType.FormatBackground:
+                        DrawFormatBackgroundPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+
+                    case SidebarPanelType.SelectionPane:
+                        DrawSelectionPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+                }
+            }
+        }
+
+        private void DrawSelectionPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            if (ActiveSlide == null) return;
+
+            // Top action buttons (Matching Image 3)
+            Rectangle btnShowAll = new Rectangle(x + 10, panelY, 86, 25);
+            Rectangle btnHideAll = new Rectangle(x + 102, panelY, 80, 25);
+            Rectangle btnMoveUp = new Rectangle(x + w - 58, panelY, 22, 25);
+            Rectangle btnMoveDown = new Rectangle(x + w - 32, panelY, 22, 25);
+
+            DrawInteractiveButton(g, btnShowAll, false, 3);
+            g.DrawString("Hiện tất cả", labelFont, Brushes.Black, btnShowAll.X + 10, btnShowAll.Y + 5);
+
+            DrawInteractiveButton(g, btnHideAll, false, 3);
+            g.DrawString("Ẩn tất cả", labelFont, Brushes.Black, btnHideAll.X + 12, btnHideAll.Y + 5);
+
+            DrawInteractiveButton(g, btnMoveUp, false, 3);
+            g.DrawString("▲", labelFont, Brushes.DimGray, btnMoveUp.X + 4, btnMoveUp.Y + 5);
+
+            DrawInteractiveButton(g, btnMoveDown, false, 3);
+            g.DrawString("▼", labelFont, Brushes.DimGray, btnMoveDown.X + 4, btnMoveDown.Y + 5);
+
+            // Shape Rows
+            int listStartY = panelY + 34;
+            int rowH = 28;
+
+            for (int r = 0; r < ActiveSlide.Shapes.Count; r++)
+            {
+                int shapeIdx = ActiveSlide.Shapes.Count - 1 - r; // Top of list = front Z-index
+                ShapeNode shape = ActiveSlide.Shapes[shapeIdx];
+                int rowY = listStartY + r * rowH;
+                Rectangle rowRect = new Rectangle(x + 10, rowY, w - 20, 26);
+
+                bool isSelected = (shapeIdx == SelectedShapeIndex) || (SelectedShapeIndices != null && SelectedShapeIndices.Contains(shapeIdx));
+
+                if (isSelected)
+                {
+                    using (SolidBrush selBg = new SolidBrush(Color.FromArgb(254, 215, 170))) // Soft peach highlight matching Image 3
+                    using (Pen selPen = new Pen(Color.FromArgb(251, 146, 60), 1.0f))
+                    {
+                        g.FillRectangle(selBg, rowRect);
+                        g.DrawRectangle(selPen, rowRect);
+                    }
+                }
+                else
+                {
+                    using (SolidBrush rowBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    {
+                        g.FillRectangle(rowBg, rowRect);
+                    }
+                }
+
+                // If currently dragging, draw drop indicator line
+                if (DraggingSelectionPaneIndex >= 0 && DraggingSelectionPaneTargetIndex == shapeIdx)
+                {
+                    using (Pen dropPen = new Pen(Color.FromArgb(225, 29, 72), 2.0f))
+                    {
+                        g.DrawLine(dropPen, rowRect.Left, rowRect.Top, rowRect.Right, rowRect.Top);
+                    }
+                }
+
+                // Display Name
+                string name = shape.GetDisplayName(shapeIdx);
+                g.DrawString(name, isSelected ? boldFont : labelFont, isSelected ? Brushes.DarkRed : Brushes.Black, rowRect.X + 8, rowRect.Y + 5);
+
+                // Eye Visibility Icon (on the right)
+                Rectangle eyeRect = new Rectangle(rowRect.Right - 24, rowRect.Y + 3, 20, 20);
+                DrawEyeVisibilityIcon(g, eyeRect.X, eyeRect.Y, shape.IsVisible);
+            }
+        }
+
+        private void DrawEyeVisibilityIcon(Graphics g, int x, int y, bool isVisible)
+        {
+            using (Pen p = new Pen(isVisible ? Color.FromArgb(51, 65, 85) : Color.FromArgb(148, 163, 184), 1.3f))
+            {
+                if (isVisible)
+                {
+                    g.DrawArc(p, x + 2, y + 3, 14, 10, 30, 120);
+                    g.DrawArc(p, x + 2, y - 1, 14, 10, 210, 120);
+                    using (SolidBrush b = new SolidBrush(Color.FromArgb(51, 65, 85)))
+                    {
+                        g.FillEllipse(b, x + 7, y + 5, 4, 4);
+                    }
+                }
+                else
+                {
+                    g.DrawLine(p, x + 3, y + 7, x + 15, y + 7);
+                }
+            }
+        }
+
+        private void DrawAnimationPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            // Play / Stop preview button
+            Rectangle btnPlay = new Rectangle(x + 10, panelY, w - 20, 26);
+            g.FillRectangle(IsPlayingAnimationPreview ? Brushes.MistyRose : Brushes.AliceBlue, btnPlay);
+            g.DrawRectangle(IsPlayingAnimationPreview ? Pens.Crimson : Pens.DodgerBlue, btnPlay);
+            g.DrawString(IsPlayingAnimationPreview ? "⏹ Dừng phát xem trước" : "▶ Phát tất cả (Play All)", boldFont, IsPlayingAnimationPreview ? Brushes.Crimson : Brushes.Navy, btnPlay.X + 24, btnPlay.Y + 5);
+            panelY += 34;
+
+            SlideNode slide = ActiveSlide;
+            if (slide == null || slide.Animations.Count == 0)
+            {
+                g.DrawString("Chưa có hiệu ứng hoạt họa trên slide này.", labelFont, Brushes.Gray, x + 12, panelY);
+                panelY += 20;
+                g.DrawString("Chọn một hình trên slide và bấm hiệu ứng trong Tab Hoạt họa (Animations).", labelFont, Brushes.DimGray, new RectangleF(x + 12, panelY, w - 24, 60));
+                return;
+            }
+
+            int stepNumber = 0;
+
+            for (int i = 0; i < slide.Animations.Count; i++)
+            {
+                ShapeAnimation anim = slide.Animations[i];
+                Rectangle animBox = new Rectangle(x + 8, panelY, w - 16, 32);
+
+                bool isSelected = (i == SelectedAnimationIndex);
+                bool isPlaying = (IsPlayingAnimationPreview && ActivePlayingAnimIndex == i);
+                bool isBeingDragged = (DraggingAnimationPaneIndex == i);
+
+                // Đường dóng chỉ thị vị trí thả (Drop Indicator Line)
+                if (DraggingAnimationPaneIndex >= 0 && DraggingAnimationPaneTargetIndex == i && DraggingAnimationPaneIndex != DraggingAnimationPaneTargetIndex)
+                {
+                    using (Pen dropPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                    using (SolidBrush dropB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                    {
+                        int lineY = (DraggingAnimationPaneIndex > i) ? animBox.Top - 2 : animBox.Bottom + 2;
+                        g.DrawLine(dropPen, animBox.Left, lineY, animBox.Right, lineY);
+                        Point[] leftArrow = new Point[] { new Point(animBox.Left, lineY - 4), new Point(animBox.Left + 6, lineY), new Point(animBox.Left, lineY + 4) };
+                        Point[] rightArrow = new Point[] { new Point(animBox.Right, lineY - 4), new Point(animBox.Right - 6, lineY), new Point(animBox.Right, lineY + 4) };
+                        g.FillPolygon(dropB, leftArrow);
+                        g.FillPolygon(dropB, rightArrow);
+                    }
+                }
+
+                if (isPlaying)
+                {
+                    g.FillRectangle(Brushes.LightYellow, animBox);
+                    g.DrawRectangle(Pens.Orange, animBox);
+                }
+                else if (isBeingDragged)
+                {
+                    using (SolidBrush dragBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    using (Pen dragPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.FillRectangle(dragBg, animBox);
+                        g.DrawRectangle(dragPen, animBox);
+                    }
+                }
+                else if (isSelected)
+                {
+                    using (SolidBrush selB = new SolidBrush(Color.FromArgb(254, 215, 170)))
+                    using (Pen selP = new Pen(Color.FromArgb(251, 146, 60), 1.2f))
+                    {
+                        g.FillRectangle(selB, animBox);
+                        g.DrawRectangle(selP, animBox);
+                    }
+                }
+                else
+                {
+                    g.FillRectangle(Brushes.White, animBox);
+                    g.DrawRectangle(Pens.LightGray, animBox);
+                }
+
+                // Category color badge
+                Color catCol = GetAnimationColor(anim.Type);
+                using (SolidBrush catBrush = new SolidBrush(catCol))
+                {
+                    g.FillRectangle(catBrush, animBox.X + 2, animBox.Y + 2, 4, animBox.Height - 4);
+                }
+
+                // Click Step Indicator
+                if (anim.Trigger == AnimationTrigger.OnClick || i == 0)
+                {
+                    stepNumber++;
+                    g.DrawString(stepNumber.ToString(), boldFont, Brushes.DarkSlateGray, animBox.X + 8, animBox.Y + 7);
+                }
+                else if (anim.Trigger == AnimationTrigger.WithPrevious)
+                {
+                    g.DrawString("⁝", boldFont, Brushes.Gray, animBox.X + 10, animBox.Y + 7);
+                }
+                else // AfterPrevious
+                {
+                    g.DrawString("⏱", labelFont, Brushes.Gray, animBox.X + 8, animBox.Y + 8);
+                }
+
+                // Trigger icon
+                string trigIcon = (anim.Trigger == AnimationTrigger.OnClick) ? "🖱️" : ((anim.Trigger == AnimationTrigger.WithPrevious) ? "⏱️" : "⏳");
+                g.DrawString(trigIcon, labelFont, Brushes.Black, animBox.X + 24, animBox.Y + 8);
+
+                // Shape name & animation type
+                string shapeName = "Hình " + (i + 1);
+                if (!string.IsNullOrEmpty(anim.ShapeId))
+                {
+                    for (int sIdx = 0; sIdx < slide.Shapes.Count; sIdx++)
+                    {
+                        if (slide.Shapes[sIdx].Id == anim.ShapeId)
+                        {
+                            shapeName = !string.IsNullOrEmpty(slide.Shapes[sIdx].Text)
+                                ? (slide.Shapes[sIdx].Text.Length > 12 ? slide.Shapes[sIdx].Text.Substring(0, 12) + "..." : slide.Shapes[sIdx].Text)
+                                : slide.Shapes[sIdx].Type.ToString();
+                            break;
+                        }
+                    }
+                }
+
+                string animName = shapeName + " (" + anim.Type.ToString() + ")";
+                if (animName.Length > 20) animName = animName.Substring(0, 20) + "...";
+                g.DrawString(animName, boldFont, Brushes.Black, animBox.X + 44, animBox.Y + 7);
+
+                // Timeline duration bar on the right
+                int barW = Math.Min(45, (int)(anim.Duration * 30));
+                Rectangle timeBar = new Rectangle(animBox.Right - barW - 20, animBox.Y + 9, barW, 14);
+                using (SolidBrush barBrush = new SolidBrush(catCol))
+                {
+                    g.FillRectangle(barBrush, timeBar);
+                }
+
+                // Dropdown Options Arrow ▾
+                g.DrawString("▾", boldFont, isSelected ? Brushes.DarkOrange : Brushes.Gray, animBox.Right - 16, animBox.Y + 6);
+
+                panelY += 36;
+            }
+
+            // Bottom Reorder Toolbar (Move Earlier, Move Later, Remove)
+            panelY += 8;
+            Rectangle btnUp = new Rectangle(x + 10, panelY, 70, 24);
+            Rectangle btnDown = new Rectangle(x + 85, panelY, 70, 24);
+            Rectangle btnDel = new Rectangle(x + 160, panelY, w - 170, 24);
+
+            DrawInteractiveButton(g, btnUp, false, 3);
+            g.DrawString("▲ Sớm hơn", labelFont, Brushes.Black, btnUp.X + 4, btnUp.Y + 4);
+
+            DrawInteractiveButton(g, btnDown, false, 3);
+            g.DrawString("▼ Muộn hơn", labelFont, Brushes.Black, btnDown.X + 3, btnDown.Y + 4);
+
+            DrawInteractiveButton(g, btnDel, false, 3);
+            g.DrawString("🗑 Xóa", labelFont, Brushes.Crimson, btnDel.X + 8, btnDel.Y + 4);
+        }
+
+        public void ShowAnimationItemContextMenu(Control parentControl, Point screenPos, int animIndex)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null || animIndex < 0 || animIndex >= slide.Animations.Count) return;
+            ShapeAnimation anim = slide.Animations[animIndex];
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.0f);
+
+            // 1. Triggers
+            ToolStripMenuItem miClick = new ToolStripMenuItem("🖱️ Bắt đầu khi nhấp chuột (Start On Click)", null, (s, e) => {
+                anim.Trigger = AnimationTrigger.OnClick;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = (anim.Trigger == AnimationTrigger.OnClick) };
+
+            ToolStripMenuItem miWith = new ToolStripMenuItem("⏱️ Bắt đầu cùng với trước đó (Start With Previous)", null, (s, e) => {
+                anim.Trigger = AnimationTrigger.WithPrevious;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = (anim.Trigger == AnimationTrigger.WithPrevious) };
+
+            ToolStripMenuItem miAfter = new ToolStripMenuItem("⏳ Bắt đầu sau trước đó (Start After Previous)", null, (s, e) => {
+                anim.Trigger = AnimationTrigger.AfterPrevious;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = (anim.Trigger == AnimationTrigger.AfterPrevious) };
+
+            menu.Items.Add(miClick);
+            menu.Items.Add(miWith);
+            menu.Items.Add(miAfter);
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 2. Duration Presets
+            ToolStripMenuItem miDur = new ToolStripMenuItem("⏱️ Thời lượng (Duration)");
+            float[] durPresets = new float[] { 0.25f, 0.50f, 0.75f, 1.00f, 1.50f, 2.00f, 3.00f, 5.00f };
+            foreach (float d in durPresets)
+            {
+                float targetD = d;
+                ToolStripMenuItem dItem = new ToolStripMenuItem(string.Format("{0:0.00} giây", targetD), null, (s, e) => {
+                    anim.Duration = targetD;
+                    if (parentControl != null) parentControl.Invalidate();
+                }) { Checked = Math.Abs(anim.Duration - targetD) < 0.05f };
+                miDur.DropDownItems.Add(dItem);
+            }
+            menu.Items.Add(miDur);
+
+            // 3. Delay Presets
+            ToolStripMenuItem miDel = new ToolStripMenuItem("⏳ Độ trễ (Delay)");
+            float[] delPresets = new float[] { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f, 1.50f, 2.00f };
+            foreach (float del in delPresets)
+            {
+                float targetDel = del;
+                ToolStripMenuItem delItem = new ToolStripMenuItem(string.Format("{0:0.00} giây", targetDel), null, (s, e) => {
+                    anim.Delay = targetDel;
+                    if (parentControl != null) parentControl.Invalidate();
+                }) { Checked = Math.Abs(anim.Delay - targetDel) < 0.05f };
+                miDel.DropDownItems.Add(delItem);
+            }
+            menu.Items.Add(miDel);
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 4. Move earlier / later
+            ToolStripMenuItem miUp = new ToolStripMenuItem("▲ Di chuyển sớm hơn (Move Earlier)", null, (s, e) => {
+                MoveAnimationEarlier(animIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Enabled = (animIndex > 0) };
+
+            ToolStripMenuItem miDown = new ToolStripMenuItem("▼ Di chuyển muộn hơn (Move Later)", null, (s, e) => {
+                MoveAnimationLater(animIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Enabled = (animIndex < slide.Animations.Count - 1) };
+
+            ToolStripMenuItem miRemove = new ToolStripMenuItem("🗑 Xóa hoạt họa này (Remove)", null, (s, e) => {
+                RemoveAnimation(animIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miUp);
+            menu.Items.Add(miDown);
+            menu.Items.Add(miRemove);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        private void DrawTransitionsPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            g.DrawString("✨ HIỆU ỨNG CHUYỂN TRANG", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            panelY += 26;
+
+            Rectangle btnPreview = new Rectangle(x + 10, panelY, w - 20, 26);
+            g.FillRectangle(Brushes.AliceBlue, btnPreview);
+            g.DrawRectangle(Pens.DodgerBlue, btnPreview);
+            g.DrawString("⭐ Xem trước hiệu ứng (Preview)", boldFont, Brushes.Navy, btnPreview.X + 16, btnPreview.Y + 5);
+            panelY += 34;
+
+            string[] topTransitions = new string[] {
+                "Morph (Biến hình) ⭐",
+                "Fade (Mờ dần)",
+                "Push (Đẩy slide)",
+                "Wipe (Quét ngang)",
+                "Split (Tách đôi)",
+                "Reveal (Hiển thị)",
+                "Zoom (Thu phóng)",
+                "RandomBars (Thanh ngẫu nhiên)",
+                "Cube (Khối hộp 3D)",
+                "PageCurl (Lật góc trang)"
+            };
+
+            for (int i = 0; i < topTransitions.Length; i++)
+            {
+                Rectangle transBox = new Rectangle(x + 10, panelY, w - 20, 24);
+                string enumName = topTransitions[i].Split(' ')[0];
+                bool isSel = (ActiveSlide != null && ActiveSlide.Transition.ToString() == enumName);
+
+                g.FillRectangle(isSel ? Brushes.Moccasin : Brushes.White, transBox);
+                g.DrawRectangle(isSel ? Pens.OrangeRed : Pens.LightGray, transBox);
+                g.DrawString(topTransitions[i], labelFont, isSel ? Brushes.DarkRed : Brushes.Black, transBox.X + 6, transBox.Y + 4);
+                panelY += 28;
+            }
+        }
+
+        private void DrawFormatPropertiesPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            g.DrawString("🎨 ĐỊNH DẠNG NỀN & HÌNH VẼ", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            panelY += 26;
+
+            g.DrawString("Màu nền Slide hiện tại:", labelFont, Brushes.Black, x + 12, panelY);
+            panelY += 20;
+
+            int[] bgColors = new int[] { 0xFFFFFF, 0xF8F9FA, 0xF0FDFA, 0x0F172A, 0xFEFCE8, 0xFDF4FF };
+            for (int c = 0; c < bgColors.Length; c++)
+            {
+                Rectangle cBox = new Rectangle(x + 12 + c * 38, panelY, 30, 24);
+                Color col = Color.FromArgb(bgColors[c] | unchecked((int)0xFF000000));
+                using (SolidBrush cb = new SolidBrush(col))
+                {
+                    g.FillRectangle(cb, cBox);
+                }
+                g.DrawRectangle(Pens.Gray, cBox);
+            }
+            panelY += 34;
+
+            g.DrawString("Tỷ lệ khung hình Slide:", labelFont, Brushes.Black, x + 12, panelY);
+            panelY += 20;
+            Rectangle btn169 = new Rectangle(x + 12, panelY, 115, 24);
+            Rectangle btn43 = new Rectangle(x + 135, panelY, 115, 24);
+
+            g.FillRectangle(Presentation.IsWidescreen ? Brushes.Moccasin : Brushes.White, btn169);
+            g.DrawRectangle(Presentation.IsWidescreen ? Pens.OrangeRed : Pens.LightGray, btn169);
+            g.DrawString("16:9 Màn rộng", labelFont, Brushes.Black, btn169.X + 12, btn169.Y + 4);
+
+            g.FillRectangle(!Presentation.IsWidescreen ? Brushes.Moccasin : Brushes.White, btn43);
+            g.DrawRectangle(!Presentation.IsWidescreen ? Pens.OrangeRed : Pens.LightGray, btn43);
+            g.DrawString("4:3 Tiêu chuẩn", labelFont, Brushes.Black, btn43.X + 12, btn43.Y + 4);
+            panelY += 34;
+
+            g.DrawLine(Pens.LightGray, x + 10, panelY, x + w - 10, panelY);
+            panelY += 12;
+
+            ShapeNode shape = SelectedShape;
+            if (shape != null)
+            {
+                g.DrawString("ĐỐI TƯỢNG ĐANG CHỌN:", boldFont, Brushes.Navy, x + 12, panelY);
+                panelY += 22;
+                g.DrawString("Loại: " + shape.Type.ToString(), labelFont, Brushes.DimGray, x + 12, panelY);
+                panelY += 18;
+                g.DrawString("Tên Morph: " + (string.IsNullOrEmpty(shape.MorphName) ? "(Tự động)" : shape.MorphName), labelFont, Brushes.DimGray, x + 12, panelY);
+                panelY += 18;
+                g.DrawString("Màu tô: #" + (shape.FillColor & 0xFFFFFF).ToString("X6"), labelFont, Brushes.Black, x + 12, panelY);
+                panelY += 18;
+                g.DrawString("Phông chữ: " + shape.FontName + " (" + (int)shape.FontSize + "pt)", labelFont, Brushes.Black, x + 12, panelY);
+            }
+            else
+            {
+                g.DrawString("(Nhấp chọn hình để chỉnh sửa)", labelFont, Brushes.Gray, x + 12, panelY);
+            }
+        }
+
+        private void DrawNavigatorPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            g.DrawString("🌳 CÂY ĐỐI TƯỢNG SLIDE", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            panelY += 26;
+
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                for (int i = 0; i < slide.Shapes.Count; i++)
+                {
+                    ShapeNode s = slide.Shapes[i];
+                    bool isSel = (i == SelectedShapeIndex);
+                    Rectangle sBox = new Rectangle(x + 10, panelY, w - 20, 24);
+
+                    g.FillRectangle(isSel ? Brushes.Moccasin : Brushes.White, sBox);
+                    g.DrawRectangle(isSel ? Pens.OrangeRed : Pens.LightGray, sBox);
+
+                    string sName = (i + 1) + ". " + s.Type + ": " + (string.IsNullOrEmpty(s.Text) ? "[Hình vẽ]" : s.Text);
+                    if (sName.Length > 24) sName = sName.Substring(0, 24) + "...";
+
+                    g.DrawString(sName, labelFont, isSel ? Brushes.DarkRed : Brushes.Black, sBox.X + 6, sBox.Y + 4);
+                    panelY += 28;
+                }
+            }
+        }
+
+        private void DrawFormatBackgroundPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            // Tab icon at top (Paint bucket with orange underline)
+            Rectangle tabIconRect = new Rectangle(x + 16, panelY - 4, 30, 24);
+            using (SolidBrush iconBg = new SolidBrush(Color.FromArgb(243, 244, 246)))
+            {
+                g.FillRectangle(iconBg, tabIconRect);
+            }
+            using (Pen tabPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+            {
+                g.DrawLine(tabPen, tabIconRect.X, tabIconRect.Bottom + 2, tabIconRect.Right, tabIconRect.Bottom + 2);
+            }
+            DrawFormatBgIconVector(g, tabIconRect.X + 7, tabIconRect.Y + 4, Color.FromArgb(210, 71, 38));
+
+            // Section Header Bar: ▲ Fill
+            int fillHeaderY = panelY + 28;
+            Rectangle fillHeader = new Rectangle(x + 8, fillHeaderY, w - 16, 22);
+            using (SolidBrush hdrBg = new SolidBrush(Color.FromArgb(226, 232, 240)))
+            {
+                g.FillRectangle(hdrBg, fillHeader);
+            }
+            using (Font secFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            {
+                g.DrawString("▲  Fill (Tô nền)", secFont, Brushes.Black, fillHeader.X + 6, fillHeader.Y + 2);
+            }
+
+            int curY = fillHeaderY + 28;
+
+            // 4 Radio Buttons (Matching PowerPoint 365)
+            string[] fillOptions = new string[] {
+                "Solid fill (Tô màu đồng nhất)",
+                "Gradient fill (Tô màu chuyển sắc)",
+                "Picture or texture fill (Tô ảnh hoặc họa tiết)",
+                "Pattern fill (Tô mẫu hoa văn)"
+            };
+
+            for (int r = 0; r < fillOptions.Length; r++)
+            {
+                bool isChecked = ((int)slide.BgFillType == r);
+                DrawCustomRadioButton(g, x + 24, curY, isChecked, fillOptions[r], labelFont);
+                curY += 24;
+            }
+
+            curY += 4;
+            // Checkbox: Hide background graphics
+            DrawCustomCheckBox(g, x + 24, curY, slide.HideBackgroundGraphics, "Hide background graphics (Ẩn đồ họa nền)", labelFont);
+            curY += 30;
+
+            // Details for Gradient fill (IMAGE 2 EXACT REPLICA)
+            if (slide.BgFillType == BackgroundFillType.Gradient || slide.IsGradientBg)
+            {
+                // 1. Preset gradients
+                g.DrawString("Preset gradients:", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle presetBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, presetBtn, false, 3);
+                using (LinearGradientBrush miniLgb = new LinearGradientBrush(new Rectangle(presetBtn.X + 4, presetBtn.Y + 4, 38, 14), Color.FromArgb(220, 225, 230), Color.FromArgb(100, 116, 139), 0f))
+                {
+                    g.FillRectangle(miniLgb, presetBtn.X + 4, presetBtn.Y + 4, 38, 14);
+                    g.DrawRectangle(Pens.Gray, presetBtn.X + 4, presetBtn.Y + 4, 38, 14);
+                }
+                g.DrawString("▾", labelFont, Brushes.Gray, presetBtn.X + 48, presetBtn.Y + 4);
+                curY += 30;
+
+                // 2. Type (Linear, Radial, Rectangular, Path)
+                g.DrawString("Type (Loại):", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle typeBox = new Rectangle(x + 115, curY, w - 135, 24);
+                DrawInteractiveButton(g, typeBox, false, 3);
+                string typeName = (slide.BgGradientType == GradientType.Radial) ? "Radial (Tỏa tròn)" :
+                                  (slide.BgGradientType == GradientType.Rectangular) ? "Rectangular" :
+                                  (slide.BgGradientType == GradientType.Path) ? "Path" : "Linear (Tuyến tính)";
+                g.DrawString(typeName, labelFont, Brushes.Black, typeBox.X + 6, typeBox.Y + 4);
+                g.DrawString("▾", labelFont, Brushes.Gray, typeBox.Right - 16, typeBox.Y + 4);
+                curY += 30;
+
+                // 3. Direction
+                g.DrawString("Direction (Hướng):", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle dirBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, dirBtn, false, 3);
+                using (LinearGradientBrush dirLgb = new LinearGradientBrush(new Rectangle(dirBtn.X + 4, dirBtn.Y + 4, 38, 14), Color.FromArgb(240, 240, 240), Color.FromArgb(80, 80, 80), slide.BgGradientAngle))
+                {
+                    g.FillRectangle(dirLgb, dirBtn.X + 4, dirBtn.Y + 4, 38, 14);
+                    g.DrawRectangle(Pens.Gray, dirBtn.X + 4, dirBtn.Y + 4, 38, 14);
+                }
+                g.DrawString("▾", labelFont, Brushes.Gray, dirBtn.X + 48, dirBtn.Y + 4);
+                curY += 30;
+
+                // 4. Angle
+                g.DrawString("Angle (Góc):", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle angleBox = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, angleBox, false, 3);
+                g.DrawString(string.Format("{0:0}°", slide.BgGradientAngle), labelFont, Brushes.Black, angleBox.X + 6, angleBox.Y + 4);
+                g.DrawString("▲▼", new Font("Segoe UI", 6.5f), Brushes.DimGray, angleBox.Right - 18, angleBox.Y + 4);
+                curY += 30;
+
+                // 5. Gradient stops
+                g.DrawString("Gradient stops:", labelFont, Brushes.Black, x + 24, curY + 2);
+                curY += 20;
+
+                int trackX = x + 24;
+                int trackW = w - 106;
+                int trackH = 14;
+                Rectangle trackRect = new Rectangle(trackX, curY, trackW, trackH);
+
+                // Draw Gradient Track
+                if (slide.BgGradientStops != null && slide.BgGradientStops.Count >= 2)
+                {
+                    List<GradientStop> sortedStops = new List<GradientStop>(slide.BgGradientStops);
+                    sortedStops.Sort((s1, s2) => s1.Position.CompareTo(s2.Position));
+                    using (LinearGradientBrush trackLgb = new LinearGradientBrush(trackRect, Color.White, Color.Black, 0f))
+                    {
+                        ColorBlend cb = new ColorBlend(sortedStops.Count);
+                        for (int s = 0; s < sortedStops.Count; s++)
+                        {
+                            cb.Positions[s] = Math.Max(0f, Math.Min(1f, sortedStops[s].Position));
+                            cb.Colors[s] = AdjustColorStop(sortedStops[s].Color, sortedStops[s].Transparency, sortedStops[s].Brightness);
+                        }
+                        cb.Positions[0] = 0.0f;
+                        cb.Positions[sortedStops.Count - 1] = 1.0f;
+                        trackLgb.InterpolationColors = cb;
+                        g.FillRectangle(trackLgb, trackRect);
+                    }
+                }
+                else
+                {
+                    g.FillRectangle(Brushes.White, trackRect);
+                }
+                g.DrawRectangle(Pens.DimGray, trackRect);
+
+                // Draw Stop Pins
+                if (slide.BgGradientStops != null)
+                {
+                    for (int s = 0; s < slide.BgGradientStops.Count; s++)
+                    {
+                        GradientStop st = slide.BgGradientStops[s];
+                        int pinCenterX = trackX + (int)(Math.Max(0f, Math.Min(1f, st.Position)) * trackW);
+                        int pinTopY = trackRect.Bottom + 1;
+                        Point[] pinPts = new Point[] {
+                            new Point(pinCenterX, pinTopY),
+                            new Point(pinCenterX + 6, pinTopY + 5),
+                            new Point(pinCenterX + 6, pinTopY + 16),
+                            new Point(pinCenterX - 6, pinTopY + 16),
+                            new Point(pinCenterX - 6, pinTopY + 5)
+                        };
+
+                        Color pinCol = Color.FromArgb((st.Color >> 16) & 0xFF, (st.Color >> 8) & 0xFF, st.Color & 0xFF);
+                        using (SolidBrush pinB = new SolidBrush(pinCol))
+                        {
+                            g.FillPolygon(pinB, pinPts);
+                        }
+
+                        bool isStopSel = (s == slide.SelectedGradientStopIndex);
+                        using (Pen pinPen = new Pen(isStopSel ? Color.FromArgb(234, 88, 12) : Color.FromArgb(100, 116, 139), isStopSel ? 2.5f : 1.0f))
+                        {
+                            g.DrawPolygon(pinPen, pinPts);
+                        }
+                    }
+                }
+
+                // Add Stop [+] & Remove Stop [x] Buttons (matching Image 2)
+                Rectangle btnAddStop = new Rectangle(x + w - 74, curY - 2, 24, 22);
+                Rectangle btnDelStop = new Rectangle(x + w - 44, curY - 2, 24, 22);
+
+                DrawInteractiveButton(g, btnAddStop, false, 2);
+                g.DrawString("+⮛", new Font("Segoe UI", 7.5f, FontStyle.Bold), Brushes.DarkGreen, btnAddStop.X + 2, btnAddStop.Y + 3);
+
+                DrawInteractiveButton(g, btnDelStop, false, 2);
+                g.DrawString("✕⮛", new Font("Segoe UI", 7.5f, FontStyle.Bold), Brushes.Crimson, btnDelStop.X + 2, btnDelStop.Y + 3);
+
+                curY += 40;
+
+                // Stop Properties Controls
+                GradientStop activeStop = (slide.BgGradientStops != null && slide.SelectedGradientStopIndex >= 0 && slide.SelectedGradientStopIndex < slide.BgGradientStops.Count)
+                    ? slide.BgGradientStops[slide.SelectedGradientStopIndex]
+                    : null;
+
+                // Color (Màu)
+                g.DrawString("Color (Màu):", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle stopColBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, stopColBtn, false, 3);
+                Color activeStopCol = (activeStop != null) ? Color.FromArgb((activeStop.Color >> 16) & 0xFF, (activeStop.Color >> 8) & 0xFF, activeStop.Color & 0xFF) : Color.White;
+                using (SolidBrush cB = new SolidBrush(activeStopCol))
+                {
+                    g.FillRectangle(cB, stopColBtn.X + 5, stopColBtn.Y + 4, 16, 14);
+                    g.DrawRectangle(Pens.Gray, stopColBtn.X + 5, stopColBtn.Y + 4, 16, 14);
+                }
+                DrawPaintBucketVector(g, stopColBtn.X + 26, stopColBtn.Y + 5, Color.FromArgb(210, 71, 38));
+                g.DrawString("▾", labelFont, Brushes.Gray, stopColBtn.X + 48, stopColBtn.Y + 4);
+                curY += 28;
+
+                // Position (Vị trí)
+                g.DrawString("Position (Vị trí):", labelFont, Brushes.Black, x + 24, curY + 4);
+                int posTrackX = x + 115;
+                int posTrackW = 65;
+                int posTrackY = curY + 10;
+                using (Pen trPen = new Pen(Color.FromArgb(203, 213, 225), 3f))
+                {
+                    g.DrawLine(trPen, posTrackX, posTrackY, posTrackX + posTrackW, posTrackY);
+                }
+                float curPosFrac = (activeStop != null) ? activeStop.Position : 0f;
+                int posThumbX = posTrackX + (int)(curPosFrac * posTrackW);
+                using (SolidBrush thB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillRectangle(thB, posThumbX - 3, posTrackY - 6, 6, 12);
+                }
+                Rectangle posValBox = new Rectangle(x + w - 62, curY, 44, 22);
+                DrawInteractiveButton(g, posValBox, false, 2);
+                g.DrawString(string.Format("{0:0}%", curPosFrac * 100), labelFont, Brushes.Black, posValBox.X + 4, posValBox.Y + 3);
+                g.DrawString("⇅", labelFont, Brushes.DimGray, posValBox.Right - 12, posValBox.Y + 2);
+                curY += 28;
+
+                // Transparency (Độ trong suốt)
+                g.DrawString("Transparency:", labelFont, Brushes.Black, x + 24, curY + 4);
+                int transTrackX = x + 115;
+                int transTrackW = 65;
+                int transTrackY = curY + 10;
+                using (Pen trPen = new Pen(Color.FromArgb(203, 213, 225), 3f))
+                {
+                    g.DrawLine(trPen, transTrackX, transTrackY, transTrackX + transTrackW, transTrackY);
+                }
+                float curTransFrac = (activeStop != null) ? activeStop.Transparency : 0f;
+                int transThumbX = transTrackX + (int)(curTransFrac * transTrackW);
+                using (SolidBrush thB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillRectangle(thB, transThumbX - 3, transTrackY - 6, 6, 12);
+                }
+                Rectangle transValBox = new Rectangle(x + w - 62, curY, 44, 22);
+                DrawInteractiveButton(g, transValBox, false, 2);
+                g.DrawString(string.Format("{0:0}%", curTransFrac * 100), labelFont, Brushes.Black, transValBox.X + 4, transValBox.Y + 3);
+                g.DrawString("⇅", labelFont, Brushes.DimGray, transValBox.Right - 12, transValBox.Y + 2);
+                curY += 28;
+
+                // Brightness (Độ sáng)
+                g.DrawString("Brightness (Sáng):", labelFont, Brushes.Black, x + 24, curY + 4);
+                int brTrackX = x + 115;
+                int brTrackW = 65;
+                int brTrackY = curY + 10;
+                using (Pen trPen = new Pen(Color.FromArgb(203, 213, 225), 3f))
+                {
+                    g.DrawLine(trPen, brTrackX, brTrackY, brTrackX + brTrackW, brTrackY);
+                }
+                float curBrVal = (activeStop != null) ? activeStop.Brightness : 0f; // -1 to +1
+                float curBrFrac = (curBrVal + 1.0f) / 2.0f; // 0 to 1
+                int brThumbX = brTrackX + (int)(curBrFrac * brTrackW);
+                using (SolidBrush thB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillRectangle(thB, brThumbX - 3, brTrackY - 6, 6, 12);
+                }
+                Rectangle brValBox = new Rectangle(x + w - 62, curY, 44, 22);
+                DrawInteractiveButton(g, brValBox, false, 2);
+                g.DrawString(string.Format("{0:0}%", curBrVal * 100), labelFont, Brushes.Black, brValBox.X + 2, brValBox.Y + 3);
+                g.DrawString("⇅", labelFont, Brushes.DimGray, brValBox.Right - 12, brValBox.Y + 2);
+                curY += 28;
+            }
+            else if (slide.BgFillType == BackgroundFillType.Solid)
+            {
+                // Solid fill controls
+                g.DrawString("Color (Màu sắc):", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle colBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, colBtn, false, 3);
+                Color currentBg = Color.FromArgb(slide.BgColor | unchecked((int)0xFF000000));
+                using (SolidBrush cB = new SolidBrush(currentBg))
+                {
+                    g.FillRectangle(cB, colBtn.X + 5, colBtn.Y + 4, 16, 14);
+                    g.DrawRectangle(Pens.Gray, colBtn.X + 5, colBtn.Y + 4, 16, 14);
+                }
+                DrawPaintBucketVector(g, colBtn.X + 26, colBtn.Y + 5, Color.FromArgb(210, 71, 38));
+                g.DrawString("▾", labelFont, Brushes.Gray, colBtn.X + 48, colBtn.Y + 4);
+                curY += 34;
+
+                g.DrawString("Transparency:", labelFont, Brushes.Black, x + 24, curY + 4);
+                int trackX = x + 115;
+                int trackW = 65;
+                int trackY = curY + 10;
+                using (Pen trPen = new Pen(Color.FromArgb(203, 213, 225), 3f))
+                {
+                    g.DrawLine(trPen, trackX, trackY, trackX + trackW, trackY);
+                }
+                int thumbX = trackX + (int)(slide.BgTransparency * trackW);
+                using (SolidBrush thB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillRectangle(thB, thumbX - 3, trackY - 6, 6, 12);
+                }
+                Rectangle valBox = new Rectangle(x + w - 62, curY, 44, 22);
+                DrawInteractiveButton(g, valBox, false, 2);
+                int pct = (int)(slide.BgTransparency * 100);
+                g.DrawString(pct.ToString() + "%", labelFont, Brushes.Black, valBox.X + 4, valBox.Y + 3);
+                g.DrawString("⇅", labelFont, Brushes.DimGray, valBox.Right - 12, valBox.Y + 2);
+                curY += 34;
+            }
+            else if (slide.BgFillType == BackgroundFillType.Picture)
+            {
+                Rectangle picBtn = new Rectangle(x + 24, curY, w - 48, 28);
+                DrawInteractiveButton(g, picBtn, false, 4);
+                g.DrawString("📁 Chèn ảnh từ tệp...", boldFont, Brushes.Navy, picBtn.X + 20, picBtn.Y + 6);
+                curY += 36;
+
+                g.DrawString("Transparency:", labelFont, Brushes.Black, x + 24, curY + 4);
+                int trackX = x + 115;
+                int trackW = 65;
+                int trackY = curY + 10;
+                using (Pen trPen = new Pen(Color.FromArgb(203, 213, 225), 3f))
+                {
+                    g.DrawLine(trPen, trackX, trackY, trackX + trackW, trackY);
+                }
+                int thumbX = trackX + (int)(slide.BgTransparency * trackW);
+                using (SolidBrush thB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillRectangle(thB, thumbX - 3, trackY - 6, 6, 12);
+                }
+                Rectangle valBox = new Rectangle(x + w - 62, curY, 44, 22);
+                DrawInteractiveButton(g, valBox, false, 2);
+                int pct = (int)(slide.BgTransparency * 100);
+                g.DrawString(pct.ToString() + "%", labelFont, Brushes.Black, valBox.X + 4, valBox.Y + 3);
+                g.DrawString("⇅", labelFont, Brushes.DimGray, valBox.Right - 12, valBox.Y + 2);
+                curY += 34;
+            }
+            else if (slide.BgFillType == BackgroundFillType.Pattern)
+            {
+                g.DrawString("Pattern swatches (Mẫu hoa văn):", labelFont, Brushes.Black, x + 24, curY);
+                curY += 20;
+
+                // 12 Pattern swatches (3 rows x 4 columns)
+                PatternFillStyle[] pStyles = new PatternFillStyle[] {
+                    PatternFillStyle.Grid5Percent, PatternFillStyle.Grid10Percent, PatternFillStyle.HorizontalLight, PatternFillStyle.VerticalLight,
+                    PatternFillStyle.DiagonalUpLight, PatternFillStyle.DiagonalDownLight, PatternFillStyle.Crosshatch, PatternFillStyle.ZigZag,
+                    PatternFillStyle.Brick, PatternFillStyle.Dots, PatternFillStyle.Checker, PatternFillStyle.Waves
+                };
+
+                for (int pi = 0; pi < pStyles.Length; pi++)
+                {
+                    int row = pi / 4;
+                    int col = pi % 4;
+                    Rectangle pBox = new Rectangle(x + 24 + col * 56, curY + row * 30, 48, 24);
+                    bool isPSel = (slide.BgPatternStyle == pStyles[pi]);
+
+                    HatchStyle hs = (HatchStyle)(pi % 12);
+                    Color foreC = Color.FromArgb(slide.BgPatternForeColor | unchecked((int)0xFF000000));
+                    Color backC = Color.FromArgb(slide.BgPatternBackColor | unchecked((int)0xFF000000));
+                    using (HatchBrush hb = new HatchBrush(hs, foreC, backC))
+                    {
+                        g.FillRectangle(hb, pBox);
+                    }
+                    using (Pen bPen = new Pen(isPSel ? Color.FromArgb(234, 88, 12) : Color.LightGray, isPSel ? 2.5f : 1f))
+                    {
+                        g.DrawRectangle(bPen, pBox);
+                    }
+                }
+                curY += 100;
+
+                // Foreground & Background Colors
+                g.DrawString("Foreground:", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle foreBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, foreBtn, false, 3);
+                using (SolidBrush fb = new SolidBrush(Color.FromArgb(slide.BgPatternForeColor | unchecked((int)0xFF000000))))
+                {
+                    g.FillRectangle(fb, foreBtn.X + 5, foreBtn.Y + 4, 16, 14);
+                    g.DrawRectangle(Pens.Gray, foreBtn.X + 5, foreBtn.Y + 4, 16, 14);
+                }
+                g.DrawString("▾", labelFont, Brushes.Gray, foreBtn.X + 48, foreBtn.Y + 4);
+                curY += 28;
+
+                g.DrawString("Background:", labelFont, Brushes.Black, x + 24, curY + 4);
+                Rectangle backBtn = new Rectangle(x + w - 85, curY, 65, 24);
+                DrawInteractiveButton(g, backBtn, false, 3);
+                using (SolidBrush bb = new SolidBrush(Color.FromArgb(slide.BgPatternBackColor | unchecked((int)0xFF000000))))
+                {
+                    g.FillRectangle(bb, backBtn.X + 5, backBtn.Y + 4, 16, 14);
+                    g.DrawRectangle(Pens.Gray, backBtn.X + 5, backBtn.Y + 4, 16, 14);
+                }
+                g.DrawString("▾", labelFont, Brushes.Gray, backBtn.X + 48, backBtn.Y + 4);
+                curY += 30;
+            }
+
+            // Bottom Buttons (Apply to All & Reset Background)
+            int bottomBtnY = h - 45;
+            if (bottomBtnY < curY + 40) bottomBtnY = curY + 40;
+
+            Rectangle applyBtn = new Rectangle(x + 10, bottomBtnY, 120, 28);
+            DrawInteractiveButton(g, applyBtn, false, 3);
+            g.DrawString("Apply to All", boldFont, Brushes.Black, applyBtn.X + 20, applyBtn.Y + 6);
+
+            Rectangle resetBtn = new Rectangle(x + 138, bottomBtnY, 134, 28);
+            DrawInteractiveButton(g, resetBtn, false, 3);
+            g.DrawString("Reset Background", boldFont, Brushes.DimGray, resetBtn.X + 10, resetBtn.Y + 6);
+        }
+
+        public void ShowPresetGradientsMenu(Control parentControl, Point screenPos)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.0f);
+
+            List<PresetGradient> presets = PresetGradient.GetPresets();
+            foreach (PresetGradient pr in presets)
+            {
+                PresetGradient currentPr = pr;
+                Bitmap bmp = new Bitmap(36, 16);
+                using (Graphics bg = Graphics.FromImage(bmp))
+                {
+                    List<GradientStop> sorted = new List<GradientStop>(currentPr.Stops);
+                    sorted.Sort((s1, s2) => s1.Position.CompareTo(s2.Position));
+                    ColorBlend cb = new ColorBlend(sorted.Count);
+                    for (int i = 0; i < sorted.Count; i++)
+                    {
+                        cb.Positions[i] = sorted[i].Position;
+                        cb.Colors[i] = AdjustColorStop(sorted[i].Color, sorted[i].Transparency, sorted[i].Brightness);
+                    }
+                    cb.Positions[0] = 0.0f;
+                    cb.Positions[sorted.Count - 1] = 1.0f;
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(new Rectangle(0, 0, 36, 16), Color.White, Color.Black, 0f))
+                    {
+                        lgb.InterpolationColors = cb;
+                        bg.FillRectangle(lgb, 0, 0, 36, 16);
+                        bg.DrawRectangle(Pens.Gray, 0, 0, 35, 15);
+                    }
+                }
+
+                ToolStripMenuItem item = new ToolStripMenuItem(currentPr.Name, bmp, (s, e) => {
+                    slide.BgFillType = BackgroundFillType.Gradient;
+                    slide.IsGradientBg = true;
+                    slide.BgGradientAngle = currentPr.Angle;
+                    slide.BgGradientStops = new List<GradientStop>();
+                    foreach (GradientStop st in currentPr.Stops)
+                    {
+                        slide.BgGradientStops.Add(st.Clone());
+                    }
+                    slide.SelectedGradientStopIndex = 0;
+                    if (parentControl != null) parentControl.Invalidate();
+                });
+                menu.Items.Add(item);
+            }
+            menu.Show(screenPos);
+        }
+
+        public void ShowGradientTypeMenu(Control parentControl, Point screenPos)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.0f);
+
+            menu.Items.Add(new ToolStripMenuItem("Tuyến tính (Linear)", null, (s, e) => {
+                slide.BgGradientType = GradientType.Linear;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = slide.BgGradientType == GradientType.Linear });
+
+            menu.Items.Add(new ToolStripMenuItem("Tỏa tròn (Radial)", null, (s, e) => {
+                slide.BgGradientType = GradientType.Radial;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = slide.BgGradientType == GradientType.Radial });
+
+            menu.Items.Add(new ToolStripMenuItem("Hình chữ nhật (Rectangular)", null, (s, e) => {
+                slide.BgGradientType = GradientType.Rectangular;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = slide.BgGradientType == GradientType.Rectangular });
+
+            menu.Items.Add(new ToolStripMenuItem("Đường dẫn (Path)", null, (s, e) => {
+                slide.BgGradientType = GradientType.Path;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = slide.BgGradientType == GradientType.Path });
+
+            menu.Show(screenPos);
+        }
+
+        public void ShowGradientDirectionMenu(Control parentControl, Point screenPos)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.0f);
+
+            var directions = new[]
+            {
+                new { Name = "Tuyến tính từ trên xuống (90°)", Angle = 90f, Type = GradientType.Linear },
+                new { Name = "Tuyến tính từ dưới lên (270°)", Angle = 270f, Type = GradientType.Linear },
+                new { Name = "Tuyến tính từ trái sang (0°)", Angle = 0f, Type = GradientType.Linear },
+                new { Name = "Tuyến tính từ phải sang (180°)", Angle = 180f, Type = GradientType.Linear },
+                new { Name = "Tuyến tính chéo xuống (45°)", Angle = 45f, Type = GradientType.Linear },
+                new { Name = "Tuyến tính chéo lên (135°)", Angle = 135f, Type = GradientType.Linear },
+                new { Name = "Tỏa tròn từ tâm (From Center)", Angle = 0f, Type = GradientType.Radial }
+            };
+
+            foreach (var d in directions)
+            {
+                var curD = d;
+                menu.Items.Add(new ToolStripMenuItem(curD.Name, null, (s, e) => {
+                    slide.BgGradientAngle = curD.Angle;
+                    slide.BgGradientType = curD.Type;
+                    if (parentControl != null) parentControl.Invalidate();
+                }) { Checked = Math.Abs(slide.BgGradientAngle - curD.Angle) < 1f && slide.BgGradientType == curD.Type });
+            }
+
+            menu.Show(screenPos);
+        }
+
+        private void DrawCustomRadioButton(Graphics g, int x, int y, bool isChecked, string text, Font font)
+        {
+            Rectangle circle = new Rectangle(x, y + 2, 13, 13);
+            using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
+            {
+                g.DrawEllipse(p, circle);
+            }
+            if (isChecked)
+            {
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.FillEllipse(b, x + 3, y + 5, 7, 7);
+                }
+            }
+            g.DrawString(text, font, Brushes.Black, x + 18, y);
+        }
+
+        private void DrawCustomCheckBox(Graphics g, int x, int y, bool isChecked, string text, Font font)
+        {
+            Rectangle box = new Rectangle(x, y + 2, 13, 13);
+            using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
+            {
+                g.DrawRectangle(p, box);
+            }
+            if (isChecked)
+            {
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                using (Pen chkP = new Pen(Color.White, 1.5f))
+                {
+                    g.FillRectangle(b, box);
+                    Point[] checkPts = new Point[] { new Point(box.X + 2, box.Y + 6), new Point(box.X + 5, box.Y + 9), new Point(box.X + 10, box.Y + 3) };
+                    g.DrawLines(chkP, checkPts);
+                }
+            }
+            g.DrawString(text, font, Brushes.Black, x + 18, y);
+        }
+
+        private void DrawPaintBucketVector(Graphics g, int x, int y, Color col)
+        {
+            using (Pen p = new Pen(Color.FromArgb(60, 60, 60), 1.3f))
+            using (SolidBrush b = new SolidBrush(col))
+            {
+                Point[] bucket = new Point[] {
+                    new Point(x + 2, y + 2),
+                    new Point(x + 9, y + 2),
+                    new Point(x + 7, y + 9),
+                    new Point(x + 1, y + 9)
+                };
+                g.FillPolygon(b, bucket);
+                g.DrawPolygon(p, bucket);
+                g.DrawArc(p, x + 3, y - 2, 6, 6, 180, 180);
+                g.FillEllipse(b, x, y + 11, 3, 3);
+            }
+        }
+
+        private void DrawInteractiveButton(Graphics g, Rectangle r, bool isHovered, int radius = 3)
+        {
+            using (SolidBrush bg = new SolidBrush(isHovered ? Color.FromArgb(241, 245, 249) : Color.FromArgb(248, 250, 252)))
+            using (Pen borderPen = new Pen(isHovered ? Color.FromArgb(148, 163, 184) : Color.FromArgb(203, 213, 225), 1.0f))
+            {
+                g.FillRectangle(bg, r);
+                g.DrawRectangle(borderPen, r);
+            }
+        }
+
+        private void DrawFormatBgIconVector(Graphics g, int x, int y, Color color)
+        {
+            using (Pen p = new Pen(color, 1.3f))
+            using (SolidBrush b = new SolidBrush(color))
+            {
+                g.DrawRectangle(p, x, y, 14, 12);
+                Point[] spill = new Point[] { new Point(x + 5, y), new Point(x + 9, y + 4), new Point(x + 7, y + 6), new Point(x + 3, y + 2) };
+                g.FillPolygon(b, spill);
+                g.FillEllipse(b, x + 2, y + 8, 3, 3);
+            }
+        }
+
+        private void ApplySmartSnapping(ShapeNode shape, float rawX, float rawY, out float snappedX, out float snappedY)
+        {
+            snappedX = rawX;
+            snappedY = rawY;
+            ActiveSmartGuides.Clear();
+            ActiveSpacingIndicators.Clear();
+
+            if (shape == null || ActiveSlide == null) return;
+
+            float cw = Presentation.CanvasWidth;
+            float ch = Presentation.CanvasHeight;
+            float sw = shape.Transform.Width;
+            float sh = shape.Transform.Height;
+
+            const float SNAP_THRESHOLD = 12.0f; // Soft, natural magnetic snap threshold for shapes & center
+            const float SLIDE_EDGE_THRESHOLD = 16.0f; // Magnetic snap threshold for slide edges & corners
+
+            float bestDistX = SNAP_THRESHOLD;
+            float bestSnapX = rawX;
+            SmartGuideLine bestGuideX = null;
+
+            float bestDistY = SNAP_THRESHOLD;
+            float bestSnapY = rawY;
+            SmartGuideLine bestGuideY = null;
+
+            // ==================== 1. Snap to Slide Edges, Margins & 4 Corners ====================
+            // A. Left Edge of Slide (X = 0)
+            float distSlideLeft = Math.Abs(rawX - 0f);
+            if (distSlideLeft <= SLIDE_EDGE_THRESHOLD && distSlideLeft < bestDistX)
+            {
+                bestDistX = distSlideLeft;
+                bestSnapX = 0f;
+                bestGuideX = new SmartGuideLine { IsVertical = true, Position = 0f, Min = 0f, Max = ch };
+            }
+
+            // B. Right Edge of Slide (X = cw - sw)
+            float distSlideRight = Math.Abs((rawX + sw) - cw);
+            if (distSlideRight <= SLIDE_EDGE_THRESHOLD && distSlideRight < bestDistX)
+            {
+                bestDistX = distSlideRight;
+                bestSnapX = cw - sw;
+                bestGuideX = new SmartGuideLine { IsVertical = true, Position = cw, Min = 0f, Max = ch };
+            }
+
+            // C. Top Edge of Slide (Y = 0)
+            float distSlideTop = Math.Abs(rawY - 0f);
+            if (distSlideTop <= SLIDE_EDGE_THRESHOLD && distSlideTop < bestDistY)
+            {
+                bestDistY = distSlideTop;
+                bestSnapY = 0f;
+                bestGuideY = new SmartGuideLine { IsVertical = false, Position = 0f, Min = 0f, Max = cw };
+            }
+
+            // D. Bottom Edge of Slide (Y = ch - sh)
+            float distSlideBottom = Math.Abs((rawY + sh) - ch);
+            if (distSlideBottom <= SLIDE_EDGE_THRESHOLD && distSlideBottom < bestDistY)
+            {
+                bestDistY = distSlideBottom;
+                bestSnapY = ch - sh;
+                bestGuideY = new SmartGuideLine { IsVertical = false, Position = ch, Min = 0f, Max = cw };
+            }
+
+            // E. Standard Slide Margin Guidelines (40px margin)
+            const float SLIDE_MARGIN = 40.0f;
+            float distMarginLeft = Math.Abs(rawX - SLIDE_MARGIN);
+            if (distMarginLeft <= SNAP_THRESHOLD && distMarginLeft < bestDistX)
+            {
+                bestDistX = distMarginLeft;
+                bestSnapX = SLIDE_MARGIN;
+                bestGuideX = new SmartGuideLine { IsVertical = true, Position = SLIDE_MARGIN, Min = SLIDE_MARGIN, Max = ch - SLIDE_MARGIN };
+            }
+
+            float distMarginRight = Math.Abs((rawX + sw) - (cw - SLIDE_MARGIN));
+            if (distMarginRight <= SNAP_THRESHOLD && distMarginRight < bestDistX)
+            {
+                bestDistX = distMarginRight;
+                bestSnapX = cw - sw - SLIDE_MARGIN;
+                bestGuideX = new SmartGuideLine { IsVertical = true, Position = cw - SLIDE_MARGIN, Min = SLIDE_MARGIN, Max = ch - SLIDE_MARGIN };
+            }
+
+            float distMarginTop = Math.Abs(rawY - SLIDE_MARGIN);
+            if (distMarginTop <= SNAP_THRESHOLD && distMarginTop < bestDistY)
+            {
+                bestDistY = distMarginTop;
+                bestSnapY = SLIDE_MARGIN;
+                bestGuideY = new SmartGuideLine { IsVertical = false, Position = SLIDE_MARGIN, Min = SLIDE_MARGIN, Max = cw - SLIDE_MARGIN };
+            }
+
+            float distMarginBottom = Math.Abs((rawY + sh) - (ch - SLIDE_MARGIN));
+            if (distMarginBottom <= SNAP_THRESHOLD && distMarginBottom < bestDistY)
+            {
+                bestDistY = distMarginBottom;
+                bestSnapY = ch - sh - SLIDE_MARGIN;
+                bestGuideY = new SmartGuideLine { IsVertical = false, Position = ch - SLIDE_MARGIN, Min = SLIDE_MARGIN, Max = ch - SLIDE_MARGIN };
+            }
+
+            // ==================== 2. Snap to Slide Canvas Center (Horizontal & Vertical Center) ====================
+            float centerX = rawX + sw / 2f;
+            float slideCenterX = cw / 2f;
+            float distCenterX = Math.Abs(centerX - slideCenterX);
+            if (distCenterX < bestDistX)
+            {
+                bestDistX = distCenterX;
+                bestSnapX = slideCenterX - sw / 2f;
+                bestGuideX = new SmartGuideLine { IsVertical = true, Position = slideCenterX, Min = 0, Max = ch };
+            }
+
+            float centerY = rawY + sh / 2f;
+            float slideCenterY = ch / 2f;
+            float distCenterY = Math.Abs(centerY - slideCenterY);
+            if (distCenterY < bestDistY)
+            {
+                bestDistY = distCenterY;
+                bestSnapY = slideCenterY - sh / 2f;
+                bestGuideY = new SmartGuideLine { IsVertical = false, Position = slideCenterY, Min = 0, Max = cw };
+            }
+
+            // ==================== 3. Snap to Other Shapes (Edges & Centers) ====================
+            List<ShapeNode> otherShapes = new List<ShapeNode>();
+            for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+            {
+                if (i != SelectedShapeIndex && (SelectedShapeIndices == null || !SelectedShapeIndices.Contains(i)))
+                {
+                    otherShapes.Add(ActiveSlide.Shapes[i]);
+                }
+            }
+
+            foreach (var other in otherShapes)
+            {
+                float ox = other.Transform.X;
+                float oy = other.Transform.Y;
+                float ow = other.Transform.Width;
+                float oh = other.Transform.Height;
+                float ocx = ox + ow / 2f;
+                float ocy = oy + oh / 2f;
+                float oright = ox + ow;
+                float obottom = oy + oh;
+
+                // --- X Alignments ---
+                // Left to Left
+                float dLL = Math.Abs(rawX - ox);
+                if (dLL < bestDistX)
+                {
+                    bestDistX = dLL;
+                    bestSnapX = ox;
+                    bestGuideX = new SmartGuideLine {
+                        IsVertical = true,
+                        Position = ox,
+                        Min = Math.Min(rawY, oy) - 10,
+                        Max = Math.Max(rawY + sh, obottom) + 10
+                    };
+                }
+
+                // Center to Center X
+                float dCCX = Math.Abs(centerX - ocx);
+                if (dCCX < bestDistX)
+                {
+                    bestDistX = dCCX;
+                    bestSnapX = ocx - sw / 2f;
+                    bestGuideX = new SmartGuideLine {
+                        IsVertical = true,
+                        Position = ocx,
+                        Min = Math.Min(rawY, oy) - 10,
+                        Max = Math.Max(rawY + sh, obottom) + 10
+                    };
+                }
+
+                // Right to Right
+                float dRR = Math.Abs((rawX + sw) - oright);
+                if (dRR < bestDistX)
+                {
+                    bestDistX = dRR;
+                    bestSnapX = oright - sw;
+                    bestGuideX = new SmartGuideLine {
+                        IsVertical = true,
+                        Position = oright,
+                        Min = Math.Min(rawY, oy) - 10,
+                        Max = Math.Max(rawY + sh, obottom) + 10
+                    };
+                }
+
+                // Left to Right (Side-by-side)
+                float dLR = Math.Abs(rawX - oright);
+                if (dLR < bestDistX)
+                {
+                    bestDistX = dLR;
+                    bestSnapX = oright;
+                    bestGuideX = new SmartGuideLine {
+                        IsVertical = true,
+                        Position = oright,
+                        Min = Math.Min(rawY, oy) - 10,
+                        Max = Math.Max(rawY + sh, obottom) + 10
+                    };
+                }
+
+                // Right to Left
+                float dRL = Math.Abs((rawX + sw) - ox);
+                if (dRL < bestDistX)
+                {
+                    bestDistX = dRL;
+                    bestSnapX = ox - sw;
+                    bestGuideX = new SmartGuideLine {
+                        IsVertical = true,
+                        Position = ox,
+                        Min = Math.Min(rawY, oy) - 10,
+                        Max = Math.Max(rawY + sh, obottom) + 10
+                    };
+                }
+
+                // --- Y Alignments ---
+                // Top to Top
+                float dTT = Math.Abs(rawY - oy);
+                if (dTT < bestDistY)
+                {
+                    bestDistY = dTT;
+                    bestSnapY = oy;
+                    bestGuideY = new SmartGuideLine {
+                        IsVertical = false,
+                        Position = oy,
+                        Min = Math.Min(rawX, ox) - 10,
+                        Max = Math.Max(rawX + sw, oright) + 10
+                    };
+                }
+
+                // Middle to Middle Y
+                float dCCY = Math.Abs(centerY - ocy);
+                if (dCCY < bestDistY)
+                {
+                    bestDistY = dCCY;
+                    bestSnapY = ocy - sh / 2f;
+                    bestGuideY = new SmartGuideLine {
+                        IsVertical = false,
+                        Position = ocy,
+                        Min = Math.Min(rawX, ox) - 10,
+                        Max = Math.Max(rawX + sw, oright) + 10
+                    };
+                }
+
+                // Bottom to Bottom
+                float dBB = Math.Abs((rawY + sh) - obottom);
+                if (dBB < bestDistY)
+                {
+                    bestDistY = dBB;
+                    bestSnapY = obottom - sh;
+                    bestGuideY = new SmartGuideLine {
+                        IsVertical = false,
+                        Position = obottom,
+                        Min = Math.Min(rawX, ox) - 10,
+                        Max = Math.Max(rawX + sw, oright) + 10
+                    };
+                }
+
+                // Top to Bottom
+                float dTB = Math.Abs(rawY - obottom);
+                if (dTB < bestDistY)
+                {
+                    bestDistY = dTB;
+                    bestSnapY = obottom;
+                    bestGuideY = new SmartGuideLine {
+                        IsVertical = false,
+                        Position = obottom,
+                        Min = Math.Min(rawX, ox) - 10,
+                        Max = Math.Max(rawX + sw, oright) + 10
+                    };
+                }
+
+                // Bottom to Top
+                float dBT = Math.Abs((rawY + sh) - oy);
+                if (dBT < bestDistY)
+                {
+                    bestDistY = dBT;
+                    bestSnapY = oy - sh;
+                    bestGuideY = new SmartGuideLine {
+                        IsVertical = false,
+                        Position = oy,
+                        Min = Math.Min(rawX, ox) - 10,
+                        Max = Math.Max(rawX + sw, oright) + 10
+                    };
+                }
+            }
+
+            // 3. Equidistant Spacing Snapping (Cách đều giữa các vật phẩm nếu có 2 cái trở lên)
+            if (otherShapes.Count >= 2)
+            {
+                for (int i = 0; i < otherShapes.Count; i++)
+                {
+                    for (int j = i + 1; j < otherShapes.Count; j++)
+                    {
+                        ShapeNode a = otherShapes[i];
+                        ShapeNode b = otherShapes[j];
+
+                        // Horizontal Spacing
+                        ShapeNode leftShape = (a.Transform.X < b.Transform.X) ? a : b;
+                        ShapeNode rightShape = (a.Transform.X < b.Transform.X) ? b : a;
+
+                        float gapH = rightShape.Transform.X - (leftShape.Transform.X + leftShape.Transform.Width);
+                        if (gapH > 4f)
+                        {
+                            // Target on right: L -> R -> S
+                            float targetXRight = rightShape.Transform.X + rightShape.Transform.Width + gapH;
+                            float dRight = Math.Abs(rawX - targetXRight);
+                            if (dRight < bestDistX && dRight < SNAP_THRESHOLD)
+                            {
+                                bestDistX = dRight;
+                                bestSnapX = targetXRight;
+                                bestGuideX = null;
+                                ActiveSpacingIndicators.Add(new SmartSpacingIndicator
+                                {
+                                    IsHorizontal = true,
+                                    Start1 = leftShape.Transform.X + leftShape.Transform.Width,
+                                    End1 = rightShape.Transform.X,
+                                    Start2 = rightShape.Transform.X + rightShape.Transform.Width,
+                                    End2 = targetXRight,
+                                    CrossPos = (leftShape.Transform.Y + rightShape.Transform.Y + rawY) / 3f + sh / 2f,
+                                    GapSize = gapH
+                                });
+                            }
+
+                            // Target on left: S -> L -> R
+                            float targetXLeft = leftShape.Transform.X - gapH - sw;
+                            float dLeft = Math.Abs(rawX - targetXLeft);
+                            if (dLeft < bestDistX && dLeft < SNAP_THRESHOLD)
+                            {
+                                bestDistX = dLeft;
+                                bestSnapX = targetXLeft;
+                                bestGuideX = null;
+                                ActiveSpacingIndicators.Add(new SmartSpacingIndicator
+                                {
+                                    IsHorizontal = true,
+                                    Start1 = targetXLeft + sw,
+                                    End1 = leftShape.Transform.X,
+                                    Start2 = leftShape.Transform.X + leftShape.Transform.Width,
+                                    End2 = rightShape.Transform.X,
+                                    CrossPos = (leftShape.Transform.Y + rightShape.Transform.Y + rawY) / 3f + sh / 2f,
+                                    GapSize = gapH
+                                });
+                            }
+                        }
+
+                        // Vertical Spacing
+                        ShapeNode topShape = (a.Transform.Y < b.Transform.Y) ? a : b;
+                        ShapeNode bottomShape = (a.Transform.Y < b.Transform.Y) ? b : a;
+
+                        float gapV = bottomShape.Transform.Y - (topShape.Transform.Y + topShape.Transform.Height);
+                        if (gapV > 4f)
+                        {
+                            // Target below: T -> B -> S
+                            float targetYBottom = bottomShape.Transform.Y + bottomShape.Transform.Height + gapV;
+                            float dBottom = Math.Abs(rawY - targetYBottom);
+                            if (dBottom < bestDistY && dBottom < SNAP_THRESHOLD)
+                            {
+                                bestDistY = dBottom;
+                                bestSnapY = targetYBottom;
+                                bestGuideY = null;
+                                ActiveSpacingIndicators.Add(new SmartSpacingIndicator
+                                {
+                                    IsHorizontal = false,
+                                    Start1 = topShape.Transform.Y + topShape.Transform.Height,
+                                    End1 = bottomShape.Transform.Y,
+                                    Start2 = bottomShape.Transform.Y + bottomShape.Transform.Height,
+                                    End2 = targetYBottom,
+                                    CrossPos = (topShape.Transform.X + bottomShape.Transform.X + rawX) / 3f + sw / 2f,
+                                    GapSize = gapV
+                                });
+                            }
+
+                            // Target above: S -> T -> B
+                            float targetYTop = topShape.Transform.Y - gapV - sh;
+                            float dTop = Math.Abs(rawY - targetYTop);
+                            if (dTop < bestDistY && dTop < SNAP_THRESHOLD)
+                            {
+                                bestDistY = dTop;
+                                bestSnapY = targetYTop;
+                                bestGuideY = null;
+                                ActiveSpacingIndicators.Add(new SmartSpacingIndicator
+                                {
+                                    IsHorizontal = false,
+                                    Start1 = targetYTop + sh,
+                                    End1 = topShape.Transform.Y,
+                                    Start2 = topShape.Transform.Y + topShape.Transform.Height,
+                                    End2 = bottomShape.Transform.Y,
+                                    CrossPos = (topShape.Transform.X + bottomShape.Transform.X + rawX) / 3f + sw / 2f,
+                                    GapSize = gapV
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            snappedX = bestSnapX;
+            snappedY = bestSnapY;
+
+            if (bestGuideX != null) ActiveSmartGuides.Add(bestGuideX);
+            if (bestGuideY != null) ActiveSmartGuides.Add(bestGuideY);
+        }
+
+        private void DrawSmartGuidesAndSpacingIndicators(Graphics g, int slideX, int slideY, float scale)
+        {
+            // 1. Draw Smart Alignment Guide Lines
+            if (ActiveSmartGuides != null && ActiveSmartGuides.Count > 0)
+            {
+                using (Pen guidePen = new Pen(Color.FromArgb(225, 29, 72), 1.3f) { DashStyle = DashStyle.Dash })
+                {
+                    foreach (var guide in ActiveSmartGuides)
+                    {
+                        if (guide.IsVertical)
+                        {
+                            float gx = slideX + guide.Position * scale;
+                            float gy1 = slideY + guide.Min * scale;
+                            float gy2 = slideY + guide.Max * scale;
+                            g.DrawLine(guidePen, gx, gy1, gx, gy2);
+                        }
+                        else
+                        {
+                            float gy = slideY + guide.Position * scale;
+                            float gx1 = slideX + guide.Min * scale;
+                            float gx2 = slideX + guide.Max * scale;
+                            g.DrawLine(guidePen, gx1, gy, gx2, gy);
+                        }
+                    }
+                }
+            }
+
+            // 2. Draw Equidistant Spacing Indicators
+            if (ActiveSpacingIndicators != null && ActiveSpacingIndicators.Count > 0)
+            {
+                using (Pen markerPen = new Pen(Color.FromArgb(225, 29, 72), 1.2f))
+                using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(225, 29, 72)))
+                {
+                    foreach (var ind in ActiveSpacingIndicators)
+                    {
+                        if (ind.IsHorizontal)
+                        {
+                            float yPos = slideY + ind.CrossPos * scale;
+                            // Gap 1
+                            float x1_a = slideX + ind.Start1 * scale;
+                            float x1_b = slideX + ind.End1 * scale;
+                            DrawHorizontalSpacingArrow(g, markerPen, arrowBrush, x1_a, x1_b, yPos);
+
+                            // Gap 2
+                            float x2_a = slideX + ind.Start2 * scale;
+                            float x2_b = slideX + ind.End2 * scale;
+                            DrawHorizontalSpacingArrow(g, markerPen, arrowBrush, x2_a, x2_b, yPos);
+                        }
+                        else
+                        {
+                            float xPos = slideX + ind.CrossPos * scale;
+                            // Gap 1
+                            float y1_a = slideY + ind.Start1 * scale;
+                            float y1_b = slideY + ind.End1 * scale;
+                            DrawVerticalSpacingArrow(g, markerPen, arrowBrush, xPos, y1_a, y1_b);
+
+                            // Gap 2
+                            float y2_a = slideY + ind.Start2 * scale;
+                            float y2_b = slideY + ind.End2 * scale;
+                            DrawVerticalSpacingArrow(g, markerPen, arrowBrush, xPos, y2_a, y2_b);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DrawHorizontalSpacingArrow(Graphics g, Pen p, SolidBrush b, float x1, float x2, float y)
+        {
+            if (x2 <= x1 + 2) return;
+            g.DrawLine(p, x1, y - 5, x1, y + 5);
+            g.DrawLine(p, x2, y - 5, x2, y + 5);
+            g.DrawLine(p, x1, y, x2, y);
+
+            PointF[] leftArrow = new PointF[] { new PointF(x1, y), new PointF(x1 + 4, y - 3), new PointF(x1 + 4, y + 3) };
+            g.FillPolygon(b, leftArrow);
+
+            PointF[] rightArrow = new PointF[] { new PointF(x2, y), new PointF(x2 - 4, y - 3), new PointF(x2 - 4, y + 3) };
+            g.FillPolygon(b, rightArrow);
+        }
+
+        private void DrawVerticalSpacingArrow(Graphics g, Pen p, SolidBrush b, float x, float y1, float y2)
+        {
+            if (y2 <= y1 + 2) return;
+            g.DrawLine(p, x - 5, y1, x + 5, y1);
+            g.DrawLine(p, x - 5, y2, x + 5, y2);
+            g.DrawLine(p, x, y1, x, y2);
+
+            PointF[] topArrow = new PointF[] { new PointF(x, y1), new PointF(x - 3, y1 + 4), new PointF(x + 3, y1 + 4) };
+            g.FillPolygon(b, topArrow);
+
+            PointF[] bottomArrow = new PointF[] { new PointF(x, y2), new PointF(x - 3, y2 - 4), new PointF(x + 3, y2 - 4) };
+            g.FillPolygon(b, bottomArrow);
+        }
+
+        private void DrawSlideRulers(Graphics g, int x, int y, int w, int h, int slideX, int slideY, int slideW, int slideH, float scale)
+        {
+            using (SolidBrush rBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            using (Pen rBorder = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
+            using (Font numFont = new Font("Segoe UI", 7.0f, FontStyle.Regular))
+            using (Pen tickPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+            using (Pen mouseTickPen = new Pen(Color.FromArgb(239, 68, 68), 1.2f) { DashStyle = DashStyle.Dot })
+            {
+                // Top Ruler (X: x to x + w, Y: y to y + 18)
+                Rectangle topRuler = new Rectangle(x, y, w, 18);
+                g.FillRectangle(rBg, topRuler);
+                g.DrawLine(rBorder, x, y + 18, x + w, y + 18);
+
+                int centerX = slideX + slideW / 2;
+                float stepPx = (float)slideW / (Presentation.IsWidescreen ? 13.333f : 10.0f);
+                if (stepPx < 10f) stepPx = 40f;
+
+                // Center 0
+                g.DrawLine(tickPen, centerX, y + 6, centerX, y + 18);
+                g.DrawString("0", numFont, Brushes.DimGray, centerX - 3, y + 1);
+
+                // Right ticks
+                for (int k = 1; k <= 15; k++)
+                {
+                    float px = centerX + k * stepPx;
+                    if (px > x + w) break;
+
+                    g.DrawLine(tickPen, px, y + 6, px, y + 18);
+                    g.DrawString(k.ToString(), numFont, Brushes.DimGray, px - 3, y + 1);
+
+                    // Sub-ticks
+                    float pSub = px - stepPx / 2f;
+                    if (pSub >= x && pSub <= x + w) g.DrawLine(tickPen, pSub, y + 11, pSub, y + 18);
+                    float pSubQ1 = px - stepPx * 0.75f;
+                    if (pSubQ1 >= x && pSubQ1 <= x + w) g.DrawLine(tickPen, pSubQ1, y + 14, pSubQ1, y + 18);
+                    float pSubQ2 = px - stepPx * 0.25f;
+                    if (pSubQ2 >= x && pSubQ2 <= x + w) g.DrawLine(tickPen, pSubQ2, y + 14, pSubQ2, y + 18);
+                }
+
+                // Left ticks
+                for (int k = 1; k <= 15; k++)
+                {
+                    float px = centerX - k * stepPx;
+                    if (px < x) break;
+
+                    g.DrawLine(tickPen, px, y + 6, px, y + 18);
+                    g.DrawString(k.ToString(), numFont, Brushes.DimGray, px - 3, y + 1);
+
+                    // Sub-ticks
+                    float pSub = px + stepPx / 2f;
+                    if (pSub >= x && pSub <= x + w) g.DrawLine(tickPen, pSub, y + 11, pSub, y + 18);
+                    float pSubQ1 = px + stepPx * 0.75f;
+                    if (pSubQ1 >= x && pSubQ1 <= x + w) g.DrawLine(tickPen, pSubQ1, y + 14, pSubQ1, y + 18);
+                    float pSubQ2 = px + stepPx * 0.25f;
+                    if (pSubQ2 >= x && pSubQ2 <= x + w) g.DrawLine(tickPen, pSubQ2, y + 14, pSubQ2, y + 18);
+                }
+
+                // Top Ruler Dynamic Mouse Indicator
+                if (CurrentMouseCanvasPos.X >= x && CurrentMouseCanvasPos.X <= x + w)
+                {
+                    g.DrawLine(mouseTickPen, CurrentMouseCanvasPos.X, y, CurrentMouseCanvasPos.X, y + 18);
+                }
+
+                // Left Ruler (X: x to x + 18, Y: y to y + h)
+                Rectangle leftRuler = new Rectangle(x, y, 18, h);
+                g.FillRectangle(rBg, leftRuler);
+                g.DrawLine(rBorder, x + 18, y, x + 18, y + h);
+
+                int centerY = slideY + slideH / 2;
+                float stepPxY = (float)slideH / (Presentation.IsWidescreen ? 7.5f : 7.5f);
+                if (stepPxY < 10f) stepPxY = 40f;
+
+                // Center 0
+                g.DrawLine(tickPen, x + 6, centerY, x + 18, centerY);
+                g.DrawString("0", numFont, Brushes.DimGray, x + 2, centerY - 5);
+
+                // Down ticks
+                for (int k = 1; k <= 10; k++)
+                {
+                    float py = centerY + k * stepPxY;
+                    if (py > y + h) break;
+
+                    g.DrawLine(tickPen, x + 6, py, x + 18, py);
+                    g.DrawString(k.ToString(), numFont, Brushes.DimGray, x + 2, py - 5);
+
+                    float pSub = py - stepPxY / 2f;
+                    if (pSub >= y && pSub <= y + h) g.DrawLine(tickPen, x + 11, pSub, x + 18, pSub);
+                }
+
+                // Up ticks
+                for (int k = 1; k <= 10; k++)
+                {
+                    float py = centerY - k * stepPxY;
+                    if (py < y) break;
+
+                    g.DrawLine(tickPen, x + 6, py, x + 18, py);
+                    g.DrawString(k.ToString(), numFont, Brushes.DimGray, x + 2, py - 5);
+
+                    float pSub = py + stepPxY / 2f;
+                    if (pSub >= y && pSub <= y + h) g.DrawLine(tickPen, x + 11, pSub, x + 18, pSub);
+                }
+
+                // Left Ruler Dynamic Mouse Indicator
+                if (CurrentMouseCanvasPos.Y >= y && CurrentMouseCanvasPos.Y <= y + h)
+                {
+                    g.DrawLine(mouseTickPen, x, CurrentMouseCanvasPos.Y, x + 18, CurrentMouseCanvasPos.Y);
+                }
+
+                // Corner Top-Left Square (18x18)
+                Rectangle corner = new Rectangle(x, y, 18, 18);
+                g.FillRectangle(rBg, corner);
+                g.DrawRectangle(rBorder, corner);
+            }
+        }
+
+        private Color GetAnimationColor(AnimationType type)
+        {
+            int val = (int)type;
+            if (val >= (int)AnimationType.GenOffice_NeonPulse && val <= (int)AnimationType.GenOffice_GoldenRibbonSwirl)
+                return Color.FromArgb(139, 92, 246); // Royal Purple / Gold (Exclusive)
+            if (val >= (int)AnimationType.Appear && val <= (int)AnimationType.Bounce)
+                return Color.FromArgb(34, 197, 94); // Green (Entrance)
+            if (val >= (int)AnimationType.Pulse && val <= (int)AnimationType.Wave)
+                return Color.FromArgb(234, 179, 8); // Yellow/Orange (Emphasis)
+            if (val >= (int)AnimationType.Disappear && val <= (int)AnimationType.BounceOut)
+                return Color.FromArgb(239, 68, 68); // Red (Exit)
+            return Color.FromArgb(59, 130, 246); // Blue (Motion)
+        }
+        #endregion
+
+        private static float EaseOutCubic(float t) { float f = t - 1.0f; return f * f * f + 1.0f; }
+        private static float EaseInCubic(float t) { return t * t * t; }
+        private static float EaseOutQuad(float t) { return t * (2.0f - t); }
+        private static float EaseInQuad(float t) { return t * t; }
+        private static float EaseOutBack(float t) { float c1 = 1.70158f; float c3 = c1 + 1f; return 1f + c3 * (float)Math.Pow(t - 1f, 3) + c1 * (float)Math.Pow(t - 1f, 2); }
+        private static float EaseOutBounce(float t)
+        {
+            float n1 = 7.5625f;
+            float d1 = 2.75f;
+            if (t < 1f / d1) return n1 * t * t;
+            else if (t < 2f / d1) { t -= 1.5f / d1; return n1 * t * t + 0.75f; }
+            else if (t < 2.5f / d1) { t -= 2.25f / d1; return n1 * t * t + 0.9375f; }
+            else { t -= 2.625f / d1; return n1 * t * t + 0.984375f; }
+        }
+
+        public void GetShapeAnimationTransform(ShapeNode shape, SlideNode slide, int currentStep, bool isPresenting, bool isPlayingPreview, int playingAnimIndex, float animProgress, out bool isVisible, out float offsetX, out float offsetY, out float scaleX, out float scaleY, out float rotDelta, out float opacityMul)
+        {
+            ShapeAnimation dummyAnim;
+            float dummyP;
+            GetShapeAnimationTransform(shape, slide, currentStep, isPresenting, isPlayingPreview, playingAnimIndex, animProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul, out dummyAnim, out dummyP);
+        }
+
+        public void GetShapeAnimationTransform(ShapeNode shape, SlideNode slide, int currentStep, bool isPresenting, bool isPlayingPreview, int playingAnimIndex, float animProgress, out bool isVisible, out float offsetX, out float offsetY, out float scaleX, out float scaleY, out float rotDelta, out float opacityMul, out ShapeAnimation activeAnim, out float activeAnimProgress)
+        {
+            isVisible = true;
+            offsetX = 0f;
+            offsetY = 0f;
+            scaleX = 1.0f;
+            scaleY = 1.0f;
+            rotDelta = 0f;
+            opacityMul = 1.0f;
+            activeAnim = null;
+            activeAnimProgress = 0f;
+
+            if (shape == null || slide == null || slide.Animations == null || slide.Animations.Count == 0) return;
+
+            // Trong chế độ soạn thảo bình thường (khi không xem trước và không trình chiếu), luôn hiển thị mọi vật phẩm
+            if (!isPresenting && !isPlayingPreview) return;
+
+            List<int> shapeAnimIndices = new List<int>();
+            for (int i = 0; i < slide.Animations.Count; i++)
+            {
+                if (slide.Animations[i].ShapeId == shape.Id)
+                {
+                    shapeAnimIndices.Add(i);
+                }
+            }
+            if (shapeAnimIndices.Count == 0) return;
+
+            // 1. Chế độ Xem trước (Preview) trong màn hình soạn thảo
+            if (isPlayingPreview)
+            {
+                int firstEntranceIdx = -1;
+                int firstExitIdx = -1;
+                for (int i = 0; i < shapeAnimIndices.Count; i++)
+                {
+                    int aIdx = shapeAnimIndices[i];
+                    ShapeAnimation a = slide.Animations[aIdx];
+                    if (firstEntranceIdx < 0 && a.IsEntrance) firstEntranceIdx = aIdx;
+                    if (firstExitIdx < 0 && a.IsExit) firstExitIdx = aIdx;
+                }
+
+                if (firstEntranceIdx >= 0)
+                {
+                    if (playingAnimIndex < firstEntranceIdx)
+                    {
+                        isVisible = false;
+                        opacityMul = 0f;
+                        return;
+                    }
+                    else if (playingAnimIndex == firstEntranceIdx)
+                    {
+                        activeAnim = slide.Animations[firstEntranceIdx];
+                        activeAnimProgress = animProgress;
+                        EvaluateAnimationEffect(activeAnim, animProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                        return;
+                    }
+                }
+
+                if (firstExitIdx >= 0)
+                {
+                    if (playingAnimIndex == firstExitIdx)
+                    {
+                        activeAnim = slide.Animations[firstExitIdx];
+                        activeAnimProgress = animProgress;
+                        EvaluateAnimationEffect(activeAnim, animProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                        return;
+                    }
+                    else if (playingAnimIndex > firstExitIdx)
+                    {
+                        isVisible = false;
+                        opacityMul = 0f;
+                        return;
+                    }
+                }
+
+                for (int i = 0; i < shapeAnimIndices.Count; i++)
+                {
+                    int aIdx = shapeAnimIndices[i];
+                    if (playingAnimIndex == aIdx)
+                    {
+                        activeAnim = slide.Animations[aIdx];
+                        activeAnimProgress = animProgress;
+                        EvaluateAnimationEffect(activeAnim, animProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // 2. Chế độ Trình chiếu Toàn màn hình (Slide Show Presentation)
+            if (isPresenting)
+            {
+                float[] startOffsets, durations;
+                int[] stepIndices;
+                GetAnimationTimeline(slide, out startOffsets, out durations, out stepIndices);
+
+                int firstEntranceStep = -1;
+                int firstEntranceAnimIdx = -1;
+                int firstExitStep = -1;
+                int firstExitAnimIdx = -1;
+
+                for (int i = 0; i < shapeAnimIndices.Count; i++)
+                {
+                    int aIdx = shapeAnimIndices[i];
+                    ShapeAnimation a = slide.Animations[aIdx];
+                    int step = (aIdx < stepIndices.Length) ? stepIndices[aIdx] : 0;
+                    if (firstEntranceStep < 0 && a.IsEntrance) { firstEntranceStep = step; firstEntranceAnimIdx = aIdx; }
+                    if (firstExitStep < 0 && a.IsExit) { firstExitStep = step; firstExitAnimIdx = aIdx; }
+                }
+
+                if (firstEntranceStep >= 0)
+                {
+                    if (currentStep < firstEntranceStep)
+                    {
+                        isVisible = false;
+                        opacityMul = 0f;
+                        return;
+                    }
+                    else if (currentStep == firstEntranceStep && IsPlayingSlideAnimation)
+                    {
+                        float stepDur = GetCurrentStepMaxDuration(slide, currentStep);
+                        float elapsed = animProgress * stepDur;
+                        float st = (firstEntranceAnimIdx < startOffsets.Length) ? startOffsets[firstEntranceAnimIdx] : 0f;
+                        float dur = (firstEntranceAnimIdx < durations.Length) ? durations[firstEntranceAnimIdx] : 0.5f;
+
+                        if (elapsed < st)
+                        {
+                            isVisible = false;
+                            opacityMul = 0f;
+                            return;
+                        }
+                        else
+                        {
+                            float p = (dur > 0.001f) ? Math.Min(1.0f, (elapsed - st) / dur) : 1.0f;
+                            activeAnim = slide.Animations[firstEntranceAnimIdx];
+                            activeAnimProgress = p;
+                            EvaluateAnimationEffect(activeAnim, p, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                            return;
+                        }
+                    }
+                }
+
+                if (firstExitStep >= 0)
+                {
+                    if (currentStep == firstExitStep)
+                    {
+                        if (IsPlayingSlideAnimation)
+                        {
+                            float stepDur = GetCurrentStepMaxDuration(slide, currentStep);
+                            float elapsed = animProgress * stepDur;
+                            float st = (firstExitAnimIdx < startOffsets.Length) ? startOffsets[firstExitAnimIdx] : 0f;
+                            float dur = (firstExitAnimIdx < durations.Length) ? durations[firstExitAnimIdx] : 0.5f;
+
+                            if (elapsed < st)
+                            {
+                                isVisible = true;
+                                opacityMul = 1.0f;
+                                return;
+                            }
+                            else
+                            {
+                                float p = (dur > 0.001f) ? Math.Min(1.0f, (elapsed - st) / dur) : 1.0f;
+                                activeAnim = slide.Animations[firstExitAnimIdx];
+                                activeAnimProgress = p;
+                                EvaluateAnimationEffect(activeAnim, p, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            isVisible = false;
+                            opacityMul = 0f;
+                            return;
+                        }
+                    }
+                    else if (currentStep > firstExitStep)
+                    {
+                        isVisible = false;
+                        opacityMul = 0f;
+                        return;
+                    }
+                }
+
+                if (IsPlayingSlideAnimation)
+                {
+                    for (int i = 0; i < shapeAnimIndices.Count; i++)
+                    {
+                        int aIdx = shapeAnimIndices[i];
+                        int step = (aIdx < stepIndices.Length) ? stepIndices[aIdx] : 0;
+                        if (currentStep == step && (slide.Animations[aIdx].IsEmphasis || slide.Animations[aIdx].IsMotionPath || slide.Animations[aIdx].IsExclusive))
+                        {
+                            float stepDur = GetCurrentStepMaxDuration(slide, currentStep);
+                            float elapsed = animProgress * stepDur;
+                            float st = (aIdx < startOffsets.Length) ? startOffsets[aIdx] : 0f;
+                            float dur = (aIdx < durations.Length) ? durations[aIdx] : 0.5f;
+                            float p = (elapsed >= st) ? ((dur > 0.001f) ? Math.Min(1.0f, (elapsed - st) / dur) : 1.0f) : 0f;
+                            activeAnim = slide.Animations[aIdx];
+                            activeAnimProgress = p;
+                            EvaluateAnimationEffect(activeAnim, p, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        public static void EvaluateAnimationEffect(ShapeAnimation a, float p, out bool isVisible, out float offsetX, out float offsetY, out float scaleX, out float scaleY, out float rotDelta, out float opacityMul)
+        {
+            isVisible = true;
+            offsetX = 0f;
+            offsetY = 0f;
+            scaleX = 1.0f;
+            scaleY = 1.0f;
+            rotDelta = 0f;
+            opacityMul = 1.0f;
+
+            if (a == null) return;
+            p = Math.Max(0.0f, Math.Min(1.0f, p));
+
+            switch (a.Type)
+            {
+                case AnimationType.Appear:
+                    isVisible = true;
+                    opacityMul = (p >= 0.01f) ? 1.0f : 0.0f;
+                    break;
+
+                case AnimationType.FadeIn:
+                case AnimationType.WheelIn:
+                case AnimationType.RandomBarsIn:
+                    opacityMul = EaseOutQuad(p);
+                    break;
+
+                case AnimationType.SplitIn:
+                    opacityMul = EaseOutQuad(p);
+                    if (a.Direction == TransitionDirection.Horizontal || a.Direction == TransitionDirection.Out)
+                    {
+                        scaleX = Math.Max(0.01f, EaseOutQuad(p));
+                        scaleY = 1.0f;
+                    }
+                    else
+                    {
+                        scaleY = Math.Max(0.01f, EaseOutQuad(p));
+                        scaleX = 1.0f;
+                    }
+                    break;
+
+                case AnimationType.WipeIn:
+                case AnimationType.ShapeIn:
+                    opacityMul = EaseOutQuad(p);
+                    break;
+
+                case AnimationType.FlyIn:
+                    {
+                        opacityMul = Math.Min(1.0f, p * 2.0f);
+                        float flyDist = (1.0f - EaseOutCubic(p)) * 420f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -flyDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = flyDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -flyDist;
+                        else offsetY = flyDist; // FromBottom default
+                    }
+                    break;
+
+                case AnimationType.FloatIn:
+                    {
+                        opacityMul = EaseOutQuad(p);
+                        float fltDist = (1.0f - EaseOutQuad(p)) * 50f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -fltDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = fltDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -fltDist;
+                        else offsetY = fltDist;
+                    }
+                    break;
+
+                case AnimationType.ZoomIn:
+                    opacityMul = Math.Min(1.0f, p * 1.8f);
+                    float zScale = EaseOutBack(p);
+                    scaleX = Math.Max(0.01f, zScale);
+                    scaleY = Math.Max(0.01f, zScale);
+                    break;
+
+                case AnimationType.Bounce:
+                    {
+                        opacityMul = 1.0f;
+                        float bDist = (1.0f - EaseOutBounce(p)) * 320f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -bDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = bDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -bDist;
+                        else offsetY = bDist;
+                    }
+                    break;
+
+                case AnimationType.GrowAndTurn:
+                    opacityMul = Math.Min(1.0f, p * 1.5f);
+                    scaleX = EaseOutQuad(p);
+                    scaleY = EaseOutQuad(p);
+                    rotDelta = (1.0f - p) * (-360f);
+                    break;
+
+                case AnimationType.Swivel:
+                    opacityMul = 1.0f;
+                    scaleX = Math.Abs((float)Math.Cos(p * Math.PI * 2.0));
+                    break;
+
+                case AnimationType.Pulse:
+                case AnimationType.ColorPulse:
+                    float pulse = 1.0f + 0.18f * (float)Math.Sin(p * Math.PI);
+                    scaleX = pulse;
+                    scaleY = pulse;
+                    break;
+
+                case AnimationType.Spin:
+                    rotDelta = p * 360f;
+                    break;
+
+                case AnimationType.Teeter:
+                case AnimationType.Wave:
+                    rotDelta = (float)Math.Sin(p * Math.PI * 4.0) * 14.0f * (1.0f - p);
+                    break;
+
+                case AnimationType.GrowShrink:
+                case AnimationType.BoldFlash:
+                case AnimationType.BoldReveal:
+                    float gs = 1.0f + 0.25f * (float)Math.Sin(p * Math.PI);
+                    scaleX = gs;
+                    scaleY = gs;
+                    break;
+
+                case AnimationType.Disappear:
+                    opacityMul = (p < 0.99f) ? 1.0f : 0.0f;
+                    break;
+
+                case AnimationType.FadeOut:
+                case AnimationType.WheelOut:
+                case AnimationType.RandomBarsOut:
+                case AnimationType.ShrinkAndTurn:
+                    opacityMul = Math.Max(0.0f, 1.0f - EaseInQuad(p));
+                    break;
+
+                case AnimationType.SplitOut:
+                    opacityMul = Math.Max(0.0f, 1.0f - EaseInQuad(p));
+                    if (a.Direction == TransitionDirection.Horizontal || a.Direction == TransitionDirection.Out)
+                    {
+                        scaleX = Math.Max(0.01f, 1.0f - EaseInQuad(p));
+                        scaleY = 1.0f;
+                    }
+                    else
+                    {
+                        scaleY = Math.Max(0.01f, 1.0f - EaseInQuad(p));
+                        scaleX = 1.0f;
+                    }
+                    break;
+
+                case AnimationType.WipeOut:
+                case AnimationType.ShapeOut:
+                    opacityMul = Math.Max(0.0f, 1.0f - EaseInQuad(p));
+                    break;
+
+                case AnimationType.FlyOut:
+                    {
+                        opacityMul = Math.Max(0.0f, 1.0f - p);
+                        float flyOutDist = EaseInCubic(p) * 420f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -flyOutDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = flyOutDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -flyOutDist;
+                        else offsetY = flyOutDist;
+                    }
+                    break;
+
+                case AnimationType.FloatOut:
+                    {
+                        opacityMul = Math.Max(0.0f, 1.0f - p);
+                        float fltOutDist = EaseInQuad(p) * 50f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -fltOutDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = fltOutDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -fltOutDist;
+                        else offsetY = fltOutDist;
+                    }
+                    break;
+
+                case AnimationType.ZoomOut:
+                case AnimationType.SwivelOut:
+                    opacityMul = Math.Max(0.0f, 1.0f - p);
+                    float zOut = Math.Max(0.01f, 1.0f - EaseInQuad(p));
+                    scaleX = zOut;
+                    scaleY = zOut;
+                    break;
+
+                case AnimationType.BounceOut:
+                    {
+                        opacityMul = Math.Max(0.0f, 1.0f - p);
+                        float bOutDist = EaseInQuad(p) * 320f;
+                        if (a.Direction == TransitionDirection.FromLeft) offsetX = -bOutDist;
+                        else if (a.Direction == TransitionDirection.FromRight) offsetX = bOutDist;
+                        else if (a.Direction == TransitionDirection.FromTop) offsetY = -bOutDist;
+                        else offsetY = bOutDist;
+                    }
+                    break;
+
+                case AnimationType.MotionLine:
+                case AnimationType.MotionArc:
+                case AnimationType.MotionTurn:
+                case AnimationType.MotionCustom:
+                    {
+                        float u = (a.Direction == TransitionDirection.Smooth) ? SmoothEase(p) : p;
+                        EvaluateMotionPathOffset(a, u, out offsetX, out offsetY);
+                    }
+                    break;
+
+                case AnimationType.MotionShape:
+                case AnimationType.MotionLoop:
+                    {
+                        float u = p; // Periodic loop
+                        EvaluateMotionPathOffset(a, u, out offsetX, out offsetY);
+                    }
+                    break;
+
+                // ==================== 10 HIỆU ỨNG HOẠT HỌA ĐỘC QUYỀN GENOFFICE (60 FPS & DIRECTION AWARE) ====================
+                case AnimationType.GenOffice_NeonPulse:
+                    {
+                        // 1. Phát sáng Neon Đa Tầng (Cyber Neon Glow Pulse & Bloom)
+                        opacityMul = EaseOutQuad(p);
+                        scaleX = 1.0f;
+                        scaleY = 1.0f;
+                        offsetX = 0f;
+                        offsetY = 0f;
+                    }
+                    break;
+
+                case AnimationType.GenOffice_LiquidMorph:
+                    {
+                        // 2. Chảy Lỏng Đàn Hồi Ma Thuật (Liquid Fluid Wobble & Viscous Bounce)
+                        opacityMul = Math.Min(1.0f, p * 2.0f);
+                        float fluidOsc = (float)Math.Sin(p * Math.PI * 4.5) * (float)Math.Exp(-3.5f * p);
+                        if (a.Direction == TransitionDirection.Horizontal)
+                        {
+                            offsetX = (1.0f - EaseOutQuad(p)) * 120f;
+                            scaleX = Math.Max(0.01f, 1.0f - 0.28f * fluidOsc);
+                            scaleY = Math.Max(0.01f, 1.0f + 0.35f * fluidOsc);
+                        }
+                        else
+                        {
+                            offsetY = (1.0f - EaseOutQuad(p)) * 120f;
+                            scaleX = Math.Max(0.01f, 1.0f + 0.35f * fluidOsc);
+                            scaleY = Math.Max(0.01f, 1.0f - 0.28f * fluidOsc);
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_Cinematic3DFlip:
+                    {
+                        // 3. Lật 3D Điện Ảnh & Lóe Sáng (3D Perspective Flip & Specular Sheen)
+                        opacityMul = Math.Min(1.0f, p * 1.8f);
+                        float flip3D = (float)Math.Sin(p * Math.PI * 0.5);
+                        if (a.Direction == TransitionDirection.Vertical || a.Direction == TransitionDirection.FromTop || a.Direction == TransitionDirection.FromBottom)
+                        {
+                            scaleY = Math.Max(0.01f, flip3D);
+                            scaleX = 0.85f + 0.15f * flip3D;
+                            offsetY = (1.0f - flip3D) * (-60f);
+                        }
+                        else
+                        {
+                            scaleX = Math.Max(0.01f, flip3D);
+                            scaleY = 0.85f + 0.15f * flip3D;
+                            offsetX = (1.0f - flip3D) * (-60f);
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_GlitchHologram:
+                    {
+                        // 4. Nhiễu Sóng Hologram 3D (RGB Split Chromatic Aberration & Scanlines)
+                        float glitchJitter = (float)Math.Sin(p * 37.0) * (1.0f - p) * 18.0f;
+                        if (a.Direction == TransitionDirection.Vertical)
+                        {
+                            offsetY = (p < 0.85f) ? glitchJitter : 0f;
+                            scaleY = Math.Max(0.01f, 1.0f + 0.08f * (float)Math.Sin(p * 19.0) * (1.0f - p));
+                        }
+                        else
+                        {
+                            offsetX = (p < 0.85f) ? glitchJitter : 0f;
+                            scaleX = Math.Max(0.01f, 1.0f + 0.08f * (float)Math.Sin(p * 19.0) * (1.0f - p));
+                        }
+                        float flicker = (p < 0.7f) ? (0.65f + 0.35f * (float)Math.Sin(p * 29.0)) : 1.0f;
+                        opacityMul = Math.Min(1.0f, Math.Max(0.1f, p * 1.6f * flicker));
+                    }
+                    break;
+
+                case AnimationType.GenOffice_KineticSnap:
+                    {
+                        // 5. Động Năng Nam Châm Hút Dính (Kinetic Magnetic Snap & Velocity Stretch)
+                        opacityMul = Math.Min(1.0f, p * 3.0f);
+                        float snapT = EaseOutBack(p);
+                        float snapDist = (1.0f - snapT) * 380f;
+                        float stretch = (p < 0.6f) ? (1.0f + (0.6f - p) * 0.7f) : (1.0f + 0.15f * (float)Math.Sin((p - 0.6f) * Math.PI * 5.0) * (1.0f - p));
+                        if (a.Direction == TransitionDirection.FromRight)
+                        {
+                            offsetX = snapDist;
+                            scaleX = Math.Max(0.01f, stretch);
+                            scaleY = Math.Max(0.01f, 1.0f / Math.Max(0.5f, (float)Math.Sqrt(stretch)));
+                        }
+                        else if (a.Direction == TransitionDirection.FromTop)
+                        {
+                            offsetY = -snapDist;
+                            scaleY = Math.Max(0.01f, stretch);
+                            scaleX = Math.Max(0.01f, 1.0f / Math.Max(0.5f, (float)Math.Sqrt(stretch)));
+                        }
+                        else if (a.Direction == TransitionDirection.FromBottom)
+                        {
+                            offsetY = snapDist;
+                            scaleY = Math.Max(0.01f, stretch);
+                            scaleX = Math.Max(0.01f, 1.0f / Math.Max(0.5f, (float)Math.Sqrt(stretch)));
+                        }
+                        else // FromLeft default
+                        {
+                            offsetX = -snapDist;
+                            scaleX = Math.Max(0.01f, stretch);
+                            scaleY = Math.Max(0.01f, 1.0f / Math.Max(0.5f, (float)Math.Sqrt(stretch)));
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_VortexSpiral:
+                    {
+                        // 6. Xoáy Lốc Hố Đen Vũ Trụ (Cosmic Vortex 720° Spiral Zoom)
+                        float vProgress = EaseOutCubic(p);
+                        opacityMul = Math.Min(1.0f, p * 1.5f);
+                        scaleX = Math.Max(0.01f, vProgress);
+                        scaleY = Math.Max(0.01f, vProgress);
+                        float rotSign = (a.Direction == TransitionDirection.Out) ? -1.0f : 1.0f;
+                        rotDelta = rotSign * (1.0f - vProgress) * 720.0f;
+                    }
+                    break;
+
+                case AnimationType.GenOffice_OrigamiUnfold:
+                    {
+                        // 7. Mở Gấp Giấy Origami 3D (3D Dual-wing Paper Unfold)
+                        float unfoldP = EaseOutQuad(p);
+                        opacityMul = Math.Min(1.0f, p * 2.0f);
+                        if (a.Direction == TransitionDirection.Vertical || a.Direction == TransitionDirection.FromTop || a.Direction == TransitionDirection.FromBottom)
+                        {
+                            scaleY = Math.Max(0.02f, (float)Math.Sin(unfoldP * Math.PI * 0.5));
+                            scaleX = 0.4f + 0.6f * unfoldP;
+                            offsetY = (1.0f - unfoldP) * 30f;
+                        }
+                        else
+                        {
+                            scaleX = Math.Max(0.02f, (float)Math.Sin(unfoldP * Math.PI * 0.5));
+                            scaleY = 0.4f + 0.6f * unfoldP;
+                            offsetX = (1.0f - unfoldP) * 30f;
+                        }
+                        rotDelta = (1.0f - unfoldP) * 25.0f;
+                    }
+                    break;
+
+                case AnimationType.GenOffice_StarlightAssembly:
+                    {
+                        // 8. Ngưng Tụ Hạt Sao Lấp Lánh (Starlight Particle Assembly)
+                        float starP = EaseOutCubic(p);
+                        float burstScale = (p < 0.75f) ? (starP * 1.25f) : (1.25f - (p - 0.75f) * 1.0f);
+                        opacityMul = Math.Min(1.0f, p * 2.2f);
+                        scaleX = Math.Max(0.01f, burstScale);
+                        scaleY = Math.Max(0.01f, burstScale);
+                        rotDelta = (1.0f - p) * 180.0f;
+                    }
+                    break;
+
+                case AnimationType.GenOffice_ElasticJellyPop:
+                    {
+                        // 9. Thạch Jelly Đàn Hồi (Jelly Squash & Stretch Physics Pop 135%)
+                        opacityMul = Math.Min(1.0f, p * 2.5f);
+                        float jelly = (float)Math.Sin(p * Math.PI * 3.5) * (float)Math.Exp(-3.0f * p);
+                        scaleX = Math.Max(0.01f, 1.0f + 0.42f * jelly);
+                        scaleY = Math.Max(0.01f, 1.0f - 0.35f * jelly);
+                    }
+                    break;
+
+                case AnimationType.GenOffice_GoldenRibbonSwirl:
+                    {
+                        // 10. Dải Lụa Hoàng Kim Lướt Sóng (Luxury Golden Ribbon Swirl & Gold Shimmer)
+                        float ribP = EaseOutQuad(p);
+                        opacityMul = Math.Min(1.0f, p * 1.8f);
+                        scaleX = Math.Max(0.01f, 0.5f + 0.5f * ribP);
+                        scaleY = Math.Max(0.01f, 0.5f + 0.5f * ribP);
+                        float wave = (float)Math.Sin((1.0f - p) * Math.PI * 2.0) * 35.0f * (1.0f - p);
+                        float travel = (1.0f - ribP) * 260f;
+                        if (a.Direction == TransitionDirection.FromTop)
+                        {
+                            offsetY = -travel;
+                            offsetX = wave;
+                            rotDelta = -(float)Math.Sin((1.0f - p) * Math.PI * 3.0) * 12.0f;
+                        }
+                        else if (a.Direction == TransitionDirection.FromLeft)
+                        {
+                            offsetX = -travel;
+                            offsetY = wave;
+                            rotDelta = (float)Math.Sin((1.0f - p) * Math.PI * 3.0) * 12.0f;
+                        }
+                        else if (a.Direction == TransitionDirection.FromRight)
+                        {
+                            offsetX = travel;
+                            offsetY = wave;
+                            rotDelta = -(float)Math.Sin((1.0f - p) * Math.PI * 3.0) * 12.0f;
+                        }
+                        else // FromBottom default
+                        {
+                            offsetY = travel;
+                            offsetX = wave;
+                            rotDelta = (float)Math.Sin((1.0f - p) * Math.PI * 3.0) * 12.0f;
+                        }
+                    }
+                    break;
+
+                default:
+                    opacityMul = EaseOutQuad(p);
+                    break;
+            }
+        }
+
+        public static void EvaluateMotionPathOffset(ShapeAnimation anim, float u, out float offX, out float offY)
+        {
+            offX = 0f;
+            offY = 0f;
+            if (anim == null) return;
+
+            // 1. Custom Freehand Drawn Motion Path (Chuỗi tọa độ tự do do người dùng vẽ)
+            if (anim.Type == AnimationType.MotionCustom && anim.CustomPoints != null && anim.CustomPoints.Count >= 2)
+            {
+                List<PointF> pts = anim.CustomPoints;
+                int count = pts.Count;
+
+                float totalLength = 0f;
+                float[] segLengths = new float[count - 1];
+                for (int i = 0; i < count - 1; i++)
+                {
+                    float dx = pts[i + 1].X - pts[i].X;
+                    float dy = pts[i + 1].Y - pts[i].Y;
+                    segLengths[i] = (float)Math.Sqrt(dx * dx + dy * dy);
+                    totalLength += segLengths[i];
+                }
+
+                if (totalLength <= 0.001f)
+                {
+                    offX = pts[0].X;
+                    offY = pts[0].Y;
+                    return;
+                }
+
+                float targetDist = u * totalLength;
+                float accumulated = 0f;
+
+                for (int i = 0; i < count - 1; i++)
+                {
+                    float segLen = segLengths[i];
+                    if (targetDist <= accumulated + segLen || i == count - 2)
+                    {
+                        float localU = (segLen > 0.001f) ? Math.Max(0f, Math.Min(1f, (targetDist - accumulated) / segLen)) : 0f;
+                        offX = pts[i].X + (pts[i + 1].X - pts[i].X) * localU;
+                        offY = pts[i].Y + (pts[i + 1].Y - pts[i].Y) * localU;
+                        return;
+                    }
+                    accumulated += segLen;
+                }
+
+                offX = pts[count - 1].X;
+                offY = pts[count - 1].Y;
+                return;
+            }
+
+            // 2. Built-in Motion Paths with optional Endpoint Handle Dragging
+            float targetEndX = anim.HasCustomEndOffset ? anim.EndOffsetX : 180f;
+            float targetEndY = anim.HasCustomEndOffset ? anim.EndOffsetY : 120f;
+
+            switch (anim.Type)
+            {
+                case AnimationType.MotionLine: // Lines: Đường thẳng chéo/xuống
+                    offX = u * targetEndX;
+                    offY = u * targetEndY;
+                    break;
+
+                case AnimationType.MotionArc: // Arcs: Cung tròn bán nguyệt
+                    {
+                        float dist = (float)Math.Sqrt(targetEndX * targetEndX + targetEndY * targetEndY);
+                        float archH = Math.Max(40f, dist * 0.35f);
+                        float nx = -targetEndY / Math.Max(1f, dist);
+                        float ny = targetEndX / Math.Max(1f, dist);
+                        float bulge = 4f * archH * u * (1f - u);
+                        offX = u * targetEndX + nx * bulge;
+                        offY = u * targetEndY + ny * bulge;
+                    }
+                    break;
+
+                case AnimationType.MotionTurn: // Turns: Góc cua 90 độ
+                    if (u <= 0.5f)
+                    {
+                        float t1 = u / 0.5f;
+                        offX = t1 * targetEndX;
+                        offY = 0f;
+                    }
+                    else
+                    {
+                        float t2 = (u - 0.5f) / 0.5f;
+                        offX = targetEndX;
+                        offY = t2 * targetEndY;
+                    }
+                    break;
+
+                case AnimationType.MotionShape: // Shapes: Vòng quỹ đạo elip khép kín
+                    float rx = Math.Max(40f, Math.Abs(targetEndX) / 2f);
+                    float ry = Math.Max(30f, Math.Abs(targetEndY) / 2f);
+                    offX = rx * (1f - (float)Math.Cos(u * Math.PI * 2.0));
+                    offY = ry * (float)Math.Sin(u * Math.PI * 2.0);
+                    break;
+
+                case AnimationType.MotionLoop: // Loops: Vòng lặp hình số 8
+                    float la = Math.Max(50f, Math.Abs(targetEndX) / 2f);
+                    float lb = Math.Max(30f, Math.Abs(targetEndY) / 2f);
+                    offX = la * (float)Math.Sin(u * Math.PI * 2.0);
+                    offY = lb * (float)Math.Sin(u * Math.PI * 4.0);
+                    break;
+
+                case AnimationType.MotionCustom: // Custom Path: S-curve Spline mặc định
+                    {
+                        PointF p0 = new PointF(0, 0);
+                        PointF p1 = new PointF(targetEndX * 0.3f, targetEndY * 0.3f - 70f);
+                        PointF p2 = new PointF(targetEndX * 0.7f, targetEndY * 0.7f + 90f);
+                        PointF p3 = new PointF(targetEndX, targetEndY);
+
+                        float u1 = 1f - u;
+                        offX = u1 * u1 * u1 * p0.X + 3f * u1 * u1 * u * p1.X + 3f * u1 * u * u * p2.X + u * u * u * p3.X;
+                        offY = u1 * u1 * u1 * p0.Y + 3f * u1 * u1 * u * p1.Y + 3f * u1 * u * u * p2.Y + u * u * u * p3.Y;
+                    }
+                    break;
+            }
+        }
+
+        private void DrawMotionPathsOverlay(Graphics g, float slideX, float slideY, float scale, SlideNode slide)
+        {
+            if (slide == null || slide.Shapes == null) return;
+            if (IsPresenting || IsPlayingAnimationPreview) return; // In design mode only
+
+            // 1. Render Live Freehand Motion Path Sketching
+            if (IsDrawingMotionPathMode && IsDrawingMotionPathActive && CurrentDrawingMotionPoints != null && CurrentDrawingMotionPoints.Count >= 2)
+            {
+                ShapeNode shape = ActiveDrawingMotionShape ?? SelectedShape;
+                if (shape != null)
+                {
+                    float cx = slideX + (shape.Transform.X + shape.Transform.Width / 2f) * scale;
+                    float cy = slideY + (shape.Transform.Y + shape.Transform.Height / 2f) * scale;
+
+                    PointF[] drawPts = new PointF[CurrentDrawingMotionPoints.Count];
+                    for (int i = 0; i < CurrentDrawingMotionPoints.Count; i++)
+                    {
+                        drawPts[i] = new PointF(cx + CurrentDrawingMotionPoints[i].X * scale, cy + CurrentDrawingMotionPoints[i].Y * scale);
+                    }
+
+                    // Stroke
+                    using (Pen livePen = new Pen(Color.FromArgb(37, 99, 235), 2.2f) { DashStyle = DashStyle.Solid })
+                    {
+                        g.DrawCurve(livePen, drawPts, 0.5f);
+                    }
+
+                    // Start Green Dot
+                    using (SolidBrush bGreen = new SolidBrush(Color.FromArgb(34, 197, 94)))
+                    using (Pen pGreen = new Pen(Color.White, 2f))
+                    {
+                        g.FillEllipse(bGreen, cx - 6, cy - 6, 12, 12);
+                        g.DrawEllipse(pGreen, cx - 6, cy - 6, 12, 12);
+                    }
+
+                    // End Red Dot
+                    PointF lastPt = drawPts[drawPts.Length - 1];
+                    using (SolidBrush bRed = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                    using (Pen pRed = new Pen(Color.White, 2f))
+                    {
+                        g.FillEllipse(bRed, lastPt.X - 6, lastPt.Y - 6, 12, 12);
+                        g.DrawEllipse(pRed, lastPt.X - 6, lastPt.Y - 6, 12, 12);
+                    }
+
+                    // Tooltip Badge
+                    string badge = "✏️ Đang vẽ đường dẫn chuyển động (Kéo chuột tự do, thả tay để hoàn tất)";
+                    using (Font fBadge = new Font("Segoe UI", 9f, FontStyle.Bold))
+                    using (SolidBrush bBg = new SolidBrush(Color.FromArgb(220, 15, 23, 42)))
+                    using (SolidBrush bTxt = new SolidBrush(Color.White))
+                    {
+                        SizeF sz = g.MeasureString(badge, fBadge);
+                        float bx = Math.Min(slideX + 1920f * scale - sz.Width - 20, lastPt.X + 16);
+                        float by = lastPt.Y - 28;
+                        g.FillRectangle(bBg, bx, by, sz.Width + 12, sz.Height + 6);
+                        g.DrawString(badge, fBadge, bTxt, bx + 6, by + 3);
+                    }
+                }
+            }
+
+            // 2. Render Existing Motion Paths
+            if (slide.Animations != null && slide.Animations.Count > 0)
+            {
+                for (int a = 0; a < slide.Animations.Count; a++)
+                {
+                    ShapeAnimation anim = slide.Animations[a];
+                    if (anim == null || !anim.IsMotionPath) continue;
+
+                    ShapeNode shape = null;
+                    for (int s = 0; s < slide.Shapes.Count; s++)
+                    {
+                        if (slide.Shapes[s].Id == anim.ShapeId)
+                        {
+                            shape = slide.Shapes[s];
+                            break;
+                        }
+                    }
+                    if (shape == null) continue;
+
+                    float cx = slideX + (shape.Transform.X + shape.Transform.Width / 2f) * scale;
+                    float cy = slideY + (shape.Transform.Y + shape.Transform.Height / 2f) * scale;
+
+                    PointF[] pts;
+                    if (anim.Type == AnimationType.MotionCustom && anim.CustomPoints != null && anim.CustomPoints.Count >= 2)
+                    {
+                        pts = new PointF[anim.CustomPoints.Count];
+                        for (int i = 0; i < anim.CustomPoints.Count; i++)
+                        {
+                            pts[i] = new PointF(cx + anim.CustomPoints[i].X * scale, cy + anim.CustomPoints[i].Y * scale);
+                        }
+                    }
+                    else
+                    {
+                        int steps = 40;
+                        pts = new PointF[steps + 1];
+                        for (int step = 0; step <= steps; step++)
+                        {
+                            float u = step / (float)steps;
+                            float offX, offY;
+                            EvaluateMotionPathOffset(anim, u, out offX, out offY);
+                            pts[step] = new PointF(cx + offX * scale, cy + offY * scale);
+                        }
+                    }
+
+                    if (pts == null || pts.Length < 2) continue;
+
+                    PointF startPt = pts[0];
+                    PointF endPt = pts[pts.Length - 1];
+
+                    // Draw Ghost Silhouette / Destination Outline if end != start
+                    float ghostOffX = (endPt.X - startPt.X) / scale;
+                    float ghostOffY = (endPt.Y - startPt.Y) / scale;
+                    if (Math.Abs(ghostOffX) > 4f || Math.Abs(ghostOffY) > 4f)
+                    {
+                        DrawShape(g, slideX, slideY, scale, shape, false, 0.30f, ghostOffX, ghostOffY);
+                    }
+
+                    // Draw Dotted Path Trajectory
+                    using (Pen pathPen = new Pen(Color.FromArgb(100, 116, 139), 1.8f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawCurve(pathPen, pts, 0.4f);
+                    }
+
+                    // Draw Green Start Circle (Điểm bắt đầu xuất phát)
+                    using (SolidBrush bGreen = new SolidBrush(Color.FromArgb(34, 197, 94)))
+                    using (Pen pGreen = new Pen(Color.White, 1.8f))
+                    {
+                        g.FillEllipse(bGreen, startPt.X - 5, startPt.Y - 5, 10, 10);
+                        g.DrawEllipse(pGreen, startPt.X - 5, startPt.Y - 5, 10, 10);
+                    }
+
+                    // Draw Red End Circle (Điểm kết thúc chuyển động - Kéo thả để đổi đích đến)
+                    using (SolidBrush bRed = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                    using (Pen pRed = new Pen(Color.White, 1.8f))
+                    {
+                        g.FillEllipse(bRed, endPt.X - 6, endPt.Y - 6, 12, 12);
+                        g.DrawEllipse(pRed, endPt.X - 6, endPt.Y - 6, 12, 12);
+                    }
+                }
+            }
+        }
+
+        #region Render Shape & Handles
+        private Color AdjustColorStop(int rgb, float transparency, float brightness)
+        {
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+
+            if (brightness > 0.001f)
+            {
+                r = (int)(r + (255 - r) * brightness);
+                g = (int)(g + (255 - g) * brightness);
+                b = (int)(b + (255 - b) * brightness);
+            }
+            else if (brightness < -0.001f)
+            {
+                float factor = 1.0f + brightness;
+                r = (int)(r * factor);
+                g = (int)(g * factor);
+                b = (int)(b * factor);
+            }
+            r = Math.Max(0, Math.Min(255, r));
+            g = Math.Max(0, Math.Min(255, g));
+            b = Math.Max(0, Math.Min(255, b));
+
+            int alpha = (int)((1.0f - Math.Max(0f, Math.Min(1f, transparency))) * 255f);
+            return Color.FromArgb(alpha, r, g, b);
+        }
+
+        private void DrawSlideBackground(Graphics g, RectangleF rect, SlideNode slide)
+        {
+            if (rect.Width <= 0.001f || rect.Height <= 0.001f || slide == null) return;
+
+            int alpha = (int)((1.0f - Math.Max(0f, Math.Min(1f, slide.BgTransparency))) * 255f);
+            Color c = Color.FromArgb(alpha, (slide.BgColor >> 16) & 0xFF, (slide.BgColor >> 8) & 0xFF, slide.BgColor & 0xFF);
+
+            if (slide.BgFillType == BackgroundFillType.Picture && slide.CachedBgImage != null)
+            {
+                if (slide.BgTransparency > 0.001f)
+                {
+                    System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix { Matrix33 = 1.0f - slide.BgTransparency };
+                    using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                        PointF[] pts = new PointF[] { new PointF(rect.X, rect.Y), new PointF(rect.Right, rect.Y), new PointF(rect.X, rect.Bottom) };
+                        g.DrawImage(slide.CachedBgImage, pts, new RectangleF(0, 0, slide.CachedBgImage.Width, slide.CachedBgImage.Height), GraphicsUnit.Pixel, ia);
+                    }
+                }
+                else
+                {
+                    g.DrawImage(slide.CachedBgImage, rect);
+                }
+            }
+            else if (slide.BgFillType == BackgroundFillType.Pattern)
+            {
+                HatchStyle hs = HatchStyle.Percent05;
+                switch (slide.BgPatternStyle)
+                {
+                    case PatternFillStyle.Grid5Percent: hs = HatchStyle.Percent05; break;
+                    case PatternFillStyle.Grid10Percent: hs = HatchStyle.Percent10; break;
+                    case PatternFillStyle.HorizontalLight: hs = HatchStyle.LightHorizontal; break;
+                    case PatternFillStyle.VerticalLight: hs = HatchStyle.LightVertical; break;
+                    case PatternFillStyle.DiagonalUpLight: hs = HatchStyle.LightUpwardDiagonal; break;
+                    case PatternFillStyle.DiagonalDownLight: hs = HatchStyle.LightDownwardDiagonal; break;
+                    case PatternFillStyle.Crosshatch: hs = HatchStyle.Cross; break;
+                    case PatternFillStyle.ZigZag: hs = HatchStyle.ZigZag; break;
+                    case PatternFillStyle.Brick: hs = HatchStyle.HorizontalBrick; break;
+                    case PatternFillStyle.Dots: hs = HatchStyle.DottedGrid; break;
+                    case PatternFillStyle.Checker: hs = HatchStyle.LargeCheckerBoard; break;
+                    case PatternFillStyle.Waves: hs = HatchStyle.Wave; break;
+                }
+                Color foreC = Color.FromArgb(alpha, (slide.BgPatternForeColor >> 16) & 0xFF, (slide.BgPatternForeColor >> 8) & 0xFF, slide.BgPatternForeColor & 0xFF);
+                Color backC = Color.FromArgb(alpha, (slide.BgPatternBackColor >> 16) & 0xFF, (slide.BgPatternBackColor >> 8) & 0xFF, slide.BgPatternBackColor & 0xFF);
+                using (HatchBrush hb = new HatchBrush(hs, foreC, backC))
+                {
+                    g.FillRectangle(hb, rect);
+                }
+            }
+            else if (slide.IsGradientBg || slide.BgFillType == BackgroundFillType.Gradient)
+            {
+                if (slide.BgGradientStops != null && slide.BgGradientStops.Count >= 2)
+                {
+                    List<GradientStop> sortedStops = new List<GradientStop>(slide.BgGradientStops);
+                    sortedStops.Sort((s1, s2) => s1.Position.CompareTo(s2.Position));
+
+                    int stopCount = sortedStops.Count;
+                    ColorBlend cb = new ColorBlend(stopCount);
+                    for (int i = 0; i < stopCount; i++)
+                    {
+                        cb.Positions[i] = Math.Max(0.0f, Math.Min(1.0f, sortedStops[i].Position));
+                        cb.Colors[i] = AdjustColorStop(sortedStops[i].Color, sortedStops[i].Transparency, sortedStops[i].Brightness);
+                    }
+                    cb.Positions[0] = 0.0f;
+                    cb.Positions[stopCount - 1] = 1.0f;
+
+                    if (slide.BgGradientType == GradientType.Linear)
+                    {
+                        using (LinearGradientBrush lgb = new LinearGradientBrush(rect, Color.White, Color.Black, slide.BgGradientAngle))
+                        {
+                            lgb.InterpolationColors = cb;
+                            g.FillRectangle(lgb, rect);
+                        }
+                    }
+                    else
+                    {
+                        using (GraphicsPath p = new GraphicsPath())
+                        {
+                            if (slide.BgGradientType == GradientType.Radial)
+                                p.AddEllipse(rect);
+                            else
+                                p.AddRectangle(rect);
+
+                            using (PathGradientBrush pgb = new PathGradientBrush(p))
+                            {
+                                pgb.CenterPoint = new PointF(rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
+                                pgb.InterpolationColors = cb;
+                                g.FillRectangle(pgb, rect);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Color c2 = Color.FromArgb(alpha, (slide.BgColor2 >> 16) & 0xFF, (slide.BgColor2 >> 8) & 0xFF, slide.BgColor2 & 0xFF);
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(rect, c, c2, slide.BgGradientAngle))
+                    {
+                        g.FillRectangle(lgb, rect);
+                    }
+                }
+            }
+            else
+            {
+                using (SolidBrush bgBrush = new SolidBrush(c))
+                {
+                    g.FillRectangle(bgBrush, rect);
+                }
+            }
+        }
+
+        private void DrawSlideBackground(Graphics g, Rectangle rect, SlideNode slide)
+        {
+            DrawSlideBackground(g, new RectangleF(rect.X, rect.Y, rect.Width, rect.Height), slide);
+        }
+
+        public int TablePreviewCols { get; set; }
+        public int TablePreviewRows { get; set; }
+
+        public void SetTableInsertPreview(int cols, int rows)
+        {
+            TablePreviewCols = cols;
+            TablePreviewRows = rows;
+        }
+
+        public void ClearTableInsertPreview()
+        {
+            TablePreviewCols = 0;
+            TablePreviewRows = 0;
+        }
+
+        private void DrawTableInsertPreviewOverlay(Graphics g, float slideX, float slideY, float scale)
+        {
+            if (TablePreviewCols <= 0 || TablePreviewRows <= 0 || Presentation == null) return;
+
+            int cols = TablePreviewCols;
+            int rows = TablePreviewRows;
+
+            float canvasW = Presentation.CanvasWidth;
+            float canvasH = Presentation.CanvasHeight;
+
+            float tw = Math.Min(canvasW * 0.75f, cols * 140f);
+            float th = Math.Min(canvasH * 0.50f, rows * 60f);
+            float tx = (canvasW - tw) / 2f;
+            float ty = (canvasH - th) / 2f;
+
+            float sx = slideX + tx * scale;
+            float sy = slideY + ty * scale;
+            float sw = tw * scale;
+            float sh = th * scale;
+
+            float cellW = sw / cols;
+            float cellH = sh / rows;
+
+            // Translucent Table Grid Live Preview matching MS PowerPoint / Image 2
+            using (SolidBrush headerTopBrush = new SolidBrush(Color.FromArgb(190, 239, 68, 68)))
+            using (SolidBrush rowOddBrush = new SolidBrush(Color.FromArgb(140, 254, 226, 226)))
+            using (SolidBrush rowEvenBrush = new SolidBrush(Color.FromArgb(110, 255, 255, 255)))
+            using (Pen gridPen = new Pen(Color.FromArgb(220, 255, 255, 255), 1.2f))
+            using (Pen outerPen = new Pen(Color.FromArgb(240, 220, 38, 38), 2.0f))
+            {
+                // Header row
+                g.FillRectangle(headerTopBrush, sx, sy, sw, cellH);
+
+                // Body rows
+                for (int r = 1; r < rows; r++)
+                {
+                    SolidBrush b = (r % 2 == 1) ? rowOddBrush : rowEvenBrush;
+                    g.FillRectangle(b, sx, sy + r * cellH, sw, cellH);
+                }
+
+                // Gridlines
+                for (int r = 0; r <= rows; r++)
+                {
+                    g.DrawLine(gridPen, sx, sy + r * cellH, sx + sw, sy + r * cellH);
+                }
+                for (int c = 0; c <= cols; c++)
+                {
+                    g.DrawLine(gridPen, sx + c * cellW, sy, sx + c * cellW, sy + sh);
+                }
+
+                // Outer border
+                g.DrawRectangle(outerPen, sx, sy, sw, sh);
+            }
+        }
+
+        public void ApplyTableStylePreset(ShapeNode shape, int presetIndex)
+        {
+            if (shape == null || shape.Type != ShapeType.Table) return;
+
+            int[] headerColors = new int[] {
+                0x2563EB, // 0. Theme Blue
+                0xEA580C, // 1. Coral Orange
+                0x059669, // 2. Emerald Green
+                0x7C3AED, // 3. Royal Purple
+                0x1E293B, // 4. Dark Slate
+                0xDC2626, // 5. Ruby Red
+                0xD97706, // 6. Amber Gold
+                0x0D9488, // 7. Ocean Teal
+                0x4F46E5, // 8. Indigo
+                0xDB2777  // 9. Rose Pink
+            };
+
+            int[] borderColors = new int[] {
+                0x93C5FD,
+                0xFDBA74,
+                0x6EE7B7,
+                0xC4B5FD,
+                0x94A3B8,
+                0xFCA5A5,
+                0xFDE68A,
+                0x99F6E4,
+                0xA5B4FC,
+                0xFBCFE8
+            };
+
+            int p = Math.Max(0, Math.Min(headerColors.Length - 1, presetIndex));
+            shape.FillColor = headerColors[p];
+            shape.StrokeColor = borderColors[p];
+            shape.TableHeaderRow = true;
+            shape.TableBandedRows = true;
+
+            if (shape.TableCellFillColors != null) shape.TableCellFillColors.Clear();
+            if (shape.TableCellTextColors != null) shape.TableCellTextColors.Clear();
+        }
+
+        private void DrawTableShape(Graphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
+        {
+            int cols = Math.Max(1, shape.TableColumns);
+            int rows = Math.Max(1, shape.TableRows);
+
+            float cellW = baseW / cols;
+            float cellH = baseH / rows;
+
+            Color headCol = (shape.FillColor != 0x00FFFFFF && shape.FillColor != 0xF3F4F6)
+                ? Color.FromArgb(alpha, Color.FromArgb(shape.FillColor))
+                : Color.FromArgb(alpha, 210, 71, 38);
+
+            // Compute soft pastel banded tint from header color
+            Color oddRowCol = Color.FromArgb(alpha, 
+                Math.Min(255, 235 + (headCol.R / 12)), 
+                Math.Min(255, 235 + (headCol.G / 12)), 
+                Math.Min(255, 235 + (headCol.B / 12)));
+            Color evenRowCol = Color.FromArgb(alpha, 255, 255, 255);
+
+            Color gridCol = (shape.StrokeColor != 0x00FFFFFF && shape.StrokeColor != 0)
+                ? Color.FromArgb(alpha, Color.FromArgb(shape.StrokeColor))
+                : Color.FromArgb(alpha, 203, 213, 225);
+
+            int minSelR = -1, maxSelR = -1, minSelC = -1, maxSelC = -1;
+            if (isSelected && shape.TableSelectedCellRow >= 0 && shape.TableSelectedCellCol >= 0)
+            {
+                minSelR = Math.Max(0, Math.Min(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+                maxSelR = Math.Min(rows - 1, Math.Max(shape.TableSelectedCellRow, shape.TableSelectedEndRow >= 0 ? shape.TableSelectedEndRow : shape.TableSelectedCellRow));
+                minSelC = Math.Max(0, Math.Min(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+                maxSelC = Math.Min(cols - 1, Math.Max(shape.TableSelectedCellCol, shape.TableSelectedEndCol >= 0 ? shape.TableSelectedEndCol : shape.TableSelectedCellCol));
+            }
+
+            // 1. Draw Table Cell Backgrounds (Default, Custom Per-Cell Fill, Selection Highlight, and Editing Cell)
+            using (SolidBrush headB = new SolidBrush(headCol))
+            using (SolidBrush oddB = new SolidBrush(oddRowCol))
+            using (SolidBrush evenB = new SolidBrush(evenRowCol))
+            using (SolidBrush selOverlayBrush = new SolidBrush(Color.FromArgb(90, 59, 130, 246))) // Blue selection
+            using (SolidBrush editingCellBg = new SolidBrush(Color.White))
+            {
+                for (int r = 0; r < rows; r++)
+                {
+                    bool isHead = (r == 0 && shape.TableHeaderRow);
+                    for (int c = 0; c < cols; c++)
+                    {
+                        RectangleF cellRect = new RectangleF(c * cellW, r * cellH, cellW, cellH);
+                        string cellKey = r + "," + c;
+
+                        // Check custom fill color
+                        if (shape.TableCellFillColors != null && shape.TableCellFillColors.ContainsKey(cellKey))
+                        {
+                            int customFill = shape.TableCellFillColors[cellKey];
+                            using (SolidBrush custB = new SolidBrush(Color.FromArgb(alpha, Color.FromArgb(customFill))))
+                            {
+                                g.FillRectangle(custB, cellRect);
+                            }
+                        }
+                        else if (isHead)
+                        {
+                            g.FillRectangle(headB, cellRect);
+                        }
+                        else
+                        {
+                            SolidBrush b = (r % 2 == 1 && shape.TableBandedRows) ? oddB : evenB;
+                            g.FillRectangle(b, cellRect);
+                        }
+
+                        // Selection highlight overlay (Quét khối ô)
+                        if (minSelR >= 0 && r >= minSelR && r <= maxSelR && c >= minSelC && c <= maxSelC)
+                        {
+                            g.FillRectangle(selOverlayBrush, cellRect);
+                        }
+
+                        // Actively editing cell background
+                        if (IsEditingTableCell && EditingTableShape == shape && EditingTableRow == r && EditingTableCol == c)
+                        {
+                            g.FillRectangle(editingCellBg, cellRect);
+                        }
+                    }
+                }
+            }
+
+            // 2. Draw Table Cell Gridlines
+            using (Pen gridPen = new Pen(gridCol, Math.Max(1.0f, 1.0f * scale)))
+            using (Pen borderPen = new Pen(headCol, Math.Max(1.5f, 1.5f * scale)))
+            {
+                for (int r = 0; r <= rows; r++)
+                {
+                    g.DrawLine(gridPen, 0, r * cellH, baseW, r * cellH);
+                }
+                for (int c = 0; c <= cols; c++)
+                {
+                    g.DrawLine(gridPen, c * cellW, 0, c * cellW, baseH);
+                }
+                g.DrawRectangle(borderPen, 0, 0, baseW, baseH);
+            }
+
+            // 3. Draw Selected Cell Range Border
+            if (minSelR >= 0 && minSelC >= 0)
+            {
+                using (Pen selBorderPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(1.8f, 2.0f * scale)))
+                {
+                    float selX = minSelC * cellW;
+                    float selY = minSelR * cellH;
+                    float selW = (maxSelC - minSelC + 1) * cellW;
+                    float selH = (maxSelR - minSelR + 1) * cellH;
+                    g.DrawRectangle(selBorderPen, selX, selY, selW, selH);
+                }
+            }
+
+            // 4. Draw Active Editing Cell Focus Border
+            if (IsEditingTableCell && EditingTableShape == shape && EditingTableRow >= 0 && EditingTableCol >= 0)
+            {
+                using (Pen editFocusPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(2.0f, 2.2f * scale)))
+                {
+                    float eX = EditingTableCol * cellW;
+                    float eY = EditingTableRow * cellH;
+                    g.DrawRectangle(editFocusPen, eX, eY, cellW, cellH);
+                }
+            }
+
+            // 5. Draw Cell Text and Inline Caret
+            float fontSize = Math.Max(7.0f, (shape.FontSize > 0 ? shape.FontSize : 14.0f) * scale);
+            using (Font headFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (Font bodyFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Regular, GraphicsUnit.Pixel))
+            using (Font boldBodyFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (SolidBrush headTextBrush = new SolidBrush(Color.FromArgb(alpha, 255, 255, 255)))
+            using (SolidBrush bodyTextBrush = new SolidBrush(Color.FromArgb(alpha, 30, 41, 59)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            {
+                for (int r = 0; r < rows; r++)
+                {
+                    bool isHead = (r == 0 && shape.TableHeaderRow);
+
+                    for (int c = 0; c < cols; c++)
+                    {
+                        string cellKey = r + "," + c;
+                        string cellTxt = "";
+
+                        bool isCellEditing = (IsEditingTableCell && EditingTableShape == shape && EditingTableRow == r && EditingTableCol == c);
+                        if (isCellEditing)
+                        {
+                            cellTxt = EditingTableCellBuffer ?? "";
+                        }
+                        else if (shape.TableData != null && r < shape.TableData.Count && c < shape.TableData[r].Count)
+                        {
+                            cellTxt = shape.TableData[r][c] ?? "";
+                        }
+
+                        // Determine Font & Text Color
+                        bool isBold = isHead || (shape.TableCellBolds != null && shape.TableCellBolds.ContainsKey(cellKey) && shape.TableCellBolds[cellKey]);
+                        Font f = isHead ? headFont : (isBold ? boldBodyFont : bodyFont);
+
+                        Brush tb = isHead ? headTextBrush : bodyTextBrush;
+                        bool disposedBrush = false;
+                        if (shape.TableCellTextColors != null && shape.TableCellTextColors.ContainsKey(cellKey))
+                        {
+                            tb = new SolidBrush(Color.FromArgb(alpha, Color.FromArgb(shape.TableCellTextColors[cellKey])));
+                            disposedBrush = true;
+                        }
+                        else if (isCellEditing)
+                        {
+                            tb = Brushes.Black;
+                        }
+
+                        RectangleF cRect = new RectangleF(c * cellW + 6, r * cellH + 2, cellW - 12, cellH - 4);
+                        if (!string.IsNullOrEmpty(cellTxt))
+                        {
+                            g.DrawString(cellTxt, f, tb, cRect, sf);
+                        }
+
+                        // Draw Blinking Caret if Editing this cell
+                        if (isCellEditing)
+                        {
+                            int caretPos = Math.Max(0, Math.Min(TableCaretIndex, cellTxt.Length));
+                            string textBeforeCaret = cellTxt.Substring(0, caretPos);
+                            SizeF measuredBefore = g.MeasureString(textBeforeCaret, f, (int)cRect.Width, sf);
+                            float caretX = cRect.Left + (string.IsNullOrEmpty(textBeforeCaret) ? 0f : measuredBefore.Width);
+                            float caretY = cRect.Top + (cRect.Height - fontSize * 1.3f) / 2f;
+                            float caretH = Math.Max(12f, fontSize * 1.3f);
+
+                            using (Pen caretPen = new Pen(Color.FromArgb(37, 99, 235), 2.0f))
+                            {
+                                g.DrawLine(caretPen, caretX, caretY, caretX, caretY + caretH);
+                            }
+                        }
+
+                        if (disposedBrush)
+                        {
+                            tb.Dispose();
+                        }
+                    }
+                }
+            }
+        }
+
+        #region Background Removal Engine
+        public void StartBackgroundRemoval()
+        {
+            if (SelectedShape == null) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+            {
+                try { shape.CachedImage = Image.FromFile(shape.ImagePath); } catch { }
+            }
+            if (shape.CachedImage == null) return;
+
+            IsRemovingBackground = true;
+            BgRemovalTool = "None";
+            try
+            {
+                OriginalImageBeforeRemoval = (Image)shape.CachedImage.Clone();
+            }
+            catch
+            {
+                OriginalImageBeforeRemoval = new Bitmap(shape.CachedImage);
+            }
+            BgRemovalStrokes.Clear();
+            CurrentDrawingStroke = null;
+            IsDrawingBgStroke = false;
+            _bgRemovalMask = null;
+            if (BgRemovalMaskBitmap != null)
+            {
+                try { BgRemovalMaskBitmap.Dispose(); } catch { }
+                BgRemovalMaskBitmap = null;
+            }
+        }
+
+        public void AutoRemoveBackgroundDirect(ShapeNode shape = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+            {
+                try { shape.CachedImage = Image.FromFile(shape.ImagePath); } catch { }
+            }
+            if (shape.CachedImage == null) return;
+
+            SaveUndoState();
+            Image baseImg = OriginalImageBeforeRemoval ?? shape.CachedImage;
+            Bitmap srcBmp = new Bitmap(baseImg);
+            _bgRemovalMask = ComputeAutoBgMaskFromBitmap(srcBmp);
+            srcBmp.Dispose();
+
+            Bitmap resultBmp = CreateMaskedBitmapFromOriginal(baseImg, _bgRemovalMask);
+            StartLaserScanAnimation(shape, resultBmp);
+        }
+
+        public void StartColorPickMode(ShapeNode shape = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+            {
+                try { shape.CachedImage = Image.FromFile(shape.ImagePath); } catch { }
+            }
+            if (shape.CachedImage == null) return;
+
+            IsColorPickingMode = true;
+            HasColorPickHover = false;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ExecuteColorPickRemoval(ShapeNode shape, Color targetColor, float normX = 0f, float normY = 0f)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null || shape.CachedImage == null) return;
+
+            IsColorPickingMode = false;
+            HasColorPickHover = false;
+            SaveUndoState();
+
+            Image baseImg = OriginalImageBeforeRemoval ?? shape.CachedImage;
+            int w = baseImg.Width;
+            int h = baseImg.Height;
+            if (w <= 0 || h <= 0) return;
+
+            if (_bgRemovalMask == null) _bgRemovalMask = new bool[w, h];
+
+            Bitmap srcBmp = new Bitmap(baseImg);
+            System.Drawing.Imaging.BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int total = w * h;
+            int[] raw = new int[total];
+            System.Runtime.InteropServices.Marshal.Copy(sData.Scan0, raw, 0, total);
+            srcBmp.UnlockBits(sData);
+            srcBmp.Dispose();
+
+            int seedX = Math.Max(0, Math.Min(w - 1, (int)(normX * w)));
+            int seedY = Math.Max(0, Math.Min(h - 1, (int)(normY * h)));
+            int seedIdx = seedY * w + seedX;
+
+            int tr = targetColor.R;
+            int tg = targetColor.G;
+            int tb = targetColor.B;
+
+            // Thuật toán Connected Flood Fill (Lan màu liên thông từ điểm click chuột, KHÔNG lan qua màu khác/đường ngăn cách)
+            int maxGlobalDistSq = 42 * 42; // Dung sai so với màu gốc tại điểm click
+            int maxLocalEdgeSq = 28 * 28;   // Ngưỡng phát hiện cạnh biên dừng lan
+
+            bool[] visited = new bool[total];
+            Queue<int> queue = new Queue<int>();
+
+            visited[seedIdx] = true;
+            _bgRemovalMask[seedX, seedY] = true;
+            queue.Enqueue(seedIdx);
+
+            int[] dxs = new int[] { 1, -1, 0, 0 };
+            int[] dys = new int[] { 0, 0, 1, -1 };
+
+            while (queue.Count > 0)
+            {
+                int currIdx = queue.Dequeue();
+                int cx = currIdx % w;
+                int cy = currIdx / w;
+
+                int currArgb = raw[currIdx];
+                int cr = (currArgb >> 16) & 0xFF;
+                int cg = (currArgb >> 8) & 0xFF;
+                int cb = currArgb & 0xFF;
+
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = cx + dxs[k];
+                    int ny = cy + dys[k];
+
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h)
+                    {
+                        int nIdx = ny * w + nx;
+                        if (!visited[nIdx])
+                        {
+                            int nextArgb = raw[nIdx];
+                            int nr = (nextArgb >> 16) & 0xFF;
+                            int ng = (nextArgb >> 8) & 0xFF;
+                            int nb = nextArgb & 0xFF;
+
+                            // 1. Kiểm tra dừng khi gặp đường biên sắc nét với pixel trước đó
+                            int drLocal = nr - cr;
+                            int dgLocal = ng - cg;
+                            int dbLocal = nb - cb;
+                            if (drLocal * drLocal + dgLocal * dgLocal + dbLocal * dbLocal > maxLocalEdgeSq)
+                            {
+                                continue;
+                            }
+
+                            // 2. Kiểm tra dung sai màu so với màu điểm click ban đầu
+                            int drSeed = nr - tr;
+                            int dgSeed = ng - tg;
+                            int dbSeed = nb - tb;
+                            if (drSeed * drSeed + dgSeed * dgSeed + dbSeed * dbSeed <= maxGlobalDistSq)
+                            {
+                                visited[nIdx] = true;
+                                _bgRemovalMask[nx, ny] = true;
+                                queue.Enqueue(nIdx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            Bitmap resultBmp = CreateMaskedBitmapFromOriginal(baseImg, _bgRemovalMask);
+            StartLaserScanAnimation(shape, resultBmp);
+        }
+
+        public void StartLaserScanAnimation(ShapeNode shape, Bitmap resultBmp)
+        {
+            if (shape == null || shape.CachedImage == null || resultBmp == null) return;
+
+            if (ScanSourceOriginalBitmap != null)
+            {
+                try { ScanSourceOriginalBitmap.Dispose(); } catch { }
+                ScanSourceOriginalBitmap = null;
+            }
+            if (ScanPendingResultBitmap != null)
+            {
+                try { ScanPendingResultBitmap.Dispose(); } catch { }
+                ScanPendingResultBitmap = null;
+            }
+
+            ScanTargetShape = shape;
+            ScanSourceOriginalBitmap = new Bitmap(shape.CachedImage);
+            ScanPendingResultBitmap = resultBmp;
+            ScanProgress = 0.0f;
+            IsScanningActive = true;
+
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public static Color GetPixelColorFromImage(Image img, float normX, float normY)
+        {
+            if (img == null) return Color.Transparent;
+            try
+            {
+                using (Bitmap bmp = new Bitmap(img))
+                {
+                    int px = Math.Max(0, Math.Min(bmp.Width - 1, (int)(normX * bmp.Width)));
+                    int py = Math.Max(0, Math.Min(bmp.Height - 1, (int)(normY * bmp.Height)));
+                    return bmp.GetPixel(px, py);
+                }
+            }
+            catch
+            {
+                return Color.Transparent;
+            }
+        }
+
+        public static bool[,] ComputeAutoBgMaskFromBitmap(Bitmap srcBmp)
+        {
+            int w = srcBmp.Width;
+            int h = srcBmp.Height;
+            bool[,] isBg = new bool[w, h];
+            if (w <= 0 || h <= 0) return isBg;
+
+            int total = w * h;
+            int[] raw = new int[total];
+            System.Drawing.Imaging.BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Runtime.InteropServices.Marshal.Copy(sData.Scan0, raw, 0, total);
+            srcBmp.UnlockBits(sData);
+
+            // 1. Lấy mẫu màu biên từ 4 cạnh ngoài của bức ảnh
+            List<int> bgColors = new List<int>();
+            for (int x = 0; x < w; x += Math.Max(1, w / 40))
+            {
+                bgColors.Add(raw[x]);
+                bgColors.Add(raw[(h - 1) * w + x]);
+            }
+            for (int y = 0; y < h; y += Math.Max(1, h / 40))
+            {
+                bgColors.Add(raw[y * w]);
+                bgColors.Add(raw[y * w + (w - 1)]);
+            }
+
+            bool[] visited = new bool[total];
+            Queue<int> queue = new Queue<int>();
+
+            for (int x = 0; x < w; x++)
+            {
+                int topIdx = x;
+                int botIdx = (h - 1) * w + x;
+                if (!visited[topIdx]) { visited[topIdx] = true; isBg[x, 0] = true; queue.Enqueue(topIdx); }
+                if (!visited[botIdx]) { visited[botIdx] = true; isBg[x, h - 1] = true; queue.Enqueue(botIdx); }
+            }
+            for (int y = 0; y < h; y++)
+            {
+                int lIdx = y * w;
+                int rIdx = y * w + (w - 1);
+                if (!visited[lIdx]) { visited[lIdx] = true; isBg[0, y] = true; queue.Enqueue(lIdx); }
+                if (!visited[rIdx]) { visited[rIdx] = true; isBg[w - 1, y] = true; queue.Enqueue(rIdx); }
+            }
+
+            int maxGlobalDistSq = 52 * 52;
+            int maxLocalEdgeSq = 32 * 32;
+            int[] dxs = new int[] { 1, -1, 0, 0 };
+            int[] dys = new int[] { 0, 0, 1, -1 };
+
+            while (queue.Count > 0)
+            {
+                int currIdx = queue.Dequeue();
+                int cx = currIdx % w;
+                int cy = currIdx / w;
+
+                int currArgb = raw[currIdx];
+                int cr = (currArgb >> 16) & 0xFF;
+                int cg = (currArgb >> 8) & 0xFF;
+                int cb = currArgb & 0xFF;
+
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = cx + dxs[k];
+                    int ny = cy + dys[k];
+
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h)
+                    {
+                        int nIdx = ny * w + nx;
+                        if (!visited[nIdx])
+                        {
+                            int nextArgb = raw[nIdx];
+                            int nr = (nextArgb >> 16) & 0xFF;
+                            int ng = (nextArgb >> 8) & 0xFF;
+                            int nb = nextArgb & 0xFF;
+
+                            int dr = nr - cr;
+                            int dg = ng - cg;
+                            int db = nb - cb;
+                            if (dr * dr + dg * dg + db * db > maxLocalEdgeSq) continue;
+
+                            bool matchesBg = false;
+                            for (int bgc = 0; bgc < bgColors.Count; bgc++)
+                            {
+                                int sCol = bgColors[bgc];
+                                int sr = (sCol >> 16) & 0xFF;
+                                int sg = (sCol >> 8) & 0xFF;
+                                int sb = sCol & 0xFF;
+                                if ((nr - sr) * (nr - sr) + (ng - sg) * (ng - sg) + (nb - sb) * (nb - sb) <= maxGlobalDistSq)
+                                {
+                                    matchesBg = true;
+                                    break;
+                                }
+                            }
+
+                            if (matchesBg)
+                            {
+                                visited[nIdx] = true;
+                                isBg[nx, ny] = true;
+                                queue.Enqueue(nIdx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return isBg;
+        }
+
+        public static Bitmap CreateMaskedBitmapFromOriginal(Image baseImg, bool[,] mask)
+        {
+            if (baseImg == null) return null;
+            int w = baseImg.Width;
+            int h = baseImg.Height;
+            if (w <= 0 || h <= 0) return null;
+
+            Bitmap srcBmp = new Bitmap(baseImg);
+            Bitmap resultBmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            System.Drawing.Imaging.BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int total = w * h;
+            int[] raw = new int[total];
+            System.Runtime.InteropServices.Marshal.Copy(sData.Scan0, raw, 0, total);
+            srcBmp.UnlockBits(sData);
+            srcBmp.Dispose();
+
+            int[] dstPixels = new int[total];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = y * w + x;
+                    if (mask != null && mask[x, y])
+                    {
+                        dstPixels[idx] = 0; // Alpha 0 (Trong suốt 100%)
+                    }
+                    else
+                    {
+                        dstPixels[idx] = raw[idx]; // Giữ 100% màu gốc không đổi màu
+                    }
+                }
+            }
+
+            System.Drawing.Imaging.BitmapData dData = resultBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Runtime.InteropServices.Marshal.Copy(dstPixels, 0, dData.Scan0, total);
+            resultBmp.UnlockBits(dData);
+
+            return resultBmp;
+        }
+
+        public static void DrawLaserScanBeam(Graphics g, float baseW, float baseH, float beamY, float scale)
+        {
+            float glowH = Math.Max(28f, 48f * scale);
+            RectangleF glowRect = new RectangleF(0, beamY - glowH, baseW, glowH * 2);
+
+            // 1. Dải ánh sáng Cyberpunk Cyan / Electric Neon Laser Glow tỏa rộng
+            if (glowRect.Height > 0 && glowRect.Width > 0)
+            {
+                using (LinearGradientBrush lgb = new LinearGradientBrush(new PointF(0, beamY - glowH), new PointF(0, beamY + glowH), Color.Transparent, Color.Transparent))
+                {
+                    ColorBlend cb = new ColorBlend(4);
+                    cb.Colors = new Color[] {
+                        Color.FromArgb(0, 6, 182, 212),
+                        Color.FromArgb(140, 14, 165, 233),
+                        Color.FromArgb(240, 255, 255, 255),
+                        Color.FromArgb(0, 168, 85, 247)
+                    };
+                    cb.Positions = new float[] { 0.0f, 0.45f, 0.5f, 1.0f };
+                    lgb.InterpolationColors = cb;
+                    g.FillRectangle(lgb, glowRect);
+                }
+            }
+
+            // 2. Tia laser sáng trắng trung tâm sắc nét
+            using (Pen outerGlow = new Pen(Color.FromArgb(210, 6, 182, 212), Math.Max(5f, 8f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen coreLaser = new Pen(Color.FromArgb(255, 255, 255, 255), Math.Max(2.2f, 3.5f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                g.DrawLine(outerGlow, 0, beamY, baseW, beamY);
+                g.DrawLine(coreLaser, 0, beamY, baseW, beamY);
+            }
+
+            // 3. Hạt sáng lấp lánh (Shimmer Particles & Star Sparkles)
+            int seed = 42 + (int)(beamY * 15);
+            Random rnd = new Random(seed);
+            for (int p = 0; p < 12; p++)
+            {
+                float px = (float)(rnd.NextDouble() * baseW);
+                float py = beamY + (float)((rnd.NextDouble() - 0.5) * glowH * 0.8);
+                float sz = (float)(3f + rnd.NextDouble() * 5f) * scale;
+                using (SolidBrush cyanSpark = new SolidBrush(Color.FromArgb(190, 34, 211, 238)))
+                using (SolidBrush sparkBrush = new SolidBrush(Color.FromArgb(240, 255, 255, 255)))
+                {
+                    g.FillEllipse(cyanSpark, px - sz * 1.5f, py - sz * 1.5f, sz * 3f, sz * 3f);
+                    g.FillEllipse(sparkBrush, px - sz / 2f, py - sz / 2f, sz, sz);
+                }
+            }
+
+            // 4. Viền khung quét phát sáng rực rỡ
+            using (Pen borderGlow = new Pen(Color.FromArgb(160, 14, 165, 233), 2f * scale) { DashStyle = DashStyle.Dash })
+            {
+                g.DrawRectangle(borderGlow, 0, 0, baseW, baseH);
+            }
+        }
+
+        public static void DrawColorPickLoupe(Graphics g, PointF canvasMousePos, Color pickedColor)
+        {
+            float lx = canvasMousePos.X + 20;
+            float ly = canvasMousePos.Y - 20;
+            float size = 46f;
+            RectangleF loupeRect = new RectangleF(lx, ly, size, size);
+
+            // Drop shadow
+            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
+            {
+                g.FillEllipse(shadowB, lx + 2, ly + 3, size, size);
+            }
+
+            // Inner color circle
+            using (SolidBrush colorB = new SolidBrush(pickedColor))
+            {
+                g.FillEllipse(colorB, loupeRect);
+            }
+
+            // White & Dark border
+            using (Pen wp = new Pen(Color.White, 3f))
+            using (Pen dp = new Pen(Color.FromArgb(30, 41, 59), 1.2f))
+            {
+                g.DrawEllipse(wp, loupeRect);
+                g.DrawEllipse(dp, loupeRect);
+            }
+
+            // Crosshair in center
+            using (Pen crossPen = new Pen(Color.FromArgb(180, 255, 255, 255), 1.2f))
+            {
+                g.DrawLine(crossPen, lx + size / 2, ly + 6, lx + size / 2, ly + size - 6);
+                g.DrawLine(crossPen, lx + 6, ly + size / 2, lx + size - 6, ly + size / 2);
+            }
+
+            // Tooltip Tag below loupe
+            string hex = string.Format("#{0:X2}{1:X2}{2:X2}", pickedColor.R, pickedColor.G, pickedColor.B);
+            string tipText = hex + " (Nhấp để xóa màu)";
+            using (Font tipFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+            {
+                SizeF sz = g.MeasureString(tipText, tipFont);
+                RectangleF tagRect = new RectangleF(lx - (sz.Width - size) / 2, ly + size + 4, sz.Width + 12, sz.Height + 4);
+                using (SolidBrush bgB = new SolidBrush(Color.FromArgb(230, 15, 23, 42)))
+                using (Pen borderP = new Pen(Color.FromArgb(14, 165, 233), 1.2f))
+                {
+                    g.FillRectangle(bgB, tagRect);
+                    g.DrawRectangle(borderP, tagRect.X, tagRect.Y, tagRect.Width, tagRect.Height);
+                    g.DrawString(tipText, tipFont, Brushes.White, tagRect.X + 6, tagRect.Y + 2);
+                }
+            }
+        }
+
+        public void ApplyMaskToShapeImage(ShapeNode shape)
+        {
+            if (shape == null || OriginalImageBeforeRemoval == null || _bgRemovalMask == null) return;
+            int w = OriginalImageBeforeRemoval.Width;
+            int h = OriginalImageBeforeRemoval.Height;
+            if (w <= 0 || h <= 0) return;
+
+            Bitmap srcBmp = new Bitmap(OriginalImageBeforeRemoval);
+            Bitmap resultBmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            System.Drawing.Imaging.BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int total = w * h;
+            int[] srcPixels = new int[total];
+            System.Runtime.InteropServices.Marshal.Copy(sData.Scan0, srcPixels, 0, total);
+            srcBmp.UnlockBits(sData);
+            srcBmp.Dispose();
+
+            int[] dstPixels = new int[total];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = y * w + x;
+                    if (_bgRemovalMask[x, y])
+                    {
+                        dstPixels[idx] = 0; // Alpha = 0 (Transparent)
+                    }
+                    else
+                    {
+                        dstPixels[idx] = srcPixels[idx]; // Giữ 100% màu gốc từ OriginalImageBeforeRemoval
+                    }
+                }
+            }
+
+            System.Drawing.Imaging.BitmapData dData = resultBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Runtime.InteropServices.Marshal.Copy(dstPixels, 0, dData.Scan0, total);
+            resultBmp.UnlockBits(dData);
+
+            if (shape.CachedImage != null)
+            {
+                try { shape.CachedImage.Dispose(); } catch { }
+            }
+            shape.CachedImage = resultBmp;
+            RefreshBgRemovalMaskBitmap(shape);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void EndBackgroundRemoval(bool applyChanges)
+        {
+            if (!IsRemovingBackground) return;
+
+            if (applyChanges && SelectedShape != null && SelectedShape.CachedImage != null && _bgRemovalMask != null)
+            {
+                ApplyMaskToShapeImage(SelectedShape);
+            }
+            else if (!applyChanges && SelectedShape != null && OriginalImageBeforeRemoval != null)
+            {
+                if (SelectedShape.CachedImage != null)
+                {
+                    try { SelectedShape.CachedImage.Dispose(); } catch { }
+                }
+                SelectedShape.CachedImage = (Image)OriginalImageBeforeRemoval.Clone();
+            }
+
+            IsRemovingBackground = false;
+            BgRemovalTool = "None";
+            if (BgRemovalMaskBitmap != null)
+            {
+                try { BgRemovalMaskBitmap.Dispose(); } catch { }
+                BgRemovalMaskBitmap = null;
+            }
+            _bgRemovalMask = null;
+            BgRemovalStrokes.Clear();
+            CurrentDrawingStroke = null;
+            IsDrawingBgStroke = false;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void DeleteLastBgMark()
+        {
+            if (BgRemovalStrokes.Count > 0)
+            {
+                BgRemovalStrokes.RemoveAt(BgRemovalStrokes.Count - 1);
+            }
+
+            if (SelectedShape != null)
+            {
+                RecomputeAllStrokes(SelectedShape);
+            }
+        }
+
+        public void RecomputeAllStrokes(ShapeNode shape)
+        {
+            if (shape == null || OriginalImageBeforeRemoval == null) return;
+            int w = OriginalImageBeforeRemoval.Width;
+            int h = OriginalImageBeforeRemoval.Height;
+            if (BgRemovalStrokes.Count == 0)
+            {
+                _bgRemovalMask = new bool[w, h];
+                ApplyMaskToShapeImage(shape);
+                return;
+            }
+            _bgRemovalMask = new bool[w, h];
+            foreach (var stroke in BgRemovalStrokes)
+            {
+                ApplyStrokeSegmentationCore(shape, stroke);
+            }
+            ApplyMaskToShapeImage(shape);
+        }
+
+        public void ApplyStrokeSegmentation(ShapeNode shape, BgRemovalStroke stroke)
+        {
+            if (shape == null || OriginalImageBeforeRemoval == null || stroke == null) return;
+            int w = OriginalImageBeforeRemoval.Width;
+            int h = OriginalImageBeforeRemoval.Height;
+            if (_bgRemovalMask == null)
+            {
+                _bgRemovalMask = new bool[w, h];
+            }
+            ApplyStrokeSegmentationCore(shape, stroke);
+            ApplyMaskToShapeImage(shape);
+        }
+
+        private void ApplyStrokeSegmentationCore(ShapeNode shape, BgRemovalStroke stroke)
+        {
+            if (shape == null || shape.CachedImage == null || _bgRemovalMask == null || stroke == null || stroke.Points.Count == 0) return;
+
+            int w = shape.CachedImage.Width;
+            int h = shape.CachedImage.Height;
+            if (w <= 0 || h <= 0) return;
+
+            Bitmap srcBmp = new Bitmap(OriginalImageBeforeRemoval ?? shape.CachedImage);
+            System.Drawing.Imaging.BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int total = w * h;
+            int[] rawPixels = new int[total];
+            System.Runtime.InteropServices.Marshal.Copy(sData.Scan0, rawPixels, 0, total);
+            srcBmp.UnlockBits(sData);
+            srcBmp.Dispose();
+
+            // 1. Thu thập tất cả các điểm tọa độ pixel trên đường stroke (đoạn nối các điểm vẽ tự do)
+            float r = Math.Max(2f, stroke.BrushRadius);
+            int rInt = (int)Math.Ceiling(r);
+            float rSq = r * r;
+
+            List<Point> linePixels = new List<Point>();
+            if (stroke.Points.Count == 1)
+            {
+                int px = Math.Max(0, Math.Min(w - 1, (int)(stroke.Points[0].X * w)));
+                int py = Math.Max(0, Math.Min(h - 1, (int)(stroke.Points[0].Y * h)));
+                linePixels.Add(new Point(px, py));
+            }
+            else
+            {
+                for (int i = 0; i < stroke.Points.Count - 1; i++)
+                {
+                    int x0 = Math.Max(0, Math.Min(w - 1, (int)(stroke.Points[i].X * w)));
+                    int y0 = Math.Max(0, Math.Min(h - 1, (int)(stroke.Points[i].Y * h)));
+                    int x1 = Math.Max(0, Math.Min(w - 1, (int)(stroke.Points[i + 1].X * w)));
+                    int y1 = Math.Max(0, Math.Min(h - 1, (int)(stroke.Points[i + 1].Y * h)));
+
+                    int dx = Math.Abs(x1 - x0);
+                    int dy = Math.Abs(y1 - y0);
+                    int steps = Math.Max(dx, dy);
+                    if (steps == 0)
+                    {
+                        linePixels.Add(new Point(x0, y0));
+                    }
+                    else
+                    {
+                        for (int s = 0; s <= steps; s++)
+                        {
+                            float t = (float)s / steps;
+                            int lx = (int)(x0 + (x1 - x0) * t);
+                            int ly = (int)(y0 + (y1 - y0) * t);
+                            linePixels.Add(new Point(lx, ly));
+                        }
+                    }
+                }
+            }
+
+            // 2. Nhận diện các màu sắc dưới nét cọ (Bao gồm cả khi quẹt qua 2 hoặc nhiều màu)
+            bool[] visited = new bool[total];
+            Queue<int> queue = new Queue<int>();
+            List<int> sampledColors = new List<int>();
+            HashSet<int> addedSeeds = new HashSet<int>();
+
+            foreach (Point lp in linePixels)
+            {
+                for (int dy = -rInt; dy <= rInt; dy++)
+                {
+                    int sy = lp.Y + dy;
+                    if (sy < 0 || sy >= h) continue;
+
+                    for (int dx = -rInt; dx <= rInt; dx++)
+                    {
+                        if (dx * dx + dy * dy > rSq) continue;
+                        int sx = lp.X + dx;
+                        if (sx < 0 || sx >= w) continue;
+
+                        int idx = sy * w + sx;
+                        if (addedSeeds.Add(idx))
+                        {
+                            visited[idx] = true;
+                            _bgRemovalMask[sx, sy] = !stroke.IsKeep;
+                            queue.Enqueue(idx);
+
+                            int argb = rawPixels[idx];
+                            int rVal = (argb >> 16) & 0xFF;
+                            int gVal = (argb >> 8) & 0xFF;
+                            int bVal = argb & 0xFF;
+
+                            bool exists = false;
+                            for (int sc = 0; sc < sampledColors.Count; sc++)
+                            {
+                                int sCol = sampledColors[sc];
+                                int sr = (sCol >> 16) & 0xFF;
+                                int sg = (sCol >> 8) & 0xFF;
+                                int sb = sCol & 0xFF;
+                                if ((rVal - sr) * (rVal - sr) + (gVal - sg) * (gVal - sg) + (bVal - sb) * (bVal - sb) < 18 * 18)
+                                {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            if (!exists && sampledColors.Count < 64)
+                            {
+                                sampledColors.Add(argb);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Thuật toán Lan màu Thông minh (Multi-source Color Diffusion & Edge-Aware Flood Fill)
+            int maxGlobalDistSq = 52 * 52; // Ngưỡng dung sai màu sắc
+            int maxLocalEdgeSq = 32 * 32;   // Ngưỡng gradient dừng lan khi gặp cạnh viền sắc nét
+
+            int[] dxs = new int[] { 1, -1, 0, 0 };
+            int[] dys = new int[] { 0, 0, 1, -1 };
+
+            while (queue.Count > 0)
+            {
+                int currIdx = queue.Dequeue();
+                int cx = currIdx % w;
+                int cy = currIdx / w;
+
+                int currArgb = rawPixels[currIdx];
+                int cr = (currArgb >> 16) & 0xFF;
+                int cg = (currArgb >> 8) & 0xFF;
+                int cb = currArgb & 0xFF;
+
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = cx + dxs[k];
+                    int ny = cy + dys[k];
+
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h)
+                    {
+                        int nIdx = ny * w + nx;
+                        if (!visited[nIdx])
+                        {
+                            int nextArgb = rawPixels[nIdx];
+                            int nr = (nextArgb >> 16) & 0xFF;
+                            int ng = (nextArgb >> 8) & 0xFF;
+                            int nb = nextArgb & 0xFF;
+
+                            // Kiểm tra đường biên (Edge Boundary check)
+                            int dr = nr - cr;
+                            int dg = ng - cg;
+                            int db = nb - cb;
+                            int localDistSq = dr * dr + dg * dg + db * db;
+                            if (localDistSq > maxLocalEdgeSq)
+                            {
+                                continue; // Gặp cạnh sắc nét -> Dừng lan tại đường biên
+                            }
+
+                            // Kiểm tra khớp màu với các màu đã lấy mẫu trong nét cọ
+                            bool matchSample = false;
+                            for (int sc = 0; sc < sampledColors.Count; sc++)
+                            {
+                                int sCol = sampledColors[sc];
+                                int sr = (sCol >> 16) & 0xFF;
+                                int sg = (sCol >> 8) & 0xFF;
+                                int sb = sCol & 0xFF;
+                                if ((nr - sr) * (nr - sr) + (ng - sg) * (ng - sg) + (nb - sb) * (nb - sb) <= maxGlobalDistSq)
+                                {
+                                    matchSample = true;
+                                    break;
+                                }
+                            }
+
+                            if (matchSample)
+                            {
+                                visited[nIdx] = true;
+                                _bgRemovalMask[nx, ny] = !stroke.IsKeep;
+                                queue.Enqueue(nIdx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ComputeInitialBgMask(ShapeNode shape)
+        {
+            if (shape == null || shape.CachedImage == null) return;
+            Bitmap bmp = new Bitmap(OriginalImageBeforeRemoval ?? shape.CachedImage);
+            int w = bmp.Width;
+            int h = bmp.Height;
+
+            _bgRemovalMask = new bool[w, h];
+
+            System.Drawing.Imaging.BitmapData bData = bmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int total = w * h;
+            int[] raw = new int[total];
+            System.Runtime.InteropServices.Marshal.Copy(bData.Scan0, raw, 0, total);
+            bmp.UnlockBits(bData);
+            bmp.Dispose();
+
+            // Lấy mẫu các màu nền tiềm năng từ 4 cạnh viền ngoài của ảnh
+            List<int> bgColors = new List<int>();
+            for (int x = 0; x < w; x += Math.Max(1, w / 40))
+            {
+                bgColors.Add(raw[x]); // Cạnh trên
+                bgColors.Add(raw[(h - 1) * w + x]); // Cạnh dưới
+            }
+            for (int y = 0; y < h; y += Math.Max(1, h / 40))
+            {
+                bgColors.Add(raw[y * w]); // Cạnh trái
+                bgColors.Add(raw[y * w + (w - 1)]); // Cạnh phải
+            }
+
+            bool[] visited = new bool[total];
+            Queue<int> queue = new Queue<int>();
+
+            for (int x = 0; x < w; x++)
+            {
+                int topIdx = x;
+                int botIdx = (h - 1) * w + x;
+                if (!visited[topIdx]) { visited[topIdx] = true; _bgRemovalMask[x, 0] = true; queue.Enqueue(topIdx); }
+                if (!visited[botIdx]) { visited[botIdx] = true; _bgRemovalMask[x, h - 1] = true; queue.Enqueue(botIdx); }
+            }
+            for (int y = 0; y < h; y++)
+            {
+                int lIdx = y * w;
+                int rIdx = y * w + (w - 1);
+                if (!visited[lIdx]) { visited[lIdx] = true; _bgRemovalMask[0, y] = true; queue.Enqueue(lIdx); }
+                if (!visited[rIdx]) { visited[rIdx] = true; _bgRemovalMask[w - 1, y] = true; queue.Enqueue(rIdx); }
+            }
+
+            int maxGlobalDistSq = 48 * 48;
+            int maxLocalEdgeSq = 30 * 30;
+
+            int[] dxs = new int[] { 1, -1, 0, 0 };
+            int[] dys = new int[] { 0, 0, 1, -1 };
+
+            while (queue.Count > 0)
+            {
+                int currIdx = queue.Dequeue();
+                int cx = currIdx % w;
+                int cy = currIdx / w;
+
+                int currArgb = raw[currIdx];
+                int cr = (currArgb >> 16) & 0xFF;
+                int cg = (currArgb >> 8) & 0xFF;
+                int cb = currArgb & 0xFF;
+
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = cx + dxs[k];
+                    int ny = cy + dys[k];
+
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h)
+                    {
+                        int nIdx = ny * w + nx;
+                        if (!visited[nIdx])
+                        {
+                            int nextArgb = raw[nIdx];
+                            int nr = (nextArgb >> 16) & 0xFF;
+                            int ng = (nextArgb >> 8) & 0xFF;
+                            int nb = nextArgb & 0xFF;
+
+                            int dr = nr - cr;
+                            int dg = ng - cg;
+                            int db = nb - cb;
+                            if (dr * dr + dg * dg + db * db > maxLocalEdgeSq) continue;
+
+                            bool matchesBg = false;
+                            for (int bgc = 0; bgc < bgColors.Count; bgc++)
+                            {
+                                int sCol = bgColors[bgc];
+                                int sr = (sCol >> 16) & 0xFF;
+                                int sg = (sCol >> 8) & 0xFF;
+                                int sb = sCol & 0xFF;
+                                if ((nr - sr) * (nr - sr) + (ng - sg) * (ng - sg) + (nb - sb) * (nb - sb) <= maxGlobalDistSq)
+                                {
+                                    matchesBg = true;
+                                    break;
+                                }
+                            }
+
+                            if (matchesBg)
+                            {
+                                visited[nIdx] = true;
+                                _bgRemovalMask[nx, ny] = true;
+                                queue.Enqueue(nIdx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            RefreshBgRemovalMaskBitmap(shape);
+        }
+
+        private void RefreshBgRemovalMaskBitmap(ShapeNode shape)
+        {
+            if (shape == null || shape.CachedImage == null || _bgRemovalMask == null) return;
+            int w = shape.CachedImage.Width;
+            int h = shape.CachedImage.Height;
+
+            if (BgRemovalMaskBitmap != null)
+            {
+                try { BgRemovalMaskBitmap.Dispose(); } catch { }
+                BgRemovalMaskBitmap = null;
+            }
+
+            Bitmap maskBmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Imaging.BitmapData bData = maskBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            int totalPixels = w * h;
+            int[] pixels = new int[totalPixels];
+
+            // PowerPoint Signature Removal Magenta: Alpha 220, R 192, G 0, B 120
+            int magentaColor = Color.FromArgb(220, 192, 0, 120).ToArgb();
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (_bgRemovalMask[x, y])
+                    {
+                        pixels[y * w + x] = magentaColor;
+                    }
+                    else
+                    {
+                        pixels[y * w + x] = 0; // Transparent
+                    }
+                }
+            }
+
+            System.Runtime.InteropServices.Marshal.Copy(pixels, 0, bData.Scan0, totalPixels);
+            maskBmp.UnlockBits(bData);
+
+            BgRemovalMaskBitmap = maskBmp;
+        }
+        #endregion
+
+        private System.Drawing.Imaging.ColorMatrix CreateImageColorMatrix(ShapeNode shape)
+        {
+            float b = shape.ImageBrightness;
+            float c = shape.ImageContrast;
+            float s = shape.ImageSaturation;
+            float op = Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity));
+
+            if (shape.ImageRecolor == "Grayscale") s = 0.0f;
+            else if (shape.ImageRecolor == "Washout") { b = 0.45f; c = 0.55f; op *= 0.85f; }
+
+            if (shape.ImageRecolor == "Sepia")
+            {
+                return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] { 0.393f * c, 0.349f * c, 0.272f * c, 0, 0 },
+                    new float[] { 0.769f * c, 0.686f * c, 0.534f * c, 0, 0 },
+                    new float[] { 0.189f * c, 0.168f * c, 0.131f * c, 0, 0 },
+                    new float[] { 0, 0, 0, op, 0 },
+                    new float[] { b, b, b, 0, 1 }
+                });
+            }
+            else if (shape.ImageRecolor == "Blue")
+            {
+                return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] { 0.2f * c, 0.2f * c, 0.8f * c, 0, 0 },
+                    new float[] { 0.2f * c, 0.4f * c, 0.9f * c, 0, 0 },
+                    new float[] { 0.3f * c, 0.5f * c, 1.2f * c, 0, 0 },
+                    new float[] { 0, 0, 0, op, 0 },
+                    new float[] { b, b, b + 0.1f, 0, 1 }
+                });
+            }
+            else if (shape.ImageRecolor == "Orange")
+            {
+                return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] { 1.2f * c, 0.4f * c, 0.1f * c, 0, 0 },
+                    new float[] { 0.8f * c, 0.5f * c, 0.1f * c, 0, 0 },
+                    new float[] { 0.2f * c, 0.2f * c, 0.1f * c, 0, 0 },
+                    new float[] { 0, 0, 0, op, 0 },
+                    new float[] { b + 0.1f, b, b, 0, 1 }
+                });
+            }
+            else if (shape.ImageRecolor == "Green")
+            {
+                return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] { 0.2f * c, 0.7f * c, 0.2f * c, 0, 0 },
+                    new float[] { 0.2f * c, 1.1f * c, 0.2f * c, 0, 0 },
+                    new float[] { 0.2f * c, 0.6f * c, 0.3f * c, 0, 0 },
+                    new float[] { 0, 0, 0, op, 0 },
+                    new float[] { b, b + 0.08f, b, 0, 1 }
+                });
+            }
+            else if (shape.ImageRecolor == "Purple")
+            {
+                return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                    new float[] { 0.8f * c, 0.2f * c, 0.8f * c, 0, 0 },
+                    new float[] { 0.3f * c, 0.2f * c, 0.5f * c, 0, 0 },
+                    new float[] { 0.6f * c, 0.3f * c, 1.1f * c, 0, 0 },
+                    new float[] { 0, 0, 0, op, 0 },
+                    new float[] { b + 0.05f, b, b + 0.08f, 0, 1 }
+                });
+            }
+
+            float rw = 0.3086f * (1.0f - s);
+            float gw = 0.6094f * (1.0f - s);
+            float bw = 0.0820f * (1.0f - s);
+            float t = 0.5f * (1.0f - c) + b;
+
+            return new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                new float[] { (rw + s) * c, rw * c, rw * c, 0, 0 },
+                new float[] { gw * c, (gw + s) * c, gw * c, 0, 0 },
+                new float[] { bw * c, bw * c, (bw + s) * c, 0, 0 },
+                new float[] { 0, 0, 0, op, 0 },
+                new float[] { t, t, t, 0, 1 }
+            });
+        }
+
+        #region Interactive Crop & Presentation History (Undo/Redo)
+        public void ToggleCropMode()
+        {
+            if (SelectedShape == null) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.Type != ShapeType.Image && shape.CachedImage == null && string.IsNullOrEmpty(shape.ImagePath)) return;
+
+            if (!IsCropping)
+            {
+                SaveUndoState();
+                IsCropping = true;
+                ActiveCropHandle = CropHandleType.None;
+            }
+            else
+            {
+                IsCropping = false;
+                ActiveCropHandle = CropHandleType.None;
+            }
+        }
+
+        public void ConfirmCrop()
+        {
+            if (IsCropping)
+            {
+                IsCropping = false;
+                ActiveCropHandle = CropHandleType.None;
+            }
+        }
+
+        public void SaveUndoState()
+        {
+            if (Presentation == null) return;
+            try
+            {
+                _undoStack.Add(Presentation.Clone());
+                if (_undoStack.Count > MaxUndoHistory) _undoStack.RemoveAt(0);
+                _redoStack.Clear();
+            }
+            catch { }
+        }
+
+        public void Undo()
+        {
+            if (_undoStack.Count == 0 || Presentation == null) return;
+            try
+            {
+                _redoStack.Add(Presentation.Clone());
+                PresentationRoot prev = _undoStack[_undoStack.Count - 1];
+                _undoStack.RemoveAt(_undoStack.Count - 1);
+                Presentation = prev;
+                if (ActiveSlideIndex >= Presentation.Slides.Count) ActiveSlideIndex = Math.Max(0, Presentation.Slides.Count - 1);
+
+                // Đồng bộ nếu đang ở chế độ Xóa nền (Background Removal)
+                if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
+                {
+                    if (BgRemovalStrokes.Count > 0)
+                    {
+                        BgRemovalStrokes.RemoveAt(BgRemovalStrokes.Count - 1);
+                    }
+                    RecomputeAllStrokes(SelectedShape);
+                }
+
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+            catch { }
+        }
+
+        public void Redo()
+        {
+            if (_redoStack.Count == 0 || Presentation == null) return;
+            try
+            {
+                _undoStack.Add(Presentation.Clone());
+                PresentationRoot next = _redoStack[_redoStack.Count - 1];
+                _redoStack.RemoveAt(_redoStack.Count - 1);
+                Presentation = next;
+                if (ActiveSlideIndex >= Presentation.Slides.Count) ActiveSlideIndex = Math.Max(0, Presentation.Slides.Count - 1);
+
+                if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
+                {
+                    RecomputeAllStrokes(SelectedShape);
+                }
+
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+            catch { }
+        }
+
+        public void SetCropAspectRatio(float targetW, float targetH)
+        {
+            if (SelectedShape == null) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+            {
+                try { shape.CachedImage = Image.FromFile(shape.ImagePath); } catch { }
+            }
+            if (shape.CachedImage == null) return;
+
+            SaveUndoState();
+            float imgW = shape.CachedImage.Width;
+            float imgH = shape.CachedImage.Height;
+            float targetRatio = targetW / targetH;
+            float currentRatio = imgW / imgH;
+
+            if (currentRatio > targetRatio)
+            {
+                // Image is wider than target ratio -> crop left & right
+                float desiredW = imgH * targetRatio;
+                float cropFractionX = (imgW - desiredW) / (2.0f * imgW);
+                shape.CropLeft = Math.Max(0f, Math.Min(0.48f, cropFractionX));
+                shape.CropRight = Math.Max(0f, Math.Min(0.48f, cropFractionX));
+                shape.CropTop = 0f;
+                shape.CropBottom = 0f;
+            }
+            else
+            {
+                // Image is taller than target ratio -> crop top & bottom
+                float desiredH = imgW / targetRatio;
+                float cropFractionY = (imgH - desiredH) / (2.0f * imgH);
+                shape.CropTop = Math.Max(0f, Math.Min(0.48f, cropFractionY));
+                shape.CropBottom = Math.Max(0f, Math.Min(0.48f, cropFractionY));
+                shape.CropLeft = 0f;
+                shape.CropRight = 0f;
+            }
+
+            // Adjust shape bounding box height according to aspect ratio
+            shape.Transform.Height = shape.Transform.Width / targetRatio;
+        }
+
+        public void SetCropShape(string shapeName)
+        {
+            if (SelectedShape == null) return;
+            SaveUndoState();
+            SelectedShape.CropShapeType = shapeName;
+        }
+
+        public void FillCrop()
+        {
+            if (SelectedShape == null) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.CachedImage == null) return;
+
+            SaveUndoState();
+            float boxRatio = shape.Transform.Width / Math.Max(1f, shape.Transform.Height);
+            float imgRatio = shape.CachedImage.Width / (float)Math.Max(1, shape.CachedImage.Height);
+
+            if (imgRatio > boxRatio)
+            {
+                float desiredW = shape.CachedImage.Height * boxRatio;
+                float cropX = (shape.CachedImage.Width - desiredW) / (2.0f * shape.CachedImage.Width);
+                shape.CropLeft = Math.Max(0f, cropX);
+                shape.CropRight = Math.Max(0f, cropX);
+                shape.CropTop = 0f;
+                shape.CropBottom = 0f;
+            }
+            else
+            {
+                float desiredH = shape.CachedImage.Width / boxRatio;
+                float cropY = (shape.CachedImage.Height - desiredH) / (2.0f * shape.CachedImage.Height);
+                shape.CropTop = Math.Max(0f, cropY);
+                shape.CropBottom = Math.Max(0f, cropY);
+                shape.CropLeft = 0f;
+                shape.CropRight = 0f;
+            }
+        }
+
+        public void FitCrop()
+        {
+            if (SelectedShape == null) return;
+            ShapeNode shape = SelectedShape;
+            if (shape.CachedImage == null) return;
+
+            SaveUndoState();
+            shape.CropLeft = 0f;
+            shape.CropRight = 0f;
+            shape.CropTop = 0f;
+            shape.CropBottom = 0f;
+
+            float imgRatio = shape.CachedImage.Width / (float)Math.Max(1, shape.CachedImage.Height);
+            shape.Transform.Height = shape.Transform.Width / imgRatio;
+        }
+
+        public void ResetCrop()
+        {
+            if (SelectedShape == null) return;
+            SaveUndoState();
+            SelectedShape.CropLeft = 0f;
+            SelectedShape.CropRight = 0f;
+            SelectedShape.CropTop = 0f;
+            SelectedShape.CropBottom = 0f;
+            SelectedShape.CropShapeType = "Rectangle";
+        }
+
+        #region Picture Fill (Lồng Ảnh Vào Hình)
+        public void SetPictureFill(Image img, string imagePath = "")
+        {
+            if (SelectedShape == null || img == null) return;
+            SaveUndoState();
+            SelectedShape.CachedImage = img;
+            SelectedShape.ImagePath = imagePath ?? "";
+            SelectedShape.FillOpacity = 1.0f;
+            SelectedShape.OriginalWidth = img.Width;
+            SelectedShape.OriginalHeight = img.Height;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertPictureFillDialog(Control parentControl = null)
+        {
+            if (SelectedShape == null) return;
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Title = "Chọn hình ảnh để Lồng vào Hình dạng (Picture Fill)";
+                ofd.Filter = "Tất cả định dạng ảnh (*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.gif)|*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.gif|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG (*.png)|*.png|Tất cả tệp (*.*)|*.*";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        Image img = Image.FromFile(ofd.FileName);
+                        SetPictureFill(img, ofd.FileName);
+                        if (parentControl != null) parentControl.Invalidate();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Không thể tải hình ảnh: " + ex.Message, "Lỗi nạp ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        public void RemovePictureFill(Control parentControl = null)
+        {
+            if (SelectedShape == null) return;
+            SaveUndoState();
+            SelectedShape.CachedImage = null;
+            SelectedShape.ImagePath = "";
+            if (parentControl != null) parentControl.Invalidate();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+        #endregion
+
+        public static GraphicsPath CreateCropShapePath(string shapeTypeStr, float x, float y, float w, float h)
+        {
+            if (string.IsNullOrEmpty(shapeTypeStr) || shapeTypeStr == "Rectangle")
+            {
+                GraphicsPath rectPath = new GraphicsPath();
+                rectPath.AddRectangle(new RectangleF(x, y, w, h));
+                return rectPath;
+            }
+
+            ShapeType st;
+            if (Enum.TryParse<ShapeType>(shapeTypeStr, true, out st))
+            {
+                return CreateShapePath(st, x, y, w, h);
+            }
+
+            GraphicsPath defaultPath = new GraphicsPath();
+            defaultPath.AddRectangle(new RectangleF(x, y, w, h));
+            return defaultPath;
+        }
+        #endregion
+
+        private void DrawVideoShape(Graphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
+        {
+            RectangleF vRect = new RectangleF(0, 0, baseW, baseH);
+            if (vRect.Width <= 2 || vRect.Height <= 2) return;
+
+            // 1. Poster Frame Image or Rich Dark Video Canvas
+            Image poster = null;
+            if (!string.IsNullOrEmpty(shape.VideoPosterFramePath) && System.IO.File.Exists(shape.VideoPosterFramePath))
+            {
+                try { poster = Image.FromFile(shape.VideoPosterFramePath); } catch { }
+            }
+            if (poster == null && shape.CachedImage != null)
+            {
+                poster = shape.CachedImage;
+            }
+            if (poster == null && !string.IsNullOrEmpty(shape.VideoPath) && System.IO.File.Exists(shape.VideoPath))
+            {
+                try
+                {
+                    shape.CachedImage = VideoThumbnailHelper.GetVideoPosterFrame(shape.VideoPath);
+                    poster = shape.CachedImage;
+                }
+                catch { }
+            }
+
+            // Create Path based on VideoStyleIndex & CropShapeType
+            GraphicsPath vPath = new GraphicsPath();
+            int styleIdx = shape.VideoStyleIndex;
+
+            if (styleIdx == 7) // Oval
+            {
+                vPath.AddEllipse(vRect);
+            }
+            else if (styleIdx == 2 || styleIdx == 8) // Rounded
+            {
+                vPath.AddPath(CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(12 * scale + 4)), false);
+            }
+            else
+            {
+                vPath.AddRectangle(vRect);
+            }
+
+            // Drop Shadow if styleIdx == 4
+            if (styleIdx == 4)
+            {
+                using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(50, 0, 0, 0)))
+                {
+                    g.FillRectangle(shadowB, 6 * scale, 6 * scale, baseW, baseH);
+                }
+            }
+
+            GraphicsState gs = g.Save();
+            g.SetClip(vPath);
+
+            if (poster != null)
+            {
+                g.DrawImage(poster, vRect);
+                if (!shape.IsVideoPlaying)
+                {
+                    // Center Media Watermark Play Triangle on Poster
+                    float iconSz = Math.Min(baseW * 0.24f, baseH * 0.32f);
+                    float iconX = (baseW - iconSz) / 2f;
+                    float iconY = (baseH - iconSz) / 2f - (baseH > 80 ? 12 * scale : 0);
+
+                    using (SolidBrush discBg = new SolidBrush(Color.FromArgb(140, 0, 0, 0)))
+                    using (Pen discPen = new Pen(Color.FromArgb(200, 255, 255, 255), 2f * scale))
+                    {
+                        g.FillEllipse(discBg, iconX, iconY, iconSz, iconSz);
+                        g.DrawEllipse(discPen, iconX, iconY, iconSz, iconSz);
+
+                        PointF[] tri = new PointF[] {
+                            new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.28f),
+                            new PointF(iconX + iconSz * 0.72f, iconY + iconSz * 0.50f),
+                            new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.72f)
+                        };
+                        using (SolidBrush triB = new SolidBrush(Color.White))
+                        {
+                            g.FillPolygon(triB, tri);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Sleek Dark Video Stage with subtle gradient
+                using (LinearGradientBrush bgGrad = new LinearGradientBrush(vRect, Color.FromArgb(30, 41, 59), Color.FromArgb(15, 23, 42), 45f))
+                {
+                    g.FillRectangle(bgGrad, vRect);
+                }
+
+                // Decorative Center Media Watermark Icon
+                float iconSz = Math.Min(baseW * 0.28f, baseH * 0.35f);
+                float iconX = (baseW - iconSz) / 2f;
+                float iconY = (baseH - iconSz) / 2f - (baseH > 80 ? 12 * scale : 0);
+
+                using (SolidBrush discBg = new SolidBrush(Color.FromArgb(120, 0, 0, 0)))
+                using (Pen discPen = new Pen(Color.FromArgb(180, 255, 255, 255), 2f * scale))
+                {
+                    g.FillEllipse(discBg, iconX, iconY, iconSz, iconSz);
+                    g.DrawEllipse(discPen, iconX, iconY, iconSz, iconSz);
+
+                    // Large Play Triangle
+                    PointF[] tri = new PointF[] {
+                        new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.28f),
+                        new PointF(iconX + iconSz * 0.72f, iconY + iconSz * 0.50f),
+                        new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.72f)
+                    };
+                    using (SolidBrush triB = new SolidBrush(Color.White))
+                    {
+                        g.FillPolygon(triB, tri);
+                    }
+                }
+
+                // Video File Name / Title Text
+                if (baseH > 90 * scale)
+                {
+                    string vName = !string.IsNullOrEmpty(shape.VideoPath) ? System.IO.Path.GetFileName(shape.VideoPath) : (shape.Name ?? "Video Trình Chiếu");
+                    using (Font vFont = new Font("Segoe UI", Math.Max(8f, 13f * scale), FontStyle.Bold))
+                    using (SolidBrush txtB = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                        RectangleF nameRect = new RectangleF(10 * scale, iconY + iconSz + 8 * scale, baseW - 20 * scale, 30 * scale);
+                        g.DrawString(vName, vFont, txtB, nameRect, sf);
+                    }
+                }
+            }
+
+            g.Restore(gs);
+
+            // 2. Video Border & Styling Frame
+            if (styleIdx == 1) // Simple White Frame
+            {
+                using (Pen wPen = new Pen(Color.White, Math.Max(2f, 4f * scale)))
+                {
+                    g.DrawPath(wPen, vPath);
+                }
+            }
+            else if (styleIdx == 2) // Matte Dual
+            {
+                using (Pen p1 = new Pen(Color.FromArgb(200, 200, 200), Math.Max(2f, 5f * scale)))
+                using (Pen p2 = new Pen(Color.FromArgb(80, 80, 80), 1.5f * scale))
+                {
+                    g.DrawPath(p1, vPath);
+                    g.DrawPath(p2, vPath);
+                }
+            }
+            else if (styleIdx == 3) // Metal
+            {
+                using (Pen p = new Pen(Color.FromArgb(203, 213, 225), Math.Max(2.5f, 6f * scale)))
+                {
+                    g.DrawPath(p, vPath);
+                }
+            }
+            else if (styleIdx == 5) // Soft Edge
+            {
+                using (Pen p = new Pen(Color.FromArgb(120, 255, 255, 255), Math.Max(2f, 4f * scale)))
+                {
+                    g.DrawPath(p, vPath);
+                }
+            }
+            else if (styleIdx == 6) // Double Frame
+            {
+                using (Pen p1 = new Pen(Color.FromArgb(37, 99, 235), Math.Max(1.5f, 3f * scale)))
+                {
+                    g.DrawPath(p1, vPath);
+                }
+            }
+            else if (styleIdx == 7) // Beveled Oval
+            {
+                using (Pen p = new Pen(Color.White, Math.Max(2f, 4f * scale)))
+                {
+                    g.DrawPath(p, vPath);
+                }
+            }
+            else if (shape.StrokeWidth > 0 && shape.StrokeColor != 0x00FFFFFF)
+            {
+                Color sc = Color.FromArgb(alpha, (shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
+                using (Pen sPen = new Pen(sc, Math.Max(1f, shape.StrokeWidth * scale)))
+                {
+                    g.DrawPath(sPen, vPath);
+                }
+            }
+
+            vPath.Dispose();
+
+            // 3. PowerPoint On-Canvas Video Playback Bar Overlay (At Bottom)
+            if (baseH > 80 * scale)
+            {
+                float barH = Math.Max(26f, 34f * scale);
+                float barY = baseH - barH;
+                RectangleF barRect = new RectangleF(0, barY, baseW, barH);
+
+                using (SolidBrush barBg = new SolidBrush(Color.FromArgb(200, 15, 23, 42)))
+                {
+                    g.FillRectangle(barBg, barRect);
+                }
+
+                // Play / Pause Icon on Left
+                float btnSz = barH * 0.55f;
+                float btnX = 10 * scale;
+                float btnY = barY + (barH - btnSz) / 2f;
+                using (SolidBrush pb = new SolidBrush(Color.FromArgb(56, 189, 248)))
+                {
+                    if (shape.IsVideoPlaying)
+                    {
+                        // Draw Pause Icon
+                        float w = btnSz * 0.3f;
+                        g.FillRectangle(pb, btnX + btnSz * 0.1f, btnY, w, btnSz);
+                        g.FillRectangle(pb, btnX + btnSz * 0.6f, btnY, w, btnSz);
+                    }
+                    else
+                    {
+                        // Draw Play Icon
+                        PointF[] playP = new PointF[] {
+                            new PointF(btnX, btnY),
+                            new PointF(btnX + btnSz, btnY + btnSz / 2f),
+                            new PointF(btnX, btnY + btnSz)
+                        };
+                        g.FillPolygon(pb, playP);
+                    }
+                }
+
+                // Timeline Track
+                float timeX = btnX + btnSz + 12 * scale;
+                float timeW = Math.Max(40f, baseW - timeX - (baseW > 240 ? 110 * scale : 45 * scale));
+                float timeY = barY + barH / 2f - 2.5f * scale;
+                float trackH = Math.Max(3f, 5f * scale);
+
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                {
+                    g.FillRectangle(trackBg, timeX, timeY, timeW, trackH);
+                }
+
+                // Played Progress Bar (0% default preview)
+                float playedFrac = shape.VideoTotalTime > 0 ? (shape.VideoCurrentTime / shape.VideoTotalTime) : 0f;
+                using (SolidBrush progB = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                {
+                    g.FillRectangle(progB, timeX, timeY, timeW * playedFrac, trackH);
+                }
+
+                // Scrubber Knob
+                float scrubX = timeX + timeW * playedFrac;
+                float scrubR = Math.Max(4f, 6f * scale);
+                using (SolidBrush scrubB = new SolidBrush(Color.White))
+                using (Pen scrubPen = new Pen(Color.FromArgb(239, 68, 68), 1.5f))
+                {
+                    g.FillEllipse(scrubB, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
+                    g.DrawEllipse(scrubPen, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
+                }
+
+                // Yellow Bookmark Indicator Pips on timeline
+                if (shape.VideoBookmarks != null && shape.VideoBookmarks.Count > 0)
+                {
+                    using (SolidBrush bmB = new SolidBrush(Color.FromArgb(250, 204, 21)))
+                    using (Pen bmP = new Pen(Color.FromArgb(161, 98, 7), 1f))
+                    {
+                        foreach (float bSec in shape.VideoBookmarks)
+                        {
+                            float bFrac = Math.Max(0.05f, Math.Min(0.95f, bSec / 120f));
+                            float bx = timeX + timeW * bFrac;
+                            g.FillRectangle(bmB, bx - 2f, timeY - 3f * scale, 4f, trackH + 6f * scale);
+                            g.DrawRectangle(bmP, bx - 2f, timeY - 3f * scale, 4f, trackH + 6f * scale);
+                        }
+                    }
+                }
+
+                // Time Timestamp String & Speaker on Right
+                if (baseW > 240)
+                {
+                    float rightX = timeX + timeW + 8 * scale;
+                    using (Font timeFont = new Font("Segoe UI", Math.Max(6.5f, 9f * scale), FontStyle.Regular))
+                    using (SolidBrush tb = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                    {
+                        int curM = (int)(shape.VideoCurrentTime / 60);
+                        int curS = (int)(shape.VideoCurrentTime % 60);
+                        int totM = (int)(shape.VideoTotalTime / 60);
+                        int totS = (int)(shape.VideoTotalTime % 60);
+                        string timeStr = string.Format("{0:D2}:{1:D2} / {2:D2}:{3:D2}", curM, curS, totM, totS);
+                        g.DrawString(timeStr, timeFont, tb, rightX, barY + (barH - 12 * scale) / 2f);
+                    }
+
+                    // Speaker Volume Icon
+                    float spkX = baseW - 24 * scale;
+                    float spkY = barY + barH / 2f;
+                    using (Pen spkPen = new Pen(Color.FromArgb(148, 163, 184), 1.5f))
+                    {
+                        g.DrawLine(spkPen, spkX, spkY - 4 * scale, spkX + 4 * scale, spkY - 4 * scale);
+                        g.DrawLine(spkPen, spkX + 4 * scale, spkY - 4 * scale, spkX + 8 * scale, spkY - 8 * scale);
+                        g.DrawLine(spkPen, spkX + 8 * scale, spkY - 8 * scale, spkX + 8 * scale, spkY + 8 * scale);
+                        g.DrawLine(spkPen, spkX + 8 * scale, spkY + 8 * scale, spkX + 4 * scale, spkY + 4 * scale);
+                        g.DrawLine(spkPen, spkX + 4 * scale, spkY + 4 * scale, spkX, spkY + 4 * scale);
+                        g.DrawLine(spkPen, spkX, spkY + 4 * scale, spkX, spkY - 4 * scale);
+                    }
+                }
+            }
+        }
+
+        private static void DrawStarFlare(Graphics g, float cx, float cy, float radius, Color coreCol, Color glowCol)
+        {
+            if (radius <= 0.5f) return;
+            using (SolidBrush gB = new SolidBrush(glowCol))
+            using (SolidBrush cB = new SolidBrush(coreCol))
+            {
+                PointF[] horiz = new PointF[] {
+                    new PointF(cx - radius * 1.6f, cy),
+                    new PointF(cx, cy - radius * 0.25f),
+                    new PointF(cx + radius * 1.6f, cy),
+                    new PointF(cx, cy + radius * 0.25f)
+                };
+                PointF[] vert = new PointF[] {
+                    new PointF(cx, cy - radius * 1.6f),
+                    new PointF(cx + radius * 0.25f, cy),
+                    new PointF(cx, cy + radius * 1.6f),
+                    new PointF(cx - radius * 0.25f, cy)
+                };
+                g.FillPolygon(gB, horiz);
+                g.FillPolygon(gB, vert);
+                g.FillEllipse(cB, cx - radius * 0.35f, cy - radius * 0.35f, radius * 0.7f, radius * 0.7f);
+            }
+        }
+
+        public static Color GetRainbowNeonColor(float phase)
+        {
+            float p = (phase % 1.0f + 1.0f) % 1.0f;
+            float h = p * 6.0f;
+            int sector = (int)Math.Floor(h);
+            float f = h - sector;
+            int q = (int)(255 * (1.0f - f));
+            int t = (int)(255 * f);
+
+            switch (sector)
+            {
+                case 0: return Color.FromArgb(255, t, 0);       // Red to Yellow
+                case 1: return Color.FromArgb(q, 255, 0);       // Yellow to Green
+                case 2: return Color.FromArgb(0, 255, t);       // Green to Cyan
+                case 3: return Color.FromArgb(0, q, 255);       // Cyan to Blue
+                case 4: return Color.FromArgb(t, 0, 255);       // Blue to Magenta
+                default: return Color.FromArgb(255, 0, q);      // Magenta to Red
+            }
+        }
+
+        private void DrawExclusiveAnimationBackgroundVisuals(Graphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
+        {
+            if (anim == null || !anim.IsExclusive || p < 0.001f || p > 0.999f) return;
+
+            switch (anim.Type)
+            {
+                case AnimationType.GenOffice_NeonPulse:
+                    {
+                        // Check target: If TextOnly, skip shape outline bloom
+                        if (anim.NeonTarget == NeonGlowTarget.TextOnly) break;
+
+                        float pulseIntensity = (float)Math.Sin(p * Math.PI);
+                        float intensityFactor = anim.NeonIntensity > 0 ? anim.NeonIntensity : 1.0f;
+                        float glowAlpha = (float)Math.Pow(pulseIntensity, 0.55) * opacityMultiplier * intensityFactor;
+                        if (glowAlpha <= 0.01f) break;
+
+                        Color neonCol;
+                        if (anim.NeonColorMode == NeonColorMode.Rainbow)
+                        {
+                            neonCol = GetRainbowNeonColor(p * 2.0f);
+                        }
+                        else if (anim.NeonColor != 0)
+                        {
+                            neonCol = Color.FromArgb(anim.NeonColor);
+                        }
+                        else if (shape.StrokeColor != 0 && shape.StrokeColor != 0x00FFFFFF)
+                        {
+                            neonCol = Color.FromArgb((shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
+                        }
+                        else if (shape.FillColor != 0 && shape.FillColor != 0x00FFFFFF)
+                        {
+                            neonCol = Color.FromArgb((shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF);
+                        }
+                        else
+                        {
+                            neonCol = Color.FromArgb(0, 240, 255); // Cyan Neon
+                        }
+
+                        if (neonCol.R < 45 && neonCol.G < 45 && neonCol.B < 45)
+                        {
+                            neonCol = Color.FromArgb(0, 240, 255); // Cyan Neon
+                        }
+
+                        Color secNeon;
+                        if (anim.NeonColorMode == NeonColorMode.Rainbow)
+                        {
+                            secNeon = GetRainbowNeonColor(p * 2.0f + 0.33f);
+                        }
+                        else if (anim.NeonColorMode == NeonColorMode.DualTone && anim.NeonSecondaryColor != 0)
+                        {
+                            secNeon = Color.FromArgb(anim.NeonSecondaryColor);
+                        }
+                        else
+                        {
+                            secNeon = Color.FromArgb(0, 245, 255);
+                        }
+
+                        using (GraphicsPath path = (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                            ? (GraphicsPath)shape.CustomPath.Clone()
+                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                        {
+                            if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                            {
+                                using (Matrix m = new Matrix())
+                                {
+                                    m.Scale(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                                    path.Transform(m);
+                                }
+                            }
+
+                            int bloomLayers = 8;
+                            float baseBloom = anim.NeonBloomRadius > 0 ? anim.NeonBloomRadius : 28f;
+                            float maxBloom = Math.Max(10f, baseBloom * scale * pulseIntensity);
+
+                            for (int l = bloomLayers; l >= 1; l--)
+                            {
+                                float penWidth = (l / (float)bloomLayers) * maxBloom * 2.4f;
+                                int layerA = (int)(Math.Min(255f, 48f * (1.0f - (l / (float)bloomLayers)) * glowAlpha));
+                                if (layerA <= 0) continue;
+
+                                using (Pen bloomPen = new Pen(Color.FromArgb(layerA, neonCol), penWidth) { LineJoin = LineJoin.Round })
+                                {
+                                    g.DrawPath(bloomPen, path);
+                                }
+                            }
+
+                            // Quầng sáng phụ Neon nếu có
+                            int secA = (int)(Math.Min(255f, 55f * glowAlpha));
+                            if (secA > 0)
+                            {
+                                using (Pen secPen = new Pen(Color.FromArgb(secA, secNeon), Math.Max(4f, maxBloom * 0.4f)) { LineJoin = LineJoin.Round })
+                                {
+                                    g.DrawPath(secPen, path);
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_GlitchHologram:
+                    {
+                        float glitchDist = (1.0f - p) * 10f * scale;
+                        if (glitchDist > 0.5f)
+                        {
+                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            {
+                                GraphicsState gsRed = g.Save();
+                                g.TranslateTransform(-glitchDist, -glitchDist * 0.5f);
+                                using (SolidBrush redBrush = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 255, 0, 85)))
+                                {
+                                    g.FillPath(redBrush, path);
+                                }
+                                g.Restore(gsRed);
+
+                                GraphicsState gsCyan = g.Save();
+                                g.TranslateTransform(glitchDist, glitchDist * 0.5f);
+                                using (SolidBrush cyanBrush = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 0, 245, 255)))
+                                {
+                                    g.FillPath(cyanBrush, path);
+                                }
+                                g.Restore(gsCyan);
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_KineticSnap:
+                    {
+                        if (p < 0.65f)
+                        {
+                            float trailDist = (1.0f - (p / 0.65f)) * 40f * scale;
+                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            {
+                                for (int t = 3; t >= 1; t--)
+                                {
+                                    GraphicsState gsT = g.Save();
+                                    g.TranslateTransform(0, (anim.Direction == TransitionDirection.FromTop ? -1 : 1) * trailDist * (t / 3f));
+                                    using (SolidBrush tBrush = new SolidBrush(Color.FromArgb((int)(30 * t * opacityMultiplier), 59, 130, 246)))
+                                    {
+                                        g.FillPath(tBrush, path);
+                                    }
+                                    g.Restore(gsT);
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_StarlightAssembly:
+                    {
+                        if (p < 0.8f)
+                        {
+                            float inward = 1.0f - (p / 0.8f);
+                            float cx = baseW / 2f;
+                            float cy = baseH / 2f;
+                            Random rnd = new Random(1234);
+                            for (int i = 0; i < 14; i++)
+                            {
+                                double angle = rnd.NextDouble() * Math.PI * 2;
+                                float dist = (float)(rnd.NextDouble() * 120 + 40) * scale * inward;
+                                float px = cx + (float)Math.Cos(angle) * dist;
+                                float py = cy + (float)Math.Sin(angle) * dist;
+                                float sz = (float)(3f + rnd.NextDouble() * 5f) * scale;
+                                int pA = (int)(220 * (1.0f - inward * 0.4f) * opacityMultiplier);
+                                using (SolidBrush pB = new SolidBrush(Color.FromArgb(pA, 255, 215, 0)))
+                                using (SolidBrush glowB = new SolidBrush(Color.FromArgb(pA / 3, 255, 255, 255)))
+                                {
+                                    g.FillEllipse(glowB, px - sz * 1.5f, py - sz * 1.5f, sz * 3f, sz * 3f);
+                                    g.FillEllipse(pB, px - sz / 2f, py - sz / 2f, sz, sz);
+                                }
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        private void DrawExclusiveAnimationForegroundVisuals(Graphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
+        {
+            if (anim == null || !anim.IsExclusive || p < 0.001f || p > 0.999f) return;
+
+            switch (anim.Type)
+            {
+                case AnimationType.GenOffice_NeonPulse:
+                    {
+                        // If TextOnly, skip shape outline core & corner flares
+                        if (anim.NeonTarget == NeonGlowTarget.TextOnly) break;
+
+                        float pulseIntensity = (float)Math.Sin(p * Math.PI);
+                        float intensityFactor = anim.NeonIntensity > 0 ? anim.NeonIntensity : 1.0f;
+                        int coreAlpha = (int)(Math.Min(255f, 245f * (float)Math.Pow(pulseIntensity, 0.4) * opacityMultiplier * intensityFactor));
+
+                        using (GraphicsPath path = (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                            ? (GraphicsPath)shape.CustomPath.Clone()
+                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                        {
+                            if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                            {
+                                using (Matrix m = new Matrix())
+                                {
+                                    m.Scale(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                                    path.Transform(m);
+                                }
+                            }
+
+                            if (coreAlpha > 0)
+                            {
+                                using (Pen corePen = new Pen(Color.FromArgb(coreAlpha, 255, 255, 255), Math.Max(2.0f, 3.5f * scale * intensityFactor)) { LineJoin = LineJoin.Round })
+                                {
+                                    g.DrawPath(corePen, path);
+                                }
+                            }
+                        }
+
+                        // 2. 4-Corner Starlight Diamond Flares (Tia lóe sáng chữ thập 4 cánh)
+                        if (anim.NeonCornerFlares && pulseIntensity > 0.2f)
+                        {
+                            Color flareColor = (anim.NeonColorMode == NeonColorMode.Rainbow)
+                                ? GetRainbowNeonColor(p * 2.0f + 0.5f)
+                                : (anim.NeonColor != 0 ? Color.FromArgb(anim.NeonColor) : Color.FromArgb(0, 240, 255));
+                            float flareSize = Math.Max(8f, 22f * scale * pulseIntensity * intensityFactor);
+                            int flareAlpha = (int)(Math.Min(255f, 240f * pulseIntensity * opacityMultiplier));
+                            PointF[] corners = new PointF[] {
+                                new PointF(0, 0),
+                                new PointF(baseW, 0),
+                                new PointF(0, baseH),
+                                new PointF(baseW, baseH)
+                            };
+
+                            foreach (var pt in corners)
+                            {
+                                DrawStarFlare(g, pt.X, pt.Y, flareSize, Color.FromArgb(flareAlpha, 255, 255, 255), Color.FromArgb(flareAlpha / 2, flareColor));
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_GlitchHologram:
+                    {
+                        int scanA = (int)(55f * (1.0f - p * 0.5f) * opacityMultiplier);
+                        if (scanA > 0)
+                        {
+                            using (Pen scanPen = new Pen(Color.FromArgb(scanA, 0, 245, 255), 1.0f))
+                            {
+                                for (float ly = 0; ly < baseH; ly += 5.0f * scale)
+                                {
+                                    g.DrawLine(scanPen, 0, ly, baseW, ly);
+                                }
+                            }
+                        }
+
+                        float beamY = (p * 2.5f % 1.0f) * baseH;
+                        using (Pen beamGlow = new Pen(Color.FromArgb((int)(180 * opacityMultiplier), 0, 245, 255), 4f * scale))
+                        using (Pen beamCore = new Pen(Color.FromArgb((int)(240 * opacityMultiplier), 255, 255, 255), 1.5f * scale))
+                        {
+                            g.DrawLine(beamGlow, 0, beamY, baseW, beamY);
+                            g.DrawLine(beamCore, 0, beamY, baseW, beamY);
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_Cinematic3DFlip:
+                    {
+                        float glarePos = (p - 0.2f) * 2.0f;
+                        if (glarePos >= 0f && glarePos <= 1.2f)
+                        {
+                            float gx = glarePos * (baseW + baseH) - baseH / 2f;
+                            float gw = Math.Max(24f, 60f * scale);
+                            RectangleF gRect = new RectangleF(gx - gw / 2f, -10, gw, baseH + 20);
+
+                            GraphicsState gState = g.Save();
+                            using (GraphicsPath clipP = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            {
+                                g.SetClip(clipP);
+                                using (LinearGradientBrush glareBrush = new LinearGradientBrush(gRect, Color.Transparent, Color.Transparent, 45f))
+                                {
+                                    ColorBlend cb = new ColorBlend(3);
+                                    cb.Colors = new Color[] { Color.Transparent, Color.FromArgb((int)(190 * opacityMultiplier), 255, 255, 255), Color.Transparent };
+                                    cb.Positions = new float[] { 0f, 0.5f, 1f };
+                                    glareBrush.InterpolationColors = cb;
+                                    g.FillRectangle(glareBrush, gRect);
+                                }
+                            }
+                            g.Restore(gState);
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_LiquidMorph:
+                    {
+                        float glossAlpha = (float)Math.Sin(p * Math.PI) * opacityMultiplier;
+                        if (glossAlpha > 0.1f)
+                        {
+                            RectangleF glossRect = new RectangleF(baseW * 0.12f, baseH * 0.1f, baseW * 0.35f, baseH * 0.22f);
+                            using (LinearGradientBrush glossB = new LinearGradientBrush(glossRect, Color.FromArgb((int)(160 * glossAlpha), 255, 255, 255), Color.Transparent, 90f))
+                            {
+                                g.FillEllipse(glossB, glossRect);
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_OrigamiUnfold:
+                    {
+                        if (p < 0.9f)
+                        {
+                            float midX = baseW / 2f;
+                            using (Pen creaseShadow = new Pen(Color.FromArgb((int)(90 * (1f - p) * opacityMultiplier), 0, 0, 0), 2.5f * scale))
+                            using (Pen creaseLight = new Pen(Color.FromArgb((int)(130 * (1f - p) * opacityMultiplier), 255, 255, 255), 1.2f * scale))
+                            {
+                                g.DrawLine(creaseShadow, midX, 0, midX, baseH);
+                                g.DrawLine(creaseLight, midX + 1.5f, 0, midX + 1.5f, baseH);
+                            }
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_StarlightAssembly:
+                    {
+                        if (p >= 0.7f && p <= 0.95f)
+                        {
+                            float burstNorm = (p - 0.7f) / 0.25f;
+                            float burstIntensity = (float)Math.Sin(burstNorm * Math.PI);
+                            float cx = baseW / 2f;
+                            float cy = baseH / 2f;
+                            float burstRadius = Math.Max(baseW, baseH) * 0.75f * burstIntensity;
+                            DrawStarFlare(g, cx, cy, burstRadius, Color.FromArgb((int)(240 * burstIntensity * opacityMultiplier), 255, 255, 255), Color.FromArgb((int)(160 * burstIntensity * opacityMultiplier), 255, 215, 0));
+                        }
+                    }
+                    break;
+
+                case AnimationType.GenOffice_GoldenRibbonSwirl:
+                    {
+                        float ribbonAlpha = (float)Math.Sin(p * Math.PI) * opacityMultiplier;
+                        if (ribbonAlpha > 0.05f)
+                        {
+                            Random rnd = new Random(5678);
+                            for (int i = 0; i < 8; i++)
+                            {
+                                float spX = (float)(rnd.NextDouble() * baseW);
+                                float spY = (float)(rnd.NextDouble() * baseH);
+                                float spSz = (float)(2.5f + rnd.NextDouble() * 3.5f) * scale;
+                                DrawStarFlare(g, spX, spY, spSz * 2.5f, Color.FromArgb((int)(220 * ribbonAlpha), 255, 245, 180), Color.FromArgb((int)(120 * ribbonAlpha), 255, 215, 0));
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        public void DrawShape(Graphics g, float slideX, float slideY, float scale, ShapeNode shape, bool isSelected, float opacityMultiplier = 1.0f, float animOffsetX = 0f, float animOffsetY = 0f, float animScaleX = 1.0f, float animScaleY = 1.0f, float animRotDelta = 0f, ShapeAnimation activeAnim = null, float activeAnimProgress = 0f)
+        {
+            if (!shape.IsVisible) return;
+            if ((shape.IsDecorative || shape.PlaceholderType == "ThemeDecoration") && ActiveSlide != null && ActiveSlide.HideBackgroundGraphics) return;
+            if (Math.Abs(animScaleX) <= 0.001f || Math.Abs(animScaleY) <= 0.001f) return;
+
+            if (activeAnim == null && ActiveSlide != null && ActiveSlide.Animations != null)
+            {
+                foreach (ShapeAnimation a in ActiveSlide.Animations)
+                {
+                    if (a.ShapeId == shape.Id && a.Type == AnimationType.GenOffice_NeonPulse && a.NeonInfiniteLoop)
+                    {
+                        activeAnim = a;
+                        double phase = (DateTime.Now.Ticks / 10000000.0) * 2.5;
+                        activeAnimProgress = (float)(0.15 + 0.70 * (0.5 + 0.5 * Math.Sin(phase)));
+                        break;
+                    }
+                }
+            }
+
+            float baseW = shape.Transform.Width * scale;
+            float baseH = shape.Transform.Height * scale;
+            if (shape.Type == ShapeType.Line)
+            {
+                if (baseW <= 0.001f && baseH <= 0.001f) return;
+            }
+            else
+            {
+                if (baseW <= 0.001f || baseH <= 0.001f) return;
+            }
+
+            float sx = slideX + (shape.Transform.X + animOffsetX) * scale;
+            float sy = slideY + (shape.Transform.Y + animOffsetY) * scale;
+
+            GraphicsState state = g.Save();
+
+            // Transform matrix: Center anchor -> Rotation -> Scaling -> Local Top-Left
+            float centerX = sx + (baseW / 2.0f);
+            float centerY = sy + (baseH / 2.0f);
+            g.TranslateTransform(centerX, centerY);
+
+            float totalRot = shape.Transform.Rotation + animRotDelta;
+            if (Math.Abs(totalRot) > 0.01f)
+            {
+                g.RotateTransform(totalRot);
+            }
+
+            float finalScaleX = (shape.Transform.FlipHorizontal ? -1.0f : 1.0f) * animScaleX;
+            float finalScaleY = (shape.Transform.FlipVertical ? -1.0f : 1.0f) * animScaleY;
+            if (Math.Abs(finalScaleX - 1.0f) > 0.001f || Math.Abs(finalScaleY - 1.0f) > 0.001f)
+            {
+                g.ScaleTransform(finalScaleX, finalScaleY);
+            }
+
+            g.TranslateTransform(-baseW / 2.0f, -baseH / 2.0f);
+
+            RectangleF shapeRect = new RectangleF(0, 0, baseW, baseH);
+
+            float op = Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity * opacityMultiplier));
+            if (op <= 0.001f)
+            {
+                g.Restore(state);
+                return;
+            }
+            int alpha = (int)(op * 255f);
+
+            Color fillCol = Color.FromArgb(alpha, (shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF);
+            Color strokeCol = Color.FromArgb(alpha, (shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
+            Color txtCol = Color.FromArgb(alpha, (shape.TextColor >> 16) & 0xFF, (shape.TextColor >> 8) & 0xFF, shape.TextColor & 0xFF);
+
+            // Draw Exclusive Animation Background Visuals (Multi-layer Neon Bloom, RGB Split Ghost, etc.)
+            DrawExclusiveAnimationBackgroundVisuals(g, baseW, baseH, shape, activeAnim, activeAnimProgress, scale, opacityMultiplier);
+
+            if (!string.IsNullOrEmpty(shape.SmartArtType) || (shape.Name != null && shape.Name.StartsWith("SmartArt")))
+            {
+                Rectangle saBounds = new Rectangle(0, 0, (int)baseW, (int)baseH);
+                SmartArtRenderer.DrawSmartArt(g, saBounds, shape.SmartArtType ?? "Process_Linear", shape.SmartArtTitle ?? shape.Name, shape.PictureStyleIndex, shape.Text, isSelected, scale);
+                g.Restore(state);
+
+                if (isSelected)
+                {
+                    float naturalSx = slideX + shape.Transform.X * scale;
+                    float naturalSy = slideY + shape.Transform.Y * scale;
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                }
+                return;
+            }
+
+            if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
+            {
+                DrawVideoShape(g, baseW, baseH, shape, isSelected, alpha, scale);
+                g.Restore(state);
+
+                if (isSelected)
+                {
+                    float naturalSx = slideX + shape.Transform.X * scale;
+                    float naturalSy = slideY + shape.Transform.Y * scale;
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                }
+                return;
+            }
+
+            if (shape.Type == ShapeType.Table)
+            {
+                DrawTableShape(g, baseW, baseH, shape, isSelected, alpha, scale);
+                g.Restore(state);
+
+                if (isSelected)
+                {
+                    float naturalSx = slideX + shape.Transform.X * scale;
+                    float naturalSy = slideY + shape.Transform.Y * scale;
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                }
+                return;
+            }
+
+            if (shape.Type == ShapeType.Chart || shape.ChartData != null)
+            {
+                DocChartData cData = shape.ChartData ?? DocChartData.CreateDefault("Column_Clustered");
+                Rectangle chartRect = new Rectangle(0, 0, (int)baseW, (int)baseH);
+                ChartRenderer.DrawChart(g, chartRect, cData, isSelected, scale);
+                g.Restore(state);
+
+                if (isSelected)
+                {
+                    float naturalSx = slideX + shape.Transform.X * scale;
+                    float naturalSy = slideY + shape.Transform.Y * scale;
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                }
+                return;
+            }
+
+            if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
+            {
+                if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                {
+                    try
+                    {
+                        shape.CachedImage = Image.FromFile(shape.ImagePath);
+                    }
+                    catch { }
+                }
+
+                if (shape.CachedImage != null)
+                {
+                    if (shape.OriginalWidth <= 0 || shape.OriginalHeight <= 0)
+                    {
+                        shape.OriginalWidth = shape.CachedImage.Width;
+                        shape.OriginalHeight = shape.CachedImage.Height;
+                    }
+
+                    float srcX = shape.CachedImage.Width * Math.Max(0f, Math.Min(0.85f, shape.CropLeft));
+                    float srcY = shape.CachedImage.Height * Math.Max(0f, Math.Min(0.85f, shape.CropTop));
+                    float srcW = shape.CachedImage.Width * Math.Max(0.05f, (1.0f - shape.CropLeft - shape.CropRight));
+                    float srcH = shape.CachedImage.Height * Math.Max(0.05f, (1.0f - shape.CropTop - shape.CropBottom));
+                    RectangleF srcRect = new RectangleF(srcX, srcY, srcW, srcH);
+
+                    // Khi đang ở Chế độ Cắt ảnh Tương tác (Interactive Crop Mode): Vẽ ảnh gốc mờ 35% ở phía sau
+                    if (IsCropping && shape == SelectedShape)
+                    {
+                        float fullVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
+                        float fullVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
+                        float fullW = baseW / fullVisWFrac;
+                        float fullH = baseH / fullVisHFrac;
+                        float fullX = -shape.CropLeft * fullW;
+                        float fullY = -shape.CropTop * fullH;
+
+                        using (System.Drawing.Imaging.ImageAttributes dimIa = new System.Drawing.Imaging.ImageAttributes())
+                        {
+                            System.Drawing.Imaging.ColorMatrix dimCm = new System.Drawing.Imaging.ColorMatrix(new float[][] {
+                                new float[] { 1, 0, 0, 0, 0 },
+                                new float[] { 0, 1, 0, 0, 0 },
+                                new float[] { 0, 0, 1, 0, 0 },
+                                new float[] { 0, 0, 0, 0.35f, 0 },
+                                new float[] { 0, 0, 0, 0, 1 }
+                            });
+                            PointF[] dimDestPoints = new PointF[] {
+                                new PointF(fullX, fullY),
+                                new PointF(fullX + fullW, fullY),
+                                new PointF(fullX, fullY + fullH)
+                            };
+                            g.DrawImage(shape.CachedImage, dimDestPoints, new RectangleF(0, 0, shape.CachedImage.Width, shape.CachedImage.Height), GraphicsUnit.Pixel, dimIa);
+                        }
+                    }
+
+                    System.Drawing.Imaging.ColorMatrix cm = CreateImageColorMatrix(shape);
+                    using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                        PointF[] destPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
+
+                        // Picture Styles / Crop to Shape / CustomPath Multi-Shape Clipping
+                        GraphicsPath customCropPath = null;
+                        if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                        {
+                            using (Matrix m = new Matrix())
+                            {
+                                m.Scale(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                                customCropPath = (GraphicsPath)shape.CustomPath.Clone();
+                                customCropPath.Transform(m);
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(shape.CropShapeType) && shape.CropShapeType != "Rectangle")
+                        {
+                            customCropPath = CreateCropShapePath(shape.CropShapeType, 0, 0, baseW, baseH);
+                        }
+                        else if (shape.Type != ShapeType.Image && shape.Type != ShapeType.TextBox && shape.Type != ShapeType.Rectangle)
+                        {
+                            // Method 1: Picture Fill on vector shape (RoundedRectangle, Hexagon, Star, Heart, etc.)
+                            customCropPath = CreateShapePath(shape.Type, 0, 0, baseW, baseH);
+                        }
+
+                        GraphicsPath strokeOutlinePath = customCropPath != null ? (GraphicsPath)customCropPath.Clone() : null;
+
+                        GraphicsState cropShapeState = null;
+                        if (customCropPath != null)
+                        {
+                            cropShapeState = g.Save();
+                            g.SetClip(customCropPath);
+                        }
+
+                        if (shape.PictureStyleIndex == 7) // Beveled Oval
+                        {
+                            GraphicsPath ovalPath = new GraphicsPath();
+                            ovalPath.AddEllipse(0, 0, baseW, baseH);
+                            GraphicsState pState = g.Save();
+                            g.SetClip(ovalPath);
+                            g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                            g.Restore(pState);
+                            using (Pen ovalPen = new Pen(Color.White, Math.Max(3f, 4f * scale)))
+                            {
+                                g.DrawEllipse(ovalPen, 0, 0, baseW, baseH);
+                            }
+                        }
+                        else if (shape.PictureStyleIndex == 5 || shape.PictureStyleIndex == 8) // Soft Edge / Rounded Bevel
+                        {
+                            GraphicsPath roundPath = CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(14 * scale));
+                            GraphicsState pState = g.Save();
+                            g.SetClip(roundPath);
+                            g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                            g.Restore(pState);
+                            using (Pen roundPen = new Pen(Color.FromArgb(200, 255, 255, 255), Math.Max(2f, 3f * scale)))
+                            {
+                                g.DrawPath(roundPen, roundPath);
+                            }
+                        }
+                        else
+                        {
+                            // Shadow for Frame Styles
+                            if (shape.PictureStyleIndex == 1 || shape.PictureStyleIndex == 3 || shape.PictureStyleIndex == 4)
+                            {
+                                using (SolidBrush shB = new SolidBrush(Color.FromArgb(50, 0, 0, 0)))
+                                {
+                                    g.FillRectangle(shB, 6 * scale, 6 * scale, baseW, baseH);
+                                }
+                            }
+
+                            // Khi đang quét Laser AI: Bóc tách nền thời gian thực (phần trên đã bóc tách, phần dưới ảnh gốc)
+                            if (IsScanningActive && shape == ScanTargetShape && ScanPendingResultBitmap != null && ScanSourceOriginalBitmap != null)
+                            {
+                                float beamY = ScanProgress * baseH;
+                                PointF[] fullDestPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
+
+                                // 1. Phần trên tia laser (đã quét qua): Vẽ ảnh đã bóc tách nền ScanPendingResultBitmap
+                                if (beamY > 0.5f)
+                                {
+                                    GraphicsState upperClip = g.Save();
+                                    g.SetClip(new RectangleF(0, 0, baseW, beamY));
+                                    g.DrawImage(ScanPendingResultBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
+                                    g.Restore(upperClip);
+                                }
+
+                                // 2. Phần dưới tia laser (chưa quét tới): Vẽ ảnh gốc ScanSourceOriginalBitmap
+                                if (beamY < baseH - 0.5f)
+                                {
+                                    GraphicsState lowerClip = g.Save();
+                                    g.SetClip(new RectangleF(0, beamY, baseW, baseH - beamY));
+                                    g.DrawImage(ScanSourceOriginalBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
+                                    g.Restore(lowerClip);
+                                }
+
+                                // 3. Vẽ chùm tia Laser Cyberpunk phát sáng rực rỡ tại vị trí beamY
+                                DrawLaserScanBeam(g, baseW, baseH, beamY, scale);
+                            }
+                            else
+                            {
+                                g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                            }
+
+                            // Restore Crop to Shape Clip
+                            if (cropShapeState != null)
+                            {
+                                g.Restore(cropShapeState);
+                                cropShapeState = null;
+                            }
+                            if (customCropPath != null)
+                            {
+                                customCropPath.Dispose();
+                                customCropPath = null;
+                            }
+
+                            // Frame Overlay
+                            if (shape.PictureStyleIndex == 1) // Simple White Frame
+                            {
+                                using (Pen wf = new Pen(Color.White, Math.Max(4f, 6f * scale)))
+                                {
+                                    g.DrawRectangle(wf, 0, 0, baseW, baseH);
+                                }
+                            }
+                            else if (shape.PictureStyleIndex == 2) // Matte Dual
+                            {
+                                using (Pen mf = new Pen(Color.FromArgb(240, 240, 240), Math.Max(6f, 10f * scale)))
+                                using (Pen df = new Pen(Color.FromArgb(100, 100, 100), Math.Max(1f, 1.5f * scale)))
+                                {
+                                    g.DrawRectangle(mf, 0, 0, baseW, baseH);
+                                    g.DrawRectangle(df, 0, 0, baseW, baseH);
+                                }
+                            }
+                            else if (shape.PictureStyleIndex == 3) // Metal Frame
+                            {
+                                using (Pen metPen = new Pen(Color.FromArgb(203, 213, 225), Math.Max(5f, 7f * scale)))
+                                {
+                                    g.DrawRectangle(metPen, 0, 0, baseW, baseH);
+                                }
+                            }
+                            else if (shape.PictureStyleIndex == 6) // Double Frame
+                            {
+                                using (Pen p1 = new Pen(Color.FromArgb(59, 130, 246), Math.Max(2f, 3f * scale)))
+                                using (Pen p2 = new Pen(Color.White, Math.Max(1.5f, 2f * scale)))
+                                {
+                                    g.DrawRectangle(p1, 0, 0, baseW, baseH);
+                                    g.DrawRectangle(p2, 4 * scale, 4 * scale, baseW - 8 * scale, baseH - 8 * scale);
+                                }
+                            }
+                            else if (shape.StrokeWidth > 0 && strokeCol.A > 0)
+                            {
+                                using (Pen imgStrokePen = new Pen(strokeCol, Math.Max(1.0f, shape.StrokeWidth * scale)))
+                                {
+                                    if (strokeOutlinePath != null)
+                                    {
+                                        g.DrawPath(imgStrokePen, strokeOutlinePath);
+                                    }
+                                    else
+                                    {
+                                        g.DrawRectangle(imgStrokePen, 0, 0, baseW, baseH);
+                                    }
+                                }
+                            }
+
+                            if (strokeOutlinePath != null)
+                            {
+                                strokeOutlinePath.Dispose();
+                                strokeOutlinePath = null;
+                            }
+                        }
+
+                        // Background Removal Preview Overlay (Magenta tint & strokes)
+                        if (IsRemovingBackground && shape == SelectedShape && BgRemovalMaskBitmap != null)
+                        {
+                            g.DrawImage(BgRemovalMaskBitmap, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+
+                            // Draw live stroke currently being drawn (smooth feedback line while dragging, disappears upon release, no +/- badges)
+                            if (CurrentDrawingStroke != null && CurrentDrawingStroke.Points != null && CurrentDrawingStroke.Points.Count >= 2)
+                            {
+                                Color baseCol = CurrentDrawingStroke.IsKeep ? Color.FromArgb(230, 34, 197, 94) : Color.FromArgb(230, 239, 68, 68);
+                                PointF[] pts = new PointF[CurrentDrawingStroke.Points.Count];
+                                for (int pIdx = 0; pIdx < CurrentDrawingStroke.Points.Count; pIdx++)
+                                {
+                                    pts[pIdx] = new PointF(CurrentDrawingStroke.Points[pIdx].X * baseW, CurrentDrawingStroke.Points[pIdx].Y * baseH);
+                                }
+
+                                using (Pen shadowPen = new Pen(Color.FromArgb(120, 0, 0, 0), Math.Max(4f, 5.5f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                                using (Pen whitePen = new Pen(Color.White, Math.Max(2.8f, 3.8f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                                using (Pen strokePen = new Pen(baseCol, Math.Max(1.8f, 2.4f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                                {
+                                    g.DrawLines(shadowPen, pts);
+                                    g.DrawLines(whitePen, pts);
+                                    g.DrawLines(strokePen, pts);
+                                }
+                            }
+
+                            // Draw Brush Size circle indicator on mouse hover
+                            if (CurrentMouseHoverNorm.X >= 0 && CurrentMouseHoverNorm.Y >= 0 && shape.CachedImage != null)
+                            {
+                                float hx = CurrentMouseHoverNorm.X * baseW;
+                                float hy = CurrentMouseHoverNorm.Y * baseH;
+                                float brushCanvasR = (BgBrushRadius / (float)shape.CachedImage.Width) * baseW;
+                                brushCanvasR = Math.Max(4f, brushCanvasR);
+
+                                using (Pen dashPen = new Pen(Color.White, 1.8f) { DashStyle = DashStyle.Dash })
+                                using (Pen shadowPen = new Pen(Color.FromArgb(160, 0, 0, 0), 1f))
+                                {
+                                    g.DrawEllipse(shadowPen, hx - brushCanvasR, hy - brushCanvasR, brushCanvasR * 2, brushCanvasR * 2);
+                                    g.DrawEllipse(dashPen, hx - brushCanvasR, hy - brushCanvasR, brushCanvasR * 2, brushCanvasR * 2);
+                                }
+                            }
+
+                            // Hiệu ứng Quét sáng Laser AI (Laser Scanning Beam & Shimmer Animation)
+                            if (IsScanningActive && ScanProgress >= 0f && ScanProgress <= 1.0f)
+                            {
+                                float beamY = ScanProgress * baseH;
+                                float glowH = Math.Max(28f, 48f * scale);
+                                RectangleF glowRect = new RectangleF(0, beamY - glowH, baseW, glowH * 2);
+
+                                // 1. Dải ánh sáng Cyberpunk Cyan / Electric Blue Laser Glow
+                                if (glowRect.Height > 0 && glowRect.Width > 0)
+                                {
+                                    using (LinearGradientBrush lgb = new LinearGradientBrush(new PointF(0, beamY - glowH), new PointF(0, beamY + glowH), Color.Transparent, Color.Transparent))
+                                    {
+                                        ColorBlend cb = new ColorBlend(4);
+                                        cb.Colors = new Color[] {
+                                            Color.FromArgb(0, 6, 182, 212),
+                                            Color.FromArgb(140, 14, 165, 233),
+                                            Color.FromArgb(240, 255, 255, 255),
+                                            Color.FromArgb(0, 56, 189, 248)
+                                        };
+                                        cb.Positions = new float[] { 0.0f, 0.45f, 0.5f, 1.0f };
+                                        lgb.InterpolationColors = cb;
+                                        g.FillRectangle(lgb, glowRect);
+                                    }
+                                }
+
+                                // 2. Tia laser sáng trắng trung tâm sắc nét
+                                using (Pen outerGlow = new Pen(Color.FromArgb(200, 6, 182, 212), Math.Max(5f, 8f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                                using (Pen coreLaser = new Pen(Color.FromArgb(250, 255, 255, 255), Math.Max(2.2f, 3.5f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                                {
+                                    g.DrawLine(outerGlow, 0, beamY, baseW, beamY);
+                                    g.DrawLine(coreLaser, 0, beamY, baseW, beamY);
+                                }
+
+                                // 3. Hạt sáng lấp lánh (Shimmer Particles & Sparkles)
+                                int seed = 42 + (int)(ScanProgress * 150);
+                                Random rnd = new Random(seed);
+                                for (int p = 0; p < 9; p++)
+                                {
+                                    float px = (float)(rnd.NextDouble() * baseW);
+                                    float py = beamY + (float)((rnd.NextDouble() - 0.5) * glowH * 0.75);
+                                    float sz = (float)(3f + rnd.NextDouble() * 4f) * scale;
+                                    using (SolidBrush cyanSpark = new SolidBrush(Color.FromArgb(190, 34, 211, 238)))
+                                    using (SolidBrush sparkBrush = new SolidBrush(Color.FromArgb(240, 255, 255, 255)))
+                                    {
+                                        g.FillEllipse(cyanSpark, px - sz * 1.5f, py - sz * 1.5f, sz * 3f, sz * 3f);
+                                        g.FillEllipse(sparkBrush, px - sz / 2f, py - sz / 2f, sz, sz);
+                                    }
+                                }
+                            }
+
+                            // Draw Bounding Marquee Rectangle with white dash line
+                            using (Pen dashPen = new Pen(Color.White, 2.5f) { DashStyle = DashStyle.Dash })
+                            using (Pen shadowPen = new Pen(Color.FromArgb(160, 0, 0, 0), 1f))
+                            {
+                                g.DrawRectangle(shadowPen, 0, 0, baseW, baseH);
+                                g.DrawRectangle(dashPen, 0, 0, baseW, baseH);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    using (SolidBrush placeholderBg = new SolidBrush(Color.FromArgb(alpha, 240, 243, 246)))
+                    using (Pen placeholderPen = new Pen(Color.FromArgb(alpha, 180, 200, 220), 1.5f))
+                    {
+                        g.FillRectangle(placeholderBg, shapeRect);
+                        g.DrawRectangle(placeholderPen, 0, 0, baseW, baseH);
+                        using (Font infoFont = new Font("Segoe UI", Math.Max(8.0f, 12.0f * scale)))
+                        {
+                            string imgLabel = string.IsNullOrEmpty(shape.ImagePath) ? "[Hình ảnh]" : ("📷 " + System.IO.Path.GetFileName(shape.ImagePath));
+                            StringFormat csf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(alpha, 112, 128, 144)))
+                            {
+                                g.DrawString(imgLabel, infoFont, textBrush, shapeRect, csf);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Fill & Stroke for vector shapes
+                using (SolidBrush fillBrush = new SolidBrush(fillCol))
+                using (Pen strokePen = new Pen(strokeCol, Math.Max(1.0f, shape.StrokeWidth * scale)))
+                {
+                    strokePen.DashStyle = shape.DashStyle;
+
+                    if (shape.Type == ShapeType.Line)
+                    {
+                        if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2.0f;
+                        float lw = Math.Max(1.5f, shape.StrokeWidth * scale);
+                        using (Pen linePen = new Pen(strokeCol, lw) { DashStyle = shape.DashStyle, StartCap = LineCap.Round, EndCap = LineCap.Round })
+                        {
+                            g.DrawLine(linePen, 0, 0, baseW, baseH);
+                        }
+                    }
+                    else if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+                    {
+                        GraphicsState pState = g.Save();
+                        g.ScaleTransform(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                        if (shape.FillColor != 0x00FFFFFF && fillCol.A > 0) g.FillPath(fillBrush, shape.CustomPath);
+                        if (shape.StrokeWidth > 0 && strokeCol.A > 0)
+                        {
+                            float pw = Math.Max(1.0f, shape.StrokeWidth * (shape.PathWidth / Math.Max(1f, baseW)));
+                            using (Pen pPen = new Pen(strokeCol, pw))
+                            {
+                                g.DrawPath(pPen, shape.CustomPath);
+                            }
+                        }
+                        g.Restore(pState);
+                    }
+                    else
+                    {
+                        using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                        {
+                            if (shape.FillColor != 0x00FFFFFF && fillCol.A > 0) g.FillPath(fillBrush, path);
+                            if (shape.StrokeWidth > 0 && strokeCol.A > 0) g.DrawPath(strokePen, path);
+                        }
+                    }
+                }
+            }
+
+            // Placeholder Dashed Border if selected & empty
+            if (shape.IsPlaceholder && string.IsNullOrEmpty(shape.Text) && !isSelected && alpha > 0)
+            {
+                using (Pen dashPen = new Pen(Color.FromArgb(alpha, 180, 180, 180), 1.0f) { DashStyle = DashStyle.Dash })
+                {
+                    g.DrawRectangle(dashPen, 0, 0, baseW, baseH);
+                }
+            }
+
+            // Render Text
+            bool isEditingThis = isSelected && IsInlineEditing && EditingShape == shape;
+            string dispText = isEditingThis ? EditingTextBuffer : shape.Text;
+            if (string.IsNullOrEmpty(dispText) && isSelected)
+            {
+                dispText = (shape.Type == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : "";
+            }
+
+            if (!string.IsNullOrEmpty(dispText) || isEditingThis)
+            {
+                // Calculate inner margin / padding constraint
+                float padX = Math.Max(2.0f, 6.0f * scale);
+                float padY = Math.Max(2.0f, 4.0f * scale);
+                if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Diamond || shape.Type == ShapeType.Triangle ||
+                    shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Callout)
+                {
+                    padX = Math.Max(4.0f, baseW * 0.08f);
+                    padY = Math.Max(4.0f, baseH * 0.08f);
+                }
+                RectangleF textBounds = new RectangleF(padX, padY, Math.Max(2.0f, baseW - padX * 2f), Math.Max(2.0f, baseH - padY * 2f));
+
+                // If editing, draw subtle inner dashed boundary
+                if (isEditingThis)
+                {
+                    using (Pen editBoxPen = new Pen(Color.FromArgb(160, 59, 130, 246), 1.0f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawRectangle(editBoxPen, textBounds.X, textBounds.Y, textBounds.Width, textBounds.Height);
+                    }
+                }
+
+                float calculatedFontSize = Math.Max(3.0f, shape.FontSize * scale);
+                using (Font font = new Font(shape.FontName, calculatedFontSize, shape.Bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
+                {
+                    if (isEditingThis)
+                    {
+                        // Exact visual line wrapping and synchronized caret during interactive typing
+                        List<VisualTextLine> visualLines = GetVisualWrappedLines(g, dispText, font, textBounds.Width);
+
+                        float lineHeight = font.Height;
+                        float totalTextH = Math.Max(lineHeight, visualLines.Count * lineHeight);
+
+                        float startY;
+                        if (shape.VerticalAlignment == VerticalTextAlignment.Top)
+                            startY = textBounds.Y;
+                        else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom)
+                            startY = textBounds.Bottom - totalTextH;
+                        else
+                            startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+
+                        if (!string.IsNullOrEmpty(dispText) && alpha > 0)
+                        {
+                            using (SolidBrush txtBrush = new SolidBrush(txtCol))
+                            {
+                                for (int li = 0; li < visualLines.Count; li++)
+                                {
+                                    string lineText = visualLines[li].Text;
+                                    if (string.IsNullOrEmpty(lineText)) continue;
+                                    float lineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                                    float curX;
+                                    if (shape.Alignment == TextAlignment.Left)
+                                        curX = textBounds.X;
+                                    else if (shape.Alignment == TextAlignment.Right)
+                                        curX = textBounds.Right - lineWidth;
+                                    else
+                                        curX = textBounds.X + (textBounds.Width - lineWidth) / 2f;
+
+                                    float curY = startY + li * lineHeight;
+                                    g.DrawString(lineText.TrimEnd(), font, txtBrush, curX, curY, StringFormat.GenericTypographic);
+                                }
+                            }
+                        }
+
+                        // Caret line if editing
+                        string fullText = EditingTextBuffer ?? "";
+                        int caret = Math.Max(0, Math.Min(CaretIndex, fullText.Length));
+
+                        int curLineIdx = Math.Max(0, visualLines.Count - 1);
+                        int colInLine = visualLines.Count > 0 ? visualLines[curLineIdx].Length : 0;
+                        for (int i = 0; i < visualLines.Count; i++)
+                        {
+                            if (caret <= visualLines[i].StartCharIndex + visualLines[i].Length)
+                            {
+                                curLineIdx = i;
+                                colInLine = caret - visualLines[i].StartCharIndex;
+                                break;
+                            }
+                        }
+
+                        string cLineText = (curLineIdx < visualLines.Count) ? visualLines[curLineIdx].Text : "";
+                        string beforeCaret = cLineText.Substring(0, Math.Min(colInLine, cLineText.Length));
+
+                        float cLineWidth = g.MeasureString(cLineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                        float beforeWidth = g.MeasureString(beforeCaret, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+
+                        float lineStartX;
+                        if (shape.Alignment == TextAlignment.Left)
+                            lineStartX = textBounds.X;
+                        else if (shape.Alignment == TextAlignment.Right)
+                            lineStartX = textBounds.Right - cLineWidth;
+                        else
+                            lineStartX = textBounds.X + (textBounds.Width - cLineWidth) / 2f;
+
+                        float caretX = lineStartX + beforeWidth;
+                        float caretY = startY + curLineIdx * lineHeight;
+
+                        using (Pen caretPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(1.5f, 2.0f * scale)))
+                        {
+                            g.DrawLine(caretPen, caretX, caretY, caretX, caretY + lineHeight);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(dispText) && alpha > 0)
+                    {
+                        // Blazing fast hardware-accelerated 60 FPS native rendering for slide show and transitions!
+                        using (StringFormat sf = new StringFormat(StringFormat.GenericTypographic))
+                        {
+                            sf.FormatFlags = StringFormatFlags.NoClip | StringFormatFlags.MeasureTrailingSpaces;
+                            sf.Trimming = StringTrimming.Word;
+                            if (shape.Alignment == TextAlignment.Center) sf.Alignment = StringAlignment.Center;
+                            else if (shape.Alignment == TextAlignment.Right) sf.Alignment = StringAlignment.Far;
+                            else sf.Alignment = StringAlignment.Near;
+
+                            if (shape.VerticalAlignment == VerticalTextAlignment.Bottom) sf.LineAlignment = StringAlignment.Far;
+                            else if (shape.VerticalAlignment == VerticalTextAlignment.Top) sf.LineAlignment = StringAlignment.Near;
+                            else sf.LineAlignment = StringAlignment.Center;
+
+                            if (activeAnim != null && activeAnim.Type == AnimationType.GenOffice_NeonPulse &&
+                                (activeAnim.NeonTarget == NeonGlowTarget.Both || activeAnim.NeonTarget == NeonGlowTarget.TextOnly) &&
+                                activeAnimProgress > 0.001f && activeAnimProgress < 0.999f)
+                            {
+                                float pulseIntensity = (float)Math.Sin(activeAnimProgress * Math.PI);
+                                float intensityFactor = activeAnim.NeonIntensity > 0 ? activeAnim.NeonIntensity : 1.0f;
+                                float glowAlpha = (float)Math.Pow(pulseIntensity, 0.55) * opacityMultiplier * intensityFactor;
+
+                                Color neonCol;
+                                if (activeAnim.NeonColorMode == NeonColorMode.Rainbow)
+                                {
+                                    neonCol = GetRainbowNeonColor(activeAnimProgress * 2.0f);
+                                }
+                                else if (activeAnim.NeonColor != 0)
+                                {
+                                    neonCol = Color.FromArgb(activeAnim.NeonColor);
+                                }
+                                else if (shape.TextColor != 0 && shape.TextColor != 0x00FFFFFF)
+                                {
+                                    neonCol = Color.FromArgb((shape.TextColor >> 16) & 0xFF, (shape.TextColor >> 8) & 0xFF, shape.TextColor & 0xFF);
+                                }
+                                else if (shape.StrokeColor != 0 && shape.StrokeColor != 0x00FFFFFF)
+                                {
+                                    neonCol = Color.FromArgb((shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
+                                }
+                                else
+                                {
+                                    neonCol = Color.FromArgb(0, 240, 255);
+                                }
+
+                                if (neonCol.R < 45 && neonCol.G < 45 && neonCol.B < 45)
+                                {
+                                    neonCol = Color.FromArgb(0, 240, 255);
+                                }
+
+                                float baseBloom = activeAnim.NeonBloomRadius > 0 ? activeAnim.NeonBloomRadius * 0.45f : 14f;
+                                float maxTextBloom = Math.Max(3f, baseBloom * scale * pulseIntensity);
+                                int textBloomLayers = 6;
+
+                                bool pathSuccess = false;
+                                try
+                                {
+                                    using (GraphicsPath textPath = new GraphicsPath())
+                                    {
+                                        textPath.AddString(dispText, font.FontFamily, (int)font.Style, font.Size, textBounds, sf);
+                                        if (textPath.PointCount > 0)
+                                        {
+                                            // 1. Multi-layer Text Neon Glow Bloom
+                                            for (int tl = textBloomLayers; tl >= 1; tl--)
+                                            {
+                                                float penWidth = (tl / (float)textBloomLayers) * maxTextBloom * 2.2f;
+                                                int layerA = (int)(Math.Min(255f, 42f * (1.0f - (tl / (float)textBloomLayers)) * glowAlpha));
+                                                if (layerA <= 0) continue;
+
+                                                using (Pen tBloomPen = new Pen(Color.FromArgb(layerA, neonCol), penWidth) { LineJoin = LineJoin.Round })
+                                                {
+                                                    g.DrawPath(tBloomPen, textPath);
+                                                }
+                                            }
+
+                                            // 2. Luminous Text Fill
+                                            int txtFillA = (int)(Math.Min(255f, 240f * opacityMultiplier));
+                                            using (SolidBrush tFillB = new SolidBrush(Color.FromArgb(txtFillA, 255, 255, 255)))
+                                            {
+                                                g.FillPath(tFillB, textPath);
+                                            }
+
+                                            // 3. Crisp Laser Core Outline
+                                            int tCoreA = (int)(Math.Min(255f, 250f * pulseIntensity * opacityMultiplier * intensityFactor));
+                                            if (tCoreA > 0)
+                                            {
+                                                using (Pen tCorePen = new Pen(Color.FromArgb(tCoreA, 255, 255, 255), Math.Max(1.0f, 1.8f * scale * intensityFactor)) { LineJoin = LineJoin.Round })
+                                                {
+                                                    g.DrawPath(tCorePen, textPath);
+                                                }
+                                            }
+                                            pathSuccess = true;
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    pathSuccess = false;
+                                }
+
+                                if (!pathSuccess)
+                                {
+                                    // Robust Multi-directional Halo Bloom Fallback (supports all emojis, surrogates, and complex scripts)
+                                    for (int tl = textBloomLayers; tl >= 1; tl--)
+                                    {
+                                        float rad = (tl / (float)textBloomLayers) * maxTextBloom * 0.7f;
+                                        int layerA = (int)(Math.Min(255f, 36f * (1.0f - (tl / (float)textBloomLayers)) * glowAlpha));
+                                        if (layerA <= 0) continue;
+
+                                        using (SolidBrush bloomBrush = new SolidBrush(Color.FromArgb(layerA, neonCol)))
+                                        {
+                                            for (int a = 0; a < 8; a++)
+                                            {
+                                                double ang = a * Math.PI / 4.0;
+                                                float ox = (float)(Math.Cos(ang) * rad);
+                                                float oy = (float)(Math.Sin(ang) * rad);
+                                                RectangleF offsetBounds = new RectangleF(textBounds.X + ox, textBounds.Y + oy, textBounds.Width, textBounds.Height);
+                                                g.DrawString(dispText, font, bloomBrush, offsetBounds, sf);
+                                            }
+                                        }
+                                    }
+
+                                    // Luminous Laser Core Text
+                                    using (SolidBrush coreTxtBrush = new SolidBrush(Color.FromArgb((int)(250 * opacityMultiplier), 255, 255, 255)))
+                                    {
+                                        g.DrawString(dispText, font, coreTxtBrush, textBounds, sf);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                using (SolidBrush txtBrush = new SolidBrush(txtCol))
+                                {
+                                    g.DrawString(dispText, font, txtBrush, textBounds, sf);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            DrawExclusiveAnimationForegroundVisuals(g, baseW, baseH, shape, activeAnim, activeAnimProgress, scale, opacityMultiplier);
+
+            g.Restore(state);
+
+            // Render 8 Resize Handles + Rotation Knob for Selected Shape
+            if (isSelected)
+            {
+                float naturalSx = slideX + shape.Transform.X * scale;
+                float naturalSy = slideY + shape.Transform.Y * scale;
+                if (IsCropping && shape == SelectedShape)
+                {
+                    // Vẽ viền nét đứt của khung Crop
+                    using (Pen dashPen = new Pen(Color.FromArgb(220, 255, 255, 255), 1.5f) { DashStyle = DashStyle.Dash })
+                    using (Pen darkPen = new Pen(Color.FromArgb(160, 0, 0, 0), 1f))
+                    {
+                        g.DrawRectangle(darkPen, naturalSx, naturalSy, baseW, baseH);
+                        g.DrawRectangle(dashPen, naturalSx, naturalSy, baseW, baseH);
+                    }
+                    // Vẽ 8 tay cầm đen chữ L & thanh ngang/dọc chuẩn PowerPoint
+                    DrawCropHandles(g, naturalSx, naturalSy, baseW, baseH, scale);
+                }
+                else
+                {
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                }
+
+                // Vẽ Kính lúp hút màu (Color Picker Loupe) nếu đang ở chế độ Chọn màu xóa (Chroma Keying CapCut)
+                if (IsColorPickingMode && HasColorPickHover)
+                {
+                    DrawColorPickLoupe(g, ColorPickMouseCanvasPos, ColorPickHoverColor);
+                }
+            }
+        }
+
+        public void InsertTable(int cols, int rows)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            if (cols <= 0) cols = 4;
+            if (rows <= 0) rows = 3;
+
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            float tw = Math.Min(canvasW * 0.75f, cols * 180f);
+            float th = Math.Min(canvasH * 0.50f, rows * 70f);
+            float tx = (canvasW - tw) / 2f;
+            float ty = (canvasH - th) / 2f;
+
+            List<List<string>> tableData = new List<List<string>>();
+            for (int r = 0; r < rows; r++)
+            {
+                List<string> row = new List<string>();
+                for (int c = 0; c < cols; c++)
+                {
+                    row.Add("");
+                }
+                tableData.Add(row);
+            }
+
+            int themePrimary = (Presentation != null) ? Presentation.ThemePrimaryColor : 0xD24726;
+
+            ShapeNode tableShape = new ShapeNode
+            {
+                Name = "Bảng " + cols + "x" + rows,
+                Type = ShapeType.Table,
+                Transform = new Transform2D(tx, ty, tw, th),
+                FillColor = themePrimary,
+                TableColumns = cols,
+                TableRows = rows,
+                TableData = tableData,
+                TableHeaderRow = true,
+                TableBandedRows = true,
+                TableSelectedCellRow = 0,
+                TableSelectedCellCol = 0,
+                TableSelectedEndRow = 0,
+                TableSelectedEndCol = 0,
+                FontSize = 14f,
+                FontName = "Segoe UI"
+            };
+
+            ActiveSlide.AddShape(tableShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertWordArt(string text = "GENOFFICE WORDART", int styleIndex = 0)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            if (string.IsNullOrEmpty(text)) text = "GENOFFICE WORDART";
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
+
+            Color[] colors = new Color[] {
+                Color.Black,
+                Color.FromArgb(0, 114, 198),
+                Color.FromArgb(216, 59, 1),
+                Color.FromArgb(16, 124, 65),
+                Color.FromArgb(112, 48, 160),
+                Color.DarkOrange,
+                Color.FromArgb(0, 120, 215),
+                Color.DimGray,
+                Color.Crimson,
+                Color.Teal,
+                Color.DarkGoldenrod,
+                Color.MediumPurple,
+                Color.ForestGreen,
+                Color.DodgerBlue,
+                Color.Tomato
+            };
+            Color c = (styleIndex >= 0 && styleIndex < colors.Length) ? colors[styleIndex] : Color.FromArgb(0, 114, 198);
+
+            float w = Math.Max(320f, Math.Min(680f, text.Length * 26f + 60f));
+            float h = 100f;
+            float x = (canvasW - w) / 2f;
+            float y = (canvasH - h) / 2f;
+
+            ShapeNode wordArt = new ShapeNode
+            {
+                Name = "WordArt " + (ActiveSlide.Shapes.Count + 1),
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D(x, y, w, h),
+                Text = text,
+                FontSize = 36f,
+                Bold = true,
+                TextColor = c.ToArgb() & 0xFFFFFF,
+                FillColor = 0x00FFFFFF,
+                StrokeColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                HasTextShadow = true,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(wordArt);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertChart(int chartType)
+        {
+            string[] cTypes = new string[] { "Column_Clustered", "Line", "Pie", "Bar_Clustered", "Area" };
+            string ct = (chartType >= 0 && chartType < cTypes.Length) ? cTypes[chartType] : "Column_Clustered";
+            InsertChart(ct);
+        }
+
+        public void InsertChart(string chartType = "Column_Clustered")
+        {
+            if (ActiveSlide == null) return;
+            if (string.IsNullOrEmpty(chartType)) chartType = "Column_Clustered";
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
+
+            float cw = 540f;
+            float ch = 320f;
+            float cx = (canvasW - cw) / 2f;
+            float cy = (canvasH - ch) / 2f;
+
+            string chartTitle = "Biểu đồ Cột (Column Chart)";
+            if (chartType.StartsWith("Line")) chartTitle = "Biểu đồ Đường (Line Chart)";
+            else if (chartType.StartsWith("Pie") || chartType.StartsWith("Doughnut")) chartTitle = "Biểu đồ Tròn (Pie / Doughnut Chart)";
+            else if (chartType.StartsWith("Bar")) chartTitle = "Biểu đồ Thanh Ngang (Bar Chart)";
+            else if (chartType.StartsWith("Area")) chartTitle = "Biểu đồ Miền (Area Chart)";
+            else if (chartType.StartsWith("Scatter")) chartTitle = "Biểu đồ Phân tán (Scatter Chart)";
+            else if (chartType.StartsWith("Radar")) chartTitle = "Biểu đồ Mạng Radar (Radar Chart)";
+            else if (chartType.StartsWith("Combo")) chartTitle = "Biểu đồ Kết hợp (Combo Chart)";
+
+            DocChartData chartData = DocChartData.CreateDefault(chartType);
+            chartData.Title = chartTitle;
+
+            ShapeNode chartShape = new ShapeNode
+            {
+                Name = chartTitle,
+                Type = ShapeType.Chart,
+                ChartData = chartData,
+                Transform = new Transform2D(cx, cy, cw, ch),
+                FillColor = 0xFFFFFF,
+                StrokeColor = 0xCBD5E1,
+                StrokeWidth = 1.5f,
+                Text = chartTitle,
+                FontSize = 13.5f,
+                TextColor = 0x1E293B,
+                Bold = false,
+                Alignment = TextAlignment.Center
+            };
+
+            ActiveSlide.AddShape(chartShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+
+            // Open Chart Data Excel Form just like in Writer!
+            ChartDataExcelForm excelForm = new ChartDataExcelForm(chartData);
+            excelForm.OnDataChanged = (newData) =>
+            {
+                if (newData != null)
+                {
+                    chartShape.ChartData = newData;
+                    if (Form.ActiveForm != null) Form.ActiveForm.Invalidate();
+                }
+            };
+            excelForm.Show();
+        }
+
+        public void InsertSmartArt(int smartArtType)
+        {
+            string[] saTypes = new string[] { "Process_Linear", "Cycle_Radial", "Hierarchy_Tree", "Pyramid_Layers", "Matrix_Grid" };
+            string[] saNames = new string[] { "Quy trình Tuyến tính", "Sơ đồ Vòng tròn Tuần hoàn", "Sơ đồ Cây Tổ chức (Org Chart)", "Kim tự tháp Phân tầng", "Ma trận 4 Ô (SWOT / BCG)" };
+            string st = (smartArtType >= 0 && smartArtType < saTypes.Length) ? saTypes[smartArtType] : "Process_Linear";
+            string sn = (smartArtType >= 0 && smartArtType < saNames.Length) ? saNames[smartArtType] : "Quy trình";
+            InsertSmartArt(st, sn);
+        }
+
+        public void InsertSmartArt(string type = "Process_Linear", string name = "Quy trình Tuyến tính")
+        {
+            if (ActiveSlide == null) return;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
+
+            float sw = 640f;
+            float sh = 280f;
+            float sx = (canvasW - sw) / 2f;
+            float sy = (canvasH - sh) / 2f;
+
+            ShapeNode smartArt = new ShapeNode
+            {
+                Name = "SmartArt - " + (!string.IsNullOrEmpty(name) ? name : "Sơ đồ"),
+                Type = ShapeType.RoundedRectangle,
+                SmartArtType = type,
+                SmartArtTitle = name,
+                Transform = new Transform2D(sx, sy, sw, sh),
+                FillColor = 0xF8FAFC,
+                StrokeColor = 0x2563EB,
+                StrokeWidth = 1.5f
+            };
+
+            ActiveSlide.AddShape(smartArt);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertEquation(string formula = "")
+        {
+            if (ActiveSlide == null) return;
+            if (string.IsNullOrEmpty(formula)) formula = "A = πr²";
+
+            if (SelectedShape != null && (SelectedShape.Type == ShapeType.TextBox || SelectedShape.Type == ShapeType.Rectangle))
+            {
+                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản")
+                {
+                    SelectedShape.Text = formula;
+                }
+                else
+                {
+                    SelectedShape.Text += " " + formula;
+                }
+                return;
+            }
+
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            ShapeNode eqShape = new ShapeNode
+            {
+                Name = "Công thức: " + formula,
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D((canvasW - 550f) / 2f, (canvasH - 100f) / 2f, 550f, 100f),
+                Text = formula,
+                FontName = "Cambria Math",
+                FontSize = 26f,
+                Bold = false,
+                Italic = true,
+                TextColor = 0x0F172A,
+                FillColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(eqShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertSymbol(string symbol)
+        {
+            if (ActiveSlide == null || string.IsNullOrEmpty(symbol)) return;
+
+            if (SelectedShape != null && (SelectedShape.Type == ShapeType.TextBox || SelectedShape.Type == ShapeType.Rectangle))
+            {
+                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản")
+                {
+                    SelectedShape.Text = symbol;
+                }
+                else
+                {
+                    SelectedShape.Text += symbol;
+                }
+                return;
+            }
+
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            ShapeNode symShape = new ShapeNode
+            {
+                Name = "Ký hiệu: " + symbol,
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D((canvasW - 200f) / 2f, (canvasH - 80f) / 2f, 200f, 80f),
+                Text = symbol,
+                FontSize = 32f,
+                Bold = true,
+                TextColor = 0x0F172A,
+                FillColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(symShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertVideo(string videoPath = "")
+        {
+            if (ActiveSlide == null) return;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            string label = string.IsNullOrEmpty(videoPath) ? "Video Trình Chiếu" : System.IO.Path.GetFileName(videoPath);
+
+            ShapeNode videoShape = new ShapeNode
+            {
+                Name = label,
+                Type = ShapeType.Video,
+                VideoPath = videoPath,
+                VideoStyleIndex = 1,
+                VideoStartMode = VideoStartMode.InClickSequence,
+                VideoVolume = VideoVolumeLevel.High,
+                VideoBookmarks = new List<float> { 25f, 68f },
+                Transform = new Transform2D((canvasW - 640f) / 2f, (canvasH - 360f) / 2f, 640f, 360f),
+                FillColor = 0x0F172A,
+                StrokeColor = 0xFFFFFF,
+                StrokeWidth = 2.0f,
+                Text = "",
+                TextColor = 0xFFFFFF,
+                FontSize = 18f,
+                Bold = true,
+                Alignment = TextAlignment.Center
+            };
+            if (!string.IsNullOrEmpty(videoPath) && System.IO.File.Exists(videoPath))
+            {
+                try
+                {
+                    videoShape.CachedImage = VideoThumbnailHelper.GetVideoPosterFrame(videoPath);
+                }
+                catch { }
+            }
+            ActiveSlide.AddShape(videoShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void PlayVideoPreview(ShapeNode shape = null, Control parentControl = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+
+            if (parentControl == null)
+            {
+                if (Application.OpenForms.Count > 0)
+                {
+                    parentControl = Application.OpenForms[0];
+                }
+            }
+
+            if (parentControl == null) return;
+
+            if (SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape == shape)
+            {
+                SlideVideoPlayerManager.Instance.Stop();
+                return;
+            }
+
+            Rectangle targetBounds;
+            if (IsPresenting)
+            {
+                int screenW = parentControl.ClientSize.Width;
+                int screenH = parentControl.ClientSize.Height;
+                int slideW = screenW;
+                int slideH = Presentation.IsWidescreen ? (slideW * 9 / 16) : (slideW * 3 / 4);
+                if (slideH > screenH)
+                {
+                    slideH = screenH;
+                    slideW = Presentation.IsWidescreen ? (slideH * 16 / 9) : (slideH * 4 / 3);
+                }
+                int sxOffset = (screenW - slideW) / 2;
+                int syOffset = (screenH - slideH) / 2;
+                float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
+
+                if (shape.VideoPlayFullScreen)
+                {
+                    targetBounds = new Rectangle(sxOffset, syOffset, slideW, slideH);
+                }
+                else
+                {
+                    int sx = sxOffset + (int)(shape.Transform.X * scaleP);
+                    int sy = syOffset + (int)(shape.Transform.Y * scaleP);
+                    int sw = (int)(shape.Transform.Width * scaleP);
+                    int sh = (int)(shape.Transform.Height * scaleP);
+                    targetBounds = new Rectangle(sx, sy, Math.Max(100, sw), Math.Max(60, sh));
+                }
+
+                SlideVideoPlayerManager.Instance.Play(shape, parentControl, targetBounds, true);
+            }
+            else
+            {
+                int topBarY = 155;
+                int contentY = topBarY;
+                int contentH = parentControl.ClientSize.Height - contentY - 26;
+                int rightSidebarW = IsSidebarOpen ? 280 : 0;
+                int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+                int canvasW = parentControl.ClientSize.Width - leftSidebarW - rightSidebarW;
+
+                int slideX, slideY, slideW, slideH;
+                float scale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+                int sx = slideX + (int)(shape.Transform.X * scale);
+                int sy = slideY + (int)(shape.Transform.Y * scale);
+                int sw = (int)(shape.Transform.Width * scale);
+                int sh = (int)(shape.Transform.Height * scale);
+                targetBounds = new Rectangle(sx, sy, Math.Max(100, sw), Math.Max(60, sh));
+
+                SlideVideoPlayerManager.Instance.Play(shape, parentControl, targetBounds, false);
+            }
+        }
+
+        public void ShowTrimVideoDialog(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            using (TrimVideoForm trimDlg = new TrimVideoForm(shape))
+            {
+                if (trimDlg.ShowDialog(parent) == DialogResult.OK)
+                {
+                    SaveUndoState();
+                    shape.VideoTrimStart = trimDlg.TrimStart;
+                    shape.VideoTrimEnd = trimDlg.TrimEnd;
+                    if (parent != null) parent.Invalidate();
+                }
+            }
+        }
+
+        public void AddVideoBookmark(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            if (shape.VideoBookmarks == null) shape.VideoBookmarks = new List<float>();
+            float newMark = (shape.VideoBookmarks.Count > 0) ? shape.VideoBookmarks[shape.VideoBookmarks.Count - 1] + 15f : 10f;
+            SaveUndoState();
+            shape.VideoBookmarks.Add(newMark);
+            if (parent != null) parent.Invalidate();
+            MessageBox.Show(string.Format("Đã thêm Dấu trang tại thời điểm {0:0.0}s vào video.", newMark), "Thêm Dấu trang (Add Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        public void RemoveVideoBookmark(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            if (shape.VideoBookmarks == null || shape.VideoBookmarks.Count == 0)
+            {
+                MessageBox.Show("Video này hiện chưa có dấu trang nào để xóa.", "Xóa Dấu trang (Remove Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            SaveUndoState();
+            float rem = shape.VideoBookmarks[shape.VideoBookmarks.Count - 1];
+            shape.VideoBookmarks.RemoveAt(shape.VideoBookmarks.Count - 1);
+            if (parent != null) parent.Invalidate();
+            MessageBox.Show(string.Format("Đã xóa Dấu trang tại thời điểm {0:0.0}s.", rem), "Xóa Dấu trang (Remove Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        public void InsertAudio(string audioPath = "")
+        {
+            if (ActiveSlide == null) return;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            string label = string.IsNullOrEmpty(audioPath) ? "🔊 Âm thanh Nền (Audio Track)" : "🔊 " + System.IO.Path.GetFileName(audioPath);
+
+            ShapeNode audioShape = new ShapeNode
+            {
+                Name = label,
+                Type = ShapeType.RoundedRectangle,
+                Transform = new Transform2D((canvasW - 360f) / 2f, (canvasH - 100f) / 2f, 360f, 100f),
+                FillColor = 0x1E293B,
+                StrokeColor = 0xF59E0B,
+                StrokeWidth = 2.0f,
+                Text = label,
+                TextColor = 0xFFFFFF,
+                FontSize = 14f,
+                Bold = true,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(audioShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertHyperlink(string urlOrSlide = "")
+        {
+            if (SelectedShape != null)
+            {
+                SelectedShape.TextColor = 0x2563EB;
+                SelectedShape.Underline = true;
+                if (string.IsNullOrEmpty(SelectedShape.Text)) SelectedShape.Text = !string.IsNullOrEmpty(urlOrSlide) ? urlOrSlide : "https://genoffice.vn";
+            }
+            else
+            {
+                StartShapeDrawMode(ShapeType.TextBox);
+            }
+        }
+
+        public void InsertComment(string commentText = "")
+        {
+            if (ActiveSlide == null) return;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+
+            ShapeNode commentShape = new ShapeNode
+            {
+                Name = "Bình luận",
+                Type = ShapeType.Callout,
+                Transform = new Transform2D(canvasW - 280f, 80f, 240f, 120f),
+                FillColor = 0xFEF08A,
+                StrokeColor = 0xCA8A04,
+                StrokeWidth = 1.5f,
+                Text = string.IsNullOrEmpty(commentText) ? "💬 Nhận xét: Cần chỉnh sửa nội dung trang này." : "💬 " + commentText,
+                TextColor = 0x713F12,
+                FontSize = 13f,
+                Bold = false,
+                Alignment = TextAlignment.Left
+            };
+            ActiveSlide.AddShape(commentShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public void InsertHeaderFooter(string footerText = "Trình bày bởi GenOffice | Trang trình chiếu")
+        {
+            if (ActiveSlide == null) return;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+            SaveUndoState();
+            ShapeNode footerShape = new ShapeNode
+            {
+                Name = "Chân trang (Footer)",
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D(80f, canvasH - 60f, canvasW - 160f, 40f),
+                FillColor = 0x00FFFFFF,
+                StrokeColor = 0xCBD5E1,
+                StrokeWidth = 0f,
+                Text = footerText,
+                TextColor = 0x64748B,
+                FontSize = 14f,
+                Bold = false,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(footerShape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        }
+
+        public static PointF RotatePoint(PointF p, PointF center, float angleDeg)
+        {
+            if (Math.Abs(angleDeg) < 0.001f) return p;
+            double rad = angleDeg * Math.PI / 180.0;
+            double cos = Math.Cos(rad);
+            double sin = Math.Sin(rad);
+            double dx = p.X - center.X;
+            double dy = p.Y - center.Y;
+            return new PointF((float)(center.X + dx * cos - dy * sin), (float)(center.Y + dx * sin + dy * cos));
+        }
+
+        public static Point RotatePoint(Point p, Point center, float angleDeg)
+        {
+            if (Math.Abs(angleDeg) < 0.001f) return p;
+            double rad = angleDeg * Math.PI / 180.0;
+            double cos = Math.Cos(rad);
+            double sin = Math.Sin(rad);
+            double dx = p.X - center.X;
+            double dy = p.Y - center.Y;
+            return new Point((int)Math.Round(center.X + dx * cos - dy * sin), (int)Math.Round(center.Y + dx * sin + dy * cos));
+        }
+
+        private void DrawSelectedShapeHandles(Graphics g, float sx, float sy, float sw, float sh, float rotation)
+        {
+            GraphicsState s = g.Save();
+            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+
+            if (Math.Abs(rotation) > 0.001f)
+            {
+                g.TranslateTransform(center.X, center.Y);
+                g.RotateTransform(rotation);
+                g.TranslateTransform(-center.X, -center.Y);
+            }
+
+            // 1. Draw dashed selection rectangle (Rotated with the shape)
+            using (Pen boxPen = new Pen(Color.FromArgb(0, 120, 215), 1.4f) { DashStyle = DashStyle.Dash })
+            {
+                g.DrawRectangle(boxPen, sx, sy, sw, sh);
+            }
+
+            // 2. Draw 8 Resize Handles (Small white squares with blue borders)
+            PointF[] localHandles = new PointF[]
+            {
+                new PointF(sx, sy),                  // 0: Top-Left
+                new PointF(sx + sw / 2f, sy),          // 1: Top-Center
+                new PointF(sx + sw, sy),              // 2: Top-Right
+                new PointF(sx + sw, sy + sh / 2f),      // 3: Right-Center
+                new PointF(sx + sw, sy + sh),          // 4: Bottom-Right
+                new PointF(sx + sw / 2f, sy + sh),      // 5: Bottom-Center
+                new PointF(sx, sy + sh),              // 6: Bottom-Left
+                new PointF(sx, sy + sh / 2f)           // 7: Left-Center
+            };
+
+            for (int i = 0; i < localHandles.Length; i++)
+            {
+                PointF h = localHandles[i];
+                RectangleF hRect = new RectangleF(h.X - 4.5f, h.Y - 4.5f, 9f, 9f);
+                g.FillRectangle(Brushes.White, hRect);
+                using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+                {
+                    g.DrawRectangle(hPen, hRect.X, hRect.Y, hRect.Width, hRect.Height);
+                }
+            }
+
+            // 3. Draw Connecting Stem to Rotation Knob
+            PointF topCenter = localHandles[1];
+            PointF rotHandle = new PointF(topCenter.X, topCenter.Y - 24f);
+            using (Pen stemPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+            {
+                g.DrawLine(stemPen, topCenter.X, topCenter.Y, rotHandle.X, rotHandle.Y);
+            }
+
+            // 4. Draw Circular Rotation Arrow Icon (Mũi tên xoay vòng chuẩn PowerPoint 365)
+            RectangleF rotCircle = new RectangleF(rotHandle.X - 9f, rotHandle.Y - 9f, 18f, 18f);
+            using (SolidBrush whiteBg = new SolidBrush(Color.White))
+            using (Pen borderPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+            using (Pen arrowPen = new Pen(Color.FromArgb(30, 41, 59), 1.6f))
+            using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            {
+                g.FillEllipse(whiteBg, rotCircle);
+                g.DrawEllipse(borderPen, rotCircle);
+
+                // Circular arc for rotation arrow
+                RectangleF arcRect = new RectangleF(rotHandle.X - 5.5f, rotHandle.Y - 5.5f, 11f, 11f);
+                g.DrawArc(arrowPen, arcRect, -30, 240);
+
+                // Arrow head at the top-right end
+                float headX = rotHandle.X + 3.5f;
+                float headY = rotHandle.Y - 5.5f;
+                PointF[] arrowHead = new PointF[]
+                {
+                    new PointF(headX - 1f, headY - 3.5f),
+                    new PointF(headX + 3.5f, headY + 0.5f),
+                    new PointF(headX - 3.5f, headY + 2f)
+                };
+                g.FillPolygon(arrowBrush, arrowHead);
+            }
+
+            g.Restore(s);
+
+            // 5. Draw Table Move Handle at Top-Left (Nút kéo bảng 4 chiều ✥ chuẩn PowerPoint)
+            if (SelectedShape != null && SelectedShape.Type == ShapeType.Table)
+            {
+                RectangleF mvRect = new RectangleF(sx - 24f, sy - 24f, 22f, 22f);
+                using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                {
+                    g.FillRectangle(shadowB, mvRect.X + 2, mvRect.Y + 2, mvRect.Width, mvRect.Height);
+                }
+                using (SolidBrush bgB = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen borderP = new Pen(Color.FromArgb(37, 99, 235), 1.5f))
+                using (Pen arrowP = new Pen(Color.FromArgb(37, 99, 235), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (SolidBrush arrowHeadB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.FillRectangle(bgB, mvRect);
+                    g.DrawRectangle(borderP, mvRect.X, mvRect.Y, mvRect.Width, mvRect.Height);
+
+                    float cx = mvRect.X + mvRect.Width / 2f;
+                    float cy = mvRect.Y + mvRect.Height / 2f;
+                    float arm = 6f;
+
+                    // 4-way cross lines
+                    g.DrawLine(arrowP, cx - arm, cy, cx + arm, cy);
+                    g.DrawLine(arrowP, cx, cy - arm, cx, cy + arm);
+
+                    // 4 arrow tips
+                    g.FillPolygon(arrowHeadB, new PointF[] { new PointF(cx - arm - 2, cy), new PointF(cx - arm + 1, cy - 2.5f), new PointF(cx - arm + 1, cy + 2.5f) });
+                    g.FillPolygon(arrowHeadB, new PointF[] { new PointF(cx + arm + 2, cy), new PointF(cx + arm - 1, cy - 2.5f), new PointF(cx + arm - 1, cy + 2.5f) });
+                    g.FillPolygon(arrowHeadB, new PointF[] { new PointF(cx, cy - arm - 2), new PointF(cx - 2.5f, cy - arm + 1), new PointF(cx + 2.5f, cy - arm + 1) });
+                    g.FillPolygon(arrowHeadB, new PointF[] { new PointF(cx, cy + arm + 2), new PointF(cx - 2.5f, cy + arm - 1), new PointF(cx + 2.5f, cy + arm - 1) });
+                }
+            }
+
+            // 6. Rotation Degree Tooltip Badge (Hiển thị số độ xoay thời gian thực)
+            if (IsRotatingShape || Math.Abs(rotation) > 0.01f)
+            {
+                DrawRotationDegreeBadge(g, center, rotation, rotHandle);
+            }
+        }
+
+        private void DrawRotationDegreeBadge(Graphics g, PointF center, float rotation, PointF unrotatedRotH)
+        {
+            int normDeg = (int)Math.Round(rotation) % 360;
+            if (normDeg < 0) normDeg += 360;
+            string text = normDeg.ToString() + "°";
+
+            PointF badgeCenter = RotatePoint(new PointF(unrotatedRotH.X, unrotatedRotH.Y - 18f), center, rotation);
+
+            using (Font degFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            {
+                SizeF sz = g.MeasureString(text, degFont);
+                float bw = sz.Width + 12f;
+                float bh = sz.Height + 4f;
+                RectangleF badgeRect = new RectangleF(badgeCenter.X - bw / 2f, badgeCenter.Y - bh / 2f, bw, bh);
+
+                using (GraphicsPath bPath = CreateRoundedRectPath(badgeRect, 4f))
+                using (SolidBrush darkBg = new SolidBrush(Color.FromArgb(225, 15, 23, 42)))
+                using (Pen bPen = new Pen(Color.FromArgb(51, 65, 85), 1.0f))
+                using (SolidBrush textBrush = new SolidBrush(Color.White))
+                {
+                    g.FillPath(darkBg, bPath);
+                    g.DrawPath(bPen, bPath);
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString(text, degFont, textBrush, badgeRect, sf);
+                }
+            }
+        }
+
+        private void DrawCropHandles(Graphics g, float sx, float sy, float sw, float sh, float scale)
+        {
+            float arm = Math.Max(14f, 18f * Math.Min(1.2f, scale));
+            float thick = Math.Max(3.5f, 4.5f * Math.Min(1.2f, scale));
+
+            using (SolidBrush bBrush = new SolidBrush(Color.Black))
+            using (Pen wPen = new Pen(Color.White, 1.0f))
+            {
+                Action<float, float, float, float> drawBar = (bx, by, bw, bh) =>
+                {
+                    g.FillRectangle(bBrush, bx, by, bw, bh);
+                    g.DrawRectangle(wPen, bx, by, bw, bh);
+                };
+
+                // 1. Top-Left L-Handle (Góc trên bên trái)
+                drawBar(sx, sy, arm, thick);
+                drawBar(sx, sy, thick, arm);
+
+                // 2. Top-Right L-Handle (Góc trên bên phải)
+                drawBar(sx + sw - arm, sy, arm, thick);
+                drawBar(sx + sw - thick, sy, thick, arm);
+
+                // 3. Bottom-Left L-Handle (Góc dưới bên trái)
+                drawBar(sx, sy + sh - thick, arm, thick);
+                drawBar(sx, sy + sh - arm, thick, arm);
+
+                // 4. Bottom-Right L-Handle (Góc dưới bên phải)
+                drawBar(sx + sw - arm, sy + sh - thick, arm, thick);
+                drawBar(sx + sw - thick, sy + sh - arm, thick, arm);
+
+                // 5. Top-Center Bar Handle (Cạnh trên giữa)
+                drawBar(sx + sw / 2f - arm / 2f, sy, arm, thick);
+                drawBar(sx + sw / 2f - thick / 2f, sy, thick, thick + 4f);
+
+                // 6. Bottom-Center Bar Handle (Cạnh dưới giữa)
+                drawBar(sx + sw / 2f - arm / 2f, sy + sh - thick, arm, thick);
+                drawBar(sx + sw / 2f - thick / 2f, sy + sh - thick - 4f, thick, thick + 4f);
+
+                // 7. Left-Center Bar Handle (Cạnh trái giữa)
+                drawBar(sx, sy + sh / 2f - arm / 2f, thick, arm);
+                drawBar(sx, sy + sh / 2f - thick / 2f, thick + 4f, thick);
+
+                // 8. Right-Center Bar Handle (Cạnh phải giữa)
+                drawBar(sx + sw - thick, sy + sh / 2f - arm / 2f, thick, arm);
+                drawBar(sx + sw - thick - 4f, sy + sh / 2f - thick / 2f, thick + 4f, thick);
+            }
+        }
+
+        public PointF[] GetRotatedHandleCoordinates(float sx, float sy, float sw, float sh, float rotation)
+        {
+            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+            PointF[] unrotated = new PointF[]
+            {
+                new PointF(sx, sy),                  // 0: Top-Left
+                new PointF(sx + sw / 2f, sy),          // 1: Top-Center
+                new PointF(sx + sw, sy),              // 2: Top-Right
+                new PointF(sx + sw, sy + sh / 2f),      // 3: Right-Center
+                new PointF(sx + sw, sy + sh),          // 4: Bottom-Right
+                new PointF(sx + sw / 2f, sy + sh),      // 5: Bottom-Center
+                new PointF(sx, sy + sh),              // 6: Bottom-Left
+                new PointF(sx, sy + sh / 2f)           // 7: Left-Center
+            };
+            if (Math.Abs(rotation) < 0.001f) return unrotated;
+
+            PointF[] rotated = new PointF[8];
+            for (int i = 0; i < 8; i++)
+            {
+                rotated[i] = RotatePoint(unrotated[i], center, rotation);
+            }
+            return rotated;
+        }
+
+        public PointF GetRotatedRotationHandle(float sx, float sy, float sw, float sh, float rotation)
+        {
+            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+            PointF unrotatedRotH = new PointF(sx + sw / 2f, sy - 24f);
+            return RotatePoint(unrotatedRotH, center, rotation);
+        }
+
+        private PointF[] GetHandleCoordinates(float sx, float sy, float sw, float sh)
+        {
+            return new PointF[]
+            {
+                new PointF(sx, sy),                  // 0: Top-Left
+                new PointF(sx + sw / 2f, sy),          // 1: Top-Center
+                new PointF(sx + sw, sy),              // 2: Top-Right
+                new PointF(sx + sw, sy + sh / 2f),      // 3: Right-Center
+                new PointF(sx + sw, sy + sh),          // 4: Bottom-Right
+                new PointF(sx + sw / 2f, sy + sh),      // 5: Bottom-Center
+                new PointF(sx, sy + sh),              // 6: Bottom-Left
+                new PointF(sx, sy + sh / 2f)           // 7: Left-Center
+            };
+        }
+
+        private Point[] GetHandleCoordinates(int sx, int sy, int sw, int sh)
+        {
+            return new Point[]
+            {
+                new Point(sx, sy),                  // 0: Top-Left
+                new Point(sx + sw / 2, sy),          // 1: Top-Center
+                new Point(sx + sw, sy),              // 2: Top-Right
+                new Point(sx + sw, sy + sh / 2),      // 3: Right-Center
+                new Point(sx + sw, sy + sh),          // 4: Bottom-Right
+                new Point(sx + sw / 2, sy + sh),      // 5: Bottom-Center
+                new Point(sx, sy + sh),              // 6: Bottom-Left
+                new Point(sx, sy + sh / 2)           // 7: Left-Center
+            };
+        }
+
+        public struct VisualTextLine
+        {
+            public string Text;
+            public int StartCharIndex;
+            public int Length;
+        }
+
+        public static List<VisualTextLine> GetVisualWrappedLines(Graphics g, string text, Font font, float maxWidth)
+        {
+            List<VisualTextLine> result = new List<VisualTextLine>();
+            if (string.IsNullOrEmpty(text))
+            {
+                result.Add(new VisualTextLine { Text = "", StartCharIndex = 0, Length = 0 });
+                return result;
+            }
+
+            maxWidth = Math.Max(20f, maxWidth);
+            string[] paragraphs = text.Split('\n');
+            int globalCharAcc = 0;
+
+            for (int p = 0; p < paragraphs.Length; p++)
+            {
+                string para = paragraphs[p];
+                if (string.IsNullOrEmpty(para))
+                {
+                    result.Add(new VisualTextLine { Text = "", StartCharIndex = globalCharAcc, Length = 0 });
+                    globalCharAcc += 1;
+                    continue;
+                }
+
+                int paraStart = 0;
+                while (paraStart < para.Length)
+                {
+                    int low = 1;
+                    int high = para.Length - paraStart;
+                    int bestFit = 1;
+
+                    while (low <= high)
+                    {
+                        int mid = (low + high) / 2;
+                        string sub = para.Substring(paraStart, mid);
+                        float w = g.MeasureString(sub, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                        if (w <= maxWidth)
+                        {
+                            bestFit = mid;
+                            low = mid + 1;
+                        }
+                        else
+                        {
+                            high = mid - 1;
+                        }
+                    }
+
+                    int actualBreak = bestFit;
+                    if (paraStart + bestFit < para.Length)
+                    {
+                        int lastSpace = para.LastIndexOf(' ', paraStart + bestFit - 1, bestFit);
+                        if (lastSpace >= paraStart)
+                        {
+                            actualBreak = lastSpace - paraStart + 1;
+                        }
+                    }
+
+                    string lineStr = para.Substring(paraStart, actualBreak);
+                    result.Add(new VisualTextLine
+                    {
+                        Text = lineStr,
+                        StartCharIndex = globalCharAcc + paraStart,
+                        Length = actualBreak
+                    });
+
+                    paraStart += actualBreak;
+                }
+
+                globalCharAcc += para.Length + 1;
+            }
+
+            return result;
+        }
+
+        public static GraphicsPath CreateShapePath(ShapeType type, float x, float y, float w, float h)
+        {
+            GraphicsPath path = new GraphicsPath();
+            RectangleF rect = new RectangleF(x, y, w, h);
+
+            switch (type)
+            {
+                case ShapeType.Rectangle:
+                case ShapeType.TextBox:
+                    path.AddRectangle(rect);
+                    break;
+
+                case ShapeType.RoundedRectangle:
+                    float radius = Math.Min(16f, Math.Min(w, h) * 0.2f);
+                    float d = radius * 2f;
+                    RectangleF arc = new RectangleF(rect.Location, new SizeF(d, d));
+                    path.AddArc(arc, 180, 90);
+                    arc.X = rect.Right - d;
+                    path.AddArc(arc, 270, 90);
+                    arc.Y = rect.Bottom - d;
+                    path.AddArc(arc, 0, 90);
+                    arc.X = rect.Left;
+                    path.AddArc(arc, 90, 90);
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Ellipse:
+                    path.AddEllipse(rect);
+                    break;
+
+                case ShapeType.Triangle:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w / 2f, y),
+                        new PointF(x + w, y + h),
+                        new PointF(x, y + h)
+                    });
+                    break;
+
+                case ShapeType.RightTriangle:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x, y),
+                        new PointF(x + w, y + h),
+                        new PointF(x, y + h)
+                    });
+                    break;
+
+                case ShapeType.Diamond:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w / 2f, y),
+                        new PointF(x + w, y + h / 2f),
+                        new PointF(x + w / 2f, y + h),
+                        new PointF(x, y + h / 2f)
+                    });
+                    break;
+
+                case ShapeType.Parallelogram:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.22f, y),
+                        new PointF(x + w, y),
+                        new PointF(x + w * 0.78f, y + h),
+                        new PointF(x, y + h)
+                    });
+                    break;
+
+                case ShapeType.Trapezoid:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.20f, y),
+                        new PointF(x + w * 0.80f, y),
+                        new PointF(x + w, y + h),
+                        new PointF(x, y + h)
+                    });
+                    break;
+
+                case ShapeType.Hexagon:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.25f, y),
+                        new PointF(x + w * 0.75f, y),
+                        new PointF(x + w, y + h * 0.5f),
+                        new PointF(x + w * 0.75f, y + h),
+                        new PointF(x + w * 0.25f, y + h),
+                        new PointF(x, y + h * 0.5f)
+                    });
+                    break;
+
+                case ShapeType.LuxuryHexagon:
+                    // Ô Lục giác bo góc sang trọng (Luxury Rounded Hexagon Badge)
+                    float cut = Math.Min(w, h) * 0.08f;
+                    PointF[] luxHex = new PointF[] {
+                        new PointF(x + w * 0.25f + cut, y),
+                        new PointF(x + w * 0.75f - cut, y),
+                        new PointF(x + w * 0.75f + cut * 0.5f, y + cut * 0.866f),
+                        new PointF(x + w - cut * 0.5f, y + h * 0.5f - cut * 0.866f),
+                        new PointF(x + w, y + h * 0.5f),
+                        new PointF(x + w - cut * 0.5f, y + h * 0.5f + cut * 0.866f),
+                        new PointF(x + w * 0.75f + cut * 0.5f, y + h - cut * 0.866f),
+                        new PointF(x + w * 0.75f - cut, y + h),
+                        new PointF(x + w * 0.25f + cut, y + h),
+                        new PointF(x + w * 0.25f - cut * 0.5f, y + h - cut * 0.866f),
+                        new PointF(x + cut * 0.5f, y + h * 0.5f + cut * 0.866f),
+                        new PointF(x, y + h * 0.5f),
+                        new PointF(x + cut * 0.5f, y + h * 0.5f - cut * 0.866f),
+                        new PointF(x + w * 0.25f - cut * 0.5f, y + cut * 0.866f)
+                    };
+                    path.AddClosedCurve(luxHex, 0.15f);
+                    break;
+
+                case ShapeType.Octagon:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.29f, y), new PointF(x + w * 0.71f, y),
+                        new PointF(x + w, y + h * 0.29f), new PointF(x + w, y + h * 0.71f),
+                        new PointF(x + w * 0.71f, y + h), new PointF(x + w * 0.29f, y + h),
+                        new PointF(x, y + h * 0.71f), new PointF(x, y + h * 0.29f)
+                    });
+                    break;
+
+                case ShapeType.Pentagon:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.5f, y),
+                        new PointF(x + w, y + h * 0.38f),
+                        new PointF(x + w * 0.81f, y + h),
+                        new PointF(x + w * 0.19f, y + h),
+                        new PointF(x, y + h * 0.38f)
+                    });
+                    break;
+
+                case ShapeType.Star:
+                    PointF[] starPts = new PointF[10];
+                    float cx = x + w / 2f, cy = y + h / 2f, rx = w / 2f, ry = h / 2f;
+                    double angle = -Math.PI / 2, step = Math.PI / 5;
+                    for (int i = 0; i < 10; i++)
+                    {
+                        float radX = (i % 2 == 0) ? rx : (rx * 0.45f);
+                        float radY = (i % 2 == 0) ? ry : (ry * 0.45f);
+                        starPts[i] = new PointF(cx + (float)(Math.Cos(angle) * radX), cy + (float)(Math.Sin(angle) * radY));
+                        angle += step;
+                    }
+                    path.AddPolygon(starPts);
+                    break;
+
+                case ShapeType.Starburst:
+                    // Huy chương 12 cánh (12-Point Starburst Badge)
+                    PointF[] sbPts = new PointF[24];
+                    float sbcx = x + w / 2f, sbcy = y + h / 2f, sbrx = w / 2f, sbry = h / 2f;
+                    double sbAngle = -Math.PI / 2, sbStep = Math.PI / 12;
+                    for (int k = 0; k < 24; k++)
+                    {
+                        float radX = (k % 2 == 0) ? sbrx : (sbrx * 0.78f);
+                        float radY = (k % 2 == 0) ? sbry : (sbry * 0.78f);
+                        sbPts[k] = new PointF(sbcx + (float)(Math.Cos(sbAngle) * radX), sbcy + (float)(Math.Sin(sbAngle) * radY));
+                        sbAngle += sbStep;
+                    }
+                    path.AddPolygon(sbPts);
+                    break;
+
+                case ShapeType.Heart:
+                    path.AddBezier(new PointF(x + w / 2f, y + h * 0.3f), new PointF(x + w * 0.25f, y), new PointF(x, y + h * 0.25f), new PointF(x, y + h * 0.5f));
+                    path.AddBezier(new PointF(x, y + h * 0.5f), new PointF(x, y + h * 0.75f), new PointF(x + w * 0.3f, y + h * 0.9f), new PointF(x + w / 2f, y + h));
+                    path.AddBezier(new PointF(x + w / 2f, y + h), new PointF(x + w * 0.7f, y + h * 0.9f), new PointF(x + w, y + h * 0.75f), new PointF(x + w, y + h * 0.5f));
+                    path.AddBezier(new PointF(x + w, y + h * 0.5f), new PointF(x + w, y + h * 0.25f), new PointF(x + w * 0.75f, y), new PointF(x + w / 2f, y + h * 0.3f));
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Leaf:
+                    // Chiếc lá thiên nhiên (Nature Leaf)
+                    path.AddBezier(new PointF(x, y + h), new PointF(x, y + h * 0.25f), new PointF(x + w * 0.35f, y), new PointF(x + w, y));
+                    path.AddBezier(new PointF(x + w, y), new PointF(x + w, y + h * 0.75f), new PointF(x + w * 0.65f, y + h), new PointF(x, y + h));
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Clover:
+                    // Cỏ 4 lá may mắn (Four-Leaf Clover)
+                    float clvCx = x + w / 2f, clvCy = y + h / 2f;
+                    float petW = w * 0.44f, petH = h * 0.44f;
+                    path.AddEllipse(clvCx - petW / 2f, y, petW, petH);
+                    path.AddEllipse(x + w - petW, clvCy - petH / 2f, petW, petH);
+                    path.AddEllipse(clvCx - petW / 2f, y + h - petH, petW, petH);
+                    path.AddEllipse(x, clvCy - petH / 2f, petW, petH);
+                    path.AddEllipse(clvCx - petW * 0.35f, clvCy - petH * 0.35f, petW * 0.7f, petH * 0.7f);
+                    break;
+
+                case ShapeType.Flower:
+                    // Bông hoa 6 cánh nghệ thuật (Flower)
+                    float flCx = x + w / 2f, flCy = y + h / 2f;
+                    float flROuter = Math.Min(w, h) / 2f;
+                    float flRInner = flROuter * 0.48f;
+                    PointF[] flPts = new PointF[36];
+                    for (int i = 0; i < 36; i++)
+                    {
+                        double theta = i * Math.PI * 2.0 / 36.0;
+                        double rad = flRInner + (flROuter - flRInner) * Math.Pow(Math.Abs(Math.Cos(3.0 * theta)), 0.65);
+                        flPts[i] = new PointF(flCx + (float)(Math.Cos(theta) * rad * (w / Math.Min(w, h))),
+                                             flCy + (float)(Math.Sin(theta) * rad * (h / Math.Min(w, h))));
+                    }
+                    path.AddClosedCurve(flPts, 0.4f);
+                    break;
+
+                case ShapeType.Sprout:
+                    // Mầm cây xanh (Botanical Sprout)
+                    float spCx = x + w / 2f;
+                    path.AddBezier(new PointF(spCx, y + h * 0.5f), new PointF(x, y + h * 0.3f), new PointF(x, y + h * 0.05f), new PointF(spCx - w * 0.1f, y));
+                    path.AddBezier(new PointF(spCx - w * 0.1f, y), new PointF(spCx, y + h * 0.2f), new PointF(spCx, y + h * 0.4f), new PointF(spCx, y + h * 0.5f));
+                    path.AddBezier(new PointF(spCx, y + h * 0.5f), new PointF(x + w, y + h * 0.3f), new PointF(x + w, y + h * 0.05f), new PointF(spCx + w * 0.1f, y));
+                    path.AddBezier(new PointF(spCx + w * 0.1f, y), new PointF(spCx, y + h * 0.2f), new PointF(spCx, y + h * 0.4f), new PointF(spCx, y + h * 0.5f));
+                    path.AddRectangle(new RectangleF(spCx - w * 0.04f, y + h * 0.45f, w * 0.08f, h * 0.55f));
+                    break;
+
+                case ShapeType.Gem:
+                    // Viên đá quý / Kim cương (Luxury Diamond Gem)
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.22f, y),
+                        new PointF(x + w * 0.78f, y),
+                        new PointF(x + w, y + h * 0.36f),
+                        new PointF(x + w * 0.5f, y + h),
+                        new PointF(x, y + h * 0.36f)
+                    });
+                    break;
+
+                case ShapeType.Shield:
+                    // Huy hiệu Khiên Hoàng Gia (Royal Shield Badge)
+                    path.AddLine(x, y, x + w / 2f, y + h * 0.05f);
+                    path.AddLine(x + w / 2f, y + h * 0.05f, x + w, y);
+                    path.AddLine(x + w, y, x + w, y + h * 0.55f);
+                    path.AddBezier(new PointF(x + w, y + h * 0.55f), new PointF(x + w, y + h * 0.85f), new PointF(x + w * 0.7f, y + h), new PointF(x + w / 2f, y + h));
+                    path.AddBezier(new PointF(x + w / 2f, y + h), new PointF(x + w * 0.3f, y + h), new PointF(x, y + h * 0.85f), new PointF(x, y + h * 0.55f));
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Banner:
+                    // Dải ruy băng / Biểu ngữ (Ribbon Banner)
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.15f, y + h * 0.18f),
+                        new PointF(x + w * 0.85f, y + h * 0.18f),
+                        new PointF(x + w, y + h * 0.05f),
+                        new PointF(x + w * 0.92f, y + h * 0.5f),
+                        new PointF(x + w, y + h * 0.95f),
+                        new PointF(x + w * 0.85f, y + h * 0.82f),
+                        new PointF(x + w * 0.15f, y + h * 0.82f),
+                        new PointF(x, y + h * 0.95f),
+                        new PointF(x + w * 0.08f, y + h * 0.5f),
+                        new PointF(x, y + h * 0.05f)
+                    });
+                    break;
+
+                case ShapeType.Arch:
+                    // Cổng vòm cổ điển sang trọng (Luxury Architecture Arch)
+                    path.AddLine(x, y + h, x, y + h * 0.45f);
+                    path.AddArc(x, y, w, h * 0.9f, 180, 180);
+                    path.AddLine(x + w, y + h * 0.45f, x + w, y + h);
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Cloud:
+                    path.AddArc(x + w * 0.18f, y + h * 0.35f, w * 0.32f, h * 0.55f, 135, 180);
+                    path.AddArc(x + w * 0.32f, y + h * 0.08f, w * 0.42f, h * 0.65f, 180, 160);
+                    path.AddArc(x + w * 0.58f, y + h * 0.32f, w * 0.38f, h * 0.58f, 270, 160);
+                    path.AddLine(x + w * 0.85f, y + h * 0.85f, x + w * 0.15f, y + h * 0.85f);
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Sun:
+                    float sunCx = x + w / 2f, sunCy = y + h / 2f;
+                    float rDisc = Math.Min(w, h) * 0.28f;
+                    path.AddEllipse(sunCx - rDisc, sunCy - rDisc, rDisc * 2f, rDisc * 2f);
+                    PointF[] sRays = new PointF[16];
+                    double sunA = 0, sunSt = Math.PI / 8;
+                    for (int k = 0; k < 16; k++)
+                    {
+                        float rR = (k % 2 == 0) ? (Math.Min(w, h) * 0.48f) : (Math.Min(w, h) * 0.33f);
+                        sRays[k] = new PointF(sunCx + (float)(Math.Cos(sunA) * rR * (w / Math.Min(w, h))),
+                                              sunCy + (float)(Math.Sin(sunA) * rR * (h / Math.Min(w, h))));
+                        sunA += sunSt;
+                    }
+                    path.AddPolygon(sRays);
+                    break;
+
+                case ShapeType.Moon:
+                    path.AddArc(x, y, w, h, -90, 180);
+                    path.AddBezier(new PointF(x + w / 2f, y + h), new PointF(x + w * 0.8f, y + h * 0.75f), new PointF(x + w * 0.8f, y + h * 0.25f), new PointF(x + w / 2f, y));
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Lightning:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.55f, y),
+                        new PointF(x + w * 0.20f, y + h * 0.55f),
+                        new PointF(x + w * 0.48f, y + h * 0.55f),
+                        new PointF(x + w * 0.35f, y + h),
+                        new PointF(x + w * 0.80f, y + h * 0.42f),
+                        new PointF(x + w * 0.52f, y + h * 0.42f)
+                    });
+                    break;
+
+                case ShapeType.Smiley:
+                    path.AddEllipse(rect);
+                    break;
+
+                case ShapeType.Donut:
+                    path.AddEllipse(rect);
+                    path.AddEllipse(x + w * 0.25f, y + h * 0.25f, w * 0.5f, h * 0.5f);
+                    path.FillMode = FillMode.Alternate;
+                    break;
+
+                case ShapeType.Cross:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.35f, y), new PointF(x + w * 0.65f, y),
+                        new PointF(x + w * 0.65f, y + h * 0.35f), new PointF(x + w, y + h * 0.35f),
+                        new PointF(x + w, y + h * 0.65f), new PointF(x + w * 0.65f, y + h * 0.65f),
+                        new PointF(x + w * 0.65f, y + h), new PointF(x + w * 0.35f, y + h),
+                        new PointF(x + w * 0.35f, y + h * 0.65f), new PointF(x, y + h * 0.65f),
+                        new PointF(x, y + h * 0.35f), new PointF(x + w * 0.35f, y + h * 0.35f)
+                    });
+                    break;
+
+                case ShapeType.Cube:
+                    // 3D Isometric Cube
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.5f, y),
+                        new PointF(x + w, y + h * 0.25f),
+                        new PointF(x + w, y + h * 0.75f),
+                        new PointF(x + w * 0.5f, y + h),
+                        new PointF(x, y + h * 0.75f),
+                        new PointF(x, y + h * 0.25f)
+                    });
+                    break;
+
+                case ShapeType.Can:
+                    // Cylinder Can
+                    path.AddArc(x, y, w, h * 0.25f, 0, 360);
+                    path.AddLine(x, y + h * 0.125f, x, y + h * 0.875f);
+                    path.AddArc(x, y + h * 0.75f, w, h * 0.25f, 180, -180);
+                    path.AddLine(x + w, y + h * 0.875f, x + w, y + h * 0.125f);
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Arrow:
+                case ShapeType.BlockArrowRight:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x, y + h * 0.28f),
+                        new PointF(x + w * 0.62f, y + h * 0.28f),
+                        new PointF(x + w * 0.62f, y),
+                        new PointF(x + w, y + h * 0.5f),
+                        new PointF(x + w * 0.62f, y + h),
+                        new PointF(x + w * 0.62f, y + h * 0.72f),
+                        new PointF(x, y + h * 0.72f)
+                    });
+                    break;
+
+                case ShapeType.BlockArrowLeft:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.38f, y),
+                        new PointF(x + w * 0.38f, y + h * 0.28f),
+                        new PointF(x + w, y + h * 0.28f),
+                        new PointF(x + w, y + h * 0.72f),
+                        new PointF(x + w * 0.38f, y + h * 0.72f),
+                        new PointF(x + w * 0.38f, y + h),
+                        new PointF(x, y + h * 0.5f)
+                    });
+                    break;
+
+                case ShapeType.BlockArrowUp:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.5f, y),
+                        new PointF(x + w, y + h * 0.38f),
+                        new PointF(x + w * 0.72f, y + h * 0.38f),
+                        new PointF(x + w * 0.72f, y + h),
+                        new PointF(x + w * 0.28f, y + h),
+                        new PointF(x + w * 0.28f, y + h * 0.38f),
+                        new PointF(x, y + h * 0.38f)
+                    });
+                    break;
+
+                case ShapeType.BlockArrowDown:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x + w * 0.28f, y),
+                        new PointF(x + w * 0.72f, y),
+                        new PointF(x + w * 0.72f, y + h * 0.62f),
+                        new PointF(x + w, y + h * 0.62f),
+                        new PointF(x + w * 0.5f, y + h),
+                        new PointF(x, y + h * 0.62f),
+                        new PointF(x + w * 0.28f, y + h * 0.62f)
+                    });
+                    break;
+
+                case ShapeType.Chevron:
+                    path.AddPolygon(new PointF[] {
+                        new PointF(x, y),
+                        new PointF(x + w * 0.65f, y),
+                        new PointF(x + w, y + h * 0.5f),
+                        new PointF(x + w * 0.65f, y + h),
+                        new PointF(x, y + h),
+                        new PointF(x + w * 0.35f, y + h * 0.5f)
+                    });
+                    break;
+
+                case ShapeType.Callout:
+                    float bodyH = h * 0.8f;
+                    RectangleF bodyRect = new RectangleF(x, y, w, bodyH);
+                    float calloutRad = Math.Min(12f, Math.Min(w, bodyH) * 0.2f);
+                    float dArc = calloutRad * 2f;
+                    path.AddArc(bodyRect.X, bodyRect.Y, dArc, dArc, 180, 90);
+                    path.AddArc(bodyRect.Right - dArc, bodyRect.Y, dArc, dArc, 270, 90);
+                    path.AddArc(bodyRect.Right - dArc, bodyRect.Bottom - dArc, dArc, dArc, 0, 90);
+                    path.AddLine(bodyRect.Right - calloutRad, bodyRect.Bottom, bodyRect.X + bodyRect.Width * 0.45f, bodyRect.Bottom);
+                    path.AddLine(bodyRect.X + bodyRect.Width * 0.45f, bodyRect.Bottom, bodyRect.X + bodyRect.Width * 0.25f, y + h);
+                    path.AddLine(bodyRect.X + bodyRect.Width * 0.25f, y + h, bodyRect.X + bodyRect.Width * 0.30f, bodyRect.Bottom);
+                    path.AddLine(bodyRect.X + bodyRect.Width * 0.30f, bodyRect.Bottom, bodyRect.X + calloutRad, bodyRect.Bottom);
+                    path.AddArc(bodyRect.X, bodyRect.Bottom - dArc, dArc, dArc, 90, 90);
+                    path.CloseFigure();
+                    break;
+
+                case ShapeType.Line:
+                    path.AddLine(x, y, x + w, y + h);
+                    break;
+
+                default:
+                    path.AddRectangle(rect);
+                    break;
+            }
+
+            return path;
+        }
+
+        public static GraphicsPath GetShapeGraphicsPath(ShapeNode shape)
+        {
+            GraphicsPath path = new GraphicsPath();
+            if (shape == null) return path;
+
+            float x = shape.Transform.X;
+            float y = shape.Transform.Y;
+            float w = Math.Max(1f, shape.Transform.Width);
+            float h = Math.Max(1f, shape.Transform.Height);
+
+            if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
+            {
+                using (Matrix m = new Matrix())
+                {
+                    m.Translate(x, y);
+                    m.Scale(w / shape.PathWidth, h / shape.PathHeight);
+                    GraphicsPath cloneP = (GraphicsPath)shape.CustomPath.Clone();
+                    cloneP.Transform(m);
+                    path.AddPath(cloneP, false);
+                }
+            }
+            else
+            {
+                using (GraphicsPath baseP = CreateShapePath(shape.Type, x, y, w, h))
+                {
+                    path.AddPath(baseP, false);
+                }
+            }
+
+            if (Math.Abs(shape.Transform.Rotation) > 0.1f)
+            {
+                using (Matrix rotM = new Matrix())
+                {
+                    rotM.RotateAt(shape.Transform.Rotation, new PointF(x + w / 2f, y + h / 2f));
+                    path.Transform(rotM);
+                }
+            }
+
+            return path;
+        }
+
+        public static GraphicsPath CreatePathFromRegion(Region r, RectangleF fallbackBounds)
+        {
+            GraphicsPath path = new GraphicsPath();
+            using (Matrix m = new Matrix())
+            {
+                RectangleF[] scans = r.GetRegionScans(m);
+                if (scans != null && scans.Length > 0)
+                {
+                    foreach (var rect in scans)
+                    {
+                        if (rect.Width > 0.5f && rect.Height > 0.5f)
+                        {
+                            path.AddRectangle(rect);
+                        }
+                    }
+                }
+            }
+            if (path.PointCount == 0)
+            {
+                path.AddRectangle(fallbackBounds);
+            }
+            return path;
+        }
+
+        public static ShapeNode CreateShapeFromPath(GraphicsPath path, ShapeNode baseStyleShape)
+        {
+            RectangleF bounds = path.GetBounds();
+            if (bounds.Width < 1f) bounds.Width = 1f;
+            if (bounds.Height < 1f) bounds.Height = 1f;
+
+            using (Matrix m = new Matrix())
+            {
+                m.Translate(-bounds.X, -bounds.Y);
+                path.Transform(m);
+            }
+
+            ShapeNode newShape = baseStyleShape.Clone();
+            newShape.Id = Guid.NewGuid().ToString("N");
+            newShape.Name = "Hợp nhất " + newShape.Id.Substring(0, 4);
+            newShape.Type = ShapeType.CustomPath;
+            newShape.CustomPath = (GraphicsPath)path.Clone();
+            newShape.PathWidth = bounds.Width;
+            newShape.PathHeight = bounds.Height;
+            newShape.Transform = new Transform2D(bounds.X, bounds.Y, bounds.Width, bounds.Height, 0f);
+            return newShape;
+        }
+
+        public void MergeShapes(MergeShapeOperation op)
+        {
+            SlideNode slide = ActiveSlide;
+            if (slide == null) return;
+
+            // Collect valid indices in EXACT order of selection
+            List<int> validIndices = new List<int>();
+            foreach (int idx in SelectedShapeIndices)
+            {
+                if (idx >= 0 && idx < slide.Shapes.Count && !validIndices.Contains(idx))
+                {
+                    validIndices.Add(idx);
+                }
+            }
+            if (validIndices.Count < 2 && SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
+            {
+                if (!validIndices.Contains(SelectedShapeIndex)) validIndices.Add(SelectedShapeIndex);
+            }
+
+            if (validIndices.Count < 2)
+            {
+                MessageBox.Show("Vui lòng giữ phím Ctrl và chọn từ 2 hình vẽ trở lên để thực hiện tính năng Hợp nhất Hình dạng (Merge Shapes)!", "Hợp nhất Hình dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            List<ShapeNode> selectedShapes = new List<ShapeNode>();
+            foreach (int idx in validIndices)
+            {
+                selectedShapes.Add(slide.Shapes[idx]);
+            }
+
+            ShapeNode primaryShape = selectedShapes[0];
+
+            if (op == MergeShapeOperation.Union)
+            {
+                GraphicsPath unionPath = new GraphicsPath();
+                unionPath.FillMode = FillMode.Winding;
+                for (int i = 0; i < selectedShapes.Count; i++)
+                {
+                    using (GraphicsPath p = GetShapeGraphicsPath(selectedShapes[i]))
+                    {
+                        unionPath.AddPath(p, false);
+                    }
+                }
+                ShapeNode resultShape = CreateShapeFromPath(unionPath, primaryShape);
+
+                RemoveShapes(slide, validIndices);
+                slide.AddShape(resultShape);
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndex = slide.Shapes.Count - 1;
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+            }
+            else if (op == MergeShapeOperation.Combine)
+            {
+                GraphicsPath combinePath = new GraphicsPath();
+                combinePath.FillMode = FillMode.Alternate;
+                for (int i = 0; i < selectedShapes.Count; i++)
+                {
+                    using (GraphicsPath p = GetShapeGraphicsPath(selectedShapes[i]))
+                    {
+                        combinePath.AddPath(p, false);
+                    }
+                }
+                ShapeNode resultShape = CreateShapeFromPath(combinePath, primaryShape);
+
+                RemoveShapes(slide, validIndices);
+                slide.AddShape(resultShape);
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndex = slide.Shapes.Count - 1;
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+            }
+            else if (op == MergeShapeOperation.Subtract)
+            {
+                bool isImagePrimary = (primaryShape.Type == ShapeType.Image || primaryShape.CachedImage != null || (!string.IsNullOrEmpty(primaryShape.ImagePath) && System.IO.File.Exists(primaryShape.ImagePath)));
+
+                if (isImagePrimary)
+                {
+                    if (primaryShape.CachedImage == null && !string.IsNullOrEmpty(primaryShape.ImagePath) && System.IO.File.Exists(primaryShape.ImagePath))
+                    {
+                        try { primaryShape.CachedImage = Image.FromFile(primaryShape.ImagePath); } catch { }
+                    }
+
+                    using (GraphicsPath baseP = GetShapeGraphicsPath(primaryShape))
+                    using (Region r = new Region(baseP))
+                    {
+                        for (int i = 1; i < selectedShapes.Count; i++)
+                        {
+                            using (GraphicsPath otherP = GetShapeGraphicsPath(selectedShapes[i]))
+                            {
+                                r.Exclude(otherP);
+                            }
+                        }
+
+                        GraphicsPath subPath = CreatePathFromRegion(r, baseP.GetBounds());
+                        RectangleF subBounds = subPath.GetBounds();
+                        if (subBounds.Width < 1f) subBounds.Width = 1f;
+                        if (subBounds.Height < 1f) subBounds.Height = 1f;
+
+                        using (Matrix m = new Matrix())
+                        {
+                            m.Translate(-subBounds.X, -subBounds.Y);
+                            subPath.Transform(m);
+                        }
+
+                        ShapeNode resultShape = primaryShape.Clone();
+                        resultShape.Id = Guid.NewGuid().ToString("N");
+                        resultShape.Name = "Cắt rỗng ảnh " + resultShape.Id.Substring(0, 4);
+                        resultShape.Type = ShapeType.CustomPath;
+                        resultShape.CustomPath = subPath;
+                        resultShape.PathWidth = subBounds.Width;
+                        resultShape.PathHeight = subBounds.Height;
+                        resultShape.Transform = new Transform2D(subBounds.X, subBounds.Y, subBounds.Width, subBounds.Height, 0f);
+
+                        float imgWorldX = primaryShape.Transform.X;
+                        float imgWorldY = primaryShape.Transform.Y;
+                        float imgWorldW = Math.Max(1f, primaryShape.Transform.Width);
+                        float imgWorldH = Math.Max(1f, primaryShape.Transform.Height);
+
+                        resultShape.CropLeft = Math.Max(0f, (subBounds.X - imgWorldX) / imgWorldW);
+                        resultShape.CropTop = Math.Max(0f, (subBounds.Y - imgWorldY) / imgWorldH);
+                        resultShape.CropRight = Math.Max(0f, (imgWorldX + imgWorldW - (subBounds.X + subBounds.Width)) / imgWorldW);
+                        resultShape.CropBottom = Math.Max(0f, (imgWorldY + imgWorldH - (subBounds.Y + subBounds.Height)) / imgWorldH);
+
+                        resultShape.CachedImage = primaryShape.CachedImage;
+                        resultShape.ImagePath = primaryShape.ImagePath;
+                        resultShape.FillOpacity = primaryShape.FillOpacity > 0 ? primaryShape.FillOpacity : 1.0f;
+
+                        RemoveShapes(slide, validIndices);
+                        slide.AddShape(resultShape);
+                        SelectedShapeIndices.Clear();
+                        SelectedShapeIndex = slide.Shapes.Count - 1;
+                        SelectedShapeIndices.Add(SelectedShapeIndex);
+                    }
+                }
+                else
+                {
+                    // Subtract subsequent shapes from primaryShape (Tuỳ vào Ctrl chọn hình nào trước mà giữ lại hình đó)
+                    using (GraphicsPath baseP = GetShapeGraphicsPath(primaryShape))
+                    using (Region r = new Region(baseP))
+                    {
+                        for (int i = 1; i < selectedShapes.Count; i++)
+                        {
+                            using (GraphicsPath otherP = GetShapeGraphicsPath(selectedShapes[i]))
+                            {
+                                r.Exclude(otherP);
+                            }
+                        }
+
+                        GraphicsPath subPath = CreatePathFromRegion(r, baseP.GetBounds());
+                        ShapeNode resultShape = CreateShapeFromPath(subPath, primaryShape);
+
+                        RemoveShapes(slide, validIndices);
+                        slide.AddShape(resultShape);
+                        SelectedShapeIndices.Clear();
+                        SelectedShapeIndex = slide.Shapes.Count - 1;
+                        SelectedShapeIndices.Add(SelectedShapeIndex);
+                    }
+                }
+            }
+            else if (op == MergeShapeOperation.Intersect)
+            {
+                bool isImagePrimary = (primaryShape.Type == ShapeType.Image || primaryShape.CachedImage != null || (!string.IsNullOrEmpty(primaryShape.ImagePath) && System.IO.File.Exists(primaryShape.ImagePath)));
+
+                if (isImagePrimary)
+                {
+                    // Quy tắc Thứ Tự Chọn (Order Rule - Slide 7 & 8): Chọn Ảnh trước + Chọn Shape sau -> Cắt Lồng Ảnh vào Shape/Đa Shape
+                    if (primaryShape.CachedImage == null && !string.IsNullOrEmpty(primaryShape.ImagePath) && System.IO.File.Exists(primaryShape.ImagePath))
+                    {
+                        try { primaryShape.CachedImage = Image.FromFile(primaryShape.ImagePath); } catch { }
+                    }
+
+                    // Hợp nhất toàn bộ các hình khối phía sau thành 1 compound mask path
+                    GraphicsPath compoundMaskPath = new GraphicsPath();
+                    compoundMaskPath.FillMode = FillMode.Winding;
+                    for (int i = 1; i < selectedShapes.Count; i++)
+                    {
+                        using (GraphicsPath otherP = GetShapeGraphicsPath(selectedShapes[i]))
+                        {
+                            compoundMaskPath.AddPath(otherP, false);
+                        }
+                    }
+
+                    RectangleF maskBounds = compoundMaskPath.GetBounds();
+                    if (maskBounds.Width < 1f) maskBounds.Width = 1f;
+                    if (maskBounds.Height < 1f) maskBounds.Height = 1f;
+
+                    // Chuẩn hóa tọa độ mặt nạ về cục bộ (Local Coordinates)
+                    using (Matrix m = new Matrix())
+                    {
+                        m.Translate(-maskBounds.X, -maskBounds.Y);
+                        compoundMaskPath.Transform(m);
+                    }
+
+                    ShapeNode resultShape = primaryShape.Clone();
+                    resultShape.Id = Guid.NewGuid().ToString("N");
+                    resultShape.Name = "Lồng ảnh đa khung " + resultShape.Id.Substring(0, 4);
+                    resultShape.Type = ShapeType.CustomPath;
+                    resultShape.CustomPath = compoundMaskPath;
+                    resultShape.PathWidth = maskBounds.Width;
+                    resultShape.PathHeight = maskBounds.Height;
+                    resultShape.Transform = new Transform2D(maskBounds.X, maskBounds.Y, maskBounds.Width, maskBounds.Height, 0f);
+
+                    // Căn chỉnh tỉ lệ xén ảnh chính xác theo tọa độ slide (Giữ nguyên vị trí ảnh gốc)
+                    float imgWorldX = primaryShape.Transform.X;
+                    float imgWorldY = primaryShape.Transform.Y;
+                    float imgWorldW = Math.Max(1f, primaryShape.Transform.Width);
+                    float imgWorldH = Math.Max(1f, primaryShape.Transform.Height);
+
+                    resultShape.CropLeft = Math.Max(0f, (maskBounds.X - imgWorldX) / imgWorldW);
+                    resultShape.CropTop = Math.Max(0f, (maskBounds.Y - imgWorldY) / imgWorldH);
+                    resultShape.CropRight = Math.Max(0f, (imgWorldX + imgWorldW - (maskBounds.X + maskBounds.Width)) / imgWorldW);
+                    resultShape.CropBottom = Math.Max(0f, (imgWorldY + imgWorldH - (maskBounds.Y + maskBounds.Height)) / imgWorldH);
+
+                    resultShape.CachedImage = primaryShape.CachedImage;
+                    resultShape.ImagePath = primaryShape.ImagePath;
+                    resultShape.OriginalWidth = primaryShape.OriginalWidth > 0 ? primaryShape.OriginalWidth : (primaryShape.CachedImage != null ? primaryShape.CachedImage.Width : maskBounds.Width);
+                    resultShape.OriginalHeight = primaryShape.OriginalHeight > 0 ? primaryShape.OriginalHeight : (primaryShape.CachedImage != null ? primaryShape.CachedImage.Height : maskBounds.Height);
+                    resultShape.StrokeWidth = 0f; // Tối ưu đường viền No Outline (Slide 10)
+                    resultShape.FillOpacity = primaryShape.FillOpacity > 0 ? primaryShape.FillOpacity : 1.0f;
+
+                    RemoveShapes(slide, validIndices);
+                    slide.AddShape(resultShape);
+                    SelectedShapeIndices.Clear();
+                    SelectedShapeIndex = slide.Shapes.Count - 1;
+                    SelectedShapeIndices.Add(SelectedShapeIndex);
+                }
+                else
+                {
+                    // Chọn Shape trước -> Bức ảnh bị biến thành Shape vector tô màu đơn sắc (Slide 7)
+                    using (GraphicsPath baseP = GetShapeGraphicsPath(primaryShape))
+                    using (Region r = new Region(baseP))
+                    {
+                        for (int i = 1; i < selectedShapes.Count; i++)
+                        {
+                            using (GraphicsPath otherP = GetShapeGraphicsPath(selectedShapes[i]))
+                            {
+                                r.Intersect(otherP);
+                            }
+                        }
+
+                        GraphicsPath intPath = CreatePathFromRegion(r, baseP.GetBounds());
+                        ShapeNode resultShape = CreateShapeFromPath(intPath, primaryShape);
+
+                        RemoveShapes(slide, validIndices);
+                        slide.AddShape(resultShape);
+                        SelectedShapeIndices.Clear();
+                        SelectedShapeIndex = slide.Shapes.Count - 1;
+                        SelectedShapeIndices.Add(SelectedShapeIndex);
+                    }
+                }
+            }
+            else if (op == MergeShapeOperation.Fragment)
+            {
+                List<ShapeNode> fragments = new List<ShapeNode>();
+                if (selectedShapes.Count == 2)
+                {
+                    ShapeNode sA = selectedShapes[0];
+                    ShapeNode sB = selectedShapes[1];
+                    using (GraphicsPath pA = GetShapeGraphicsPath(sA))
+                    using (GraphicsPath pB = GetShapeGraphicsPath(sB))
+                    {
+                        // 1. A - B
+                        using (Region r1 = new Region(pA))
+                        {
+                            r1.Exclude(pB);
+                            GraphicsPath path1 = CreatePathFromRegion(r1, pA.GetBounds());
+                            if (path1.PointCount > 0) fragments.Add(CreateShapeFromPath(path1, sA));
+                        }
+                        // 2. A ∩ B
+                        using (Region r2 = new Region(pA))
+                        {
+                            r2.Intersect(pB);
+                            GraphicsPath path2 = CreatePathFromRegion(r2, pA.GetBounds());
+                            if (path2.PointCount > 0) fragments.Add(CreateShapeFromPath(path2, sA));
+                        }
+                        // 3. B - A
+                        using (Region r3 = new Region(pB))
+                        {
+                            r3.Exclude(pA);
+                            GraphicsPath path3 = CreatePathFromRegion(r3, pB.GetBounds());
+                            if (path3.PointCount > 0) fragments.Add(CreateShapeFromPath(path3, sB));
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < selectedShapes.Count; i++)
+                    {
+                        using (GraphicsPath pI = GetShapeGraphicsPath(selectedShapes[i]))
+                        using (Region r = new Region(pI))
+                        {
+                            for (int j = 0; j < selectedShapes.Count; j++)
+                            {
+                                if (i == j) continue;
+                                using (GraphicsPath pJ = GetShapeGraphicsPath(selectedShapes[j]))
+                                {
+                                    r.Exclude(pJ);
+                                }
+                            }
+                            GraphicsPath fPath = CreatePathFromRegion(r, pI.GetBounds());
+                            if (fPath.PointCount > 0) fragments.Add(CreateShapeFromPath(fPath, selectedShapes[i]));
+                        }
+                    }
+                }
+
+                RemoveShapes(slide, validIndices);
+                SelectedShapeIndices.Clear();
+                foreach (var frag in fragments)
+                {
+                    slide.AddShape(frag);
+                    SelectedShapeIndices.Add(slide.Shapes.Count - 1);
+                }
+                SelectedShapeIndex = slide.Shapes.Count - 1;
+            }
+        }
+
+        private void RemoveShapes(SlideNode slide, List<int> indices)
+        {
+            indices.Sort();
+            for (int i = indices.Count - 1; i >= 0; i--)
+            {
+                if (indices[i] >= 0 && indices[i] < slide.Shapes.Count)
+                {
+                    slide.Shapes.RemoveAt(indices[i]);
+                }
+            }
+        }
+
+        public void BringShapeToFront()
+        {
+            if (ActiveSlide == null || SelectedShapeIndex < 0 || SelectedShapeIndex >= ActiveSlide.Shapes.Count) return;
+            ShapeNode shape = ActiveSlide.Shapes[SelectedShapeIndex];
+            ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+            ActiveSlide.Shapes.Add(shape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+        }
+
+        public void SendShapeToBack()
+        {
+            if (ActiveSlide == null || SelectedShapeIndex < 0 || SelectedShapeIndex >= ActiveSlide.Shapes.Count) return;
+            ShapeNode shape = ActiveSlide.Shapes[SelectedShapeIndex];
+            ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+            ActiveSlide.Shapes.Insert(0, shape);
+            SelectedShapeIndex = 0;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(0);
+        }
+
+        public void BringShapeForward()
+        {
+            if (ActiveSlide == null || SelectedShapeIndex < 0 || SelectedShapeIndex >= ActiveSlide.Shapes.Count - 1) return;
+            ShapeNode shape = ActiveSlide.Shapes[SelectedShapeIndex];
+            ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+            ActiveSlide.Shapes.Insert(SelectedShapeIndex + 1, shape);
+            SelectedShapeIndex++;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+        }
+
+        public void SendShapeBackward()
+        {
+            if (ActiveSlide == null || SelectedShapeIndex <= 0 || SelectedShapeIndex >= ActiveSlide.Shapes.Count) return;
+            ShapeNode shape = ActiveSlide.Shapes[SelectedShapeIndex];
+            ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+            ActiveSlide.Shapes.Insert(SelectedShapeIndex - 1, shape);
+            SelectedShapeIndex--;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+        }
+
+        public void AlignShapes(ShapeAlignType align)
+        {
+            if (ActiveSlide == null) return;
+            float cw = Presentation.CanvasWidth;
+            float ch = Presentation.CanvasHeight;
+
+            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 1)
+            {
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                foreach (int idx in SelectedShapeIndices)
+                {
+                    if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                    {
+                        var t = ActiveSlide.Shapes[idx].Transform;
+                        if (t.X < minX) minX = t.X;
+                        if (t.Y < minY) minY = t.Y;
+                        if (t.X + t.Width > maxX) maxX = t.X + t.Width;
+                        if (t.Y + t.Height > maxY) maxY = t.Y + t.Height;
+                    }
+                }
+                foreach (int idx in SelectedShapeIndices)
+                {
+                    if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                    {
+                        var t = ActiveSlide.Shapes[idx].Transform;
+                        switch (align)
+                        {
+                            case ShapeAlignType.Left: t.X = minX; break;
+                            case ShapeAlignType.Center: t.X = minX + (maxX - minX - t.Width) / 2f; break;
+                            case ShapeAlignType.Right: t.X = maxX - t.Width; break;
+                            case ShapeAlignType.Top: t.Y = minY; break;
+                            case ShapeAlignType.Middle: t.Y = minY + (maxY - minY - t.Height) / 2f; break;
+                            case ShapeAlignType.Bottom: t.Y = maxY - t.Height; break;
+                        }
+                    }
+                }
+            }
+            else if (SelectedShape != null)
+            {
+                var t = SelectedShape.Transform;
+                switch (align)
+                {
+                    case ShapeAlignType.Left: t.X = 0f; break;
+                    case ShapeAlignType.Center: t.X = (cw - t.Width) / 2f; break;
+                    case ShapeAlignType.Right: t.X = cw - t.Width; break;
+                    case ShapeAlignType.Top: t.Y = 0f; break;
+                    case ShapeAlignType.Middle: t.Y = (ch - t.Height) / 2f; break;
+                    case ShapeAlignType.Bottom: t.Y = ch - t.Height; break;
+                }
+            }
+        }
+
+        public void ApplySlideLayoutTemplate(SlideNode slide, SlideLayoutType layout)
+        {
+            if (slide == null) return;
+            slide.Layout = layout;
+            slide.Shapes.Clear();
+
+            float cw = Presentation.CanvasWidth;
+            float ch = Presentation.CanvasHeight;
+
+            switch (layout)
+            {
+                case SlideLayoutType.TitleSlide:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề Chính",
+                        Transform = new Transform2D(cw * 0.1f, ch * 0.28f, cw * 0.8f, 100f),
+                        Text = "BẤM ĐỂ THÊM TIÊU ĐỀ",
+                        FontSize = 36f,
+                        Bold = true,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề Phụ",
+                        Transform = new Transform2D(cw * 0.15f, ch * 0.52f, cw * 0.7f, 60f),
+                        Text = "Bấm để thêm tiêu đề phụ",
+                        FontSize = 20f,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x64748B,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.TitleAndContent:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
+                        Text = "Tiêu đề trang chiếu",
+                        FontSize = 30f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Nội dung",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.88f, ch * 0.62f),
+                        Text = "• Nhập nội dung chính tại đây\n• Nhấn Enter để thêm mục mới\n• Có thể chèn hình ảnh, biểu đồ hoặc bảng biểu",
+                        FontSize = 18f,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Top,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.SectionHeader:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề Mục",
+                        Transform = new Transform2D(cw * 0.08f, ch * 0.38f, cw * 0.84f, 90f),
+                        Text = "TIÊU ĐỀ PHẦN MỤC",
+                        FontSize = 34f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.TwoContent:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
+                        Text = "Tiêu đề trang chiếu",
+                        FontSize = 30f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Cột 1",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.42f, ch * 0.62f),
+                        Text = "• Nội dung cột bên trái\n• Chi tiết mục 1",
+                        FontSize = 18f,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Top,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Cột 2",
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.26f, cw * 0.42f, ch * 0.62f),
+                        Text = "• Nội dung cột bên phải\n• Chi tiết mục 2",
+                        FontSize = 18f,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Top,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.Comparison:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
+                        Text = "So sánh hai phương án",
+                        FontSize = 30f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề A",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.24f, cw * 0.42f, 40f),
+                        Text = "Phương án A",
+                        FontSize = 20f,
+                        Bold = true,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Nội dung A",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.35f, cw * 0.42f, ch * 0.55f),
+                        Text = "• Ưu điểm phương án A\n• Chi phí và thời gian",
+                        FontSize = 16f,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề B",
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.24f, cw * 0.42f, 40f),
+                        Text = "Phương án B",
+                        FontSize = 20f,
+                        Bold = true,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Nội dung B",
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.35f, cw * 0.42f, ch * 0.55f),
+                        Text = "• Ưu điểm phương án B\n• Chi phí và thời gian",
+                        FontSize = 16f,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.TitleOnly:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
+                        Text = "Tiêu đề trang chiếu",
+                        FontSize = 30f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+
+                case SlideLayoutType.Blank:
+                    break;
+
+                case SlideLayoutType.ContentWithCaption:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.32f, 50f),
+                        Text = "Tiêu đề nội dung",
+                        FontSize = 22f,
+                        Bold = true,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Chú thích",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.38f, cw * 0.32f, ch * 0.5f),
+                        Text = "Mô tả chi tiết và giải thích ý nghĩa của hình ảnh hoặc sơ đồ bên cạnh.",
+                        FontSize = 14f,
+                        TextColor = 0x64748B,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.RoundedRectangle,
+                        Name = "Khung Nội dung",
+                        Transform = new Transform2D(cw * 0.42f, ch * 0.15f, cw * 0.52f, ch * 0.72f),
+                        Text = "[ Khung nội dung chính / hình ảnh ]",
+                        FontSize = 16f,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x94A3B8,
+                        FillColor = 0xF1F5F9,
+                        StrokeColor = 0xCBD5E1,
+                        StrokeWidth = 1.5f
+                    });
+                    break;
+
+                case SlideLayoutType.PictureWithCaption:
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.RoundedRectangle,
+                        Name = "Hình ảnh Chính",
+                        Transform = new Transform2D(cw * 0.1f, ch * 0.1f, cw * 0.8f, ch * 0.65f),
+                        Text = "🖼 [ Nhấp để chèn hình ảnh ]",
+                        FontSize = 18f,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x64748B,
+                        FillColor = 0xF8FAFC,
+                        StrokeColor = 0xCBD5E1,
+                        StrokeWidth = 1.5f
+                    });
+                    slide.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Chú thích",
+                        Transform = new Transform2D(cw * 0.1f, ch * 0.78f, cw * 0.8f, 50f),
+                        Text = "Bấm để thêm chú thích hình ảnh...",
+                        FontSize = 15f,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x64748B,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    break;
+            }
+        }
+
+        public void ShowSlideContextMenu(Control parentControl, Point screenPos)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = true;
+
+            // 1. Paste Options:
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
+            miPasteHeader.Enabled = false;
+            menu.Items.Add(miPasteHeader);
+
+            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", CreatePasteOptionIcon(0), (s, e) => {
+                Paste();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", CreatePasteOptionIcon(1), (s, e) => {
+                Paste();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miPasteTheme);
+            menu.Items.Add(miPastePic);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 2. Layout ▾ (Bố cục ▾)
+            ToolStripMenuItem miLayout = new ToolStripMenuItem("Bố cục (Layout)", CreateLayoutMenuIcon());
+            SlideLayoutType[] layouts = new SlideLayoutType[] {
+                SlideLayoutType.TitleSlide, SlideLayoutType.TitleAndContent, SlideLayoutType.SectionHeader,
+                SlideLayoutType.TwoContent, SlideLayoutType.Comparison, SlideLayoutType.TitleOnly,
+                SlideLayoutType.Blank, SlideLayoutType.ContentWithCaption, SlideLayoutType.PictureWithCaption
+            };
+            string[] layoutNames = new string[] {
+                "Trang Tiêu đề (Title Slide)", "Tiêu đề & Nội dung (Title and Content)", "Tiêu đề Phần (Section Header)",
+                "Hai Nội dung (Two Content)", "So sánh (Comparison)", "Chỉ Tiêu đề (Title Only)",
+                "Trang Trống (Blank)", "Nội dung kèm Chú thích (Content with Caption)", "Hình ảnh kèm Chú thích (Picture with Caption)"
+            };
+
+            for (int i = 0; i < layouts.Length; i++)
+            {
+                SlideLayoutType lType = layouts[i];
+                ToolStripMenuItem miSub = new ToolStripMenuItem(layoutNames[i], CreateLayoutThumbIcon(lType), (s, e) => {
+                    if (ActiveSlide != null)
+                    {
+                        ActiveSlide.Layout = lType;
+                        ApplySlideLayoutTemplate(ActiveSlide, lType);
+                        if (parentControl != null) parentControl.Invalidate();
+                    }
+                });
+                if (ActiveSlide != null && ActiveSlide.Layout == lType) miSub.Checked = true;
+                miLayout.DropDownItems.Add(miSub);
+            }
+            menu.Items.Add(miLayout);
+
+            // 3. Reset Slide (Đặt lại Trang chiếu)
+            ToolStripMenuItem miReset = new ToolStripMenuItem("Đặt lại Trang chiếu (Reset Slide)", CreateResetSlideIcon(), (s, e) => {
+                if (ActiveSlide != null)
+                {
+                    ApplySlideLayoutTemplate(ActiveSlide, ActiveSlide.Layout);
+                    if (parentControl != null) parentControl.Invalidate();
+                }
+            });
+            menu.Items.Add(miReset);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 4. Grid and Guides... ▾ (Lưới và Đường căn... ▾)
+            ToolStripMenuItem miGridGuides = new ToolStripMenuItem("Lưới và Đường căn (Grid and Guides)...", CreateGridIcon());
+            ToolStripMenuItem miGuides = new ToolStripMenuItem("Đường định tuyến chuột X, Y (Guides)", null, (s, e) => {
+                ShowMouseGuides = !ShowMouseGuides;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = ShowMouseGuides };
+
+            ToolStripMenuItem miSnap = new ToolStripMenuItem("Bắt dính vào lưới (Snap to Grid)", null, (s, e) => {
+                SnapToGrid = !SnapToGrid;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = SnapToGrid };
+
+            ToolStripMenuItem miShowGrid = new ToolStripMenuItem("Hiện lưới trên màn hình (Display Grid on Screen)", null, (s, e) => {
+                ShowGrid = !ShowGrid;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = ShowGrid };
+
+            ToolStripMenuItem miSmartGuides = new ToolStripMenuItem("Hiện đường căn thông minh (Display Smart Guides)", null, (s, e) => {
+                ShowSmartGuides = !ShowSmartGuides;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = ShowSmartGuides };
+
+            miGridGuides.DropDownItems.AddRange(new ToolStripItem[] { miGuides, miSnap, miShowGrid, miSmartGuides });
+            menu.Items.Add(miGridGuides);
+
+            // 5. Ruler (Thước kẻ)
+            ToolStripMenuItem miRuler = new ToolStripMenuItem("Thước kẻ (Ruler)", null, (s, e) => {
+                ShowRuler = !ShowRuler;
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = ShowRuler };
+            menu.Items.Add(miRuler);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 6. Format Background... (Định dạng Nền...) - Lưu ý bỏ New Comment theo yêu cầu người dùng
+            ToolStripMenuItem miFmtBg = new ToolStripMenuItem("Định dạng Nền (Format Background)...", CreateFormatBgIcon(), (s, e) => {
+                SidebarPanel = SidebarPanelType.FormatBackground;
+                IsSidebarOpen = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miFmtBg);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        public void OpenSmartArtEditor(ShapeNode shape)
+        {
+            if (shape == null) return;
+            using (SmartArtEditorDialog dlg = new SmartArtEditorDialog(shape.SmartArtType, shape.Text, shape.PictureStyleIndex, (newText, newColor) =>
+            {
+                shape.Text = newText;
+                shape.PictureStyleIndex = newColor;
+            }))
+            {
+                dlg.ShowDialog();
+            }
+        }
+
+        public void ShowShapeContextMenu(Control parentControl, Point screenPos, int shapeIndex)
+        {
+            if (ActiveSlide == null || shapeIndex < 0 || shapeIndex >= ActiveSlide.Shapes.Count) return;
+            ShapeNode shape = ActiveSlide.Shapes[shapeIndex];
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = true;
+
+            if (!string.IsNullOrEmpty(shape.SmartArtType) || (shape.Name != null && shape.Name.StartsWith("SmartArt")))
+            {
+                menu.Items.Add("✏️ Chỉnh sửa nội dung chữ SmartArt...", null, (s, e) =>
+                {
+                    OpenSmartArtEditor(shape);
+                    if (parentControl != null) parentControl.Invalidate();
+                });
+
+                ToolStripMenuItem colorMenu = new ToolStripMenuItem("🎨 Đổi màu sắc SmartArt (Color Palette)");
+                colorMenu.DropDownItems.Add("🟠 Cam & Vàng (Office Warm)", null, (s, e) => { shape.PictureStyleIndex = 0; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add("🔵 Xanh Lam Chuẩn (Office Blue)", null, (s, e) => { shape.PictureStyleIndex = 1; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add("🌈 Đa sắc màu (Colorful Accent)", null, (s, e) => { shape.PictureStyleIndex = 2; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add("🟢 Xanh Lục (Emerald Green)", null, (s, e) => { shape.PictureStyleIndex = 3; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add("🟣 Tím & Hồng (Purple & Magenta)", null, (s, e) => { shape.PictureStyleIndex = 4; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add("⚫ Đơn sắc (Monochrome Gray)", null, (s, e) => { shape.PictureStyleIndex = 5; if (parentControl != null) parentControl.Invalidate(); });
+                menu.Items.Add(colorMenu);
+                menu.Items.Add(new ToolStripSeparator());
+            }
+
+            // Mini Quick-Formatting Toolbar Header
+            ToolStripMenuItem miQuickFill = new ToolStripMenuItem("Tô màu Nền (Fill)...", CreateQuickFillIcon(shape.FillColor), (s, e) => {
+                Point pt = (parentControl != null) ? parentControl.PointToScreen(new Point(screenPos.X, screenPos.Y)) : screenPos;
+                Color curC = Color.FromArgb((shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF);
+                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
+                colDlg.OnColorSelected += (c) =>
+                {
+                    if (c == Color.Transparent)
+                    {
+                        shape.FillOpacity = 0.0f;
+                    }
+                    else
+                    {
+                        shape.FillColor = c.ToArgb() & 0x00FFFFFF;
+                        shape.FillOpacity = 1.0f;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                };
+                colDlg.Show();
+            });
+            ToolStripMenuItem miQuickStroke = new ToolStripMenuItem("Màu Viền (Outline)...", CreateQuickStrokeIcon(shape.StrokeColor), (s, e) => {
+                Point pt = (parentControl != null) ? parentControl.PointToScreen(new Point(screenPos.X, screenPos.Y)) : screenPos;
+                Color curC = Color.FromArgb((shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
+                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
+                colDlg.OnColorSelected += (c) =>
+                {
+                    if (c == Color.Transparent)
+                    {
+                        shape.StrokeWidth = 0.0f;
+                    }
+                    else
+                    {
+                        shape.StrokeColor = c.ToArgb() & 0x00FFFFFF;
+                        if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2.0f;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                };
+                colDlg.Show();
+            });
+            menu.Items.Add(miQuickFill);
+            menu.Items.Add(miQuickStroke);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 1. Cut / Copy / Paste Options
+            ToolStripMenuItem miCut = new ToolStripMenuItem("Cắt (Cut)", CreateCutIcon(), (s, e) => {
+                Cut();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miCopy = new ToolStripMenuItem("Chép (Copy)", CreateCopyIcon(), (s, e) => {
+                Copy();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miCut);
+            menu.Items.Add(miCopy);
+
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
+            miPasteHeader.Enabled = false;
+            menu.Items.Add(miPasteHeader);
+
+            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", CreatePasteOptionIcon(0), (s, e) => {
+                Paste();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", CreatePasteOptionIcon(1), (s, e) => {
+                Paste();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miPasteTheme);
+            menu.Items.Add(miPastePic);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 2. Edit Text & Edit Points
+            ToolStripMenuItem miEditText = new ToolStripMenuItem("Chỉnh sửa Văn bản (Edit Text)", CreateEditTextIcon(), (s, e) => {
+                StartInlineEditing(shape);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miEditPoints = new ToolStripMenuItem("Chỉnh sửa Điểm (Edit Points)", CreateEditPointsIcon());
+            miEditPoints.Enabled = (shape.Type == ShapeType.CustomPath);
+            menu.Items.Add(miEditText);
+            menu.Items.Add(miEditPoints);
+
+            // 3. Group / Ungroup
+            ToolStripMenuItem miGroup = new ToolStripMenuItem("Nhóm (Group)", CreateGroupIcon());
+            miGroup.DropDownItems.Add(new ToolStripMenuItem("Nhóm (Group)", null, (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); }));
+            miGroup.DropDownItems.Add(new ToolStripMenuItem("Rã nhóm (Ungroup)", null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
+            miGroup.DropDownItems.Add(new ToolStripMenuItem("Gom nhóm lại (Regroup)", null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
+            menu.Items.Add(miGroup);
+
+            // 4. Bring to Front Submenu
+            ToolStripMenuItem miFront = new ToolStripMenuItem("Đưa lên trên cùng (Bring to Front)", CreateBringFrontIcon());
+            miFront.DropDownItems.Add(new ToolStripMenuItem("Đưa lên trên cùng (Bring to Front)", null, (s, e) => {
+                BringShapeToFront();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            miFront.DropDownItems.Add(new ToolStripMenuItem("Lên trên một lớp (Bring Forward)", null, (s, e) => {
+                BringShapeForward();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(miFront);
+
+            // 5. Send to Back Submenu
+            ToolStripMenuItem miBack = new ToolStripMenuItem("Đưa về sau cùng (Send to Back)", CreateSendBackIcon());
+            miBack.DropDownItems.Add(new ToolStripMenuItem("Đưa về sau cùng (Send to Back)", null, (s, e) => {
+                SendShapeToBack();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            miBack.DropDownItems.Add(new ToolStripMenuItem("Xuống dưới một lớp (Send Backward)", null, (s, e) => {
+                SendShapeBackward();
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(miBack);
+
+            // Menu Lật Hình (Gương)
+            ToolStripMenuItem miFlip = new ToolStripMenuItem("Lật Hình (Gương ⇄ ⇅)", CreateFlipMenuIcon());
+            miFlip.DropDownItems.Add(new ToolStripMenuItem("Lật Ngang ⇄ (Flip Horizontal)", null, (s, e) => {
+                shape.Transform.FlipHorizontal = !shape.Transform.FlipHorizontal;
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            miFlip.DropDownItems.Add(new ToolStripMenuItem("Lật Dọc ⇅ (Flip Vertical)", null, (s, e) => {
+                shape.Transform.FlipVertical = !shape.Transform.FlipVertical;
+                if (parentControl != null) parentControl.Invalidate();
+            }));
+            menu.Items.Add(miFlip);
+
+            // Menu Làm mờ / Độ trong suốt (Opacity)
+            ToolStripMenuItem miOpacity = new ToolStripMenuItem("Làm mờ / Độ trong suốt (Opacity)...", CreateOpacityMenuIcon());
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("100% Đặc (Opaque)", null, (s, e) => { shape.FillOpacity = 1.0f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("80% Hơi mờ", null, (s, e) => { shape.FillOpacity = 0.8f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("60% Bán trong suốt", null, (s, e) => { shape.FillOpacity = 0.6f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("40% Mờ (Translucent)", null, (s, e) => { shape.FillOpacity = 0.4f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("20% Rất mờ", null, (s, e) => { shape.FillOpacity = 0.2f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem("0% Trong suốt (Transparent)", null, (s, e) => { shape.FillOpacity = 0.0f; if (parentControl != null) parentControl.Invalidate(); }));
+            menu.Items.Add(miOpacity);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 6. Lồng Ảnh Vào Hình (Picture Fill) & Cắt xén (Crop to Shape)
+            ToolStripMenuItem miPicFill = new ToolStripMenuItem("Lồng Ảnh vào Hình (Picture Fill)...");
+            miPicFill.DropDownItems.Add(new ToolStripMenuItem("🖼️ Chọn ảnh từ máy tính (Insert from Computer)...", null, (s, e) => {
+                InsertPictureFillDialog(parentControl);
+            }));
+            miPicFill.DropDownItems.Add(new ToolStripMenuItem("📋 Dán ảnh từ Clipboard (Paste from Clipboard)", null, (s, e) => {
+                if (Clipboard.ContainsImage())
+                {
+                    Image clipImg = Clipboard.GetImage();
+                    if (clipImg != null)
+                    {
+                        SetPictureFill(clipImg, "");
+                        if (parentControl != null) parentControl.Invalidate();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Không tìm thấy dữ liệu hình ảnh trong Clipboard!", "Dán ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }));
+            if (shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
+            {
+                miPicFill.DropDownItems.Add(new ToolStripSeparator());
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem("🔄 Căn lấp đầy (Fill to Shape)", null, (s, e) => {
+                    FillCrop();
+                    if (parentControl != null) parentControl.Invalidate();
+                }));
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem("📐 Căn vừa vặn (Fit to Shape)", null, (s, e) => {
+                    FitCrop();
+                    if (parentControl != null) parentControl.Invalidate();
+                }));
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem("❌ Xóa ảnh lồng (Remove Picture Fill)", null, (s, e) => {
+                    RemovePictureFill(parentControl);
+                }));
+            }
+            menu.Items.Add(miPicFill);
+
+            // Cắt xén ảnh theo hình dạng (Crop to Shape)
+            ToolStripMenuItem miCropToShape = new ToolStripMenuItem("Cắt xén theo Hình khối (Crop to Shape)...");
+            string[] shapeCropNames = new string[] {
+                "Rectangle", "Chữ nhật (Rectangle)",
+                "RoundedRectangle", "Chữ nhật bo góc (Rounded Rectangle)",
+                "Oval", "Hình Elip / Tròn (Oval)",
+                "Triangle", "Tam giác (Triangle)",
+                "Diamond", "Hình thoi (Diamond)",
+                "Hexagon", "Lục giác (Hexagon)",
+                "Octagon", "Bát giác (Octagon)",
+                "Heart", "Trái tim (Heart)",
+                "Star", "Ngôi sao (Star)",
+                "BlockArrowRight", "Mũi tên phải (Right Arrow)",
+                "Chevron", "Mũi tên chữ V (Chevron)",
+                "Callout", "Bong bóng thoại (Callout)",
+                "Cloud", "Đám mây (Cloud)",
+                "Shield", "Khiên bảo vệ (Shield)"
+            };
+            for (int scIdx = 0; scIdx < shapeCropNames.Length; scIdx += 2)
+            {
+                string sTypeKey = shapeCropNames[scIdx];
+                string sDispName = shapeCropNames[scIdx + 1];
+                miCropToShape.DropDownItems.Add(new ToolStripMenuItem(sDispName, null, (s, e) => {
+                    SetCropShape(sTypeKey);
+                    if (parentControl != null) parentControl.Invalidate();
+                }));
+            }
+            menu.Items.Add(miCropToShape);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 7. Hyperlink & Search & Alt Text
+            ToolStripMenuItem miLink = new ToolStripMenuItem("Liên kết (Hyperlink)...", CreateLinkIcon(), (s, e) => {
+            });
+            ToolStripMenuItem miSavePic = new ToolStripMenuItem("Lưu dưới dạng Hình ảnh...", CreateSavePicIcon(), (s, e) => {
+                SaveShapeAsPicture(shape);
+            });
+            ToolStripMenuItem miSizePos = new ToolStripMenuItem("Kích thước và Vị trí (Size and Position)...", CreateSizePosIcon(), (s, e) => {
+                SidebarPanel = SidebarPanelType.Properties;
+                IsSidebarOpen = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miFormatShape = new ToolStripMenuItem("Định dạng Hình dạng (Format Shape)...", CreateFormatShapeMenuIcon(), (s, e) => {
+                SidebarPanel = SidebarPanelType.Properties;
+                IsSidebarOpen = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miSelectionPane = new ToolStripMenuItem("Ngăn Lựa chọn (Selection Pane)...", CreateSelectionPaneIcon(), (s, e) => {
+                SidebarPanel = SidebarPanelType.SelectionPane;
+                IsSidebarOpen = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miLink);
+            menu.Items.Add(miSavePic);
+            menu.Items.Add(miSizePos);
+            menu.Items.Add(miFormatShape);
+            menu.Items.Add(miSelectionPane);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        private SlideNode _slidesClipboardSlide = null;
+
+        public void ShowThumbnailContextMenu(Control parentControl, Point screenPos, int slideIndex)
+        {
+            if (Presentation == null || Presentation.Slides.Count == 0) return;
+            if (slideIndex < 0) slideIndex = 0;
+            if (slideIndex >= Presentation.Slides.Count) slideIndex = Presentation.Slides.Count - 1;
+            SlideNode targetSlide = Presentation.Slides[slideIndex];
+            ActiveSlideIndex = slideIndex;
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = true;
+
+            // 1. Cut / Copy / Paste Options
+            ToolStripMenuItem miCut = new ToolStripMenuItem("Cắt (Cut)", CreateCutIcon(), (s, e) => {
+                CutSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miCopy = new ToolStripMenuItem("Chép (Copy)", CreateCopyIcon(), (s, e) => {
+                CopySlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miCut);
+            menu.Items.Add(miCopy);
+
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
+            miPasteHeader.Enabled = false;
+            menu.Items.Add(miPasteHeader);
+
+            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", CreatePasteOptionIcon(0), (s, e) => {
+                PasteSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", CreatePasteOptionIcon(1), (s, e) => {
+                PasteSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miPasteTheme.Enabled = (_slidesClipboardSlide != null);
+            miPastePic.Enabled = (_slidesClipboardSlide != null);
+            menu.Items.Add(miPasteTheme);
+            menu.Items.Add(miPastePic);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 2. New Slide, Duplicate Slide, Delete Slide, Add Section
+            ToolStripMenuItem miNewSlide = new ToolStripMenuItem("Trang chiếu Mới (New Slide)", CreateNewSlideMenuIcon(), (s, e) => {
+                InsertNewSlideAfter(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miDupSlide = new ToolStripMenuItem("Nhân bản Trang chiếu (Duplicate Slide)", CreateDupSlideMenuIcon(), (s, e) => {
+                DuplicateSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miDelSlide = new ToolStripMenuItem("Xóa Trang chiếu (Delete Slide)", CreateDeleteSlideMenuIcon(), (s, e) => {
+                DeleteSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            ToolStripMenuItem miAddSection = new ToolStripMenuItem("Thêm Phần (Add Section)", CreateAddSectionMenuIcon(), (s, e) => {
+                AddSection(parentControl, slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miNewSlide);
+            menu.Items.Add(miDupSlide);
+            menu.Items.Add(miDelSlide);
+            menu.Items.Add(miAddSection);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 3. Layout ▾
+            ToolStripMenuItem miLayout = new ToolStripMenuItem("Bố cục (Layout)", CreateLayoutMenuIcon());
+            SlideLayoutType[] layouts = new SlideLayoutType[] {
+                SlideLayoutType.TitleSlide, SlideLayoutType.TitleAndContent, SlideLayoutType.SectionHeader,
+                SlideLayoutType.TwoContent, SlideLayoutType.Comparison, SlideLayoutType.TitleOnly,
+                SlideLayoutType.Blank, SlideLayoutType.ContentWithCaption, SlideLayoutType.PictureWithCaption
+            };
+            string[] layoutNames = new string[] {
+                "Trang Tiêu đề (Title Slide)", "Tiêu đề & Nội dung (Title and Content)", "Tiêu đề Phần (Section Header)",
+                "Hai Nội dung (Two Content)", "So sánh (Comparison)", "Chỉ Tiêu đề (Title Only)",
+                "Trang Trống (Blank)", "Nội dung kèm Chú thích (Content with Caption)", "Hình ảnh kèm Chú thích (Picture with Caption)"
+            };
+            for (int i = 0; i < layouts.Length; i++)
+            {
+                SlideLayoutType lType = layouts[i];
+                ToolStripMenuItem subItem = new ToolStripMenuItem(layoutNames[i], CreateLayoutThumbIcon(lType), (EventHandler)((s, e) => {
+                    targetSlide.Layout = lType;
+                    ApplySlideLayoutTemplate(targetSlide, lType);
+                    if (parentControl != null) parentControl.Invalidate();
+                }));
+                if (targetSlide.Layout == lType) subItem.Checked = true;
+                miLayout.DropDownItems.Add(subItem);
+            }
+            menu.Items.Add(miLayout);
+
+            // 4. Reset Slide
+            ToolStripMenuItem miReset = new ToolStripMenuItem("Đặt lại Trang chiếu (Reset Slide)", CreateResetSlideIcon(), (s, e) => {
+                ResetSlide(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miReset);
+
+            // 5. Format Background...
+            ToolStripMenuItem miFmtBg = new ToolStripMenuItem("Định dạng Nền (Format Background)...", CreateFormatBgIcon(), (s, e) => {
+                SidebarPanel = SidebarPanelType.FormatBackground;
+                IsSidebarOpen = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            menu.Items.Add(miFmtBg);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 6. Photo Album...
+            ToolStripMenuItem miPhotoAlbum = new ToolStripMenuItem("Tập ảnh (Photo Album)...", CreatePhotoAlbumIcon());
+            miPhotoAlbum.Enabled = false;
+            menu.Items.Add(miPhotoAlbum);
+
+            // 7. Hide Slide / Unhide Slide
+            string hideText = targetSlide.IsHidden ? "Hiện Trang chiếu (Unhide Slide)" : "Ẩn Trang chiếu (Hide Slide)";
+            ToolStripMenuItem miHide = new ToolStripMenuItem(hideText, CreateHideSlideMenuIcon(), (s, e) => {
+                targetSlide.IsHidden = !targetSlide.IsHidden;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            if (targetSlide.IsHidden) miHide.Checked = true;
+            menu.Items.Add(miHide);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        public static string PromptRenameSection(IWin32Window owner, string currentName = "Untitled Section")
+        {
+            using (Form form = new Form())
+            {
+                form.Text = "Rename Section";
+                form.FormBorderStyle = FormBorderStyle.FixedDialog;
+                form.StartPosition = FormStartPosition.CenterParent;
+                form.MaximizeBox = false;
+                form.MinimizeBox = false;
+                form.HelpButton = true;
+                form.ShowIcon = false;
+                form.ShowInTaskbar = false;
+                form.ClientSize = new Size(270, 120);
+                form.BackColor = Color.White;
+                form.Font = new Font("Segoe UI", 9f);
+
+                Label lbl = new Label { Text = "Section name:", Location = new Point(14, 12), AutoSize = true, ForeColor = Color.FromArgb(30, 41, 59) };
+                TextBox txt = new TextBox { Text = string.IsNullOrEmpty(currentName) ? "Untitled Section" : currentName, Location = new Point(16, 34), Width = 236 };
+                txt.SelectAll();
+
+                Button btnRename = new Button {
+                    Text = "Rename",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(76, 74),
+                    Size = new Size(82, 28),
+                    BackColor = Color.FromArgb(240, 240, 240),
+                    FlatStyle = FlatStyle.System
+                };
+                Button btnCancel = new Button {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(170, 74),
+                    Size = new Size(82, 28),
+                    BackColor = Color.FromArgb(240, 240, 240),
+                    FlatStyle = FlatStyle.System
+                };
+
+                form.Controls.AddRange(new Control[] { lbl, txt, btnRename, btnCancel });
+                form.AcceptButton = btnRename;
+                form.CancelButton = btnCancel;
+
+                if (form.ShowDialog(owner) == DialogResult.OK)
+                {
+                    return string.IsNullOrWhiteSpace(txt.Text) ? "Untitled Section" : txt.Text.Trim();
+                }
+                return null;
+            }
+        }
+
+        public void ShowSectionContextMenu(Control parentControl, Point screenPos, int slideIndex)
+        {
+            if (Presentation == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return;
+            SlideNode secSlide = Presentation.Slides[slideIndex];
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = true;
+
+            // 1. Rename Section
+            ToolStripMenuItem miRename = new ToolStripMenuItem("Đổi tên Phần (Rename Section)", CreateRenameSecIcon(), (s, e) => {
+                string renamed = PromptRenameSection(parentControl, secSlide.SectionName);
+                if (renamed != null)
+                {
+                    secSlide.SectionName = renamed;
+                    if (parentControl != null) parentControl.Invalidate();
+                }
+            });
+
+            // 2. Remove Section
+            ToolStripMenuItem miRemoveSec = new ToolStripMenuItem("Xóa Phần (Remove Section)", CreateRemoveSecIcon(), (s, e) => {
+                secSlide.IsSectionHeader = false;
+                secSlide.SectionName = "";
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            // 3. Remove Section & Slides
+            ToolStripMenuItem miRemoveSecAndSlides = new ToolStripMenuItem("Xóa Phần và Trang chiếu (Remove Section & Slides)", CreateRemoveSecAndSlidesIcon(), (s, e) => {
+                int nextSec = slideIndex + 1;
+                while (nextSec < Presentation.Slides.Count && !Presentation.Slides[nextSec].IsSectionHeader)
+                {
+                    nextSec++;
+                }
+                int countToRemove = nextSec - slideIndex;
+                if (Presentation.Slides.Count > countToRemove)
+                {
+                    for (int k = 0; k < countToRemove; k++)
+                    {
+                        Presentation.Slides.RemoveAt(slideIndex);
+                    }
+                    ActiveSlideIndex = Math.Max(0, Math.Min(slideIndex, Presentation.Slides.Count - 1));
+                }
+                else
+                {
+                    Presentation.Slides[0].Shapes.Clear();
+                    Presentation.Slides[0].IsSectionHeader = false;
+                    Presentation.Slides[0].SectionName = "";
+                }
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            // 4. Remove All Sections
+            ToolStripMenuItem miRemoveAll = new ToolStripMenuItem("Xóa Tất cả các Phần (Remove All Sections)", CreateRemoveAllSecIcon(), (s, e) => {
+                RemoveAllSections();
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miRename);
+            menu.Items.Add(miRemoveSec);
+            menu.Items.Add(miRemoveSecAndSlides);
+            menu.Items.Add(miRemoveAll);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 5. Move Section Up
+            ToolStripMenuItem miMoveUp = new ToolStripMenuItem("Di chuyển Phần Lên trên (Move Section Up)", CreateMoveSecUpIcon(), (s, e) => {
+                MoveSectionUp(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            bool canMoveUp = (slideIndex > 0);
+            miMoveUp.Enabled = canMoveUp;
+
+            // 6. Move Section Down
+            bool canMoveDown = false;
+            for (int k = slideIndex + 1; k < Presentation.Slides.Count; k++)
+            {
+                if (Presentation.Slides[k].IsSectionHeader) { canMoveDown = true; break; }
+            }
+            ToolStripMenuItem miMoveDown = new ToolStripMenuItem("Di chuyển Phần Xuống dưới (Move Section Down)", CreateMoveSecDownIcon(), (s, e) => {
+                MoveSectionDown(slideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miMoveDown.Enabled = canMoveDown;
+
+            menu.Items.Add(miMoveUp);
+            menu.Items.Add(miMoveDown);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 7. Collapse All
+            ToolStripMenuItem miCollapseAll = new ToolStripMenuItem("Thu gọn Tất cả (Collapse All)", CreateCollapseAllIcon(), (s, e) => {
+                foreach (var sl in Presentation.Slides)
+                {
+                    if (sl.IsSectionHeader || (sl == Presentation.Slides[0] && HasAnySections()))
+                    {
+                        sl.IsSectionCollapsed = true;
+                    }
+                }
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            // 8. Expand All
+            ToolStripMenuItem miExpandAll = new ToolStripMenuItem("Mở rộng Tất cả (Expand All)", CreateExpandAllIcon(), (s, e) => {
+                foreach (var sl in Presentation.Slides)
+                {
+                    sl.IsSectionCollapsed = false;
+                }
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miCollapseAll);
+            menu.Items.Add(miExpandAll);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        public void MoveSectionUp(int slideIndex)
+        {
+            if (Presentation == null || slideIndex <= 0 || slideIndex >= Presentation.Slides.Count) return;
+
+            int nextSec = slideIndex + 1;
+            while (nextSec < Presentation.Slides.Count && !Presentation.Slides[nextSec].IsSectionHeader)
+            {
+                nextSec++;
+            }
+            List<SlideNode> currentSecSlides = new List<SlideNode>();
+            for (int i = slideIndex; i < nextSec; i++)
+            {
+                currentSecSlides.Add(Presentation.Slides[i]);
+            }
+
+            int prevSec = slideIndex - 1;
+            while (prevSec > 0 && !Presentation.Slides[prevSec].IsSectionHeader)
+            {
+                prevSec--;
+            }
+
+            for (int i = nextSec - 1; i >= slideIndex; i--)
+            {
+                Presentation.Slides.RemoveAt(i);
+            }
+
+            Presentation.Slides.InsertRange(prevSec, currentSecSlides);
+            ActiveSlideIndex = prevSec;
+        }
+
+        public void MoveSectionDown(int slideIndex)
+        {
+            if (Presentation == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return;
+
+            int nextSec = slideIndex + 1;
+            while (nextSec < Presentation.Slides.Count && !Presentation.Slides[nextSec].IsSectionHeader)
+            {
+                nextSec++;
+            }
+            if (nextSec >= Presentation.Slides.Count) return;
+
+            List<SlideNode> currentSecSlides = new List<SlideNode>();
+            for (int i = slideIndex; i < nextSec; i++)
+            {
+                currentSecSlides.Add(Presentation.Slides[i]);
+            }
+
+            int nextNextSec = nextSec + 1;
+            while (nextNextSec < Presentation.Slides.Count && !Presentation.Slides[nextNextSec].IsSectionHeader)
+            {
+                nextNextSec++;
+            }
+
+            for (int i = nextSec - 1; i >= slideIndex; i--)
+            {
+                Presentation.Slides.RemoveAt(i);
+            }
+
+            int insertPos = nextNextSec - currentSecSlides.Count;
+            Presentation.Slides.InsertRange(insertPos, currentSecSlides);
+            ActiveSlideIndex = insertPos;
+        }
+
+        public void RemoveAllSections()
+        {
+            if (Presentation == null) return;
+            foreach (var sl in Presentation.Slides)
+            {
+                sl.IsSectionHeader = false;
+                sl.SectionName = "";
+                sl.IsSectionCollapsed = false;
+            }
+        }
+
+        public void CutSlide(int index)
+        {
+            CopySlide(index);
+            DeleteSlide(index);
+        }
+
+        public void CopySlide(int index)
+        {
+            if (Presentation != null && index >= 0 && index < Presentation.Slides.Count)
+            {
+                _slidesClipboardSlide = Presentation.Slides[index].Clone();
+            }
+        }
+
+        public void PasteSlide(int index)
+        {
+            if (_slidesClipboardSlide != null && Presentation != null)
+            {
+                SlideNode newSlide = _slidesClipboardSlide.Clone();
+                int insertIdx = Math.Min(Presentation.Slides.Count, index + 1);
+                Presentation.Slides.Insert(insertIdx, newSlide);
+                ActiveSlideIndex = insertIdx;
+            }
+        }
+
+        public void InsertNewSlideAfter(int index)
+        {
+            if (Presentation == null) return;
+            SlideNode newSlide = new SlideNode { Layout = SlideLayoutType.TitleAndContent };
+            ApplySlideLayoutTemplate(newSlide, SlideLayoutType.TitleAndContent);
+            int insertIdx = Math.Min(Presentation.Slides.Count, index + 1);
+            Presentation.Slides.Insert(insertIdx, newSlide);
+            ActiveSlideIndex = insertIdx;
+        }
+
+        public void DuplicateSlide(int index)
+        {
+            if (Presentation != null && index >= 0 && index < Presentation.Slides.Count)
+            {
+                SlideNode dup = Presentation.Slides[index].Clone();
+                Presentation.Slides.Insert(index + 1, dup);
+                ActiveSlideIndex = index + 1;
+            }
+        }
+
+        public void DeleteSlide(int index)
+        {
+            if (Presentation == null || Presentation.Slides.Count == 0) return;
+            if (index >= 0 && index < Presentation.Slides.Count)
+            {
+                if (Presentation.Slides.Count > 1)
+                {
+                    Presentation.Slides.RemoveAt(index);
+                    ActiveSlideIndex = Math.Max(0, Math.Min(index, Presentation.Slides.Count - 1));
+                }
+                else
+                {
+                    Presentation.Slides[0].Shapes.Clear();
+                    Presentation.Slides[0].BgColor = 0xFFFFFF;
+                    Presentation.Slides[0].IsGradientBg = false;
+                    ApplySlideLayoutTemplate(Presentation.Slides[0], SlideLayoutType.TitleSlide);
+                }
+            }
+        }
+
+        public void ResetSlide(int index)
+        {
+            if (Presentation != null && index >= 0 && index < Presentation.Slides.Count)
+            {
+                SlideNode s = Presentation.Slides[index];
+                s.Shapes.Clear();
+                ApplySlideLayoutTemplate(s, s.Layout);
+            }
+        }
+
+        public void AddSection(IWin32Window owner, int slideIndex)
+        {
+            if (Presentation == null || Presentation.Slides.Count == 0) return;
+            if (slideIndex < 0) slideIndex = 0;
+            if (slideIndex >= Presentation.Slides.Count) slideIndex = Presentation.Slides.Count - 1;
+
+            // Đảm bảo slide 0 có Default Section nếu thêm phần ở các slide sau
+            if (slideIndex > 0 && !Presentation.Slides[0].IsSectionHeader)
+            {
+                Presentation.Slides[0].IsSectionHeader = true;
+                Presentation.Slides[0].SectionName = "Default Section";
+            }
+
+            string newName = PromptRenameSection(owner, "Untitled Section");
+            if (newName != null)
+            {
+                Presentation.Slides[slideIndex].IsSectionHeader = true;
+                Presentation.Slides[slideIndex].SectionName = newName;
+                Presentation.Slides[slideIndex].IsSectionCollapsed = false;
+                ActiveSlideIndex = slideIndex;
+            }
+        }
+
+        public static Image CreateRenameSecIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 3, 13, 10);
+                }
+                using (Pen cursorPen = new Pen(Color.FromArgb(15, 23, 42), 1.5f))
+                {
+                    g.DrawLine(cursorPen, 5, 5, 11, 5);
+                    g.DrawLine(cursorPen, 8, 5, 8, 11);
+                    g.DrawLine(cursorPen, 5, 11, 11, 11);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateRemoveSecIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.1f))
+                {
+                    g.DrawRectangle(p, 1, 2, 12, 10);
+                }
+                using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.8f))
+                {
+                    g.DrawLine(redPen, 9, 9, 15, 15);
+                    g.DrawLine(redPen, 15, 9, 9, 15);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateRemoveSecAndSlidesIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.1f))
+                {
+                    g.DrawRectangle(p, 4, 1, 10, 8);
+                    g.FillRectangle(Brushes.White, 1, 4, 10, 8);
+                    g.DrawRectangle(p, 1, 4, 10, 8);
+                }
+                using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.8f))
+                {
+                    g.DrawLine(redPen, 9, 9, 15, 15);
+                    g.DrawLine(redPen, 15, 9, 9, 15);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateRemoveAllSecIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.1f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 4);
+                    g.DrawRectangle(p, 1, 6, 13, 4);
+                }
+                using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.8f))
+                {
+                    g.DrawLine(redPen, 9, 9, 15, 15);
+                    g.DrawLine(redPen, 15, 9, 9, 15);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateMoveSecUpIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 2.0f))
+                {
+                    p.StartCap = LineCap.Round;
+                    p.EndCap = LineCap.Round;
+                    Point[] pts = new Point[] { new Point(3, 10), new Point(8, 4), new Point(13, 10) };
+                    g.DrawLines(p, pts);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateMoveSecDownIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(148, 163, 184), 2.0f))
+                {
+                    p.StartCap = LineCap.Round;
+                    p.EndCap = LineCap.Round;
+                    Point[] pts = new Point[] { new Point(3, 6), new Point(8, 12), new Point(13, 6) };
+                    g.DrawLines(p, pts);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateCollapseAllIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 2, 13, 4);
+                    g.DrawRectangle(p, 1, 8, 13, 4);
+                }
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    Point[] tri = new Point[] { new Point(2, 4), new Point(2, 10), new Point(7, 7) };
+                    g.FillPolygon(b, tri);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateExpandAllIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 2, 13, 4);
+                    g.DrawRectangle(p, 1, 8, 13, 4);
+                }
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    Point[] tri = new Point[] { new Point(3, 4), new Point(9, 4), new Point(6, 9) };
+                    g.FillPolygon(b, tri);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateNewSlideMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 11);
+                    g.DrawLine(p, 1, 5, 14, 5);
+                }
+                using (Pen greenPen = new Pen(Color.FromArgb(22, 163, 74), 2.0f))
+                {
+                    g.DrawLine(greenPen, 3, 1, 3, 7);
+                    g.DrawLine(greenPen, 0, 4, 6, 4);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateDupSlideMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.1f))
+                {
+                    g.DrawRectangle(p, 4, 1, 11, 10);
+                    g.FillRectangle(Brushes.White, 1, 4, 11, 10);
+                    g.DrawRectangle(p, 1, 4, 11, 10);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateDeleteSlideMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 11);
+                }
+                using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.8f))
+                {
+                    g.DrawLine(redPen, 2, 9, 7, 14);
+                    g.DrawLine(redPen, 7, 9, 2, 14);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateAddSectionMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(22, 163, 74)))
+                {
+                    g.DrawRectangle(p, 1, 3, 13, 11);
+                    g.FillRectangle(b, 1, 1, 13, 3);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateResetSlideMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 12);
+                }
+                using (Pen bluePen = new Pen(Color.FromArgb(37, 99, 235), 1.6f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.DrawArc(bluePen, 3, 4, 8, 8, 200, 200);
+                    PointF[] arrow = new PointF[] { new PointF(1, 7), new PointF(6, 4), new PointF(6, 10) };
+                    g.FillPolygon(b, arrow);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateHideSlideMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.DrawRectangle(p, 1, 2, 13, 11);
+                    Point[] tri = new Point[] { new Point(2, 12), new Point(13, 12), new Point(13, 3) };
+                    g.FillPolygon(b, tri);
+                    g.DrawLine(new Pen(Color.FromArgb(71, 85, 105), 1.2f), 1, 13, 14, 2);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreatePhotoAlbumIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(148, 163, 184), 1.1f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 12);
+                    g.DrawLine(p, 3, 10, 7, 5);
+                    g.DrawLine(p, 7, 5, 12, 11);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateNewCommentMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    Point[] bubble = new Point[] {
+                        new Point(1, 1), new Point(13, 1), new Point(13, 10),
+                        new Point(6, 10), new Point(2, 14), new Point(2, 10), new Point(1, 10)
+                    };
+                    g.DrawPolygon(p, bubble);
+                }
+                using (Pen greenPen = new Pen(Color.FromArgb(22, 163, 74), 1.8f))
+                {
+                    g.DrawLine(greenPen, 11, 0, 11, 6);
+                    g.DrawLine(greenPen, 8, 3, 14, 3);
+                }
+            }
+            return bmp;
+        }
+
+        public void SaveShapeAsPicture(ShapeNode shape)
+        {
+            if (shape == null) return;
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "PNG Image (*.png)|*.png|JPEG Image (*.jpg)|*.jpg";
+                sfd.FileName = (shape.Name ?? "Shape") + ".png";
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    int w = Math.Max(20, (int)shape.Transform.Width);
+                    int h = Math.Max(20, (int)shape.Transform.Height);
+                    using (Bitmap bmp = new Bitmap(w, h))
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.Clear(Color.Transparent);
+                        ShapeNode clone = shape.Clone();
+                        clone.Transform.X = 0;
+                        clone.Transform.Y = 0;
+                        DrawShape(g, 0, 0, 1.0f, clone, false);
+                        bmp.Save(sfd.FileName);
+                    }
+                }
+            }
+        }
+
+        public static Image CreateQuickFillIcon(int color)
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                Color c = Color.FromArgb((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+                using (SolidBrush b = new SolidBrush(c))
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.FillRectangle(b, 2, 2, 12, 9);
+                    g.DrawRectangle(p, 2, 2, 12, 9);
+                    g.FillRectangle(new SolidBrush(Color.FromArgb(234, 88, 12)), 2, 12, 12, 3);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateQuickStrokeIcon(int color)
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                Color c = Color.FromArgb((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+                using (Pen p = new Pen(c, 2.0f))
+                {
+                    g.DrawRectangle(p, 2, 2, 12, 9);
+                }
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.FillRectangle(b, 2, 12, 12, 3);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateCutIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.3f))
+                {
+                    g.DrawEllipse(p, 1, 9, 5, 5);
+                    g.DrawEllipse(p, 10, 9, 5, 5);
+                    g.DrawLine(p, 4, 10, 12, 2);
+                    g.DrawLine(p, 12, 10, 4, 2);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateCopyIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                {
+                    g.FillRectangle(b, 5, 2, 9, 10);
+                    g.DrawRectangle(p, 5, 2, 9, 10);
+                    g.FillRectangle(Brushes.White, 2, 5, 9, 10);
+                    g.DrawRectangle(p, 2, 5, 9, 10);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateEditTextIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.0f) { DashStyle = DashStyle.Dash })
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 13);
+                }
+                using (Font f = new Font("Segoe UI", 8f, FontStyle.Bold))
+                {
+                    g.DrawString("A", f, Brushes.Black, 3, 1);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateEditPointsIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(148, 163, 184), 1.2f))
+                {
+                    g.DrawLine(p, 3, 13, 13, 3);
+                    g.FillRectangle(Brushes.DodgerBlue, 1, 11, 4, 4);
+                    g.FillRectangle(Brushes.DodgerBlue, 11, 1, 4, 4);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateGroupIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.1f))
+                {
+                    g.DrawRectangle(p, 1, 1, 9, 9);
+                    g.DrawRectangle(p, 6, 6, 9, 9);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateBringFrontIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen darkPen = new Pen(Color.FromArgb(51, 65, 85), 1.2f))
+                using (SolidBrush yellowBrush = new SolidBrush(Color.FromArgb(251, 191, 36)))
+                {
+                    g.DrawRectangle(darkPen, 5, 5, 9, 9);
+                    g.FillRectangle(yellowBrush, 1, 1, 9, 9);
+                    g.DrawRectangle(darkPen, 1, 1, 9, 9);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateSendBackIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen darkPen = new Pen(Color.FromArgb(51, 65, 85), 1.2f))
+                using (SolidBrush yellowBrush = new SolidBrush(Color.FromArgb(251, 191, 36)))
+                {
+                    g.FillRectangle(yellowBrush, 5, 5, 9, 9);
+                    g.DrawRectangle(darkPen, 5, 5, 9, 9);
+                    g.FillRectangle(Brushes.White, 1, 1, 9, 9);
+                    g.DrawRectangle(darkPen, 1, 1, 9, 9);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateLinkIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.4f))
+                {
+                    g.DrawEllipse(p, 2, 4, 7, 7);
+                    g.DrawEllipse(p, 7, 4, 7, 7);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateSavePicIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(16, 185, 129), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 13);
+                    g.FillEllipse(new SolidBrush(Color.FromArgb(16, 185, 129)), 3, 3, 3, 3);
+                    g.DrawLine(p, 2, 12, 6, 7);
+                    g.DrawLine(p, 6, 7, 10, 11);
+                    g.DrawLine(p, 10, 11, 13, 8);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateSizePosIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.3f))
+                {
+                    g.DrawLine(p, 2, 8, 14, 8);
+                    g.DrawLine(p, 8, 2, 8, 14);
+                    // Arrows
+                    g.DrawLine(p, 4, 6, 2, 8);
+                    g.DrawLine(p, 4, 10, 2, 8);
+                    g.DrawLine(p, 12, 6, 14, 8);
+                    g.DrawLine(p, 12, 10, 14, 8);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateFormatShapeMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.3f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.DrawRectangle(p, 2, 2, 11, 11);
+                    g.FillRectangle(b, 5, 5, 5, 5);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateSelectionPaneIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(234, 88, 12), 1.2f))
+                using (Pen p2 = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 3, 1, 11, 10);
+                    g.DrawRectangle(p2, 1, 5, 9, 9);
+                    // Small cursor arrow pointer
+                    using (SolidBrush curBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                    {
+                        PointF[] arrow = new PointF[] { new PointF(8, 7), new PointF(13, 12), new PointF(10, 12), new PointF(8, 15) };
+                        g.FillPolygon(curBrush, arrow);
+                    }
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateFlipMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.3f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.DrawLine(p, 2, 8, 14, 8);
+                    g.FillPolygon(b, new PointF[] { new PointF(2, 8), new PointF(5, 5), new PointF(5, 11) });
+                    g.FillPolygon(b, new PointF[] { new PointF(14, 8), new PointF(11, 5), new PointF(11, 11) });
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateOpacityMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (SolidBrush b1 = new SolidBrush(Color.FromArgb(120, 59, 130, 246)))
+                using (SolidBrush b2 = new SolidBrush(Color.FromArgb(220, 234, 88, 12)))
+                using (Pen p = new Pen(Color.FromArgb(30, 41, 59), 1.0f))
+                {
+                    g.FillEllipse(b1, 1, 2, 10, 10);
+                    g.FillEllipse(b2, 5, 4, 10, 10);
+                    g.DrawEllipse(p, 1, 2, 10, 10);
+                    g.DrawEllipse(p, 5, 4, 10, 10);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreatePasteOptionIcon(int type)
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(217, 119, 6), 1.2f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(217, 119, 6)))
+                {
+                    g.DrawRectangle(p, 1, 3, 10, 11);
+                    g.FillRectangle(b, 4, 1, 4, 3);
+                    if (type == 0) // Theme
+                    {
+                        g.DrawRectangle(new Pen(Color.FromArgb(37, 99, 235), 1.2f), 5, 6, 8, 8);
+                    }
+                    else // Picture
+                    {
+                        g.DrawRectangle(new Pen(Color.FromArgb(16, 185, 129), 1.2f), 5, 6, 8, 8);
+                        g.FillEllipse(new SolidBrush(Color.FromArgb(16, 185, 129)), 7, 8, 2, 2);
+                    }
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateLayoutMenuIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawRectangle(p, 1, 1, 13, 13);
+                    g.DrawLine(p, 1, 5, 14, 5);
+                    g.DrawLine(p, 7, 5, 7, 14);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateLayoutThumbIcon(SlideLayoutType type)
+        {
+            Bitmap bmp = new Bitmap(24, 18);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.White);
+                using (Pen p = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+                using (Pen dashP = new Pen(Color.FromArgb(100, 116, 139), 1.0f) { DashStyle = DashStyle.Dot })
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                {
+                    g.DrawRectangle(p, 0, 0, 23, 17);
+                    switch (type)
+                    {
+                        case SlideLayoutType.TitleSlide:
+                            g.DrawRectangle(dashP, 4, 4, 15, 4);
+                            g.DrawRectangle(dashP, 6, 10, 11, 3);
+                            break;
+                        case SlideLayoutType.TitleAndContent:
+                            g.DrawRectangle(dashP, 3, 2, 17, 3);
+                            g.DrawRectangle(dashP, 3, 7, 17, 8);
+                            break;
+                        case SlideLayoutType.SectionHeader:
+                            g.DrawRectangle(dashP, 3, 7, 17, 5);
+                            break;
+                        case SlideLayoutType.TwoContent:
+                            g.DrawRectangle(dashP, 3, 2, 17, 3);
+                            g.DrawRectangle(dashP, 3, 7, 8, 8);
+                            g.DrawRectangle(dashP, 12, 7, 8, 8);
+                            break;
+                        case SlideLayoutType.Comparison:
+                            g.DrawRectangle(dashP, 3, 2, 17, 2);
+                            g.DrawRectangle(dashP, 3, 5, 8, 2);
+                            g.DrawRectangle(dashP, 12, 5, 8, 2);
+                            g.DrawRectangle(dashP, 3, 8, 8, 7);
+                            g.DrawRectangle(dashP, 12, 8, 8, 7);
+                            break;
+                        case SlideLayoutType.TitleOnly:
+                            g.DrawRectangle(dashP, 3, 2, 17, 3);
+                            break;
+                        case SlideLayoutType.Blank:
+                            break;
+                        case SlideLayoutType.ContentWithCaption:
+                            g.DrawRectangle(dashP, 2, 3, 6, 3);
+                            g.DrawRectangle(dashP, 2, 7, 6, 8);
+                            g.DrawRectangle(dashP, 9, 3, 12, 12);
+                            break;
+                        case SlideLayoutType.PictureWithCaption:
+                            g.DrawRectangle(dashP, 3, 2, 17, 10);
+                            g.DrawRectangle(dashP, 3, 13, 17, 3);
+                            break;
+                    }
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateResetSlideIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(217, 119, 6), 1.3f))
+                {
+                    g.DrawArc(p, 2, 2, 11, 11, 45, 270);
+                    Point[] arrow = new Point[] { new Point(10, 1), new Point(13, 4), new Point(10, 7) };
+                    g.FillPolygon(new SolidBrush(Color.FromArgb(217, 119, 6)), arrow);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateGridIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+                {
+                    g.DrawLine(p, 5, 1, 5, 14);
+                    g.DrawLine(p, 10, 1, 10, 14);
+                    g.DrawLine(p, 1, 5, 14, 5);
+                    g.DrawLine(p, 1, 10, 14, 10);
+                }
+            }
+            return bmp;
+        }
+
+        public static Image CreateFormatBgIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen p = new Pen(Color.FromArgb(210, 71, 38), 1.2f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    g.DrawRectangle(p, 2, 2, 11, 11);
+                    Point[] spill = new Point[] { new Point(7, 2), new Point(11, 6), new Point(9, 8), new Point(5, 4) };
+                    g.FillPolygon(b, spill);
+                    g.FillEllipse(b, 4, 10, 3, 3);
+                }
+            }
+            return bmp;
+        }
+
+        private GraphicsPath CreateRoundedRectPath(RectangleF bounds, float radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            float diameter = radius * 2f;
+            if (diameter > bounds.Width) diameter = bounds.Width;
+            if (diameter > bounds.Height) diameter = bounds.Height;
+            if (diameter <= 0.001f)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+            RectangleF arc = new RectangleF(bounds.Location, new SizeF(diameter, diameter));
+
+            path.AddArc(arc, 180, 90);
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private GraphicsPath CreateRoundedRectPath(Rectangle bounds, int radius)
+        {
+            return CreateRoundedRectPath(new RectangleF(bounds.X, bounds.Y, bounds.Width, bounds.Height), radius);
+        }
+
+        private void DrawStarShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            PointF[] pts = new PointF[10];
+            float cx = r.X + r.Width / 2f;
+            float cy = r.Y + r.Height / 2f;
+            float rx = r.Width / 2f;
+            float ry = r.Height / 2f;
+            double angle = -Math.PI / 2;
+            double step = Math.PI / 5;
+
+            for (int i = 0; i < 10; i++)
+            {
+                float radX = (i % 2 == 0) ? rx : (rx * 0.45f);
+                float radY = (i % 2 == 0) ? ry : (ry * 0.45f);
+                pts[i] = new PointF(cx + (float)(Math.Cos(angle) * radX), cy + (float)(Math.Sin(angle) * radY));
+                angle += step;
+            }
+
+            if (fill) g.FillPolygon(b, pts);
+            if (stroke) g.DrawPolygon(p, pts);
+        }
+
+        private void DrawStarShape(Graphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            DrawStarShape(g, new RectangleF(r.X, r.Y, r.Width, r.Height), b, p, fill, stroke);
+        }
+
+        private void DrawArrowShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            float yMid = r.Y + r.Height / 2f;
+            float yTop = r.Y + r.Height * 0.25f;
+            float yBot = r.Y + r.Height * 0.75f;
+            float xHead = r.X + r.Width * 0.65f;
+
+            PointF[] pts = new PointF[]
+            {
+                new PointF(r.X, yTop),
+                new PointF(xHead, yTop),
+                new PointF(xHead, r.Y),
+                new PointF(r.Right, yMid),
+                new PointF(xHead, r.Bottom),
+                new PointF(xHead, yBot),
+                new PointF(r.X, yBot)
+            };
+
+            if (fill) g.FillPolygon(b, pts);
+            if (stroke) g.DrawPolygon(p, pts);
+        }
+
+        private void DrawArrowShape(Graphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            DrawArrowShape(g, new RectangleF(r.X, r.Y, r.Width, r.Height), b, p, fill, stroke);
+        }
+
+        private void DrawHeartShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                float w = r.Width;
+                float h = r.Height;
+                float x = r.X;
+                float y = r.Y;
+
+                path.AddBezier(new PointF(x + w / 2f, y + h * 0.3f),
+                               new PointF(x + w * 0.25f, y),
+                               new PointF(x, y + h * 0.25f),
+                               new PointF(x, y + h * 0.5f));
+                path.AddBezier(new PointF(x, y + h * 0.5f),
+                               new PointF(x, y + h * 0.75f),
+                               new PointF(x + w * 0.3f, y + h * 0.9f),
+                               new PointF(x + w / 2f, y + h));
+                path.AddBezier(new PointF(x + w / 2f, y + h),
+                               new PointF(x + w * 0.7f, y + h * 0.9f),
+                               new PointF(x + w, y + h * 0.75f),
+                               new PointF(x + w, y + h * 0.5f));
+                path.AddBezier(new PointF(x + w, y + h * 0.5f),
+                               new PointF(x + w, y + h * 0.25f),
+                               new PointF(x + w * 0.75f, y),
+                               new PointF(x + w / 2f, y + h * 0.3f));
+                path.CloseFigure();
+
+                if (fill) g.FillPath(b, path);
+                if (stroke) g.DrawPath(p, path);
+            }
+        }
+
+        private void DrawCalloutShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        {
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                float bodyH = r.Height * 0.8f;
+                RectangleF bodyRect = new RectangleF(r.X, r.Y, r.Width, bodyH);
+                float rad = Math.Min(12f, Math.Min(r.Width, bodyH) * 0.2f);
+                float d = rad * 2f;
+
+                path.AddArc(bodyRect.X, bodyRect.Y, d, d, 180, 90);
+                path.AddArc(bodyRect.Right - d, bodyRect.Y, d, d, 270, 90);
+                path.AddArc(bodyRect.Right - d, bodyRect.Bottom - d, d, d, 0, 90);
+
+                // Speech pointer
+                path.AddLine(bodyRect.Right - rad, bodyRect.Bottom, bodyRect.X + bodyRect.Width * 0.45f, bodyRect.Bottom);
+                path.AddLine(bodyRect.X + bodyRect.Width * 0.45f, bodyRect.Bottom, bodyRect.X + bodyRect.Width * 0.25f, r.Bottom);
+                path.AddLine(bodyRect.X + bodyRect.Width * 0.25f, r.Bottom, bodyRect.X + bodyRect.Width * 0.30f, bodyRect.Bottom);
+                path.AddLine(bodyRect.X + bodyRect.Width * 0.30f, bodyRect.Bottom, bodyRect.X + rad, bodyRect.Bottom);
+
+                path.AddArc(bodyRect.X, bodyRect.Bottom - d, d, d, 90, 90);
+                path.CloseFigure();
+
+                if (fill) g.FillPath(b, path);
+                if (stroke) g.DrawPath(p, path);
+            }
+        }
+
+        public void GetConstrainedDrawBounds(out int outX, out int outY, out int outW, out int outH, out bool isSquare)
+        {
+            int dx = ShapeDrawCurrent.X - ShapeDrawStart.X;
+            int dy = ShapeDrawCurrent.Y - ShapeDrawStart.Y;
+            isSquare = (Control.ModifierKeys & Keys.Control) != 0 || (Control.ModifierKeys & Keys.Shift) != 0;
+
+            if (isSquare)
+            {
+                int side = Math.Max(Math.Abs(dx), Math.Abs(dy));
+                outW = side;
+                outH = side;
+                outX = (dx >= 0) ? ShapeDrawStart.X : (ShapeDrawStart.X - side);
+                outY = (dy >= 0) ? ShapeDrawStart.Y : (ShapeDrawStart.Y - side);
+            }
+            else
+            {
+                outW = Math.Abs(dx);
+                outH = Math.Abs(dy);
+                outX = Math.Min(ShapeDrawStart.X, ShapeDrawCurrent.X);
+                outY = Math.Min(ShapeDrawStart.Y, ShapeDrawCurrent.Y);
+            }
+        }
+
+        private void DrawPendingShapeOverlay(Graphics g)
+        {
+            int x, y, w, h;
+            bool isSquare;
+            GetConstrainedDrawBounds(out x, out y, out w, out h, out isSquare);
+
+            if (PendingShapeType == ShapeType.Line)
+            {
+                if (w < 2 && h < 2) return;
+            }
+            else
+            {
+                if (w < 2 || h < 2) return;
+            }
+
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            RectangleF rect = new RectangleF(x, y, w, h);
+            Color previewFill = Color.FromArgb(160, 68, 114, 196); // Soft theme blue
+            Color previewStroke = Color.FromArgb(37, 99, 235);     // Sharp blue outline
+
+            using (SolidBrush fillBrush = new SolidBrush(previewFill))
+            using (Pen strokePen = new Pen(previewStroke, 1.8f) { DashStyle = DashStyle.Solid })
+            using (Pen dashedPen = new Pen(Color.FromArgb(200, 37, 99, 235), 1.2f) { DashStyle = DashStyle.Dash })
+            {
+                // Bounding box dashed guide
+                g.DrawRectangle(dashedPen, x, y, w, h);
+
+                // Real-time live shape drawing
+                if (PendingShapeType == ShapeType.Line)
+                {
+                    g.DrawLine(strokePen, ShapeDrawStart.X, ShapeDrawStart.Y, ShapeDrawCurrent.X, ShapeDrawCurrent.Y);
+                }
+                else
+                {
+                    using (GraphicsPath path = CreateShapePath(PendingShapeType, x, y, w, h))
+                    {
+                        g.FillPath(fillBrush, path);
+                        g.DrawPath(strokePen, path);
+                    }
+                }
+
+                // Size Badge tag at bottom right
+                string tip = isSquare ? string.Format("{0} × {1} (Khóa 1:1)", w, h) : string.Format("{0} × {1} px", w, h);
+                using (Font tipFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+                using (SolidBrush tipBg = new SolidBrush(Color.FromArgb(220, 15, 23, 42)))
+                {
+                    SizeF tSize = g.MeasureString(tip, tipFont);
+                    RectangleF tipRect = new RectangleF(x + w + 6, y + h - tSize.Height / 2, tSize.Width + 8, tSize.Height + 4);
+                    using (GraphicsPath tipP = CreateRoundedRectPath(tipRect, 4f))
+                    {
+                        g.FillPath(tipBg, tipP);
+                    }
+                    g.DrawString(tip, tipFont, Brushes.White, tipRect.X + 4, tipRect.Y + 2);
+                }
+            }
+        }
+        #endregion
+
+        #region Transitions & Morph Renderer (60 FPS)
+        public void DrawFullscreenPresenter(Graphics g, int screenW, int screenH, bool isMainDisplay = true)
+        {
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            // 1. Chế độ Diễn giả (Presenter View) trên màn hình chính khi thuyết trình 2 màn hình hoặc người dùng bật
+            if (isMainDisplay && IsPresenterViewMode)
+            {
+                DrawPresenterView(g, screenW, screenH);
+                if (IsSlideSorterModalOpen)
+                {
+                    DrawSlideSorterModal(g, screenW, screenH);
+                }
+                return;
+            }
+
+            // 2. Chế độ Màn hình Kết thúc Slide Show (Màn hình đen với chữ nhỏ báo hết)
+            if (IsEndSlideShowScreen)
+            {
+                g.FillRectangle(Brushes.Black, 0, 0, screenW, screenH);
+                using (Font endFont = new Font("Segoe UI", 12.0f, FontStyle.Regular))
+                using (SolidBrush endBrush = new SolidBrush(Color.FromArgb(170, 180, 195)))
+                {
+                    string endText = "Kết thúc trình chiếu, bấm chuột hoặc nhấn phím bất kỳ để thoát.";
+                    SizeF sz = g.MeasureString(endText, endFont);
+                    g.DrawString(endText, endFont, endBrush, (screenW - sz.Width) / 2f, (screenH - sz.Height) / 2f);
+                }
+                return;
+            }
+
+            // 3. Chế độ Màn hình Đen hoặc Trắng tạm thời (Phím B / W)
+            if (BlackScreenMode)
+            {
+                g.FillRectangle(Brushes.Black, 0, 0, screenW, screenH);
+                if (isMainDisplay) DrawSlideShowHoverToolbar(g, screenW, screenH);
+                return;
+            }
+            if (WhiteScreenMode)
+            {
+                g.FillRectangle(Brushes.White, 0, 0, screenW, screenH);
+                if (isMainDisplay) DrawSlideShowHoverToolbar(g, screenW, screenH);
+                return;
+            }
+
+            g.FillRectangle(Brushes.Black, 0, 0, screenW, screenH);
+
+            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
+            int slideW = screenW;
+            int slideH = (int)(screenW / targetRatio);
+            if (slideH > screenH)
+            {
+                slideH = screenH;
+                slideW = (int)(screenH * targetRatio);
+            }
+            int slideX = (screenW - slideW) / 2;
+            int slideY = (screenH - slideH) / 2;
+
+            if (IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape != null)
+            {
+                ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
+                float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
+                if (vs.VideoPlayFullScreen)
+                {
+                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(slideX, slideY, slideW, slideH));
+                }
+                else
+                {
+                    int vsx = slideX + (int)(vs.Transform.X * scaleP);
+                    int vsy = slideY + (int)(vs.Transform.Y * scaleP);
+                    int vsw = (int)(vs.Transform.Width * scaleP);
+                    int vsh = (int)(vs.Transform.Height * scaleP);
+                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
+                }
+            }
+
+            Rectangle slideRect = new Rectangle(slideX, slideY, slideW, slideH);
+
+            // Phóng to chi tiết (Zoom Magnifier)
+            GraphicsState zoomState = null;
+            if (IsSlideZoomActive && !SlideZoomCenter.IsEmpty)
+            {
+                zoomState = g.Save();
+                g.TranslateTransform(SlideZoomCenter.X, SlideZoomCenter.Y);
+                g.ScaleTransform(SlideZoomFactor, SlideZoomFactor);
+                g.TranslateTransform(-SlideZoomCenter.X, -SlideZoomCenter.Y);
+            }
+
+            // Check if Transition is actively playing
+            if (IsTransitioning)
+            {
+                SlideNode toSlide = (TransitionToSlideIndex >= 0 && TransitionToSlideIndex < Presentation.Slides.Count) ? Presentation.Slides[TransitionToSlideIndex] : ActiveSlide;
+                SlideNode fromSlide = (TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count && TransitionFromSlideIndex != TransitionToSlideIndex)
+                    ? Presentation.Slides[TransitionFromSlideIndex]
+                    : new SlideNode { BgColor = toSlide.BgColor, IsGradientBg = toSlide.IsGradientBg, BgColor2 = toSlide.BgColor2 };
+                float scale = (float)slideW / Presentation.CanvasWidth;
+                RenderTransitionFrame(g, slideRect, fromSlide, toSlide, toSlide.Transition, TransitionProgress, scale);
+            }
+            else
+            {
+                SlideNode slide = ActiveSlide;
+                if (slide != null)
+                {
+                    DrawSlideBackground(g, slideRect, slide);
+                    float scale = (float)slideW / Presentation.CanvasWidth;
+                    foreach (ShapeNode shape in slide.Shapes)
+                    {
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        ShapeAnimation activeAnim;
+                        float activeP;
+                        GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
+
+                        if (isVis)
+                        {
+                            DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                        }
+                    }
+                }
+            }
+
+            // Draw Pen Strokes
+            using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                foreach (List<Point> stroke in PenStrokes)
+                {
+                    if (stroke.Count > 1) g.DrawLines(strokePen, stroke.ToArray());
+                }
+                if (CurrentStroke.Count > 1)
+                {
+                    g.DrawLines(strokePen, CurrentStroke.ToArray());
+                }
+            }
+
+            // Draw Laser Pointer
+            if (LaserPointerMode && !CurrentLaserPoint.IsEmpty)
+            {
+                using (SolidBrush laserBrush = new SolidBrush(Color.FromArgb(240, 255, 30, 30)))
+                using (SolidBrush haloBrush = new SolidBrush(Color.FromArgb(80, 255, 50, 50)))
+                {
+                    g.FillEllipse(haloBrush, CurrentLaserPoint.X - 16, CurrentLaserPoint.Y - 16, 32, 32);
+                    g.FillEllipse(laserBrush, CurrentLaserPoint.X - 6, CurrentLaserPoint.Y - 6, 12, 12);
+                }
+            }
+
+            if (zoomState != null)
+            {
+                g.Restore(zoomState);
+            }
+
+            // Slide Sorter Modal (Xem danh sách toàn bộ slide)
+            if (IsSlideSorterModalOpen)
+            {
+                DrawSlideSorterModal(g, screenW, screenH);
+                return;
+            }
+
+            // Thanh công cụ nổi chuẩn PowerPoint ở góc dưới bên trái (Chỉ hiện trên màn hình điều khiển)
+            if (isMainDisplay)
+            {
+                DrawSlideShowHoverToolbar(g, screenW, screenH);
+                if (IsRehearsingTimings)
+                {
+                    DrawRehearsalFloatingToolbar(g, screenW, screenH);
+                }
+            }
+        }
+
+        #region PowerPoint Floating Toolbar & Presenter View Layout
+        public int GetHoverToolbarButtonAt(Point p, int screenH)
+        {
+            int barY = screenH - 46;
+            for (int i = 0; i < 6; i++)
+            {
+                int btnX = 24 + i * 36;
+                int dx = p.X - (btnX + 14);
+                int dy = p.Y - (barY + 14);
+                if (dx * dx + dy * dy <= 16 * 16)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private void DrawSlideShowHoverToolbar(Graphics g, int screenW, int screenH)
+        {
+            int barY = screenH - 46;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            for (int i = 0; i < 6; i++)
+            {
+                int btnX = 24 + i * 36;
+                bool isHovered = (HoverToolbarButtonIndex == i);
+                bool isActive = (i == 2 && (AnnotationPenMode || LaserPointerMode)) || (i == 4 && IsSlideZoomActive) || (i == 3 && IsSlideSorterModalOpen);
+
+                Color bgCol = isActive ? Color.FromArgb(220, 210, 71, 38)
+                    : (isHovered ? Color.FromArgb(190, 60, 60, 60) : Color.FromArgb(70, 20, 20, 20));
+                Color borderCol = isHovered ? Color.FromArgb(240, 255, 255, 255) : Color.FromArgb(90, 255, 255, 255);
+                Color iconCol = (isActive || isHovered) ? Color.White : Color.FromArgb(210, 255, 255, 255);
+
+                using (SolidBrush bgBrush = new SolidBrush(bgCol))
+                using (Pen bPen = new Pen(borderCol, 1.2f))
+                using (Pen iconPen = new Pen(iconCol, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (SolidBrush iconBrush = new SolidBrush(iconCol))
+                {
+                    g.FillEllipse(bgBrush, btnX, barY, 28, 28);
+                    g.DrawEllipse(bPen, btnX, barY, 28, 28);
+
+                    switch (i)
+                    {
+                        case 0: // < (Previous)
+                            Point[] pLeft = new Point[] { new Point(btnX + 16, barY + 8), new Point(btnX + 11, barY + 14), new Point(btnX + 16, barY + 20) };
+                            g.DrawLines(iconPen, pLeft);
+                            break;
+
+                        case 1: // > (Next)
+                            Point[] pRight = new Point[] { new Point(btnX + 12, barY + 8), new Point(btnX + 17, barY + 14), new Point(btnX + 12, barY + 20) };
+                            g.DrawLines(iconPen, pRight);
+                            break;
+
+                        case 2: // Pen / Laser
+                            g.DrawLine(iconPen, btnX + 9, barY + 19, btnX + 19, barY + 9);
+                            g.DrawLine(iconPen, btnX + 8, barY + 20, btnX + 11, barY + 17);
+                            g.DrawLine(iconPen, btnX + 16, barY + 8, btnX + 20, barY + 12);
+                            break;
+
+                        case 3: // Grid (Slide Sorter)
+                            g.DrawRectangle(iconPen, btnX + 7, barY + 8, 5, 4);
+                            g.DrawRectangle(iconPen, btnX + 15, barY + 8, 5, 4);
+                            g.DrawRectangle(iconPen, btnX + 7, barY + 15, 5, 4);
+                            g.DrawRectangle(iconPen, btnX + 15, barY + 15, 5, 4);
+                            break;
+
+                        case 4: // Magnifier / Zoom
+                            g.DrawEllipse(iconPen, btnX + 7, barY + 7, 10, 10);
+                            g.DrawLine(iconPen, btnX + 15, barY + 15, btnX + 20, barY + 20);
+                            break;
+
+                        case 5: // ... (More Options)
+                            g.FillEllipse(iconBrush, btnX + 7, barY + 12, 3, 3);
+                            g.FillEllipse(iconBrush, btnX + 12, barY + 12, 3, 3);
+                            g.FillEllipse(iconBrush, btnX + 17, barY + 12, 3, 3);
+                            break;
+                    }
+                }
+            }
+        }
+
+        private Rectangle _rehearsalToolbarRect = new Rectangle(20, 20, 240, 66);
+
+        private void DrawRehearsalFloatingToolbar(Graphics g, int screenW, int screenH)
+        {
+            Rectangle r = _rehearsalToolbarRect;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Drop shadow
+            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+            {
+                g.FillRectangle(shadowB, r.X + 3, r.Y + 3, r.Width, r.Height);
+            }
+
+            // Main white container with subtle border (terracotta border as in PowerPoint Image 1)
+            using (SolidBrush bgB = new SolidBrush(Color.White))
+            using (Pen borderPen = new Pen(Color.FromArgb(180, 50, 20), 1.5f))
+            {
+                g.FillRectangle(bgB, r);
+                g.DrawRectangle(borderPen, r);
+            }
+
+            // Title row: "Recording" on left, minimize & close on right
+            using (Font titleFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
+            using (SolidBrush textB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            {
+                g.DrawString("Recording", titleFont, textB, r.X + 6, r.Y + 4);
+            }
+
+            // Top-Right: Minimize [▼] and Close [✕]
+            using (SolidBrush iconB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            using (Pen iconP = new Pen(Color.FromArgb(100, 116, 139), 1.5f))
+            {
+                // Minimize arrow ▼
+                g.FillPolygon(iconB, new Point[] {
+                    new Point(r.Right - 32, r.Y + 8),
+                    new Point(r.Right - 24, r.Y + 8),
+                    new Point(r.Right - 28, r.Y + 13)
+                });
+                // Close ✕
+                g.DrawLine(iconP, r.Right - 18, r.Y + 7, r.Right - 10, r.Y + 15);
+                g.DrawLine(iconP, r.Right - 10, r.Y + 7, r.Right - 18, r.Y + 15);
+            }
+
+            // Controls Row (Y: r.Y + 28)
+            int rowY = r.Y + 28;
+
+            // 1. Next Button [ ➜ ]
+            Rectangle btnNext = new Rectangle(r.X + 6, rowY + 2, 22, 22);
+            using (SolidBrush blueB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                g.FillPolygon(blueB, new PointF[] {
+                    new PointF(btnNext.X + 4, btnNext.Y + 7),
+                    new PointF(btnNext.X + 12, btnNext.Y + 7),
+                    new PointF(btnNext.X + 12, btnNext.Y + 3),
+                    new PointF(btnNext.X + 18, btnNext.Y + 11),
+                    new PointF(btnNext.X + 12, btnNext.Y + 19),
+                    new PointF(btnNext.X + 12, btnNext.Y + 15),
+                    new PointF(btnNext.X + 4, btnNext.Y + 15)
+                });
+            }
+
+            // 2. Pause / Play Button [ ❚❚ ] or [ ▶ ]
+            Rectangle btnPause = new Rectangle(r.X + 34, rowY + 2, 22, 22);
+            using (SolidBrush blueB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                if (IsRehearsalPaused)
+                {
+                    // Play triangle
+                    g.FillPolygon(blueB, new PointF[] {
+                        new PointF(btnPause.X + 6, btnPause.Y + 4),
+                        new PointF(btnPause.X + 18, btnPause.Y + 11),
+                        new PointF(btnPause.X + 6, btnPause.Y + 18)
+                    });
+                }
+                else
+                {
+                    // Pause bars
+                    g.FillRectangle(blueB, btnPause.X + 5, btnPause.Y + 4, 4, 14);
+                    g.FillRectangle(blueB, btnPause.X + 13, btnPause.Y + 4, 4, 14);
+                }
+            }
+
+            // Separator 1
+            using (Pen sepPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.DrawLine(sepPen, r.X + 62, rowY + 3, r.X + 62, rowY + 23);
+            }
+
+            // 3. Current Slide Timer Box (e.g. 0:00:07)
+            Rectangle timeBox = new Rectangle(r.X + 68, rowY + 1, 62, 24);
+            using (Pen tbPen = new Pen(Color.FromArgb(160, 174, 192), 1f))
+            using (SolidBrush tbBg = new SolidBrush(Color.White))
+            {
+                g.FillRectangle(tbBg, timeBox);
+                g.DrawRectangle(tbPen, timeBox);
+            }
+
+            TimeSpan slideTime = IsRehearsalPaused ? RehearsalSlideElapsed : (DateTime.Now - RehearsalSlideStartTime + RehearsalSlideElapsed);
+            string slideStr = string.Format("{0:D1}:{1:D2}:{2:D2}", (int)slideTime.TotalHours, slideTime.Minutes, slideTime.Seconds);
+            using (Font timeFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+            using (SolidBrush timeTextB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(slideStr, timeFont, timeTextB, timeBox, sf);
+            }
+
+            // 4. Repeat Button [ ↺ ]
+            Rectangle btnRepeat = new Rectangle(r.X + 136, rowY + 2, 22, 22);
+            using (Pen repPen = new Pen(Color.FromArgb(37, 99, 235), 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush repB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                g.DrawArc(repPen, btnRepeat.X + 4, btnRepeat.Y + 5, 14, 13, 45, 270);
+                g.FillPolygon(repB, new PointF[] {
+                    new PointF(btnRepeat.X + 3, btnRepeat.Y + 5),
+                    new PointF(btnRepeat.X + 9, btnRepeat.Y + 2),
+                    new PointF(btnRepeat.X + 8, btnRepeat.Y + 8)
+                });
+            }
+
+            // Separator 2
+            using (Pen sepPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.DrawLine(sepPen, r.X + 164, rowY + 3, r.X + 164, rowY + 23);
+            }
+
+            // 5. Total Presentation Timer Text (e.g. 0:00:07)
+            TimeSpan totalTime = IsRehearsalPaused ? RehearsalTotalElapsed : (DateTime.Now - RehearsalTotalStartTime + RehearsalTotalElapsed);
+            string totalStr = string.Format("{0:D1}:{1:D2}:{2:D2}", (int)totalTime.TotalHours, totalTime.Minutes, totalTime.Seconds);
+            using (Font totalFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+            using (SolidBrush totalTextB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            {
+                g.DrawString(totalStr, totalFont, totalTextB, r.X + 170, rowY + 4);
+            }
+        }
+
+        private void DrawPresenterView(Graphics g, int screenW, int screenH)
+        {
+            // Nền tối sang trọng
+            using (SolidBrush darkBg = new SolidBrush(Color.FromArgb(24, 24, 24)))
+            {
+                g.FillRectangle(darkBg, 0, 0, screenW, screenH);
+            }
+
+            // 1. TOP BAR (Thanh tiêu đề thời gian & điều khiển)
+            int topH = 46;
+            using (SolidBrush topBg = new SolidBrush(Color.FromArgb(32, 32, 32)))
+            using (Pen borderPen = new Pen(Color.FromArgb(50, 50, 50), 1f))
+            {
+                g.FillRectangle(topBg, 0, 0, screenW, topH);
+                g.DrawLine(borderPen, 0, topH, screenW, topH);
+            }
+
+            // Đồng hồ đếm giờ thuyết trình (Stopwatch)
+            TimeSpan elapsed = IsPresentationTimerPaused ? PresentationPausedElapsed : (DateTime.Now - PresentationStartTime + PresentationPausedElapsed);
+            string timerStr = string.Format("⏱️ {0:D2}:{1:D2}:{2:D2}", (int)elapsed.TotalHours, elapsed.Minutes, elapsed.Seconds);
+            using (Font timeFont = new Font("Segoe UI", 15.0f, FontStyle.Bold))
+            {
+                g.DrawString(timerStr, timeFont, Brushes.White, 16, 8);
+            }
+
+            // Nút Tạm dừng / Đặt lại giờ
+            using (Font btnFont = new Font("Segoe UI", 9.5f))
+            using (Pen bPen = new Pen(Color.FromArgb(70, 70, 70), 1f))
+            using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(45, 45, 45)))
+            {
+                Rectangle pauseRect = new Rectangle(210, 8, 100, 30);
+                g.FillRectangle(btnBg, pauseRect);
+                g.DrawRectangle(bPen, pauseRect);
+                g.DrawString(IsPresentationTimerPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng", btnFont, Brushes.WhiteSmoke, pauseRect.X + 16, pauseRect.Y + 6);
+
+                Rectangle resetRect = new Rectangle(320, 8, 90, 30);
+                g.FillRectangle(btnBg, resetRect);
+                g.DrawRectangle(bPen, resetRect);
+                g.DrawString("🔄 Đặt lại", btnFont, Brushes.WhiteSmoke, resetRect.X + 16, resetRect.Y + 6);
+
+                Rectangle dispRect = new Rectangle(420, 8, 170, 30);
+                g.FillRectangle(btnBg, dispRect);
+                g.DrawRectangle(bPen, dispRect);
+                g.DrawString("🖥️ Cài đặt hiển thị ▼", btnFont, Brushes.WhiteSmoke, dispRect.X + 14, dispRect.Y + 6);
+
+                // Nút Kết thúc trình chiếu (End Show)
+                Rectangle endRect = new Rectangle(screenW - 200, 8, 184, 30);
+                using (SolidBrush redBtn = new SolidBrush(Color.FromArgb(180, 40, 40)))
+                {
+                    g.FillRectangle(redBtn, endRect);
+                    g.DrawRectangle(Pens.DarkRed, endRect);
+                    g.DrawString("✕ Kết thúc trình chiếu", btnFont, Brushes.White, endRect.X + 18, endRect.Y + 6);
+                }
+            }
+
+            // Đồng hồ thời gian thực hiện tại
+            string clockStr = "🕐 " + DateTime.Now.ToString("HH:mm:ss");
+            using (Font clockFont = new Font("Segoe UI", 12.0f))
+            {
+                g.DrawString(clockStr, clockFont, Brushes.DarkGray, screenW - 350, 12);
+            }
+
+            // 2. MAIN WORKSPACE (Phân chia: Trái = Slide hiện tại | Phải = Slide kế tiếp + Ghi chú)
+            int bottomH = 65;
+            int mainY = topH + 8;
+            int mainH = screenH - mainY - bottomH - 8;
+            int leftW = (int)(screenW * 0.58f);
+            int rightW = screenW - leftW - 24;
+
+            // Khung Slide hiện tại (Bên Trái)
+            using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
+            {
+                g.DrawString("Slide hiện tại (Slide " + (ActiveSlideIndex + 1) + " / " + Presentation.Slides.Count + ")", headerFont, Brushes.DarkOrange, 20, mainY + 2);
+            }
+
+            int currSlideMaxW = leftW - 32;
+            int currSlideMaxH = mainH - 36;
+            float ratio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
+            int curW = currSlideMaxW;
+            int curH = (int)(curW / ratio);
+            if (curH > currSlideMaxH)
+            {
+                curH = currSlideMaxH;
+                curW = (int)(curH * ratio);
+            }
+            int curX = 20 + (currSlideMaxW - curW) / 2;
+            int curY = mainY + 28 + (currSlideMaxH - curH) / 2;
+
+            Rectangle curSlideRect = new Rectangle(curX, curY, curW, curH);
+
+            // Vẽ slide hiện tại (kèm bóng đổ và viền sáng)
+            using (SolidBrush shadow = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
+            {
+                g.FillRectangle(shadow, curX + 6, curY + 6, curW, curH);
+            }
+
+            if (IsEndSlideShowScreen)
+            {
+                g.FillRectangle(Brushes.Black, curSlideRect);
+                using (Font endFont = new Font("Segoe UI", 10.5f, FontStyle.Regular))
+                using (SolidBrush endBrush = new SolidBrush(Color.FromArgb(170, 180, 195)))
+                {
+                    string endText = "Kết thúc trình chiếu, bấm chuột để thoát.";
+                    SizeF sz = g.MeasureString(endText, endFont);
+                    g.DrawString(endText, endFont, endBrush, curSlideRect.X + (curSlideRect.Width - sz.Width) / 2f, curSlideRect.Y + (curSlideRect.Height - sz.Height) / 2f);
+                }
+            }
+            else if (IsTransitioning)
+            {
+                SlideNode toSlide = (TransitionToSlideIndex >= 0 && TransitionToSlideIndex < Presentation.Slides.Count) ? Presentation.Slides[TransitionToSlideIndex] : ActiveSlide;
+                SlideNode fromSlide = (TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count && TransitionFromSlideIndex != TransitionToSlideIndex)
+                    ? Presentation.Slides[TransitionFromSlideIndex]
+                    : new SlideNode { BgColor = toSlide.BgColor, IsGradientBg = toSlide.IsGradientBg, BgColor2 = toSlide.BgColor2 };
+                float scale = (float)curW / Presentation.CanvasWidth;
+                RenderTransitionFrame(g, curSlideRect, fromSlide, toSlide, toSlide.Transition, TransitionProgress, scale);
+            }
+            else
+            {
+                SlideNode slide = ActiveSlide;
+                if (slide != null)
+                {
+                    DrawSlideBackground(g, curSlideRect, slide);
+                    float scale = (float)curW / Presentation.CanvasWidth;
+                    foreach (ShapeNode shape in slide.Shapes)
+                    {
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        ShapeAnimation activeAnim;
+                        float activeP;
+                        GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
+
+                        if (isVis)
+                        {
+                            DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                        }
+                    }
+                }
+            }
+            using (Pen curBorder = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
+            {
+                g.DrawRectangle(curBorder, curSlideRect);
+            }
+
+            // Vẽ nét bút và laser lên slide hiện tại trong presenter view
+            using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth * ((float)curW / Presentation.CanvasWidth)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                float penScale = (float)curW / screenW;
+                foreach (List<Point> stroke in PenStrokes)
+                {
+                    if (stroke.Count > 1)
+                    {
+                        Point[] miniPts = new Point[stroke.Count];
+                        for (int k = 0; k < stroke.Count; k++) miniPts[k] = new Point(curX + (int)(stroke[k].X * penScale), curY + (int)(stroke[k].Y * penScale));
+                        g.DrawLines(strokePen, miniPts);
+                    }
+                }
+            }
+
+            // Khung Phải Top: Slide Tiếp Theo (Next Slide Preview)
+            int rightX = leftW + 12;
+            int nextH = (int)(mainH * 0.44f);
+            using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
+            {
+                g.DrawString("Slide tiếp theo:", headerFont, Brushes.LightGray, rightX, mainY + 2);
+            }
+
+            int nextMaxW = rightW - 24;
+            int nextMaxH = nextH - 32;
+            int nextW = nextMaxW;
+            int nextHActual = (int)(nextW / ratio);
+            if (nextHActual > nextMaxH)
+            {
+                nextHActual = nextMaxH;
+                nextW = (int)(nextHActual * ratio);
+            }
+            int nextX = rightX + (nextMaxW - nextW) / 2;
+            int nextY = mainY + 26 + (nextMaxH - nextHActual) / 2;
+
+            Rectangle nextRect = new Rectangle(nextX, nextY, nextW, nextHActual);
+            if (ActiveSlideIndex + 1 < Presentation.Slides.Count)
+            {
+                SlideNode nextSlide = Presentation.Slides[ActiveSlideIndex + 1];
+                DrawSlideBackground(g, nextRect, nextSlide);
+                float nextScale = (float)nextW / Presentation.CanvasWidth;
+                foreach (ShapeNode shape in nextSlide.Shapes)
+                {
+                    DrawShape(g, nextX, nextY, nextScale, shape, false);
+                }
+                g.DrawRectangle(Pens.Gray, nextRect);
+            }
+            else
+            {
+                g.FillRectangle(Brushes.Black, nextRect);
+                g.DrawRectangle(Pens.DimGray, nextRect);
+                using (Font endFont = new Font("Segoe UI", 11.0f, FontStyle.Italic))
+                {
+                    g.DrawString("Hết bản trình chiếu (End of Slide Show)", endFont, Brushes.DimGray, nextX + 16, nextY + nextHActual / 2 - 10);
+                }
+            }
+
+            // Khung Phải Bottom: Ghi chú của Diễn giả (Speaker Notes)
+            int notesY = mainY + nextH + 10;
+            int notesH = mainH - nextH - 14;
+            using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
+            using (Font smallFont = new Font("Segoe UI", 9.0f))
+            {
+                g.DrawString("Ghi chú người thuyết trình:", headerFont, Brushes.LightGray, rightX, notesY);
+
+                // Nút thu phóng chữ A- / A+
+                Rectangle btnMinus = new Rectangle(screenW - 80, notesY, 26, 20);
+                Rectangle btnPlus = new Rectangle(screenW - 48, notesY, 26, 20);
+                g.FillRectangle(Brushes.DimGray, btnMinus);
+                g.FillRectangle(Brushes.DimGray, btnPlus);
+                g.DrawString("A-", smallFont, Brushes.White, btnMinus.X + 4, btnMinus.Y + 2);
+                g.DrawString("A+", smallFont, Brushes.White, btnPlus.X + 4, btnPlus.Y + 2);
+            }
+
+            Rectangle notesRect = new Rectangle(rightX, notesY + 24, rightW - 24, notesH - 24);
+            using (SolidBrush notesBg = new SolidBrush(Color.FromArgb(30, 30, 30)))
+            using (Pen notesBorder = new Pen(Color.FromArgb(60, 60, 60), 1f))
+            {
+                g.FillRectangle(notesBg, notesRect);
+                g.DrawRectangle(notesBorder, notesRect);
+            }
+
+            string notes = (ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes))
+                ? ActiveSlide.SpeakerNotes : "(Không có ghi chú cho slide này)";
+            using (Font notesFont = new Font("Segoe UI", PresenterNotesFontSize))
+            using (SolidBrush textBrush = new SolidBrush((ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes)) ? Color.White : Color.Gray))
+            {
+                RectangleF textBounds = new RectangleF(notesRect.X + 10, notesRect.Y + 10, notesRect.Width - 20, notesRect.Height - 20);
+                g.DrawString(notes, notesFont, textBrush, textBounds);
+            }
+
+            // 3. BOTTOM BAR (Thanh công cụ điều hướng & công cụ bổ trợ)
+            int botY = screenH - bottomH;
+            using (SolidBrush botBg = new SolidBrush(Color.FromArgb(32, 32, 32)))
+            using (Pen borderPen = new Pen(Color.FromArgb(50, 50, 50), 1f))
+            {
+                g.FillRectangle(botBg, 0, botY, screenW, bottomH);
+                g.DrawLine(borderPen, 0, botY, screenW, botY);
+            }
+
+            // Cụm nút điều hướng Slide
+            using (Font navFont = new Font("Segoe UI", 12.0f, FontStyle.Bold))
+            using (Font toolFont = new Font("Segoe UI", 9.5f))
+            using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(48, 48, 48)))
+            using (Pen bPen = new Pen(Color.FromArgb(70, 70, 70), 1f))
+            {
+                // Nút Lùi
+                Rectangle prevBtn = new Rectangle(24, botY + 14, 46, 36);
+                g.FillRectangle(btnBg, prevBtn);
+                g.DrawRectangle(bPen, prevBtn);
+                g.DrawString("◀", navFont, Brushes.White, prevBtn.X + 12, prevBtn.Y + 8);
+
+                // Số thứ tự slide
+                string slideCountStr = (ActiveSlideIndex + 1) + " / " + Presentation.Slides.Count;
+                g.DrawString(slideCountStr, navFont, Brushes.WhiteSmoke, 82, botY + 22);
+
+                // Nút Tiến
+                Rectangle nextBtn = new Rectangle(160, botY + 14, 46, 36);
+                g.FillRectangle(btnBg, nextBtn);
+                g.DrawRectangle(bPen, nextBtn);
+                g.DrawString("▶", navFont, Brushes.White, nextBtn.X + 14, nextBtn.Y + 8);
+
+                // Các nút công cụ
+                Rectangle penBtn = new Rectangle(240, botY + 14, 110, 36);
+                g.FillRectangle((AnnotationPenMode || LaserPointerMode) ? Brushes.DarkRed : btnBg, penBtn);
+                g.DrawRectangle(bPen, penBtn);
+                g.DrawString("🖊️ Bút / Laser", toolFont, Brushes.White, penBtn.X + 10, penBtn.Y + 8);
+
+                Rectangle gridBtn = new Rectangle(360, botY + 14, 130, 36);
+                g.FillRectangle(btnBg, gridBtn);
+                g.DrawRectangle(bPen, gridBtn);
+                g.DrawString("🗂️ Tất cả Slide", toolFont, Brushes.White, gridBtn.X + 10, gridBtn.Y + 8);
+
+                Rectangle zoomBtn = new Rectangle(500, botY + 14, 90, 36);
+                g.FillRectangle(IsSlideZoomActive ? Brushes.DarkRed : btnBg, zoomBtn);
+                g.DrawRectangle(bPen, zoomBtn);
+                g.DrawString("🔍 Zoom", toolFont, Brushes.White, zoomBtn.X + 14, zoomBtn.Y + 8);
+
+                Rectangle blackBtn = new Rectangle(600, botY + 14, 120, 36);
+                g.FillRectangle(BlackScreenMode ? Brushes.DimGray : btnBg, blackBtn);
+                g.DrawRectangle(bPen, blackBtn);
+                g.DrawString("⬛ Màn đen (B)", toolFont, Brushes.White, blackBtn.X + 10, blackBtn.Y + 8);
+            }
+        }
+
+        private void DrawSlideSorterModal(Graphics g, int screenW, int screenH)
+        {
+            // Lớp phủ mờ nền
+            using (SolidBrush darkDim = new SolidBrush(Color.FromArgb(235, 15, 15, 15)))
+            {
+                g.FillRectangle(darkDim, 0, 0, screenW, screenH);
+            }
+
+            // Tiêu đề Modal
+            using (Font titleFont = new Font("Segoe UI", 16.0f, FontStyle.Bold))
+            using (Font subFont = new Font("Segoe UI", 10.0f))
+            {
+                g.DrawString("🗂️ TẤT CẢ CÁC SLIDE (Nhấp vào slide bất kỳ để chuyển đến ngay lập tức)", titleFont, Brushes.White, 40, 20);
+                g.DrawString("Nhấn Escape (Esc) hoặc nút Đóng để quay lại trình chiếu", subFont, Brushes.DarkGray, 40, 50);
+            }
+
+            // Nút Đóng '✕ Đóng (Esc)'
+            Rectangle closeBtn = new Rectangle(screenW - 150, 20, 110, 34);
+            using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(60, 60, 60)))
+            using (Font btnFont = new Font("Segoe UI", 10.0f, FontStyle.Bold))
+            {
+                g.FillRectangle(btnBg, closeBtn);
+                g.DrawRectangle(Pens.Gray, closeBtn);
+                g.DrawString("✕ Đóng (Esc)", btnFont, Brushes.White, closeBtn.X + 12, closeBtn.Y + 8);
+            }
+
+            // Lưới hiển thị các thẻ Slide
+            int cols = 4;
+            int cardW = (screenW - 120) / cols;
+            float ratio = Presentation.IsWidescreen ? (9.0f / 16.0f) : (3.0f / 4.0f);
+            int cardH = (int)(cardW * ratio);
+            int startX = 40;
+            int startY = 80;
+
+            for (int i = 0; i < Presentation.Slides.Count; i++)
+            {
+                int row = i / cols;
+                int col = i % cols;
+                int cx = startX + col * (cardW + 18);
+                int cy = startY + row * (cardH + 36);
+
+                if (cy + cardH > screenH) break;
+
+                Rectangle cardRect = new Rectangle(cx, cy, cardW, cardH);
+                SlideNode s = Presentation.Slides[i];
+
+                // Vẽ nội dung thẻ
+                DrawSlideBackground(g, cardRect, s);
+                float miniScale = (float)cardW / Presentation.CanvasWidth;
+                foreach (ShapeNode shape in s.Shapes)
+                {
+                    DrawShape(g, cx, cy, miniScale, shape, false);
+                }
+
+                // Viền sáng quanh slide đang chọn
+                bool isActive = (i == ActiveSlideIndex);
+                Color borderCol = isActive ? Color.FromArgb(210, 71, 38) : Color.FromArgb(100, 100, 100);
+                using (Pen bPen = new Pen(borderCol, isActive ? 3.0f : 1.0f))
+                {
+                    g.DrawRectangle(bPen, cardRect);
+                }
+
+                // Tiêu đề số slide
+                using (Font sFont = new Font("Segoe UI", 10.0f, isActive ? FontStyle.Bold : FontStyle.Regular))
+                using (SolidBrush textBrush = new SolidBrush(isActive ? Color.Orange : Color.WhiteSmoke))
+                {
+                    g.DrawString("Slide " + (i + 1) + ": " + s.Title, sFont, textBrush, cx, cy + cardH + 4);
+                }
+            }
+        }
+
+        public void ShowMoreOptionsMenu(Control parent, Point pt)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.RenderMode = ToolStripRenderMode.System;
+            menu.Font = new Font("Segoe UI", 9.5f);
+
+            ToolStripMenuItem miLastViewed = new ToolStripMenuItem("Last Viewed (Quay lại slide vừa xem)");
+            miLastViewed.Enabled = (LastViewedSlideIndex >= 0 && LastViewedSlideIndex < Presentation.Slides.Count);
+            miLastViewed.Click += (s, e) =>
+            {
+                if (LastViewedSlideIndex >= 0)
+                {
+                    int prev = ActiveSlideIndex;
+                    ActiveSlideIndex = LastViewedSlideIndex;
+                    LastViewedSlideIndex = prev;
+                    TriggerTransition(prev, ActiveSlideIndex, false);
+                    if (parent != null) parent.Invalidate();
+                }
+            };
+            menu.Items.Add(miLastViewed);
+
+            ToolStripMenuItem miCustomShow = new ToolStripMenuItem("Custom Show");
+            miCustomShow.DropDownItems.Add(new ToolStripMenuItem("Slide Show Toàn bộ (1 - " + Presentation.Slides.Count + ")", null, (s, e) => { }));
+            menu.Items.Add(miCustomShow);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem miPresenter = new ToolStripMenuItem(IsPresenterViewMode ? "Hide Presenter View (Chiếu slide toàn màn hình)" : "Show Presenter View (Xem Chế độ Diễn giả)");
+            miPresenter.Click += (s, e) =>
+            {
+                IsPresenterViewMode = !IsPresenterViewMode;
+                if (parent != null) parent.Invalidate();
+            };
+            menu.Items.Add(miPresenter);
+
+            ToolStripMenuItem miScreen = new ToolStripMenuItem("Screen");
+            ToolStripMenuItem miBlack = new ToolStripMenuItem("Black Screen (Màn hình Đen) [B]", null, (s, e) => { BlackScreenMode = !BlackScreenMode; WhiteScreenMode = false; if (parent != null) parent.Invalidate(); });
+            ToolStripMenuItem miWhite = new ToolStripMenuItem("White Screen (Màn hình Trắng) [W]", null, (s, e) => { WhiteScreenMode = !WhiteScreenMode; BlackScreenMode = false; if (parent != null) parent.Invalidate(); });
+            ToolStripMenuItem miTaskbar = new ToolStripMenuItem("Show Taskbar (Hiện thanh Taskbar)", null, (s, e) => { if (parent is Form) ((Form)parent).TopMost = false; });
+            miScreen.DropDownItems.Add(miBlack);
+            miScreen.DropDownItems.Add(miWhite);
+            miScreen.DropDownItems.Add(miTaskbar);
+            menu.Items.Add(miScreen);
+
+            ToolStripMenuItem miDisplay = new ToolStripMenuItem("Display Settings");
+            ToolStripMenuItem miSwap = new ToolStripMenuItem("Swap Presenter View and Slide Show (Hoán đổi 2 màn hình)", null, (s, e) =>
+            {
+                IsPresenterViewMode = !IsPresenterViewMode;
+                if (parent != null) parent.Invalidate();
+            });
+            ToolStripMenuItem miDuplicate = new ToolStripMenuItem("Duplicate Slide Show (Nhân bản bản chiếu)", null, (s, e) =>
+            {
+                IsPresenterViewMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            miDisplay.DropDownItems.Add(miSwap);
+            miDisplay.DropDownItems.Add(miDuplicate);
+            menu.Items.Add(miDisplay);
+
+            ToolStripMenuItem miArrow = new ToolStripMenuItem("Arrow Options");
+            miArrow.DropDownItems.Add(new ToolStripMenuItem("Automatic (Tự động ẩn)", null, (s, e) => { }));
+            miArrow.DropDownItems.Add(new ToolStripMenuItem("Visible (Luôn hiển thị)", null, (s, e) => { Cursor.Show(); }));
+            miArrow.DropDownItems.Add(new ToolStripMenuItem("Hidden (Ẩn con trỏ)", null, (s, e) => { Cursor.Hide(); }));
+            menu.Items.Add(miArrow);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem miHelp = new ToolStripMenuItem("Help (Trợ giúp phím tắt) [F1]", null, (s, e) =>
+            {
+                MessageBox.Show(
+                    "PHÍM TẮT TRÌNH CHIẾU POWERPOINT:\n\n" +
+                    "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Lên (▲), Phải (▶), Space, Enter, PageDown\n" +
+                    "• Lùi slide / bước trước đó: Chuột Phải, Mũi tên Xuống (▼), Trái (◀), Backspace, PageUp\n" +
+                    "• Bút vẽ (Pen): Phím P\n" +
+                    "• Con trỏ Laser (Laser Pointer): Phím L\n" +
+                    "• Màn hình đen: Phím B | Màn hình trắng: Phím W\n" +
+                    "• Xóa tất cả nét vẽ: Phím E\n" +
+                    "• Thoát trình chiếu: Phím Escape (Esc)",
+                    "Trợ giúp Trình chiếu GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            });
+            menu.Items.Add(miHelp);
+
+            ToolStripMenuItem miEndShow = new ToolStripMenuItem("End Show (Kết thúc trình chiếu) [Esc]", null, (s, e) =>
+            {
+                StopPresenting();
+                if (parent != null) parent.Invalidate();
+            });
+            miEndShow.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            menu.Items.Add(miEndShow);
+
+            menu.Show(parent, pt);
+        }
+
+        public void ShowPenOptionsMenu(Control parent, Point pt)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.RenderMode = ToolStripRenderMode.System;
+            menu.Font = new Font("Segoe UI", 9.5f);
+
+            ToolStripMenuItem miLaser = new ToolStripMenuItem("Laser Pointer (Con trỏ Laser đỏ) [L]", null, (s, e) =>
+            {
+                LaserPointerMode = !LaserPointerMode;
+                AnnotationPenMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            miLaser.Checked = LaserPointerMode;
+            menu.Items.Add(miLaser);
+
+            ToolStripMenuItem miPen = new ToolStripMenuItem("Pen (Bút vẽ ghi chú) [P]", null, (s, e) =>
+            {
+                AnnotationPenMode = !AnnotationPenMode;
+                LaserPointerMode = false;
+                IsHighlighter = false;
+                AnnotationWidth = 4.0f;
+                if (parent != null) parent.Invalidate();
+            });
+            miPen.Checked = (AnnotationPenMode && !IsHighlighter);
+            menu.Items.Add(miPen);
+
+            ToolStripMenuItem miHigh = new ToolStripMenuItem("Highlighter (Bút dạ quang) [H]", null, (s, e) =>
+            {
+                AnnotationPenMode = true;
+                LaserPointerMode = false;
+                IsHighlighter = true;
+                AnnotationColor = Color.FromArgb(140, 255, 255, 0);
+                AnnotationWidth = 14.0f;
+                if (parent != null) parent.Invalidate();
+            });
+            miHigh.Checked = (AnnotationPenMode && IsHighlighter);
+            menu.Items.Add(miHigh);
+
+            ToolStripMenuItem miEraser = new ToolStripMenuItem("Eraser (Tẩy nét vẽ) [E]", null, (s, e) =>
+            {
+                PenStrokes.Clear();
+                CurrentStroke.Clear();
+                if (parent != null) parent.Invalidate();
+            });
+            menu.Items.Add(miEraser);
+
+            ToolStripMenuItem miInkColor = new ToolStripMenuItem("Ink Color (Màu mực vẽ)");
+            Color[] colors = new Color[] { Color.Red, Color.Yellow, Color.Lime, Color.Cyan, Color.White, Color.Black };
+            string[] names = new string[] { "Đỏ (Red)", "Vàng (Yellow)", "Xanh lá (Green)", "Xanh lam (Cyan)", "Trắng (White)", "Đen (Black)" };
+            for (int i = 0; i < colors.Length; i++)
+            {
+                Color c = colors[i];
+                string n = names[i];
+                ToolStripMenuItem ci = new ToolStripMenuItem(n, null, (s, e) =>
+                {
+                    AnnotationColor = Color.FromArgb(230, c.R, c.G, c.B);
+                    AnnotationPenMode = true;
+                    LaserPointerMode = false;
+                    if (parent != null) parent.Invalidate();
+                });
+                miInkColor.DropDownItems.Add(ci);
+            }
+            menu.Items.Add(miInkColor);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem miClear = new ToolStripMenuItem("Erase All Ink on Slide (Xóa tất cả nét vẽ)", null, (s, e) =>
+            {
+                PenStrokes.Clear();
+                CurrentStroke.Clear();
+                if (parent != null) parent.Invalidate();
+            });
+            menu.Items.Add(miClear);
+
+            menu.Show(parent, pt);
+        }
+
+        public void ShowDisplaySettingsMenu(Control parent, Point pt)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.RenderMode = ToolStripRenderMode.System;
+            menu.Font = new Font("Segoe UI", 9.5f);
+
+            ToolStripMenuItem miSwap = new ToolStripMenuItem("Swap Presenter View and Slide Show (Hoán đổi 2 màn hình)", null, (s, e) =>
+            {
+                IsPresenterViewMode = !IsPresenterViewMode;
+                if (parent != null) parent.Invalidate();
+            });
+            ToolStripMenuItem miDuplicate = new ToolStripMenuItem("Duplicate Slide Show (Nhân bản chiếu slide)", null, (s, e) =>
+            {
+                IsPresenterViewMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            menu.Items.Add(miSwap);
+            menu.Items.Add(miDuplicate);
+            menu.Show(parent, pt);
+        }
+        #endregion
+
+        private void DrawSlideFull(Graphics g, RectangleF targetRect, SlideNode slide, float baseScale, float opacity = 1.0f, bool isFromSlide = false)
+        {
+            if (slide == null || targetRect.Width <= 0 || targetRect.Height <= 0) return;
+            GraphicsState gs = g.Save();
+            g.IntersectClip(targetRect);
+
+            // Matrix-based smooth scaling transform to lock layout & eliminate text glyph jittering:
+            float targetScale = targetRect.Width / Presentation.CanvasWidth;
+            if (baseScale > 0.001f && Math.Abs(targetScale - baseScale) > 0.005f)
+            {
+                float sx = targetScale / baseScale;
+                g.TranslateTransform(targetRect.X, targetRect.Y);
+                g.ScaleTransform(sx, sx);
+
+                RectangleF baseRect = new RectangleF(0, 0, Presentation.CanvasWidth * baseScale, Presentation.CanvasHeight * baseScale);
+                DrawSlideBackground(g, baseRect, slide);
+
+                bool isSlideShowOrPreview = IsPresenting || IsPreviewingTransition;
+                bool treatAsFromSlide = isFromSlide;
+                if (isSlideShowOrPreview && !treatAsFromSlide)
+                {
+                    if (IsTransitioning && TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count)
+                    {
+                        if (Presentation.Slides[TransitionFromSlideIndex] == slide && TransitionFromSlideIndex != TransitionToSlideIndex)
+                        {
+                            treatAsFromSlide = true;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < slide.Shapes.Count; i++)
+                {
+                    ShapeNode sh = slide.Shapes[i];
+                    if (isSlideShowOrPreview)
+                    {
+                        if (treatAsFromSlide)
+                        {
+                            DrawShape(g, 0, 0, baseScale, sh, false, opacity);
+                        }
+                        else
+                        {
+                            bool isVis;
+                            float offX, offY, scX, scY, rDelta, opMul;
+                            GetShapeAnimationTransform(sh, slide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                            if (isVis)
+                            {
+                                DrawShape(g, 0, 0, baseScale, sh, false, opacity * opMul, offX, offY, scX, scY, rDelta);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        DrawShape(g, 0, 0, baseScale, sh, false, opacity);
+                    }
+                }
+                g.Restore(gs);
+                return;
+            }
+
+            DrawSlideBackground(g, targetRect, slide);
+            float slideScale = targetRect.Width / Presentation.CanvasWidth;
+
+            bool isSlideShowOrPreviewDirect = IsPresenting || IsPreviewingTransition;
+            bool treatAsFromSlideDirect = isFromSlide;
+            if (isSlideShowOrPreviewDirect && !treatAsFromSlideDirect)
+            {
+                if (IsTransitioning && TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count)
+                {
+                    if (Presentation.Slides[TransitionFromSlideIndex] == slide && TransitionFromSlideIndex != TransitionToSlideIndex)
+                    {
+                        treatAsFromSlideDirect = true;
+                    }
+                }
+            }
+
+            for (int i = 0; i < slide.Shapes.Count; i++)
+            {
+                ShapeNode sh = slide.Shapes[i];
+                if (isSlideShowOrPreviewDirect)
+                {
+                    if (treatAsFromSlideDirect)
+                    {
+                        // Trên slide trước đó (fromSlide), mọi hoạt họa đã hoàn tất -> vẽ đầy đủ
+                        DrawShape(g, targetRect.X, targetRect.Y, slideScale, sh, false, opacity);
+                    }
+                    else
+                    {
+                        // Trên slide đích (toSlide), đang ở bước 0 trước khi nhấp chuột.
+                        // Vật phẩm có hiệu ứng Entrance phải ẩn hoàn toàn 100% trong lúc chuyển cảnh!
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        GetShapeAnimationTransform(sh, slide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                        if (isVis)
+                        {
+                            DrawShape(g, targetRect.X, targetRect.Y, slideScale, sh, false, opacity * opMul, offX, offY, scX, scY, rDelta);
+                        }
+                    }
+                }
+                else
+                {
+                    DrawShape(g, targetRect.X, targetRect.Y, slideScale, sh, false, opacity);
+                }
+            }
+            g.Restore(gs);
+        }
+
+        private void RenderFadeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
+            DrawSlideFull(g, rect, toSlide, scale, t);
+        }
+
+        private void RenderPushTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromBottom;
+            RectangleF rectA, rectB;
+            switch (dir)
+            {
+                case TransitionDirection.FromTop:
+                    rectA = new RectangleF(rect.X, rect.Y + rect.Height * t, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X, rect.Y - rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromLeft:
+                    rectA = new RectangleF(rect.X + rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X - rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromRight:
+                    rectA = new RectangleF(rect.X - rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X + rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromBottom:
+                default:
+                    rectA = new RectangleF(rect.X, rect.Y - rect.Height * t, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X, rect.Y + rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+            }
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, rectA, fromSlide, scale);
+            DrawSlideFull(g, rectB, toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderWipeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
+            RectangleF wipeClip;
+            switch (dir)
+            {
+                case TransitionDirection.FromLeft:
+                    wipeClip = new RectangleF(rect.X, rect.Y, rect.Width * t, rect.Height);
+                    break;
+                case TransitionDirection.FromTop:
+                    wipeClip = new RectangleF(rect.X, rect.Y, rect.Width, rect.Height * t);
+                    break;
+                case TransitionDirection.FromBottom:
+                    wipeClip = new RectangleF(rect.X, rect.Bottom - rect.Height * t, rect.Width, rect.Height * t);
+                    break;
+                case TransitionDirection.FromRight:
+                default:
+                    wipeClip = new RectangleF(rect.Right - rect.Width * t, rect.Y, rect.Width * t, rect.Height);
+                    break;
+            }
+            GraphicsState st = g.Save();
+            g.SetClip(wipeClip);
+            DrawSlideFull(g, rect, toSlide, scale);
+            g.Restore(st);
+        }
+
+        private void RenderSplitTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Vertical;
+            GraphicsState st = g.Save();
+            if (dir == TransitionDirection.Horizontal || dir == TransitionDirection.In)
+            {
+                float splitH = rect.Height * t / 2f;
+                RectangleF splitClip = new RectangleF(rect.X, rect.Y + rect.Height / 2f - splitH, rect.Width, splitH * 2f);
+                g.SetClip(splitClip);
+            }
+            else
+            {
+                float splitW = rect.Width * t / 2f;
+                RectangleF splitClip = new RectangleF(rect.X + rect.Width / 2f - splitW, rect.Y, splitW * 2f, rect.Height);
+                g.SetClip(splitClip);
+            }
+            DrawSlideFull(g, rect, toSlide, scale);
+            g.Restore(st);
+        }
+
+        private void RenderRevealTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
+            RectangleF rectA;
+            switch (dir)
+            {
+                case TransitionDirection.FromLeft:
+                    rectA = new RectangleF(rect.X - rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromTop:
+                    rectA = new RectangleF(rect.X, rect.Y - rect.Height * t, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromBottom:
+                    rectA = new RectangleF(rect.X, rect.Y + rect.Height * t, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromRight:
+                default:
+                    rectA = new RectangleF(rect.X + rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    break;
+            }
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, rectA, fromSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderCutTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f) DrawSlideFull(g, rect, fromSlide, scale);
+            else DrawSlideFull(g, rect, toSlide, scale);
+        }
+
+        private void RenderCoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
+            RectangleF rectB;
+            switch (dir)
+            {
+                case TransitionDirection.FromLeft:
+                    rectB = new RectangleF(rect.X - rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromTop:
+                    rectB = new RectangleF(rect.X, rect.Y - rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromBottom:
+                    rectB = new RectangleF(rect.X, rect.Y + rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromRight:
+                default:
+                    rectB = new RectangleF(rect.X + rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+            }
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, rectB, toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderUncoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromLeft;
+            RectangleF rectA;
+            switch (dir)
+            {
+                case TransitionDirection.FromRight:
+                    rectA = new RectangleF(rect.X + rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromTop:
+                    rectA = new RectangleF(rect.X, rect.Y - rect.Height * t, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromBottom:
+                    rectA = new RectangleF(rect.X, rect.Y + rect.Height * t, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromLeft:
+                default:
+                    rectA = new RectangleF(rect.X - rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    break;
+            }
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, rectA, fromSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderFlashTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f)
+            {
+                DrawSlideFull(g, rect, fromSlide, scale);
+                int flashAlpha = (int)(255 * (t * 2.0f));
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(Math.Min(255, flashAlpha), 255, 255, 255)))
+                {
+                    g.FillRectangle(b, rect);
+                }
+            }
+            else
+            {
+                DrawSlideFull(g, rect, toSlide, scale);
+                int flashAlpha = (int)(255 * (1.0f - (t - 0.5f) * 2.0f));
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(Math.Max(0, flashAlpha), 255, 255, 255)))
+                {
+                    g.FillRectangle(b, rect);
+                }
+            }
+        }
+
+        private void RenderShapeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) * 0.6f;
+            float curR = maxR * t;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddEllipse(rect.X + rect.Width / 2f - curR, rect.Y + rect.Height / 2f - curR, curR * 2, curR * 2);
+                GraphicsState gs = g.Save();
+                g.SetClip(path);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderFallOverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float rad = t * (float)(Math.PI / 2.0);
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+
+            float curH = rect.Height * cos;
+            float topY = rect.Bottom - curH;
+            float pW = rect.Width * 0.12f * sin;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+
+            if (sin > 0.05f)
+            {
+                using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb((int)(180 * sin), 0, 0, 0)))
+                {
+                    g.FillRectangle(shadowBrush, rect.X - pW / 2f, topY, rect.Width + pW, curH);
+                }
+            }
+
+            RectangleF panelRect = new RectangleF(rect.X - pW / 2f, topY, rect.Width + pW, curH);
+            DrawSlideFull(g, panelRect, fromSlide, scale, Math.Max(0.1f, cos));
+            g.Restore(gs);
+        }
+
+        private void RenderCurtainsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            // 1. Stage Background (Slide B is on stage)
+            DrawSlideFull(g, rect, toSlide, scale);
+
+            // 2. Realistic Theatre Curtains Physics (Fast 60 FPS CPU Render)
+            float halfW = rect.Width / 2f;
+            float leftPanelW = halfW * (1.0f - t);
+            float rightPanelX = rect.Right - halfW * (1.0f - t);
+            float rightPanelW = halfW * (1.0f - t);
+
+            if (leftPanelW > 1)
+            {
+                GraphicsState gsL = g.Save();
+                g.IntersectClip(new RectangleF(rect.X, rect.Y, leftPanelW, rect.Height));
+                int folds = 4;
+                float foldW = leftPanelW / folds;
+                for (int i = 0; i < folds; i++)
+                {
+                    RectangleF fRect = new RectangleF(rect.X + i * foldW, rect.Y, foldW + 1f, rect.Height);
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(fRect, Color.FromArgb(70, 0, 5), Color.FromArgb(195, 20, 30), 0f))
+                    {
+                        g.FillRectangle(lgb, fRect);
+                    }
+                }
+                using (SolidBrush goldB = new SolidBrush(Color.FromArgb(245, 158, 11)))
+                {
+                    g.FillRectangle(goldB, rect.X + leftPanelW - 5, rect.Y, 5, rect.Height);
+                }
+                g.Restore(gsL);
+            }
+
+            if (rightPanelW > 1)
+            {
+                GraphicsState gsR = g.Save();
+                g.IntersectClip(new RectangleF(rightPanelX, rect.Y, rightPanelW, rect.Height));
+                int folds = 4;
+                float foldW = rightPanelW / folds;
+                for (int i = 0; i < folds; i++)
+                {
+                    RectangleF fRect = new RectangleF(rightPanelX + i * foldW, rect.Y, foldW + 1f, rect.Height);
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(fRect, Color.FromArgb(195, 20, 30), Color.FromArgb(70, 0, 5), 0f))
+                    {
+                        g.FillRectangle(lgb, fRect);
+                    }
+                }
+                using (SolidBrush goldB = new SolidBrush(Color.FromArgb(245, 158, 11)))
+                {
+                    g.FillRectangle(goldB, rightPanelX, rect.Y, 5, rect.Height);
+                }
+                g.Restore(gsR);
+            }
+
+            // Top Header Valance Swag
+            float valanceH = Math.Max(10, rect.Height * 0.07f);
+            using (LinearGradientBrush valanceB = new LinearGradientBrush(new RectangleF(rect.X, rect.Y, rect.Width, valanceH), Color.FromArgb(120, 5, 15), Color.FromArgb(50, 0, 5), 90f))
+            {
+                g.FillRectangle(valanceB, rect.X, rect.Y, rect.Width, valanceH);
+            }
+            using (Pen goldPen = new Pen(Color.FromArgb(245, 158, 11), 2f))
+            {
+                g.DrawLine(goldPen, rect.X, rect.Y + valanceH, rect.Right, rect.Y + valanceH);
+            }
+        }
+
+        private void RenderWindTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float wx = rect.X + rect.Width * 0.9f * t;
+            float wy = rect.Y + (float)Math.Sin(t * Math.PI * 4.0) * 20f;
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(wx, wy, rect.Width, rect.Height), fromSlide, scale, 1.0f - t);
+            g.Restore(gs);
+        }
+
+        private void RenderPrestigeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float curH = rect.Height * t;
+            float curY = rect.Bottom - curH;
+            RectangleF archClip = new RectangleF(rect.X, curY, rect.Width, curH);
+            GraphicsState gs = g.Save();
+            g.SetClip(archClip);
+            DrawSlideFull(g, rect, toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderFractureTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            int nCols = 6;
+            float sw = (float)rect.Width / nCols;
+            for (int c = 0; c < nCols; c++)
+            {
+                float drop = rect.Height * (float)Math.Pow(t, 1.3 + (c % 3) * 0.4);
+                RectangleF shardClip = new RectangleF(rect.X + c * sw, rect.Y, sw, rect.Height);
+                GraphicsState gs = g.Save();
+                g.SetClip(shardClip);
+                DrawSlideFull(g, new RectangleF(rect.X, rect.Y + drop, rect.Width, rect.Height), fromSlide, scale, 1.0f - t);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderCrushTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float s = Math.Max(0.01f, 1.0f - t);
+            float cw = rect.Width * s;
+            float ch = rect.Height * s;
+            float cx = rect.X + (rect.Width - cw) / 2f;
+            float cy = rect.Y + (rect.Height - ch) / 2f;
+            DrawSlideFull(g, new RectangleF(cx, cy, cw, ch), fromSlide, scale, s);
+        }
+
+        private void RenderPeelOffTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float peelW = rect.Width * (1.0f - t);
+            float peelH = rect.Height * (1.0f - t);
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                PointF[] pts = new PointF[] {
+                    new PointF(rect.X, rect.Y),
+                    new PointF(rect.X + peelW, rect.Y),
+                    new PointF(rect.X, rect.Y + peelH)
+                };
+                path.AddPolygon(pts);
+                GraphicsState gs = g.Save();
+                g.SetClip(path);
+                DrawSlideFull(g, rect, fromSlide, scale);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderPageCurlTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float remW = rect.Width * (1.0f - t);
+
+            GraphicsState gs = g.Save();
+            g.SetClip(new RectangleF(rect.X, rect.Y, remW, rect.Height));
+            DrawSlideFull(g, rect, fromSlide, scale);
+            g.Restore(gs);
+
+            if (remW > 5 && remW < rect.Width)
+            {
+                float curlW = Math.Min(45f, remW);
+                RectangleF curlRect = new RectangleF(rect.X + remW - curlW, rect.Y, curlW, rect.Height);
+                using (LinearGradientBrush curlGrad = new LinearGradientBrush(curlRect, Color.FromArgb(0, 255, 255, 255), Color.FromArgb(240, 255, 255, 255), 0f))
+                {
+                    ColorBlend cb = new ColorBlend();
+                    cb.Colors = new Color[] { Color.FromArgb(0, 0, 0, 0), Color.FromArgb(90, 0, 0, 0), Color.FromArgb(230, 255, 255, 255), Color.FromArgb(160, 240, 240, 240) };
+                    cb.Positions = new float[] { 0.0f, 0.4f, 0.85f, 1.0f };
+                    curlGrad.InterpolationColors = cb;
+                    g.FillRectangle(curlGrad, curlRect);
+                }
+                RectangleF shadowRect = new RectangleF(rect.X + remW, rect.Y, Math.Min(35f, rect.Right - (rect.X + remW)), rect.Height);
+                if (shadowRect.Width > 0)
+                {
+                    using (LinearGradientBrush castShadow = new LinearGradientBrush(shadowRect, Color.FromArgb(130, 0, 0, 0), Color.FromArgb(0, 0, 0, 0), 0f))
+                    {
+                        g.FillRectangle(castShadow, shadowRect);
+                    }
+                }
+            }
+        }
+
+        private void RenderAirplaneTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+
+            if (t < 0.35f)
+            {
+                float s = 1.0f - t / 0.35f * 0.4f;
+                float curW = rect.Width * s;
+                float curX = rect.X + (rect.Width - curW) / 2f;
+                DrawSlideFull(g, new RectangleF(curX, rect.Y, curW, rect.Height), fromSlide, scale);
+            }
+            else
+            {
+                float flightT = (t - 0.35f) / 0.65f;
+                float startX = rect.X + rect.Width / 2f;
+                float startY = rect.Y + rect.Height / 2f;
+                float targetX = rect.Right + 150f;
+                float targetY = rect.Y - 120f;
+
+                float planeX = startX + (targetX - startX) * flightT;
+                float planeY = startY + (targetY - startY) * flightT + (float)Math.Sin(flightT * Math.PI) * -40f;
+                float planeScale = Math.Max(0.2f, 1.0f - flightT * 0.6f);
+
+                GraphicsState gs = g.Save();
+                g.TranslateTransform(planeX, planeY);
+                g.RotateTransform(-25f + flightT * 10f);
+                g.ScaleTransform(planeScale, planeScale);
+
+                PointF pNose = new PointF(70, 0);
+                PointF pTail = new PointF(-70, 0);
+                PointF pLeftWing = new PointF(-50, -45);
+                PointF pRightWing = new PointF(-50, 45);
+                PointF pKeel = new PointF(-30, 0);
+
+                using (SolidBrush bLW = new SolidBrush(Color.FromArgb(235, 240, 250)))
+                using (SolidBrush bRW = new SolidBrush(Color.FromArgb(195, 210, 235)))
+                using (SolidBrush bKeel = new SolidBrush(Color.FromArgb(145, 175, 215)))
+                using (Pen penPlane = new Pen(Color.FromArgb(100, 140, 190), 1.2f))
+                {
+                    PointF[] lw = new PointF[] { pNose, pLeftWing, pKeel };
+                    g.FillPolygon(bLW, lw);
+                    g.DrawPolygon(penPlane, lw);
+
+                    PointF[] rw = new PointF[] { pNose, pRightWing, pKeel };
+                    g.FillPolygon(bRW, rw);
+                    g.DrawPolygon(penPlane, rw);
+
+                    PointF[] keel = new PointF[] { pNose, pTail, pKeel };
+                    g.FillPolygon(bKeel, keel);
+                    g.DrawPolygon(penPlane, keel);
+                }
+
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderOrigamiTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float ox = rect.X + rect.Width * t * 1.1f;
+            float oy = rect.Y - rect.Height * 0.6f * t;
+            float os = Math.Max(0.02f, 1.0f - t);
+            DrawSlideFull(g, new RectangleF(ox, oy, rect.Width * os, rect.Height * os), fromSlide, scale, 1.0f - t);
+        }
+
+        private void RenderDissolveTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            if (t <= 0.001f) return;
+            int cols = 12;
+            int rows = 7;
+            float bw = (float)rect.Width / cols;
+            float bh = (float)rect.Height / rows;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        float hash = (float)((c * 37 + r * 73 + c * r * 13) % 100) / 100.0f;
+                        if (hash <= t)
+                        {
+                            path.AddRectangle(new RectangleF(rect.X + c * bw, rect.Y + r * bh, bw + 0.5f, bh + 0.5f));
+                        }
+                    }
+                }
+                if (path.PointCount > 0)
+                {
+                    GraphicsState gs = g.Save();
+                    g.SetClip(path, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    g.Restore(gs);
+                }
+            }
+        }
+
+        private void RenderCheckerTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            int rows = 4;
+            float rh = (float)rect.Height / rows;
+            for (int r = 0; r < rows; r++)
+            {
+                float xoff = (r % 2 == 0) ? -rect.Width * (1.0f - t) : rect.Width * (1.0f - t);
+                RectangleF rowClip = new RectangleF(rect.X, rect.Y + r * rh, rect.Width, rh);
+                GraphicsState gs = g.Save();
+                g.IntersectClip(rowClip);
+                DrawSlideFull(g, new RectangleF(rect.X + xoff, rect.Y, rect.Width, rect.Height), toSlide, scale);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderBlindsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Vertical;
+            int slats = 6;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                if (dir == TransitionDirection.Horizontal)
+                {
+                    float sh = (float)rect.Height / slats;
+                    for (int i = 0; i < slats; i++)
+                    {
+                        float sy = rect.Y + i * sh;
+                        float h = (t < 0.5f) ? (sh * (1.0f - t * 2.0f)) : (sh * ((t - 0.5f) * 2.0f));
+                        float y = sy + (sh - h) / 2f;
+                        path.AddRectangle(new RectangleF(rect.X, y, rect.Width, h));
+                    }
+                }
+                else
+                {
+                    float sw = (float)rect.Width / slats;
+                    for (int i = 0; i < slats; i++)
+                    {
+                        float sx = rect.X + i * sw;
+                        float w = (t < 0.5f) ? (sw * (1.0f - t * 2.0f)) : (sw * ((t - 0.5f) * 2.0f));
+                        float x = sx + (sw - w) / 2f;
+                        path.AddRectangle(new RectangleF(x, rect.Y, w, rect.Height));
+                    }
+                }
+
+                if (t < 0.5f)
+                {
+                    GraphicsState gs = g.Save();
+                    g.SetClip(path, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, fromSlide, scale);
+                    g.Restore(gs);
+                }
+                else
+                {
+                    GraphicsState gs = g.Save();
+                    g.SetClip(path, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    g.Restore(gs);
+                }
+            }
+        }
+
+        private void RenderClockTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float sweep = 360f * t;
+            float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height);
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddPie(rect.X + rect.Width / 2f - maxR, rect.Y + rect.Height / 2f - maxR, maxR * 2, maxR * 2, -90f, sweep);
+                GraphicsState gs = g.Save();
+                g.SetClip(path);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderRippleTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
+            DrawSlideFull(g, rect, toSlide, scale, t);
+            float maxR = Math.Max(rect.Width, rect.Height) * 0.7f;
+            using (Pen rp = new Pen(Color.FromArgb((int)(140 * (1.0f - t)), 100, 180, 255), 3.5f))
+            {
+                float curR = maxR * t;
+                g.DrawEllipse(rp, rect.X + rect.Width / 2f - curR, rect.Y + rect.Height / 2f - curR, curR * 2, curR * 2);
+                float curR2 = maxR * Math.Max(0.0f, t - 0.2f);
+                if (curR2 > 0) g.DrawEllipse(rp, rect.X + rect.Width / 2f - curR2, rect.Y + rect.Height / 2f - curR2, curR2 * 2, curR2 * 2);
+            }
+        }
+
+        private void RenderHoneycombTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            int hCols = 8;
+            int hRows = 5;
+            float hw = (float)rect.Width / hCols;
+            float hh = (float)rect.Height / hRows;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                for (int r = 0; r < hRows; r++)
+                {
+                    for (int c = 0; c < hCols; c++)
+                    {
+                        float dx = (c - hCols / 2f) / hCols;
+                        float dy = (r - hRows / 2f) / hRows;
+                        float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                        if (t >= dist * 0.7f)
+                        {
+                            float ht = Math.Min(1.0f, (t - dist * 0.7f) / 0.3f);
+                            float curHw = hw * ht;
+                            float curHh = hh * ht;
+                            path.AddRectangle(new RectangleF(rect.X + c * hw + (hw - curHw) / 2f, rect.Y + r * hh + (hh - curHh) / 2f, curHw, curHh));
+                        }
+                    }
+                }
+                if (path.PointCount > 0)
+                {
+                    GraphicsState gs = g.Save();
+                    g.SetClip(path, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    g.Restore(gs);
+                }
+            }
+        }
+
+        private void RenderGlitterTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
+            DrawSlideFull(g, rect, toSlide, scale, t);
+        }
+
+        private void RenderVortexTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f)
+            {
+                float s = 1.0f - t * 2.0f;
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                float y = rect.Y + (rect.Height - h) / 2f;
+                DrawSlideFull(g, new RectangleF(x, y, w, h), fromSlide, scale, s);
+            }
+            else
+            {
+                float s = (t - 0.5f) * 2.0f;
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                float y = rect.Y + (rect.Height - h) / 2f;
+                DrawSlideFull(g, new RectangleF(x, y, w, h), toSlide, scale, s);
+            }
+        }
+
+        private void RenderShredTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            int strips = 6;
+            float sw = (float)rect.Width / strips;
+            for (int i = 0; i < strips; i++)
+            {
+                float offY = (i % 2 == 0) ? -rect.Height * t : rect.Height * t;
+                RectangleF sClip = new RectangleF(rect.X + i * sw, rect.Y, sw, rect.Height);
+                GraphicsState gs = g.Save();
+                g.IntersectClip(sClip);
+                DrawSlideFull(g, new RectangleF(rect.X, rect.Y + offY, rect.Width, rect.Height), fromSlide, scale, 1.0f - t);
+                g.Restore(gs);
+            }
+        }
+
+        private void RenderSwitchTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float offA = -rect.Width * 0.4f * t;
+            float sA = 1.0f - t * 0.3f;
+            float offB = rect.Width * 0.4f * (1.0f - t);
+            float sB = 0.7f + t * 0.3f;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(rect.X + offA, rect.Y + (rect.Height * (1.0f - sA)) / 2f, rect.Width * sA, rect.Height * sA), fromSlide, scale, 1.0f - t * 0.5f);
+            DrawSlideFull(g, new RectangleF(rect.X + offB, rect.Y + (rect.Height * (1.0f - sB)) / 2f, rect.Width * sB, rect.Height * sB), toSlide, scale, 0.5f + t * 0.5f);
+            g.Restore(gs);
+        }
+
+        private void RenderFlipTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float rad = t * (float)Math.PI;
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+            float pY = rect.Height * 0.08f * sin;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+
+            if (t < 0.5f)
+            {
+                float curW = rect.Width * Math.Abs(cos);
+                float curX = rect.X + (rect.Width - curW) / 2f;
+                RectangleF flipRect = new RectangleF(curX, rect.Y + pY / 2f, curW, rect.Height - pY);
+                DrawSlideFull(g, flipRect, fromSlide, scale, Math.Max(0.2f, Math.Abs(cos)));
+            }
+            else
+            {
+                float curW = rect.Width * Math.Abs(cos);
+                float curX = rect.X + (rect.Width - curW) / 2f;
+                RectangleF flipRect = new RectangleF(curX, rect.Y + pY / 2f, curW, rect.Height - pY);
+                DrawSlideFull(g, flipRect, toSlide, scale, Math.Max(0.2f, Math.Abs(cos)));
+            }
+
+            if (sin > 0.8f)
+            {
+                int flashA = (int)(255 * ((sin - 0.8f) / 0.2f));
+                using (SolidBrush flashB = new SolidBrush(Color.FromArgb(Math.Min(200, flashA), 255, 255, 255)))
+                {
+                    g.FillRectangle(flashB, rect.X + rect.Width / 2f - 4, rect.Y, 8, rect.Height);
+                }
+            }
+
+            g.Restore(gs);
+        }
+
+        private void RenderGalleryTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float offA = -rect.Width * t;
+            float offB = rect.Width * (1.0f - t);
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(rect.X + offA, rect.Y, rect.Width, rect.Height), fromSlide, scale);
+            DrawSlideFull(g, new RectangleF(rect.X + offB, rect.Y, rect.Width, rect.Height), toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderCubeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
+            float rad = t * (float)(Math.PI / 2.0);
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+
+            if (dir == TransitionDirection.FromLeft)
+            {
+                float xA = rect.X + rect.Width * (1.0f - cos);
+                float wA = rect.Width * cos;
+                float pY_A = rect.Height * 0.12f * sin;
+                DrawSlideFull(g, new RectangleF(xA, rect.Y + pY_A / 2f, wA, rect.Height - pY_A), fromSlide, scale, Math.Max(0.2f, cos));
+
+                float wB = rect.Width * sin;
+                float pY_B = rect.Height * 0.12f * cos;
+                DrawSlideFull(g, new RectangleF(rect.X, rect.Y + pY_B / 2f, wB, rect.Height - pY_B), toSlide, scale, Math.Max(0.2f, sin));
+            }
+            else if (dir == TransitionDirection.FromTop)
+            {
+                float yA = rect.Y + rect.Height * (1.0f - cos);
+                float hA = rect.Height * cos;
+                float pX_A = rect.Width * 0.12f * sin;
+                DrawSlideFull(g, new RectangleF(rect.X + pX_A / 2f, yA, rect.Width - pX_A, hA), fromSlide, scale, Math.Max(0.2f, cos));
+
+                float hB = rect.Height * sin;
+                float pX_B = rect.Width * 0.12f * cos;
+                DrawSlideFull(g, new RectangleF(rect.X + pX_B / 2f, rect.Y, rect.Width - pX_B, hB), toSlide, scale, Math.Max(0.2f, sin));
+            }
+            else if (dir == TransitionDirection.FromBottom)
+            {
+                float hA = rect.Height * cos;
+                float pX_A = rect.Width * 0.12f * sin;
+                DrawSlideFull(g, new RectangleF(rect.X + pX_A / 2f, rect.Y, rect.Width - pX_A, hA), fromSlide, scale, Math.Max(0.2f, cos));
+
+                float yB = rect.Bottom - rect.Height * sin;
+                float hB = rect.Height * sin;
+                float pX_B = rect.Width * 0.12f * cos;
+                DrawSlideFull(g, new RectangleF(rect.X + pX_B / 2f, yB, rect.Width - pX_B, hB), toSlide, scale, Math.Max(0.2f, sin));
+            }
+            else
+            {
+                float wA = rect.Width * cos;
+                float pY_A = rect.Height * 0.12f * sin;
+                DrawSlideFull(g, new RectangleF(rect.X, rect.Y + pY_A / 2f, wA, rect.Height - pY_A), fromSlide, scale, Math.Max(0.2f, cos));
+
+                float xB = rect.X + wA;
+                float wB = rect.Width * sin;
+                float pY_B = rect.Height * 0.12f * cos;
+                DrawSlideFull(g, new RectangleF(xB, rect.Y + pY_B / 2f, wB, rect.Height - pY_B), toSlide, scale, Math.Max(0.2f, sin));
+            }
+
+            g.Restore(gs);
+        }
+
+        private void RenderDoorsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float halfW = rect.Width / 2f;
+            float rad = t * (float)(Math.PI / 2.0);
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+            float pY = rect.Height * 0.12f * sin;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+
+            float doorLW = halfW * cos;
+            if (doorLW > 1)
+            {
+                RectangleF leftDoor = new RectangleF(rect.X, rect.Y - pY / 2f, doorLW, rect.Height + pY);
+                DrawSlideFull(g, leftDoor, fromSlide, scale, Math.Max(0.3f, cos));
+                using (SolidBrush darkEdge = new SolidBrush(Color.FromArgb((int)(180 * sin), 20, 20, 25)))
+                {
+                    g.FillRectangle(darkEdge, rect.X + doorLW - 4, rect.Y - pY / 2f, 4, rect.Height + pY);
+                }
+            }
+
+            float doorRW = halfW * cos;
+            float doorRX = rect.Right - doorRW;
+            if (doorRW > 1)
+            {
+                RectangleF rightDoor = new RectangleF(doorRX, rect.Y - pY / 2f, doorRW, rect.Height + pY);
+                DrawSlideFull(g, rightDoor, fromSlide, scale, Math.Max(0.3f, cos));
+                using (SolidBrush darkEdge = new SolidBrush(Color.FromArgb((int)(180 * sin), 20, 20, 25)))
+                {
+                    g.FillRectangle(darkEdge, doorRX, rect.Y - pY / 2f, 4, rect.Height + pY);
+                }
+            }
+
+            float openW = rect.Width * (1.0f - cos);
+            if (openW > 0)
+            {
+                using (LinearGradientBrush shadowL = new LinearGradientBrush(new RectangleF(rect.X + doorLW, rect.Y, 15, rect.Height), Color.FromArgb(120, 0, 0, 0), Color.FromArgb(0, 0, 0, 0), 0f))
+                {
+                    g.FillRectangle(shadowL, rect.X + doorLW, rect.Y, 15, rect.Height);
+                }
+                using (LinearGradientBrush shadowR = new LinearGradientBrush(new RectangleF(doorRX - 15, rect.Y, 15, rect.Height), Color.FromArgb(0, 0, 0, 0), Color.FromArgb(120, 0, 0, 0), 0f))
+                {
+                    g.FillRectangle(shadowR, doorRX - 15, rect.Y, 15, rect.Height);
+                }
+            }
+
+            g.Restore(gs);
+        }
+
+        private void RenderBoxTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f)
+            {
+                float s = 1.0f - t;
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                float y = rect.Y + (rect.Height - h) / 2f;
+                DrawSlideFull(g, new RectangleF(x, y, w, h), fromSlide, scale, s);
+            }
+            else
+            {
+                float s = t;
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                float y = rect.Y + (rect.Height - h) / 2f;
+                DrawSlideFull(g, new RectangleF(x, y, w, h), toSlide, scale, s);
+            }
+        }
+
+        private void RenderCombTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Horizontal;
+            if (dir == TransitionDirection.Vertical)
+            {
+                int cols = 6;
+                float cw = (float)rect.Width / cols;
+                for (int c = 0; c < cols; c++)
+                {
+                    float yoff = (c % 2 == 0) ? -rect.Height * (1.0f - t) : rect.Height * (1.0f - t);
+                    RectangleF colClip = new RectangleF(rect.X + c * cw, rect.Y, cw, rect.Height);
+                    GraphicsState gs = g.Save();
+                    g.IntersectClip(colClip);
+                    DrawSlideFull(g, new RectangleF(rect.X, rect.Y + yoff, rect.Width, rect.Height), toSlide, scale);
+                    g.Restore(gs);
+                }
+            }
+            else
+            {
+                int rows = 6;
+                float rh = (float)rect.Height / rows;
+                for (int r = 0; r < rows; r++)
+                {
+                    float xoff = (r % 2 == 0) ? -rect.Width * (1.0f - t) : rect.Width * (1.0f - t);
+                    RectangleF rowClip = new RectangleF(rect.X, rect.Y + r * rh, rect.Width, rh);
+                    GraphicsState gs = g.Save();
+                    g.IntersectClip(rowClip);
+                    DrawSlideFull(g, new RectangleF(rect.X + xoff, rect.Y, rect.Width, rect.Height), toSlide, scale);
+                    g.Restore(gs);
+                }
+            }
+        }
+
+        private void RenderZoomTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.In;
+            float cx = rect.X + rect.Width / 2f;
+            float cy = rect.Y + rect.Height / 2f;
+
+            if (dir == TransitionDirection.Out)
+            {
+                // Zoom Out: toSlide expands from background, fromSlide shrinks to a small thumbnail
+                float bgScale = 1.15f - t * 0.15f;
+                float bgW = rect.Width * bgScale;
+                float bgH = rect.Height * bgScale;
+                GraphicsState gsBg = g.Save();
+                g.IntersectClip(rect);
+                DrawSlideFull(g, new RectangleF(cx - bgW / 2f, cy - bgH / 2f, bgW, bgH), toSlide, scale, Math.Min(1.0f, t * 1.5f));
+                g.Restore(gsBg);
+
+                float cardScale = Math.Max(0.01f, 1.0f - t * 0.75f);
+                float cardW = rect.Width * cardScale;
+                float cardH = rect.Height * cardScale;
+                float cardX = cx - cardW / 2f;
+                float cardY = cy - cardH / 2f;
+
+                if (t < 0.98f)
+                {
+                    // 3D Drop Shadow behind shrinking card
+                    int shadowAlpha = (int)(90 * (1.0f - t));
+                    using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(shadowAlpha, 0, 0, 0)))
+                    {
+                        g.FillRectangle(shadowB, cardX + 8 * (1.0f - t), cardY + 8 * (1.0f - t), cardW, cardH);
+                    }
+
+                    GraphicsState gsCard = g.Save();
+                    g.IntersectClip(new RectangleF(cardX, cardY, cardW, cardH));
+                    DrawSlideFull(g, new RectangleF(cardX, cardY, cardW, cardH), fromSlide, scale, 1.0f - t * 0.6f);
+                    g.Restore(gsCard);
+
+                    // Card border
+                    using (Pen borderPen = new Pen(Color.FromArgb((int)(160 * (1.0f - t)), 255, 255, 255), 1.5f))
+                    {
+                        g.DrawRectangle(borderPen, cardX, cardY, cardW, cardH);
+                    }
+                }
+            }
+            else
+            {
+                // Zoom In (PowerPoint Standard): fromSlide is visible in background, toSlide starts as a small card and zooms in with 3D Depth
+                // 1. Background fromSlide
+                float fromScale = 1.0f + t * 0.18f;
+                float fromW = rect.Width * fromScale;
+                float fromH = rect.Height * fromScale;
+                float fromX = cx - fromW / 2f;
+                float fromY = cy - fromH / 2f;
+
+                GraphicsState gsFrom = g.Save();
+                g.IntersectClip(rect);
+                DrawSlideFull(g, new RectangleF(fromX, fromY, fromW, fromH), fromSlide, scale, Math.Max(0.0f, 1.0f - t * 1.1f));
+                g.Restore(gsFrom);
+
+                // 2. Foreground toSlide zooming in
+                float zoomScale = 0.22f + t * 0.78f; // starts as miniature (0.22x) and zooms to full 1.0x
+                float cardW = rect.Width * zoomScale;
+                float cardH = rect.Height * zoomScale;
+                float cardX = cx - cardW / 2f;
+                float cardY = cy - cardH / 2f;
+                RectangleF cardRect = new RectangleF(cardX, cardY, cardW, cardH);
+
+                // 3D Drop Shadow behind card when elevated
+                if (t < 0.92f)
+                {
+                    int shadowAlpha = (int)(110 * (1.0f - t));
+                    float shadowOffset = 12f * (1.0f - t);
+                    using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(shadowAlpha, 0, 0, 0)))
+                    {
+                        g.FillRectangle(shadowB, cardX + shadowOffset, cardY + shadowOffset, cardW, cardH);
+                    }
+                }
+
+                // Render toSlide smoothly with unified card bounds and matrix scaling
+                GraphicsState gsCard = g.Save();
+                g.IntersectClip(cardRect);
+                DrawSlideFull(g, cardRect, toSlide, scale);
+                g.Restore(gsCard);
+
+                // Subtle glowing border around card while flying in
+                if (t < 0.95f)
+                {
+                    using (Pen cardBorder = new Pen(Color.FromArgb((int)(160 * (1.0f - t)), 255, 255, 255), Math.Max(1.0f, 2.0f * (1.0f - t))))
+                    {
+                        g.DrawRectangle(cardBorder, cardX, cardY, cardW, cardH);
+                    }
+                }
+            }
+        }
+
+        private void RenderRandomBarsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            if (t <= 0.001f) return;
+            int numBars = 12;
+            int barW = rect.Width / numBars;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                for (int i = 0; i < numBars; i++)
+                {
+                    int currBarW = (int)(barW * t);
+                    if (currBarW > 0)
+                    {
+                        path.AddRectangle(new Rectangle(rect.X + i * barW, rect.Y, currBarW, rect.Height));
+                    }
+                }
+                if (path.PointCount > 0)
+                {
+                    GraphicsState st = g.Save();
+                    g.SetClip(path, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    g.Restore(st);
+                }
+            }
+        }
+
+        private void RenderPanTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromBottom;
+            RectangleF rectA, rectB;
+            switch (dir)
+            {
+                case TransitionDirection.FromTop:
+                    rectA = new RectangleF(rect.X, rect.Y + rect.Height * t, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X, rect.Y - rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromLeft:
+                    rectA = new RectangleF(rect.X + rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X - rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromRight:
+                    rectA = new RectangleF(rect.X - rect.Width * t, rect.Y, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X + rect.Width * (1.0f - t), rect.Y, rect.Width, rect.Height);
+                    break;
+                case TransitionDirection.FromBottom:
+                default:
+                    rectA = new RectangleF(rect.X, rect.Y - rect.Height * t, rect.Width, rect.Height);
+                    rectB = new RectangleF(rect.X, rect.Y + rect.Height * (1.0f - t), rect.Width, rect.Height);
+                    break;
+            }
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, rectA, fromSlide, scale);
+            DrawSlideFull(g, rectB, toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderFerrisWheelTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float rad = (float)(t * Math.PI / 2.0);
+            float offXA = -(float)Math.Sin(rad) * rect.Width;
+            float offYA = (float)(1.0 - Math.Cos(rad)) * rect.Height;
+            float offXB = (float)Math.Cos(rad) * rect.Width;
+            float offYB = -(float)Math.Sin(rad) * rect.Height;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(rect.X + offXA, rect.Y + offYA, rect.Width, rect.Height), fromSlide, scale, 1.0f - t);
+            DrawSlideFull(g, new RectangleF(rect.X + offXB, rect.Y + offYB, rect.Width, rect.Height), toSlide, scale, t);
+            g.Restore(gs);
+        }
+
+        private void RenderConveyorTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float offA = -rect.Width * t;
+            float offB = rect.Width * (1.0f - t);
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(rect.X + offA, rect.Y, rect.Width, rect.Height), fromSlide, scale);
+            DrawSlideFull(g, new RectangleF(rect.X + offB, rect.Y, rect.Width, rect.Height), toSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderRotateTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f)
+            {
+                float s = 1.0f - t * 2.0f;
+                float w = rect.Width * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                DrawSlideFull(g, new RectangleF(x, rect.Y, w, rect.Height), fromSlide, scale);
+            }
+            else
+            {
+                float s = (t - 0.5f) * 2.0f;
+                float w = rect.Width * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                DrawSlideFull(g, new RectangleF(x, rect.Y, w, rect.Height), toSlide, scale);
+            }
+        }
+
+        private void RenderWindowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            float hw = rect.Width / 2f;
+            float hh = rect.Height / 2f;
+            float curW = hw * (1.0f - t);
+            float curH = hh * (1.0f - t);
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            // Top-Left pane
+            DrawSlideFull(g, new RectangleF(rect.X, rect.Y, curW, curH), fromSlide, scale);
+            // Top-Right pane
+            DrawSlideFull(g, new RectangleF(rect.Right - curW, rect.Y, curW, curH), fromSlide, scale);
+            // Bottom-Left pane
+            DrawSlideFull(g, new RectangleF(rect.X, rect.Bottom - curH, curW, curH), fromSlide, scale);
+            // Bottom-Right pane
+            DrawSlideFull(g, new RectangleF(rect.Right - curW, rect.Bottom - curH, curW, curH), fromSlide, scale);
+            g.Restore(gs);
+        }
+
+        private void RenderOrbitTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float offA = -rect.Width * 0.5f * t;
+            float sA = 1.0f - t * 0.4f;
+            float offB = rect.Width * 0.5f * (1.0f - t);
+            float sB = 0.6f + t * 0.4f;
+
+            GraphicsState gs = g.Save();
+            g.SetClip(rect);
+            DrawSlideFull(g, new RectangleF(rect.X + offA, rect.Y + (rect.Height * (1.0f - sA)) / 2f, rect.Width * sA, rect.Height * sA), fromSlide, scale, 1.0f - t * 0.5f);
+            DrawSlideFull(g, new RectangleF(rect.X + offB, rect.Y + (rect.Height * (1.0f - sB)) / 2f, rect.Width * sB, rect.Height * sB), toSlide, scale, 0.5f + t * 0.5f);
+            g.Restore(gs);
+        }
+
+        private void RenderFlyThroughTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            if (t < 0.5f)
+            {
+                float s = 1.0f + t * 2.0f; // 1.0 to 2.0x
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X - (w - rect.Width) / 2f;
+                float y = rect.Y - (h - rect.Height) / 2f;
+                GraphicsState gs = g.Save();
+                g.SetClip(rect);
+                DrawSlideFull(g, new RectangleF(x, y, w, h), fromSlide, scale, 1.0f - t * 2.0f);
+                g.Restore(gs);
+            }
+            else
+            {
+                float s = (t - 0.5f) * 2.0f; // 0.0 to 1.0x
+                float w = rect.Width * s;
+                float h = rect.Height * s;
+                float x = rect.X + (rect.Width - w) / 2f;
+                float y = rect.Y + (rect.Height - h) / 2f;
+                GraphicsState gs = g.Save();
+                g.SetClip(rect);
+                DrawSlideFull(g, new RectangleF(x, y, w, h), toSlide, scale, s);
+                g.Restore(gs);
+            }
+        }
+
+        // ==================== 10 HIỆU ỨNG CHUYỂN CẢNH ĐỘC QUYỀN GENOFFICE ====================
+        private void RenderCinematicPrismTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float sweepX = rect.X + rect.Width * t;
+            GraphicsState gs = g.Save();
+            g.IntersectClip(new RectangleF(rect.X, rect.Y, sweepX - rect.X, rect.Height));
+            DrawSlideFull(g, rect, toSlide, scale);
+            g.Restore(gs);
+
+            // Optical Rainbow Prism Flare at the sweep line
+            float flareW = Math.Min(60f, rect.Width * 0.12f);
+            using (LinearGradientBrush lgb = new LinearGradientBrush(new RectangleF(sweepX - flareW / 2f, rect.Y, flareW, rect.Height), Color.FromArgb(0, 255, 255, 255), Color.FromArgb(160, 255, 255, 255), LinearGradientMode.Horizontal))
+            {
+                ColorBlend cb = new ColorBlend(5);
+                cb.Colors = new Color[] { Color.FromArgb(0, 239, 68, 68), Color.FromArgb(180, 239, 68, 68), Color.FromArgb(240, 255, 255, 255), Color.FromArgb(180, 34, 197, 94), Color.FromArgb(0, 59, 130, 246) };
+                cb.Positions = new float[] { 0.0f, 0.3f, 0.5f, 0.7f, 1.0f };
+                lgb.InterpolationColors = cb;
+                g.FillRectangle(lgb, sweepX - flareW / 2f, rect.Y, flareW, rect.Height);
+            }
+        }
+
+        private void RenderLiquidFluidTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            using (GraphicsPath wavePath = new GraphicsPath())
+            {
+                int steps = 32;
+                PointF[] pts = new PointF[steps + 3];
+                pts[0] = new PointF(rect.Right, rect.Bottom);
+                pts[1] = new PointF(rect.Left, rect.Bottom);
+                for (int i = 0; i <= steps; i++)
+                {
+                    float px = rect.X + (rect.Width * (float)i / steps);
+                    float waveY = rect.Y + rect.Height * (1.0f - t) + (float)Math.Sin(px / 40.0f + t * 12.0f) * 22.0f * (1.0f - t) + (float)Math.Cos(px / 70.0f - t * 8.0f) * 12.0f * (1.0f - t);
+                    pts[i + 2] = new PointF(px, waveY);
+                }
+                wavePath.AddPolygon(pts);
+
+                GraphicsState gs = g.Save();
+                g.SetClip(wavePath, CombineMode.Intersect);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+
+                using (Pen liquidEdge = new Pen(Color.FromArgb((int)(180 * (1.0f - t * 0.5f)), 255, 255, 255), 2.5f))
+                {
+                    for (int i = 2; i < pts.Length - 1; i++)
+                    {
+                        g.DrawLine(liquidEdge, pts[i], pts[i + 1]);
+                    }
+                }
+            }
+        }
+
+        private void RenderMatrixRainTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            int cols = 20;
+            float colW = (float)rect.Width / cols;
+            using (GraphicsPath colPath = new GraphicsPath())
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    float offset = ((c * 7) % 11) / 11.0f * 0.45f;
+                    float ct = Math.Max(0.0f, Math.Min(1.0f, (t - offset) / 0.55f));
+                    if (ct > 0)
+                    {
+                        colPath.AddRectangle(new RectangleF(rect.X + c * colW, rect.Y, colW + 0.5f, rect.Height * ct));
+                    }
+                }
+                if (colPath.PointCount > 0)
+                {
+                    GraphicsState gs = g.Save();
+                    g.SetClip(colPath, CombineMode.Intersect);
+                    DrawSlideFull(g, rect, toSlide, scale);
+                    g.Restore(gs);
+
+                    // Matrix Green Neon Leading Edge Sparkles
+                    using (SolidBrush headBrush = new SolidBrush(Color.FromArgb(220, 74, 222, 128)))
+                    using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            float offset = ((c * 7) % 11) / 11.0f * 0.45f;
+                            float ct = Math.Max(0.0f, Math.Min(1.0f, (t - offset) / 0.55f));
+                            if (ct > 0 && ct < 1.0f)
+                            {
+                                float curY = rect.Y + rect.Height * ct;
+                                g.FillRectangle(headBrush, rect.X + c * colW, curY - 4, colW, 4);
+                                g.FillRectangle(whiteBrush, rect.X + c * colW + colW / 2f - 2, curY - 2, 4, 2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void RenderNeonPulseTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float cx = rect.X + rect.Width / 2f;
+            float cy = rect.Y + rect.Height / 2f;
+            float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) / 2f;
+            float r = t * maxR;
+
+            using (GraphicsPath circlePath = new GraphicsPath())
+            {
+                circlePath.AddEllipse(cx - r, cy - r, r * 2f, r * 2f);
+                GraphicsState gs = g.Save();
+                g.SetClip(circlePath, CombineMode.Intersect);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+
+                if (t < 0.98f)
+                {
+                    using (Pen p1 = new Pen(Color.FromArgb((int)(140 * (1.0f - t)), 168, 85, 247), 8f))
+                    using (Pen p2 = new Pen(Color.FromArgb((int)(200 * (1.0f - t)), 6, 182, 212), 4f))
+                    using (Pen p3 = new Pen(Color.FromArgb((int)(255 * (1.0f - t)), 255, 255, 255), 1.5f))
+                    {
+                        g.DrawEllipse(p1, cx - r, cy - r, r * 2f, r * 2f);
+                        g.DrawEllipse(p2, cx - r, cy - r, r * 2f, r * 2f);
+                        g.DrawEllipse(p3, cx - r, cy - r, r * 2f, r * 2f);
+                    }
+                }
+            }
+        }
+
+        private void RenderPortalWarpTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float cx = rect.X + rect.Width / 2f;
+            float cy = rect.Y + rect.Height / 2f;
+            float pw = rect.Width * t;
+            float ph = rect.Height * t;
+
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t * 0.8f);
+
+            using (GraphicsPath portalPath = new GraphicsPath())
+            {
+                portalPath.AddEllipse(cx - pw / 2f, cy - ph / 2f, Math.Max(1f, pw), Math.Max(1f, ph));
+                GraphicsState gs = g.Save();
+                g.SetClip(portalPath, CombineMode.Intersect);
+                float toScale = 0.7f + t * 0.3f;
+                float tw = rect.Width * toScale;
+                float th = rect.Height * toScale;
+                DrawSlideFull(g, new RectangleF(cx - tw / 2f, cy - th / 2f, tw, th), toSlide, scale);
+                g.Restore(gs);
+
+                if (t > 0.02f && t < 0.98f)
+                {
+                    using (Pen plasmaPen = new Pen(Color.FromArgb((int)(180 * (1.0f - t)), 236, 72, 153), 6f))
+                    using (Pen cyanPen = new Pen(Color.FromArgb((int)(220 * (1.0f - t)), 56, 189, 248), 2.5f))
+                    {
+                        g.DrawEllipse(plasmaPen, cx - pw / 2f, cy - ph / 2f, pw, ph);
+                        g.DrawEllipse(cyanPen, cx - pw / 2f, cy - ph / 2f, pw, ph);
+                    }
+                }
+            }
+        }
+
+        private void RenderSupernovaTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float cx = rect.X + rect.Width / 2f;
+            float cy = rect.Y + rect.Height / 2f;
+            float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) / 2f;
+
+            if (t < 0.3f)
+            {
+                float blastT = t / 0.3f;
+                DrawSlideFull(g, rect, fromSlide, scale);
+                float coreR = blastT * maxR * 0.4f;
+                using (SolidBrush coreBrush = new SolidBrush(Color.FromArgb((int)(220 * blastT), 255, 255, 255)))
+                using (SolidBrush amberBrush = new SolidBrush(Color.FromArgb((int)(160 * blastT), 245, 158, 11)))
+                {
+                    g.FillEllipse(amberBrush, cx - coreR, cy - coreR, coreR * 2f, coreR * 2f);
+                    g.FillEllipse(coreBrush, cx - coreR * 0.6f, cy - coreR * 0.6f, coreR * 1.2f, coreR * 1.2f);
+                }
+            }
+            else
+            {
+                float blastT = (t - 0.3f) / 0.7f;
+                DrawSlideFull(g, rect, toSlide, scale);
+                DrawSlideFull(g, rect, fromSlide, scale, 1.0f - blastT);
+
+                // Golden Radial Sunburst Rays
+                int rays = 12;
+                using (SolidBrush rayBrush = new SolidBrush(Color.FromArgb((int)(160 * (1.0f - blastT)), 245, 158, 11)))
+                {
+                    for (int i = 0; i < rays; i++)
+                    {
+                        double angle = i * Math.PI * 2.0 / rays + blastT * 0.5;
+                        PointF p1 = new PointF((float)(cx + Math.Cos(angle) * maxR * blastT), (float)(cy + Math.Sin(angle) * maxR * blastT));
+                        PointF p2 = new PointF((float)(cx + Math.Cos(angle + 0.15) * maxR * blastT), (float)(cy + Math.Sin(angle + 0.15) * maxR * blastT));
+                        g.FillPolygon(rayBrush, new PointF[] { new PointF(cx, cy), p1, p2 });
+                    }
+                }
+            }
+        }
+
+        private void RenderHologramGlitchTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, toSlide, scale);
+            int strips = 12;
+            float sh = (float)rect.Height / strips;
+            for (int s = 0; s < strips; s++)
+            {
+                float sy = rect.Y + s * sh;
+                float jitter = (float)Math.Sin(s * 13.7f + t * 35.0f) * (1.0f - t) * 50.0f;
+                GraphicsState gs = g.Save();
+                g.IntersectClip(new RectangleF(rect.X, sy, rect.Width, sh));
+                DrawSlideFull(g, new RectangleF(rect.X + jitter, rect.Y, rect.Width, rect.Height), fromSlide, scale, 1.0f - t);
+                g.Restore(gs);
+
+                // Cyan scanline
+                if (s % 2 == 0 && t < 0.85f)
+                {
+                    using (Pen cyanScan = new Pen(Color.FromArgb((int)(80 * (1.0f - t)), 6, 182, 212), 1.0f))
+                    {
+                        g.DrawLine(cyanScan, rect.X, sy, rect.Right, sy);
+                    }
+                }
+            }
+        }
+
+        private void RenderKaleidoscopeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float cx = rect.X + rect.Width / 2f;
+            float cy = rect.Y + rect.Height / 2f;
+            float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) / 2f;
+            int facets = 8;
+
+            using (GraphicsPath kaleido = new GraphicsPath())
+            {
+                for (int i = 0; i < facets; i++)
+                {
+                    double a1 = i * Math.PI * 2.0 / facets;
+                    double a2 = a1 + (Math.PI * 2.0 / facets) * t;
+                    PointF p1 = new PointF((float)(cx + Math.Cos(a1) * maxR), (float)(cy + Math.Sin(a1) * maxR));
+                    PointF p2 = new PointF((float)(cx + Math.Cos(a2) * maxR), (float)(cy + Math.Sin(a2) * maxR));
+                    kaleido.AddPolygon(new PointF[] { new PointF(cx, cy), p1, p2 });
+                }
+                GraphicsState gs = g.Save();
+                g.SetClip(kaleido, CombineMode.Intersect);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+
+                if (t < 0.95f)
+                {
+                    using (Pen facetPen = new Pen(Color.FromArgb((int)(160 * (1.0f - t)), 139, 92, 246), 1.5f))
+                    {
+                        for (int i = 0; i < facets; i++)
+                        {
+                            double a = i * Math.PI * 2.0 / facets + t * 0.3;
+                            g.DrawLine(facetPen, cx, cy, (float)(cx + Math.Cos(a) * maxR), (float)(cy + Math.Sin(a) * maxR));
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DrawGoldenStarCard(Graphics g, float cx, float cy, float r, float rotationAngle, int alpha)
+        {
+            if (r <= 1.0f || alpha <= 0) return;
+            PointF[] starPts = new PointF[10];
+            float innerR = r * 0.44f;
+            for (int i = 0; i < 10; i++)
+            {
+                double angle = rotationAngle - Math.PI / 2.0 + i * Math.PI / 5.0;
+                float curR = (i % 2 == 0) ? r : innerR;
+                starPts[i] = new PointF(cx + (float)(Math.Cos(angle) * curR), cy + (float)(Math.Sin(angle) * curR));
+            }
+
+            // Vibrant golden yellow star fill
+            using (SolidBrush goldBrush = new SolidBrush(Color.FromArgb(alpha, 250, 204, 21))) // #FACC15
+            {
+                g.FillPolygon(goldBrush, starPts);
+            }
+
+            // Crisp clean white outline seam ("đường kẽ trắng để nhìn ra ngôi sao")
+            using (Pen whitePen = new Pen(Color.FromArgb(alpha, 255, 255, 255), 2.5f) { LineJoin = LineJoin.Round })
+            {
+                g.DrawPolygon(whitePen, starPts);
+            }
+
+            // Central amber jewel highlight
+            using (SolidBrush jewelBrush = new SolidBrush(Color.FromArgb((int)(alpha * 0.85f), 245, 158, 11)))
+            {
+                g.FillEllipse(jewelBrush, cx - innerR * 0.5f, cy - innerR * 0.5f, innerR, innerR);
+            }
+        }
+
+        private void RenderStarlightTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            float screenCx = rect.X + rect.Width / 2f;
+            float screenCy = rect.Y + rect.Height / 2f;
+            float maxDiag = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height);
+
+            if (t < 0.5f)
+            {
+                DrawSlideFull(g, rect, fromSlide, scale);
+            }
+            else
+            {
+                DrawSlideFull(g, rect, toSlide, scale);
+            }
+
+            int cols = 7;
+            int rows = 4;
+            float cw = (float)rect.Width / cols;
+            float ch = (float)rect.Height / rows;
+            float starRadius = Math.Max(cw, ch) * 0.82f;
+
+            if (t < 0.5f)
+            {
+                // Phase 1: Grid of Golden Stars with White Seams fly IN from all edges to blanket the screen
+                float p = t / 0.5f; // 0.0 -> 1.0
+                float pIn = (float)Math.Sin(p * Math.PI / 2.0); // smooth deceleration
+
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        float targetX = rect.X + (c + 0.5f) * cw;
+                        float targetY = rect.Y + (r + 0.5f) * ch;
+
+                        // Radial vector from screen center to target
+                        float dx = targetX - screenCx;
+                        float dy = targetY - screenCy;
+                        float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                        float angle = (float)Math.Atan2(dy, dx);
+
+                        float startDist = dist + maxDiag * 0.85f;
+                        float curDist = startDist + (dist - startDist) * pIn;
+                        float curX = screenCx + (float)Math.Cos(angle) * curDist;
+                        float curY = screenCy + (float)Math.Sin(angle) * curDist;
+
+                        float curRot = (1.0f - pIn) * ((r + c) % 2 == 0 ? 1.5f : -1.5f);
+                        float curR = starRadius * (0.3f + 0.7f * pIn);
+                        int alpha = Math.Min(255, (int)(255 * Math.Min(1.0f, pIn * 1.5f)));
+
+                        DrawGoldenStarCard(g, curX, curY, curR, curRot, alpha);
+                    }
+                }
+            }
+            else
+            {
+                // Phase 2: Golden Stars EXPLODE OUTWARD in all directions (scatter off screen)
+                float p = (t - 0.5f) / 0.5f; // 0.0 -> 1.0
+                float pOut = p * p; // smooth acceleration outward
+
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        float targetX = rect.X + (c + 0.5f) * cw;
+                        float targetY = rect.Y + (r + 0.5f) * ch;
+
+                        float dx = targetX - screenCx;
+                        float dy = targetY - screenCy;
+                        float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                        float angle = (float)Math.Atan2(dy, dx);
+
+                        float endDist = dist + maxDiag * 1.1f;
+                        float curDist = dist + (endDist - dist) * pOut;
+                        float curX = screenCx + (float)Math.Cos(angle) * curDist;
+                        float curY = screenCy + (float)Math.Sin(angle) * curDist;
+
+                        float curRot = pOut * ((r + c) % 2 == 0 ? 2.5f : -2.5f);
+                        float curR = starRadius * Math.Max(0.1f, 1.0f - pOut * 0.3f);
+                        int alpha = Math.Max(0, (int)(255 * (1.0f - pOut)));
+
+                        DrawGoldenStarCard(g, curX, curY, curR, curRot, alpha);
+                    }
+                }
+            }
+        }
+
+        private void RenderGoldenRibbonTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            DrawSlideFull(g, rect, fromSlide, scale);
+            float sweepX = rect.X + rect.Width * t;
+
+            using (GraphicsPath ribbonPath = new GraphicsPath())
+            {
+                ribbonPath.AddLine(rect.X, rect.Y, sweepX, rect.Y);
+                ribbonPath.AddBezier(sweepX, rect.Y, sweepX - 40, rect.Y + rect.Height / 3f, sweepX + 40, rect.Y + rect.Height * 2f / 3f, sweepX, rect.Bottom);
+                ribbonPath.AddLine(sweepX, rect.Bottom, rect.X, rect.Bottom);
+                ribbonPath.CloseFigure();
+
+                GraphicsState gs = g.Save();
+                g.SetClip(ribbonPath, CombineMode.Intersect);
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gs);
+
+                if (t < 0.98f)
+                {
+                    using (Pen ribPen = new Pen(Color.FromArgb((int)(220 * (1.0f - t * 0.4f)), 245, 158, 11), 5f))
+                    using (Pen ribCore = new Pen(Color.FromArgb(254, 240, 138), 1.5f))
+                    {
+                        PointF[] bPts = new PointF[] {
+                            new PointF(sweepX, rect.Y),
+                            new PointF(sweepX - 40, rect.Y + rect.Height / 3f),
+                            new PointF(sweepX + 40, rect.Y + rect.Height * 2f / 3f),
+                            new PointF(sweepX, rect.Bottom)
+                        };
+                        g.DrawBeziers(ribPen, bPts);
+                        g.DrawBeziers(ribCore, bPts);
+                    }
+                }
+            }
+        }
+
+        private float GetFlowNormalizedPosition(ShapeNode sh, TransitionDirection dir)
+        {
+            if (sh == null) return 0f;
+            float canvasW = (float)Presentation.CanvasWidth;
+            float canvasH = (float)Presentation.CanvasHeight;
+            float cx = sh.Transform.X + sh.Transform.Width / 2f;
+            float cy = sh.Transform.Y + sh.Transform.Height / 2f;
+
+            switch (dir)
+            {
+                case TransitionDirection.FromLeft:
+                    // Flow to right: leftmost (smallest X) is trailing, rightmost (largest X) is leading
+                    return Math.Max(0.0f, Math.Min(1.0f, 1.0f - (cx / canvasW)));
+
+                case TransitionDirection.FromTop:
+                    // Flow downwards: topmost is trailing, bottommost is leading
+                    return Math.Max(0.0f, Math.Min(1.0f, 1.0f - (cy / canvasH)));
+
+                case TransitionDirection.FromBottom:
+                    // Flow upwards: bottommost is trailing, topmost is leading
+                    return Math.Max(0.0f, Math.Min(1.0f, cy / canvasH));
+
+                case TransitionDirection.FromRight:
+                default:
+                    // Flow to left: leftmost is leading (0.0), rightmost is trailing (1.0)
+                    return Math.Max(0.0f, Math.Min(1.0f, cx / canvasW));
+            }
+        }
+
+        private float CanvaEaseInOut(float t)
+        {
+            if (t <= 0.0f) return 0.0f;
+            if (t >= 1.0f) return 1.0f;
+            return (t < 0.5f)
+                ? (float)(8.0 * t * t * t * t)
+                : (float)(1.0 - Math.Pow(-2.0 * t + 2.0, 4) / 2.0);
+        }
+
+        private void RenderCanvaFlowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        {
+            GraphicsState gsClip = g.Save();
+            g.IntersectClip(rect);
+
+            TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
+            float vx = -1.0f, vy = 0.0f; // Default: From Right -> flow leftwards
+            if (dir == TransitionDirection.FromLeft) { vx = 1.0f; vy = 0.0f; }
+            else if (dir == TransitionDirection.FromTop) { vx = 0.0f; vy = 1.0f; }
+            else if (dir == TransitionDirection.FromBottom) { vx = 0.0f; vy = -1.0f; }
+
+            float slideCanvasW = (float)rect.Width;
+            float slideCanvasH = (float)rect.Height;
+
+            // 1. Layer 1: Background Parallax Camera Glide (Tầng nền trôi êm 0.40x)
+            float bgEase = CanvaEaseInOut(t);
+            float bgParallax = 0.40f;
+            if (fromSlide != null)
+            {
+                RectangleF bgRectA = new RectangleF(
+                    rect.X + vx * slideCanvasW * bgEase * bgParallax,
+                    rect.Y + vy * slideCanvasH * bgEase * bgParallax,
+                    rect.Width, rect.Height);
+                DrawSlideBackground(g, bgRectA, fromSlide);
+            }
+            if (toSlide != null && bgEase > 0.01f)
+            {
+                RectangleF bgRectB = new RectangleF(
+                    rect.X - vx * slideCanvasW * (1.0f - bgEase) * bgParallax,
+                    rect.Y - vy * slideCanvasH * (1.0f - bgEase) * bgParallax,
+                    rect.Width, rect.Height);
+                DrawSlideBackground(g, bgRectB, toSlide);
+            }
+
+            // 2. Layer 2: Slide A Outflowing Objects (Chảy so le đa tầng độc lập, có trước sau mượt mà giống hệt slide sau)
+            if (fromSlide != null && fromSlide.Shapes != null && t < 0.98f)
+            {
+                int countA = fromSlide.Shapes.Count;
+                float axisDist = (vx != 0) ? slideCanvasW : slideCanvasH;
+                for (int i = 0; i < countA; i++)
+                {
+                    ShapeNode sh = fromSlide.Shapes[i];
+                    if (sh == null) continue;
+
+                    // Vị trí không gian của vật phẩm (0.0: đầu dòng chảy, 1.0: cuối dòng chảy)
+                    float pos = GetFlowNormalizedPosition(sh, dir);
+
+                    // Khởi hành so le: vật phẩm ở đầu dòng xuất phát trước, ở sau xuất phát sau
+                    float tStart = pos * 0.30f;
+                    if (t < tStart)
+                    {
+                        // Chưa đến giờ bay: đứng yên trên slide
+                        DrawShape(g, rect.X, rect.Y, scale, sh, false, 1.0f);
+                        continue;
+                    }
+
+                    // Thời gian bay độc lập cho từng vật phẩm (không dính chung một nhịp)
+                    float duration = 0.68f;
+                    float u = Math.Min(1.0f, (t - tStart) / duration);
+
+                    // Đường cong lướt êm ái tự nhiên giống hệt slide sau
+                    float easeOut = 1.0f - (float)Math.Pow(1.0f - u, 2.4);
+                    float travelDist = axisDist * (1.15f + 0.25f * (1.0f - pos));
+
+                    float moveX = vx * travelDist * easeOut;
+                    float moveY = vy * travelDist * easeOut;
+
+                    float posX = rect.X + moveX;
+                    float posY = rect.Y + moveY;
+
+                    // Vẽ phẳng 2D 100% độ rõ (không fade out giữa chừng, tràn ra khỏi mép khung hình)
+                    DrawShape(g, posX, posY, scale, sh, false, 1.0f);
+                }
+            }
+
+            // 3. Layer 3: Slide B Inflowing Objects (Chảy phẳng 2D đặc 100%, tràn so le từ mép ngoài vào trong)
+            if (toSlide != null && toSlide.Shapes != null && t > 0.02f)
+            {
+                int countB = toSlide.Shapes.Count;
+                float axisDist = (vx != 0) ? slideCanvasW : slideCanvasH;
+                for (int j = 0; j < countB; j++)
+                {
+                    ShapeNode sh = toSlide.Shapes[j];
+                    if (sh == null) continue;
+
+                    if (IsPresenting || IsPreviewingTransition)
+                    {
+                        bool isVis;
+                        float offX, offY, scX, scY, rDelta, opMul;
+                        GetShapeAnimationTransform(sh, toSlide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                        if (!isVis) continue;
+                    }
+
+                    // Vị trí đích đến của vật phẩm (0.0: sâu trong slide nhất, 1.0: sát mép đón nhất)
+                    float pos = GetFlowNormalizedPosition(sh, dir);
+
+                    // Khởi hành so le: vật phẩm đi sâu vào trước, vật phẩm ở gần vào sau
+                    float tIn = 0.02f + pos * 0.30f;
+                    if (t < tIn) continue; // Chưa đến lượt bay vào
+
+                    // Thời gian bay độc lập cho từng vật phẩm
+                    float durationIn = 0.68f;
+                    float u = Math.Min(1.0f, (t - tIn) / durationIn);
+
+                    // Đường cong êm ái đồng bộ với slide trước
+                    float easeIn = 1.0f - (float)Math.Pow(1.0f - u, 2.4);
+                    float startDist = axisDist * (1.15f + 0.25f * pos);
+
+                    float remDist = (1.0f - easeIn);
+                    float moveX = -vx * startDist * remDist;
+                    float moveY = -vy * startDist * remDist;
+
+                    float posX = rect.X + moveX;
+                    float posY = rect.Y + moveY;
+
+                    // Vẽ phẳng 2D 100% độ rõ (tràn từ bên ngoài vào đúng đích)
+                    DrawShape(g, posX, posY, scale, sh, false, 1.0f);
+                }
+            }
+
+            g.Restore(gsClip);
+        }
+
+        private Color InterpolateColor(Color c1, Color c2, float t)
+        {
+            int r = (int)(c1.R + (c2.R - c1.R) * t);
+            int g = (int)(c1.G + (c2.G - c1.G) * t);
+            int b = (int)(c1.B + (c2.B - c1.B) * t);
+            return Color.FromArgb(Math.Max(0, Math.Min(255, r)), Math.Max(0, Math.Min(255, g)), Math.Max(0, Math.Min(255, b)));
+        }
+        #endregion
+
+        #region Other Presentation Views
+        private void DrawOutlineView(Graphics g, int x, int y, int w, int h)
+        {
+            g.FillRectangle(Brushes.White, x, y, w, h);
+            int py = y + 20;
+            using (Font titleFont = new Font("Segoe UI", 12.0f, FontStyle.Bold))
+            using (Font bodyFont = new Font("Segoe UI", 10.0f, FontStyle.Regular))
+            {
+                g.DrawString("📋 CHẾ ĐỘ XEM DÀN BÀI (OUTLINE VIEW)", titleFont, Brushes.DarkOrange, x + 30, py);
+                py += 35;
+
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    SlideNode slide = Presentation.Slides[i];
+                    g.DrawString("Slide " + (i + 1) + ": " + slide.Title, titleFont, (i == ActiveSlideIndex) ? Brushes.OrangeRed : Brushes.Black, x + 40, py);
+                    py += 24;
+
+                    foreach (ShapeNode shape in slide.Shapes)
+                    {
+                        if (!string.IsNullOrEmpty(shape.Text))
+                        {
+                            foreach (string line in shape.Text.Split('\n'))
+                            {
+                                g.DrawString("    • " + line, bodyFont, Brushes.DimGray, x + 60, py);
+                                py += 20;
+                            }
+                        }
+                    }
+                    py += 10;
+                }
+            }
+        }
+
+        private void DrawNotesView(Graphics g, int x, int y, int w, int h)
+        {
+            using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
+            {
+                g.FillRectangle(stageBg, x, y, w, h);
+            }
+
+            int pageW = 480;
+            int pageH = 640;
+            int pageX = x + (w - pageW) / 2;
+            int pageY = y + 20;
+
+            Rectangle pageRect = new Rectangle(pageX, pageY, pageW, pageH);
+            g.FillRectangle(Brushes.White, pageRect);
+            g.DrawRectangle(Pens.Gray, pageRect);
+
+            int miniW = pageW - 40;
+            int miniH = miniW * 9 / 16;
+            Rectangle miniRect = new Rectangle(pageX + 20, pageY + 20, miniW, miniH);
+
+            SlideNode slide = ActiveSlide;
+            if (slide != null)
+            {
+                DrawSlideBackground(g, miniRect, slide);
+                g.DrawRectangle(Pens.LightGray, miniRect);
+            }
+
+            int notesY = miniRect.Bottom + 20;
+            int notesH = pageH - (notesY - pageY) - 20;
+            Rectangle notesRect = new Rectangle(pageX + 20, notesY, miniW, notesH);
+            g.DrawRectangle(Pens.Silver, notesRect);
+
+            using (Font headerFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font notesFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+            {
+                g.DrawString("GHI CHÚ DIỄN GIẢ (SPEAKER NOTES):", headerFont, Brushes.DarkOrange, notesRect.X + 8, notesRect.Y + 8);
+                string notesText = (slide != null && !string.IsNullOrEmpty(slide.SpeakerNotes)) ? slide.SpeakerNotes : "Nhấp vào đây để thêm ghi chú cho slide...";
+                g.DrawString(notesText, notesFont, Brushes.Black, new RectangleF(notesRect.X + 8, notesRect.Y + 30, notesRect.Width - 16, notesRect.Height - 40));
+            }
+        }
+
+        private void DrawSlideSorterView(Graphics g, int x, int y, int w, int h)
+        {
+            using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
+            {
+                g.FillRectangle(stageBg, x, y, w, h);
+            }
+
+            int cardW = 240;
+            int cardH = Presentation.IsWidescreen ? (cardW * 9 / 16) : (cardW * 3 / 4);
+            int padding = 30;
+            int cols = Math.Max(1, (w - padding) / (cardW + padding));
+
+            using (Font titleFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+            {
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    int row = i / cols;
+                    int col = i % cols;
+
+                    int cx = x + padding + col * (cardW + padding);
+                    int cy = y + padding + row * (cardH + padding + 30);
+
+                    Rectangle cardRect = new Rectangle(cx, cy, cardW, cardH);
+                    SlideNode s = Presentation.Slides[i];
+
+                    g.FillRectangle(Brushes.White, cardRect);
+                    Color borderCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.LightGray;
+                    using (Pen bPen = new Pen(borderCol, (i == ActiveSlideIndex) ? 2.5f : 1.0f))
+                    {
+                        g.DrawRectangle(bPen, cardRect);
+                    }
+
+                    float miniScale = (float)cardW / Presentation.CanvasWidth;
+                    GraphicsState state = g.Save();
+                    g.SetClip(cardRect);
+
+                    DrawSlideBackground(g, cardRect, s);
+
+                    foreach (ShapeNode shape in s.Shapes)
+                    {
+                        int mx = cx + (int)(shape.Transform.X * miniScale);
+                        int my = cy + (int)(shape.Transform.Y * miniScale);
+                        int mw = Math.Max(2, (int)(shape.Transform.Width * miniScale));
+                        int mh = Math.Max(2, (int)(shape.Transform.Height * miniScale));
+
+                        Color fillCol = Color.FromArgb(shape.FillColor | unchecked((int)0xFF000000));
+                        using (SolidBrush miniBrush = new SolidBrush(fillCol))
+                        {
+                            g.FillRectangle(miniBrush, mx, my, mw, mh);
+                        }
+                    }
+                    g.Restore(state);
+
+                    g.DrawString("Slide " + (i + 1) + ": " + s.Title, titleFont, (i == ActiveSlideIndex) ? Brushes.DarkOrange : Brushes.Black, cx, cy + cardH + 6);
+                }
+            }
+        }
+
+        private void DrawSlideMasterView(Graphics g, int x, int y, int w, int h)
+        {
+            using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
+            {
+                g.FillRectangle(stageBg, x, y, w, h);
+            }
+
+            int slideW = (int)(960 * ZoomLevel);
+            int slideH = (int)(540 * ZoomLevel);
+            int slideX = x + (w - slideW) / 2;
+            int slideY = y + (h - slideH) / 2;
+
+            Rectangle masterRect = new Rectangle(slideX, slideY, slideW, slideH);
+            g.FillRectangle(Brushes.White, masterRect);
+            g.DrawRectangle(Pens.DarkRed, masterRect);
+
+            using (Font titleFont = new Font("Segoe UI", 16.0f, FontStyle.Bold))
+            using (Font subFont = new Font("Segoe UI", 10.0f, FontStyle.Italic))
+            {
+                g.DrawString("🎨 CHẾ ĐỘ XEM SLIDE MASTER TEMPLATE", titleFont, Brushes.DarkRed, slideX + 40, slideY + 40);
+                g.DrawString("Định hình tiêu đề toàn cục, chân trang, phông chữ và bố cục định sẵn...", subFont, Brushes.DimGray, slideX + 40, slideY + 80);
+            }
+        }
+        #endregion
+
+        #region Mouse & Keyboard Interaction Handlers
+        public void HandleMouseDown(Point mousePos, int width, int height, MouseButtons buttons = MouseButtons.Left, Control parentControl = null)
+        {
+            if (IsPresenting)
+            {
+                // Nếu đang ở Màn hình Đen Kết thúc Slide Show
+                if (IsEndSlideShowScreen)
+                {
+                    if (buttons == MouseButtons.Right)
+                    {
+                        IsEndSlideShowScreen = false;
+                    }
+                    else
+                    {
+                        IsEndSlideShowScreen = false;
+                        StopPresenting();
+                    }
+                    return;
+                }
+
+                // 1. Nếu đang mở bảng chọn tất cả Slide (Slide Sorter Modal)
+                if (IsSlideSorterModalOpen)
+                {
+                    // Nút đóng ✕
+                    if (mousePos.Y >= 15 && mousePos.Y <= 55 && mousePos.X >= width - 155 && mousePos.X <= width - 35)
+                    {
+                        IsSlideSorterModalOpen = false;
+                        return;
+                    }
+
+                    int cols = 4;
+                    int cardW = (width - 120) / cols;
+                    float ratio = Presentation.IsWidescreen ? (9.0f / 16.0f) : (3.0f / 4.0f);
+                    int cardH = (int)(cardW * ratio);
+                    int startX = 40;
+                    int startY = 80;
+
+                    for (int i = 0; i < Presentation.Slides.Count; i++)
+                    {
+                        int row = i / cols;
+                        int col = i % cols;
+                        int cx = startX + col * (cardW + 18);
+                        int cy = startY + row * (cardH + 36);
+
+                        Rectangle cardRect = new Rectangle(cx, cy, cardW, cardH);
+                        if (cardRect.Contains(mousePos))
+                        {
+                            int prev = ActiveSlideIndex;
+                            ActiveSlideIndex = i;
+                            IsSlideSorterModalOpen = false;
+                            TriggerTransition(prev, ActiveSlideIndex, false);
+                            return;
+                        }
+                    }
+
+                    // Nhấp ra ngoài đóng modal
+                    IsSlideSorterModalOpen = false;
+                    return;
+                }
+
+                // 2. Nếu đang ở Chế độ Diễn giả (Presenter View)
+                if (IsPresenterViewMode)
+                {
+                    // Top Bar clicks
+                    if (mousePos.Y <= 46)
+                    {
+                        // Nút Tạm dừng (210..310)
+                        if (mousePos.X >= 210 && mousePos.X <= 310)
+                        {
+                            IsPresentationTimerPaused = !IsPresentationTimerPaused;
+                            if (IsPresentationTimerPaused) LastPresentationPauseTime = DateTime.Now;
+                            else PresentationStartTime += (DateTime.Now - LastPresentationPauseTime);
+                            return;
+                        }
+                        // Nút Đặt lại (320..410)
+                        if (mousePos.X >= 320 && mousePos.X <= 410)
+                        {
+                            PresentationStartTime = DateTime.Now;
+                            PresentationPausedElapsed = TimeSpan.Zero;
+                            IsPresentationTimerPaused = false;
+                            return;
+                        }
+                        // Cài đặt hiển thị (420..590)
+                        if (mousePos.X >= 420 && mousePos.X <= 590)
+                        {
+                            ShowDisplaySettingsMenu(parentControl, mousePos);
+                            return;
+                        }
+                        // Kết thúc trình chiếu (width - 200..width - 16)
+                        if (mousePos.X >= width - 200 && mousePos.X <= width - 16)
+                        {
+                            StopPresenting();
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+
+                    // Bottom Bar clicks
+                    if (mousePos.Y >= height - 65)
+                    {
+                        // Lùi (24..70)
+                        if (mousePos.X >= 24 && mousePos.X <= 70)
+                        {
+                            PreviousPresenterStep();
+                            return;
+                        }
+                        // Tiến (160..206)
+                        if (mousePos.X >= 160 && mousePos.X <= 206)
+                        {
+                            AdvancePresenterStep();
+                            return;
+                        }
+                        // Bút & Laser (240..350)
+                        if (mousePos.X >= 240 && mousePos.X <= 350)
+                        {
+                            ShowPenOptionsMenu(parentControl, new Point(mousePos.X, height - 70));
+                            return;
+                        }
+                        // Tất cả Slide Grid (360..490)
+                        if (mousePos.X >= 360 && mousePos.X <= 490)
+                        {
+                            IsSlideSorterModalOpen = true;
+                            return;
+                        }
+                        // Zoom (500..590)
+                        if (mousePos.X >= 500 && mousePos.X <= 590)
+                        {
+                            IsSlideZoomActive = !IsSlideZoomActive;
+                            SlideZoomCenter = new Point(width / 4, height / 2);
+                            return;
+                        }
+                        // Màn đen (600..720)
+                        if (mousePos.X >= 600 && mousePos.X <= 720)
+                        {
+                            BlackScreenMode = !BlackScreenMode;
+                            return;
+                        }
+                    }
+
+                    // Nút Zoom chữ A- / A+ trong khung Ghi chú
+                    int nextH = (int)((height - 46 - 8 - 65 - 8) * 0.44f);
+                    int notesY = 46 + 8 + nextH + 10;
+                    if (mousePos.Y >= notesY && mousePos.Y <= notesY + 22)
+                    {
+                        if (mousePos.X >= width - 80 && mousePos.X <= width - 54)
+                        {
+                            PresenterNotesFontSize = Math.Max(10, PresenterNotesFontSize - 2);
+                            return;
+                        }
+                        if (mousePos.X >= width - 48 && mousePos.X <= width - 22)
+                        {
+                            PresenterNotesFontSize = Math.Min(28, PresenterNotesFontSize + 2);
+                            return;
+                        }
+                    }
+
+                    // Nhấp vào màn hình slide chính bên trái
+                    if (buttons == MouseButtons.Left)
+                    {
+                        AdvancePresenterStep();
+                    }
+                    else if (buttons == MouseButtons.Right)
+                    {
+                        PreviousPresenterStep();
+                    }
+                    return;
+                }
+
+                // 3. Chế độ Chiếu Fullscreen thông thường
+                // Kiểm tra nhấp vào Thanh công cụ ghi thời gian Rehearsal Floating Toolbar
+                if (IsRehearsingTimings && _rehearsalToolbarRect.Contains(mousePos))
+                {
+                    int rx = mousePos.X - _rehearsalToolbarRect.X;
+                    int ry = mousePos.Y - _rehearsalToolbarRect.Y;
+
+                    // Close button [✕]
+                    if (rx >= _rehearsalToolbarRect.Width - 24 && ry <= 20)
+                    {
+                        StopPresenting();
+                        return;
+                    }
+
+                    // Next button [➜]
+                    if (rx >= 6 && rx <= 30 && ry >= 26)
+                    {
+                        AdvancePresenterStep();
+                        return;
+                    }
+
+                    // Pause / Resume button [❚❚] / [▶]
+                    if (rx >= 34 && rx <= 58 && ry >= 26)
+                    {
+                        IsRehearsalPaused = !IsRehearsalPaused;
+                        if (IsRehearsalPaused)
+                        {
+                            RehearsalSlideElapsed += DateTime.Now - RehearsalSlideStartTime;
+                            RehearsalTotalElapsed += DateTime.Now - RehearsalTotalStartTime;
+                        }
+                        else
+                        {
+                            RehearsalSlideStartTime = DateTime.Now;
+                            RehearsalTotalStartTime = DateTime.Now;
+                        }
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+
+                    // Repeat button [↺]
+                    if (rx >= 136 && rx <= 160 && ry >= 26)
+                    {
+                        RehearsalSlideStartTime = DateTime.Now;
+                        RehearsalSlideElapsed = TimeSpan.Zero;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+
+                    return;
+                }
+
+                // Kiểm tra nhấp vào Thanh công cụ nổi 6 nút ở góc dưới bên trái
+                int clickedBtn = GetHoverToolbarButtonAt(mousePos, height);
+                if (clickedBtn >= 0)
+                {
+                    switch (clickedBtn)
+                    {
+                        case 0: // < (Prev)
+                            PreviousPresenterStep();
+                            break;
+                        case 1: // > (Next)
+                            AdvancePresenterStep();
+                            break;
+                        case 2: // Pen & Laser Menu
+                            ShowPenOptionsMenu(parentControl, new Point(24 + 2 * 36, height - 50));
+                            break;
+                        case 3: // Grid Modal
+                            IsSlideSorterModalOpen = true;
+                            break;
+                        case 4: // Zoom
+                            IsSlideZoomActive = !IsSlideZoomActive;
+                            SlideZoomCenter = mousePos;
+                            break;
+                        case 5: // ... (More Options Context Menu)
+                            ShowMoreOptionsMenu(parentControl, new Point(24 + 5 * 36, height - 50));
+                            break;
+                    }
+                    return;
+                }
+
+                if (buttons == MouseButtons.Right)
+                {
+                    ShowMoreOptionsMenu(parentControl, mousePos);
+                    return;
+                }
+
+                if (AnnotationPenMode)
+                {
+                    CurrentStroke.Clear();
+                    CurrentStroke.Add(mousePos);
+                    return;
+                }
+
+                // Tiến bước / slide hoặc phát video
+                if (buttons == MouseButtons.Left)
+                {
+                    bool clickedVideo = false;
+                    if (ActiveSlide != null)
+                    {
+                        int slideW = width;
+                        int slideH = Presentation.IsWidescreen ? (slideW * 9 / 16) : (slideW * 3 / 4);
+                        if (slideH > height)
+                        {
+                            slideH = height;
+                            slideW = Presentation.IsWidescreen ? (slideH * 16 / 9) : (slideH * 4 / 3);
+                        }
+                        int sxOffset = (width - slideW) / 2;
+                        int syOffset = (height - slideH) / 2;
+                        float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
+
+                        for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+                        {
+                            ShapeNode shape = ActiveSlide.Shapes[i];
+                            int sx = sxOffset + (int)(shape.Transform.X * scaleP);
+                            int sy = syOffset + (int)(shape.Transform.Y * scaleP);
+                            int sw = (int)(shape.Transform.Width * scaleP);
+                            int sh = (int)(shape.Transform.Height * scaleP);
+                            
+                            if (mousePos.X >= sx && mousePos.X <= sx + sw && mousePos.Y >= sy && mousePos.Y <= sy + sh)
+                            {
+                                if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
+                                {
+                                    PlayVideoPreview(shape, parentControl);
+                                    clickedVideo = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!clickedVideo)
+                    {
+                        AdvancePresenterStep();
+                    }
+                }
+                return;
+            }
+
+            if (buttons == MouseButtons.Middle)
+            {
+                IsPanningCanvas = true;
+                PanStartMouse = mousePos;
+                PanStartScroll = new Point(CanvasScrollX, CanvasScrollY);
+                return;
+            }
+
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            // 1. Left Slide Pane Click
+            if (ViewMode != ImpressViewMode.SlideSorter && mousePos.X <= leftSidebarW)
+            {
+                IsDrawingShapeMode = false;
+                IsDrawingActive = false;
+                int sidebarY = contentY;
+
+                if (mousePos.Y >= sidebarY + 8 && mousePos.Y <= sidebarY + 36)
+                {
+                    if (mousePos.X >= 8 && mousePos.X <= 100) AddSlide();
+                    else if (mousePos.X >= 106 && mousePos.X <= 198) DuplicateActiveSlide();
+                    return;
+                }
+
+                int curY = sidebarY + 44 - ThumbScrollY;
+                int thumbW = 150;
+                int thumbH = Presentation.IsWidescreen ? (thumbW * 9 / 16) : (thumbW * 3 / 4);
+                bool currentCollapsed = false;
+
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    SlideNode s = Presentation.Slides[i];
+                    if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                    {
+                        Rectangle secRect = new Rectangle(6, curY, leftSidebarW - 10, 24);
+                        if (secRect.Contains(mousePos))
+                        {
+                            if (buttons == MouseButtons.Right)
+                            {
+                                ShowSectionContextMenu(parentControl, mousePos, i);
+                                return;
+                            }
+                            else
+                            {
+                                s.IsSectionCollapsed = !s.IsSectionCollapsed;
+                                ActiveSlideIndex = i;
+                                SelectedShapeIndex = -1;
+                                EndInlineEditing();
+                                if (parentControl != null) parentControl.Invalidate();
+                                return;
+                            }
+                        }
+                        currentCollapsed = s.IsSectionCollapsed;
+                        curY += 24;
+                    }
+
+                    if (currentCollapsed) continue;
+
+                    int rowTop = (i == 0) ? curY : (curY - 8);
+                    int rowBottom = (i == Presentation.Slides.Count - 1) ? (curY + thumbH + 14) : (curY + thumbH + 6);
+
+                    if (mousePos.Y >= rowTop && mousePos.Y < rowBottom)
+                    {
+                        if (buttons == MouseButtons.Right)
+                        {
+                            ShowThumbnailContextMenu(parentControl, mousePos, i);
+                            return;
+                        }
+                        else
+                        {
+                            int prevIdx = ActiveSlideIndex;
+                            ActiveSlideIndex = i;
+                            SelectedShapeIndex = -1;
+                            EndInlineEditing();
+
+                            if (prevIdx != i && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                            {
+                                TriggerTransition(prevIdx, i, true);
+                            }
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+
+                    curY += thumbH + 14;
+                }
+
+                if (buttons == MouseButtons.Right)
+                {
+                    ShowThumbnailContextMenu(parentControl, mousePos, Math.Max(0, Presentation.Slides.Count - 1));
+                }
+                return;
+            }
+
+            // 2. Right Task Pane Click (if open)
+            if (rightSidebarW > 0 && mousePos.X >= width - rightSidebarW)
+            {
+                int panelX = width - rightSidebarW;
+                int sidebarY = contentY;
+
+                // Close Button '✕' in Header
+                if (mousePos.Y >= sidebarY && mousePos.Y <= sidebarY + 36)
+                {
+                    if (mousePos.X >= width - 32 && mousePos.X <= width - 4)
+                    {
+                        IsSidebarOpen = false;
+                        return;
+                    }
+                    return;
+                }
+
+                // Interactive Controls in Animation Pane
+                if (SidebarPanel == SidebarPanelType.AnimationPane)
+                {
+                    int btnPlayY = sidebarY + 42;
+                    if (mousePos.Y >= btnPlayY && mousePos.Y <= btnPlayY + 26)
+                    {
+                        if (IsPlayingAnimationPreview)
+                        {
+                            IsPlayingAnimationPreview = false;
+                            ActivePlayingAnimIndex = -1;
+                        }
+                        else
+                        {
+                            PlayAnimationPreview();
+                        }
+                        return;
+                    }
+
+                    SlideNode slide = ActiveSlide;
+                    if (slide != null && slide.Animations.Count > 0)
+                    {
+                        int animStartY = btnPlayY + 34;
+                        for (int i = 0; i < slide.Animations.Count; i++)
+                        {
+                            int aY = animStartY + i * 36;
+                            Rectangle animBox = new Rectangle(panelX + 8, aY, rightSidebarW - 16, 32);
+                            if (animBox.Contains(mousePos))
+                            {
+                                SelectedAnimationIndex = i;
+                                // Highlight target shape on canvas
+                                string sId = slide.Animations[i].ShapeId;
+                                for (int sIdx = 0; sIdx < slide.Shapes.Count; sIdx++)
+                                {
+                                    if (slide.Shapes[sIdx].Id == sId)
+                                    {
+                                        SelectedShapeIndex = sIdx;
+                                        if (SelectedShapeIndices != null) { SelectedShapeIndices.Clear(); SelectedShapeIndices.Add(sIdx); }
+                                        break;
+                                    }
+                                }
+
+                                if (buttons == MouseButtons.Right || mousePos.X >= animBox.Right - 22)
+                                {
+                                    ShowAnimationItemContextMenu(parentControl, mousePos, i);
+                                }
+                                else if (buttons == MouseButtons.Left)
+                                {
+                                    DraggingAnimationPaneIndex = i;
+                                    DraggingAnimationPaneTargetIndex = i;
+                                }
+
+                                if (parentControl != null) parentControl.Invalidate();
+                                return;
+                            }
+                        }
+
+                        // Bottom Reorder Toolbar (Move Earlier, Move Later, Remove)
+                        int bottomToolbarY = animStartY + slide.Animations.Count * 36 + 8;
+                        if (mousePos.Y >= bottomToolbarY && mousePos.Y <= bottomToolbarY + 24)
+                        {
+                            if (mousePos.X >= panelX + 10 && mousePos.X <= panelX + 80)
+                            {
+                                MoveAnimationEarlier();
+                                if (parentControl != null) parentControl.Invalidate();
+                                return;
+                            }
+                            else if (mousePos.X >= panelX + 85 && mousePos.X <= panelX + 155)
+                            {
+                                MoveAnimationLater();
+                                if (parentControl != null) parentControl.Invalidate();
+                                return;
+                            }
+                            else if (mousePos.X >= panelX + 160 && mousePos.X <= panelX + rightSidebarW - 10)
+                            {
+                                RemoveAnimation();
+                                if (parentControl != null) parentControl.Invalidate();
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Interactive Controls in Transitions Pane
+                if (SidebarPanel == SidebarPanelType.SlideTransitions)
+                {
+                    int btnPrevY = sidebarY + 42 + 26;
+                    if (mousePos.Y >= btnPrevY && mousePos.Y <= btnPrevY + 26)
+                    {
+                        PlayTransitionPreview();
+                        return;
+                    }
+
+                    int listY = btnPrevY + 34;
+                    int clickedTransIdx = (mousePos.Y - listY) / 28;
+                    TransitionType[] transTypes = new TransitionType[] {
+                        TransitionType.Morph, TransitionType.Fade, TransitionType.Push, TransitionType.Wipe,
+                        TransitionType.Split, TransitionType.Reveal, TransitionType.Zoom, TransitionType.RandomBars,
+                        TransitionType.Cube, TransitionType.PageCurl
+                    };
+                    if (clickedTransIdx >= 0 && clickedTransIdx < transTypes.Length && ActiveSlide != null)
+                    {
+                        ActiveSlide.Transition = transTypes[clickedTransIdx];
+                        PlayTransitionPreview();
+                        return;
+                    }
+                }
+
+                // Interactive Controls in Format Properties
+                if (SidebarPanel == SidebarPanelType.Properties && ActiveSlide != null)
+                {
+                    int colorY = sidebarY + 42 + 46;
+                    if (mousePos.Y >= colorY && mousePos.Y <= colorY + 24)
+                    {
+                        int[] bgColors = new int[] { 0xFFFFFF, 0xF8F9FA, 0xF0FDFA, 0x0F172A, 0xFEFCE8, 0xFDF4FF };
+                        int colIdx = (mousePos.X - (panelX + 12)) / 38;
+                        if (colIdx >= 0 && colIdx < bgColors.Length)
+                        {
+                            ActiveSlide.BgColor = bgColors[colIdx];
+                            return;
+                        }
+                    }
+
+                    int ratioY = colorY + 54;
+                    if (mousePos.Y >= ratioY && mousePos.Y <= ratioY + 24)
+                    {
+                        if (mousePos.X >= panelX + 12 && mousePos.X <= panelX + 127) SetSlideSize(true);
+                        else if (mousePos.X >= panelX + 135 && mousePos.X <= panelX + 250) SetSlideSize(false);
+                        return;
+                    }
+                }
+                else if (SidebarPanel == SidebarPanelType.FormatBackground && ActiveSlide != null)
+                {
+                    int sy = sidebarY + 42 + SidebarScrollY;
+                    int fillHeaderY = sy + 28;
+                    int curY = fillHeaderY + 28;
+
+                    // 4 Radio buttons
+                    if (mousePos.Y >= curY && mousePos.Y < curY + 24 * 4)
+                    {
+                        int r = (mousePos.Y - curY) / 24;
+                        if (r == 0)
+                        {
+                            ActiveSlide.BgFillType = BackgroundFillType.Solid;
+                            ActiveSlide.IsGradientBg = false;
+                        }
+                        else if (r == 1)
+                        {
+                            ActiveSlide.BgFillType = BackgroundFillType.Gradient;
+                            ActiveSlide.IsGradientBg = true;
+                            if (ActiveSlide.BgGradientStops == null || ActiveSlide.BgGradientStops.Count < 2)
+                            {
+                                ActiveSlide.BgGradientStops = new List<GradientStop>
+                                {
+                                    new GradientStop(ActiveSlide.BgColor, 0.0f),
+                                    new GradientStop(ActiveSlide.BgColor2 != 0 ? ActiveSlide.BgColor2 : 0xF3F4F6, 1.0f)
+                                };
+                            }
+                        }
+                        else if (r == 2)
+                        {
+                            ActiveSlide.BgFillType = BackgroundFillType.Picture;
+                            using (OpenFileDialog ofd = new OpenFileDialog())
+                            {
+                                ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp";
+                                if (ofd.ShowDialog() == DialogResult.OK)
+                                {
+                                    ActiveSlide.BgImagePath = ofd.FileName;
+                                    try { ActiveSlide.CachedBgImage = Image.FromFile(ofd.FileName); } catch { }
+                                }
+                            }
+                        }
+                        else if (r == 3)
+                        {
+                            ActiveSlide.BgFillType = BackgroundFillType.Pattern;
+                        }
+                        return;
+                    }
+
+                    curY += 24 * 4 + 4;
+
+                    // Checkbox: Hide background graphics
+                    if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                    {
+                        ActiveSlide.HideBackgroundGraphics = !ActiveSlide.HideBackgroundGraphics;
+                        return;
+                    }
+
+                    curY += 30;
+
+                    // Details for Gradient fill
+                    if (ActiveSlide.BgFillType == BackgroundFillType.Gradient || ActiveSlide.IsGradientBg)
+                    {
+                        // 1. Preset gradients
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                ShowPresetGradientsMenu(parentControl, Cursor.Position);
+                                return;
+                            }
+                        }
+                        curY += 30;
+
+                        // 2. Type
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + 115)
+                            {
+                                ShowGradientTypeMenu(parentControl, Cursor.Position);
+                                return;
+                            }
+                        }
+                        curY += 30;
+
+                        // 3. Direction
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                ShowGradientDirectionMenu(parentControl, Cursor.Position);
+                                return;
+                            }
+                        }
+                        curY += 30;
+
+                        // 4. Angle
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                if (mousePos.X >= panelX + rightSidebarW - 35)
+                                    ActiveSlide.BgGradientAngle = (ActiveSlide.BgGradientAngle + 45f) % 360f;
+                                else
+                                    ActiveSlide.BgGradientAngle = (ActiveSlide.BgGradientAngle + 315f) % 360f;
+                                return;
+                            }
+                        }
+                        curY += 30;
+
+                        // 5. Gradient stops bar & pins
+                        curY += 20;
+                        int trackX = panelX + 24;
+                        int trackW = rightSidebarW - 106;
+                        int trackH = 14;
+                        Rectangle trackRect = new Rectangle(trackX, curY, trackW, trackH);
+
+                        // Add Stop [+] button
+                        Rectangle btnAddStop = new Rectangle(panelX + rightSidebarW - 74, curY - 2, 24, 22);
+                        if (btnAddStop.Contains(mousePos))
+                        {
+                            if (ActiveSlide.BgGradientStops == null) ActiveSlide.BgGradientStops = new List<GradientStop>();
+                            float newPos = 0.5f;
+                            int newCol = 0x2563EB;
+                            if (ActiveSlide.BgGradientStops.Count > 0)
+                            {
+                                int curIdx = Math.Max(0, Math.Min(ActiveSlide.BgGradientStops.Count - 1, ActiveSlide.SelectedGradientStopIndex));
+                                newPos = Math.Min(1.0f, ActiveSlide.BgGradientStops[curIdx].Position + 0.15f);
+                                newCol = ActiveSlide.BgGradientStops[curIdx].Color;
+                            }
+                            ActiveSlide.BgGradientStops.Add(new GradientStop(newCol, newPos));
+                            ActiveSlide.SelectedGradientStopIndex = ActiveSlide.BgGradientStops.Count - 1;
+                            return;
+                        }
+
+                        // Remove Stop [x] button
+                        Rectangle btnDelStop = new Rectangle(panelX + rightSidebarW - 44, curY - 2, 24, 22);
+                        if (btnDelStop.Contains(mousePos))
+                        {
+                            if (ActiveSlide.BgGradientStops != null && ActiveSlide.BgGradientStops.Count > 2)
+                            {
+                                int curIdx = Math.Max(0, Math.Min(ActiveSlide.BgGradientStops.Count - 1, ActiveSlide.SelectedGradientStopIndex));
+                                ActiveSlide.BgGradientStops.RemoveAt(curIdx);
+                                ActiveSlide.SelectedGradientStopIndex = Math.Max(0, curIdx - 1);
+                            }
+                            return;
+                        }
+
+                        // Check Stop Pins Underneath Track
+                        if (mousePos.Y >= trackRect.Bottom - 2 && mousePos.Y <= trackRect.Bottom + 20 && ActiveSlide.BgGradientStops != null)
+                        {
+                            for (int s = 0; s < ActiveSlide.BgGradientStops.Count; s++)
+                            {
+                                int pinCenterX = trackX + (int)(ActiveSlide.BgGradientStops[s].Position * trackW);
+                                if (Math.Abs(mousePos.X - pinCenterX) <= 8)
+                                {
+                                    ActiveSlide.SelectedGradientStopIndex = s;
+                                    IsDraggingGradientStop = true;
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Check Track Click
+                        if (trackRect.Contains(mousePos) && ActiveSlide.BgGradientStops != null)
+                        {
+                            float frac = Math.Max(0f, Math.Min(1f, (float)(mousePos.X - trackX) / trackW));
+                            if (ActiveSlide.SelectedGradientStopIndex >= 0 && ActiveSlide.SelectedGradientStopIndex < ActiveSlide.BgGradientStops.Count)
+                            {
+                                ActiveSlide.BgGradientStops[ActiveSlide.SelectedGradientStopIndex].Position = frac;
+                            }
+                            IsDraggingGradientStop = true;
+                            return;
+                        }
+
+                        curY += 40;
+
+                        GradientStop activeStop = (ActiveSlide.BgGradientStops != null && ActiveSlide.SelectedGradientStopIndex >= 0 && ActiveSlide.SelectedGradientStopIndex < ActiveSlide.BgGradientStops.Count)
+                            ? ActiveSlide.BgGradientStops[ActiveSlide.SelectedGradientStopIndex] : null;
+
+                        // Color button
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85 && activeStop != null)
+                            {
+                                Point pt = new Point(Cursor.Position.X, Cursor.Position.Y);
+                                Color curC = Color.FromArgb((activeStop.Color >> 16) & 0xFF, (activeStop.Color >> 8) & 0xFF, activeStop.Color & 0xFF);
+                                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, false);
+                                colDlg.OnColorSelected += (c) =>
+                                {
+                                    activeStop.Color = c.ToArgb() & 0xFFFFFF;
+                                };
+                                colDlg.Show();
+                                return;
+                            }
+                        }
+                        curY += 28;
+
+                        // Position slider / spinner
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26 && activeStop != null)
+                        {
+                            int posTrackX = panelX + 115;
+                            int posTrackW = 65;
+                            if (mousePos.X >= posTrackX && mousePos.X <= posTrackX + posTrackW)
+                            {
+                                float frac = (float)(mousePos.X - posTrackX) / posTrackW;
+                                activeStop.Position = Math.Max(0f, Math.Min(1f, frac));
+                                DraggingBgSliderType = 2;
+                                return;
+                            }
+                            else if (mousePos.X >= panelX + rightSidebarW - 62)
+                            {
+                                if (mousePos.Y < curY + 12) activeStop.Position = Math.Min(1.0f, activeStop.Position + 0.05f);
+                                else activeStop.Position = Math.Max(0.0f, activeStop.Position - 0.05f);
+                                return;
+                            }
+                        }
+                        curY += 28;
+
+                        // Transparency slider / spinner
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26 && activeStop != null)
+                        {
+                            int transTrackX = panelX + 115;
+                            int transTrackW = 65;
+                            if (mousePos.X >= transTrackX && mousePos.X <= transTrackX + transTrackW)
+                            {
+                                float frac = (float)(mousePos.X - transTrackX) / transTrackW;
+                                activeStop.Transparency = Math.Max(0f, Math.Min(1f, frac));
+                                DraggingBgSliderType = 1;
+                                return;
+                            }
+                            else if (mousePos.X >= panelX + rightSidebarW - 62)
+                            {
+                                if (mousePos.Y < curY + 12) activeStop.Transparency = Math.Min(1.0f, activeStop.Transparency + 0.05f);
+                                else activeStop.Transparency = Math.Max(0.0f, activeStop.Transparency - 0.05f);
+                                return;
+                            }
+                        }
+                        curY += 28;
+
+                        // Brightness slider / spinner
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26 && activeStop != null)
+                        {
+                            int brTrackX = panelX + 115;
+                            int brTrackW = 65;
+                            if (mousePos.X >= brTrackX && mousePos.X <= brTrackX + brTrackW)
+                            {
+                                float frac = (float)(mousePos.X - brTrackX) / brTrackW;
+                                activeStop.Brightness = (frac * 2.0f) - 1.0f;
+                                DraggingBgSliderType = 3;
+                                return;
+                            }
+                            else if (mousePos.X >= panelX + rightSidebarW - 62)
+                            {
+                                if (mousePos.Y < curY + 12) activeStop.Brightness = Math.Min(1.0f, activeStop.Brightness + 0.05f);
+                                else activeStop.Brightness = Math.Max(-1.0f, activeStop.Brightness - 0.05f);
+                                return;
+                            }
+                        }
+                        curY += 28;
+                    }
+                    else if (ActiveSlide.BgFillType == BackgroundFillType.Solid)
+                    {
+                        // Color button
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 30)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                Point pt = new Point(Cursor.Position.X, Cursor.Position.Y);
+                                Color curC = Color.FromArgb((ActiveSlide.BgColor >> 16) & 0xFF, (ActiveSlide.BgColor >> 8) & 0xFF, ActiveSlide.BgColor & 0xFF);
+                                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, false);
+                                colDlg.OnColorSelected += (c) =>
+                                {
+                                    ActiveSlide.BgColor = c.ToArgb() & 0xFFFFFF;
+                                };
+                                colDlg.Show();
+                                return;
+                            }
+                        }
+                        curY += 34;
+
+                        // Transparency slider
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 30)
+                        {
+                            int trackX = panelX + 115;
+                            int trackW = 65;
+                            if (mousePos.X >= trackX && mousePos.X <= trackX + trackW)
+                            {
+                                float frac = (float)(mousePos.X - trackX) / trackW;
+                                ActiveSlide.BgTransparency = Math.Max(0f, Math.Min(1f, frac));
+                                DraggingBgSliderType = 1;
+                                return;
+                            }
+                        }
+                        curY += 34;
+                    }
+                    else if (ActiveSlide.BgFillType == BackgroundFillType.Picture)
+                    {
+                        // File Button
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 32)
+                        {
+                            using (OpenFileDialog ofd = new OpenFileDialog())
+                            {
+                                ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp";
+                                if (ofd.ShowDialog() == DialogResult.OK)
+                                {
+                                    ActiveSlide.BgImagePath = ofd.FileName;
+                                    try { ActiveSlide.CachedBgImage = Image.FromFile(ofd.FileName); } catch { }
+                                }
+                            }
+                            return;
+                        }
+                        curY += 36;
+
+                        // Transparency
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 30)
+                        {
+                            int trackX = panelX + 115;
+                            int trackW = 65;
+                            if (mousePos.X >= trackX && mousePos.X <= trackX + trackW)
+                            {
+                                float frac = (float)(mousePos.X - trackX) / trackW;
+                                ActiveSlide.BgTransparency = Math.Max(0f, Math.Min(1f, frac));
+                                DraggingBgSliderType = 1;
+                                return;
+                            }
+                        }
+                        curY += 34;
+                    }
+                    else if (ActiveSlide.BgFillType == BackgroundFillType.Pattern)
+                    {
+                        curY += 20;
+                        PatternFillStyle[] pStyles = new PatternFillStyle[] {
+                            PatternFillStyle.Grid5Percent, PatternFillStyle.Grid10Percent, PatternFillStyle.HorizontalLight, PatternFillStyle.VerticalLight,
+                            PatternFillStyle.DiagonalUpLight, PatternFillStyle.DiagonalDownLight, PatternFillStyle.Crosshatch, PatternFillStyle.ZigZag,
+                            PatternFillStyle.Brick, PatternFillStyle.Dots, PatternFillStyle.Checker, PatternFillStyle.Waves
+                        };
+
+                        for (int pi = 0; pi < pStyles.Length; pi++)
+                        {
+                            int row = pi / 4;
+                            int col = pi % 4;
+                            Rectangle pBox = new Rectangle(panelX + 24 + col * 56, curY + row * 30, 48, 24);
+                            if (pBox.Contains(mousePos))
+                            {
+                                ActiveSlide.BgPatternStyle = pStyles[pi];
+                                return;
+                            }
+                        }
+                        curY += 100;
+
+                        // Foreground Color
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                Point pt = new Point(Cursor.Position.X, Cursor.Position.Y);
+                                Color curC = Color.FromArgb((ActiveSlide.BgPatternForeColor >> 16) & 0xFF, (ActiveSlide.BgPatternForeColor >> 8) & 0xFF, ActiveSlide.BgPatternForeColor & 0xFF);
+                                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, false);
+                                colDlg.OnColorSelected += (c) =>
+                                {
+                                    ActiveSlide.BgPatternForeColor = c.ToArgb() & 0xFFFFFF;
+                                };
+                                colDlg.Show();
+                                return;
+                            }
+                        }
+                        curY += 28;
+
+                        // Background Color
+                        if (mousePos.Y >= curY && mousePos.Y < curY + 26)
+                        {
+                            if (mousePos.X >= panelX + rightSidebarW - 85)
+                            {
+                                Point pt = new Point(Cursor.Position.X, Cursor.Position.Y);
+                                Color curC = Color.FromArgb((ActiveSlide.BgPatternBackColor >> 16) & 0xFF, (ActiveSlide.BgPatternBackColor >> 8) & 0xFF, ActiveSlide.BgPatternBackColor & 0xFF);
+                                ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, false);
+                                colDlg.OnColorSelected += (c) =>
+                                {
+                                    ActiveSlide.BgPatternBackColor = c.ToArgb() & 0xFFFFFF;
+                                };
+                                colDlg.Show();
+                                return;
+                            }
+                        }
+                        curY += 30;
+                    }
+
+                    // Bottom Buttons (Apply to All & Reset Background)
+                    int bottomBtnY = height - 45;
+                    if (mousePos.Y >= bottomBtnY && mousePos.Y <= bottomBtnY + 32)
+                    {
+                        // Apply to All (X: panelX + 10..panelX + 130)
+                        if (mousePos.X >= panelX + 10 && mousePos.X <= panelX + 130)
+                        {
+                            foreach (var s in Presentation.Slides)
+                            {
+                                s.BgColor = ActiveSlide.BgColor;
+                                s.BgFillType = ActiveSlide.BgFillType;
+                                s.IsGradientBg = ActiveSlide.IsGradientBg;
+                                s.BgColor2 = ActiveSlide.BgColor2;
+                                s.BgGradientAngle = ActiveSlide.BgGradientAngle;
+                                s.BgGradientType = ActiveSlide.BgGradientType;
+                                s.BgImagePath = ActiveSlide.BgImagePath;
+                                s.CachedBgImage = ActiveSlide.CachedBgImage;
+                                s.BgTransparency = ActiveSlide.BgTransparency;
+                                s.HideBackgroundGraphics = ActiveSlide.HideBackgroundGraphics;
+                                s.BgPatternStyle = ActiveSlide.BgPatternStyle;
+                                s.BgPatternForeColor = ActiveSlide.BgPatternForeColor;
+                                s.BgPatternBackColor = ActiveSlide.BgPatternBackColor;
+
+                                s.BgGradientStops = new List<GradientStop>();
+                                if (ActiveSlide.BgGradientStops != null)
+                                {
+                                    foreach (GradientStop gs in ActiveSlide.BgGradientStops)
+                                    {
+                                        s.BgGradientStops.Add(gs.Clone());
+                                    }
+                                }
+                            }
+                            MessageBox.Show("Đã áp dụng định dạng nền cho toàn bộ trang chiếu!", "Định dạng Nền", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        // Reset Background (X: panelX + 138..panelX + 272)
+                        if (mousePos.X >= panelX + 138 && mousePos.X <= panelX + 272)
+                        {
+                            ApplyTheme(Presentation.CurrentTheme ?? "Office");
+                            return;
+                        }
+                    }
+                }
+                else if (SidebarPanel == SidebarPanelType.SelectionPane && ActiveSlide != null)
+                {
+                    int sy = sidebarY + 42 + SidebarScrollY;
+                    Rectangle btnShowAll = new Rectangle(panelX + 10, sy, 86, 25);
+                    Rectangle btnHideAll = new Rectangle(panelX + 102, sy, 80, 25);
+                    Rectangle btnMoveUp = new Rectangle(panelX + rightSidebarW - 58, sy, 22, 25);
+                    Rectangle btnMoveDown = new Rectangle(panelX + rightSidebarW - 32, sy, 22, 25);
+
+                    if (btnShowAll.Contains(mousePos))
+                    {
+                        foreach (var s in ActiveSlide.Shapes) s.IsVisible = true;
+                        return;
+                    }
+                    if (btnHideAll.Contains(mousePos))
+                    {
+                        foreach (var s in ActiveSlide.Shapes) s.IsVisible = false;
+                        return;
+                    }
+                    if (btnMoveUp.Contains(mousePos))
+                    {
+                        BringShapeForward();
+                        return;
+                    }
+                    if (btnMoveDown.Contains(mousePos))
+                    {
+                        SendShapeBackward();
+                        return;
+                    }
+
+                    int listStartY = sy + 34;
+                    int rowH = 28;
+                    int clickedRow = (mousePos.Y - listStartY) / rowH;
+                    if (clickedRow >= 0 && clickedRow < ActiveSlide.Shapes.Count)
+                    {
+                        int shapeIdx = ActiveSlide.Shapes.Count - 1 - clickedRow;
+                        Rectangle rowRect = new Rectangle(panelX + 10, listStartY + clickedRow * rowH, rightSidebarW - 20, 26);
+                        Rectangle eyeRect = new Rectangle(rowRect.Right - 26, rowRect.Y + 3, 22, 22);
+
+                        if (eyeRect.Contains(mousePos))
+                        {
+                            ActiveSlide.Shapes[shapeIdx].IsVisible = !ActiveSlide.Shapes[shapeIdx].IsVisible;
+                            return;
+                        }
+                        else
+                        {
+                            SelectedShapeIndex = shapeIdx;
+                            SelectedShapeIndices.Clear();
+                            SelectedShapeIndices.Add(shapeIdx);
+                            DraggingSelectionPaneIndex = shapeIdx;
+                            DraggingSelectionPaneTargetIndex = shapeIdx;
+                            return;
+                        }
+                    }
+                }
+                return;
+            }
+
+            // 3. Center Slide Viewport Interaction
+            if (ViewMode == ImpressViewMode.Normal || ViewMode == ImpressViewMode.ReadingView)
+            {
+                int minScrollX, maxScrollX, minScrollY, maxScrollY;
+                GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+
+                bool hasVScroll = (minScrollY < maxScrollY);
+                bool hasHScroll = (minScrollX < maxScrollX);
+                int sbH = 14;
+                int sbW = 14;
+
+                // 3.1. Xử lý nhấp và kéo thanh cuộn ngang (Horizontal Scrollbar)
+                if (hasHScroll && mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH &&
+                    mousePos.X >= leftSidebarW && mousePos.X <= leftSidebarW + (hasVScroll ? (canvasW - sbW) : canvasW))
+                {
+                    int hTrackW = hasVScroll ? (canvasW - sbW) : canvasW;
+                    int hTrackX = leftSidebarW;
+                    int totalW = maxScrollX - minScrollX + canvasW;
+                    int thumbW = Math.Max(40, (int)((float)canvasW / totalW * hTrackW));
+                    thumbW = Math.Min(thumbW, hTrackW);
+                    float fracX = (float)(CanvasScrollX - minScrollX) / Math.Max(1, maxScrollX - minScrollX);
+                    int thumbX = hTrackX + (int)(fracX * (hTrackW - thumbW));
+
+                    if (mousePos.X >= thumbX && mousePos.X <= thumbX + thumbW)
+                    {
+                        IsDraggingHScrollBar = true;
+                        ScrollBarDragStartMouseX = mousePos.X;
+                        ScrollBarDragStartScrollX = CanvasScrollX;
+                    }
+                    else
+                    {
+                        // Nhấp trực tiếp lên đường track -> Nhảy nhanh / định vị tâm thumb tới vị trí nhấp chuột
+                        float targetFrac = (float)(mousePos.X - hTrackX - thumbW / 2) / Math.Max(1, hTrackW - thumbW);
+                        targetFrac = Math.Max(0f, Math.Min(1f, targetFrac));
+                        CanvasScrollX = minScrollX + (int)(targetFrac * (maxScrollX - minScrollX));
+                        ClampScroll(canvasW, contentH);
+                        IsDraggingHScrollBar = true;
+                        ScrollBarDragStartMouseX = mousePos.X;
+                        ScrollBarDragStartScrollX = CanvasScrollX;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+
+                // 3.2. Xử lý nhấp và kéo thanh cuộn dọc (Vertical Scrollbar)
+                if (hasVScroll && mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW &&
+                    mousePos.Y >= contentY && mousePos.Y <= contentY + (hasHScroll ? (contentH - sbH) : contentH))
+                {
+                    int vTrackH = hasHScroll ? (contentH - sbH) : contentH;
+                    int vTrackY = contentY;
+                    int totalH = maxScrollY - minScrollY + contentH;
+                    int thumbH = Math.Max(40, (int)((float)contentH / totalH * vTrackH));
+                    thumbH = Math.Min(thumbH, vTrackH);
+                    float fracY = (float)(CanvasScrollY - minScrollY) / Math.Max(1, maxScrollY - minScrollY);
+                    int thumbY = vTrackY + (int)(fracY * (vTrackH - thumbH));
+
+                    if (mousePos.Y >= thumbY && mousePos.Y <= thumbY + thumbH)
+                    {
+                        IsDraggingVScrollBar = true;
+                        ScrollBarDragStartMouseY = mousePos.Y;
+                        ScrollBarDragStartScrollY = CanvasScrollY;
+                    }
+                    else
+                    {
+                        // Nhấp trực tiếp lên đường track -> Nhảy nhanh / định vị tâm thumb tới vị trí nhấp chuột
+                        float targetFrac = (float)(mousePos.Y - vTrackY - thumbH / 2) / Math.Max(1, vTrackH - thumbH);
+                        targetFrac = Math.Max(0f, Math.Min(1f, targetFrac));
+                        CanvasScrollY = minScrollY + (int)(targetFrac * (maxScrollY - minScrollY));
+                        ClampScroll(canvasW, contentH);
+                        IsDraggingVScrollBar = true;
+                        ScrollBarDragStartMouseY = mousePos.Y;
+                        ScrollBarDragStartScrollY = CanvasScrollY;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+
+                int slideX, slideY, slideW, slideH;
+                float scale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+                // Xử lý Chế độ Vẽ tự do đường chuyển động (Motion Path Freehand Drawing Mode)
+                if (IsDrawingMotionPathMode)
+                {
+                    SaveUndoState();
+                    IsDrawingMotionPathActive = true;
+                    CurrentDrawingMotionPoints.Clear();
+                    float mouseSlideX = (mousePos.X - slideX) / scale;
+                    float mouseSlideY = (mousePos.Y - slideY) / scale;
+
+                    ShapeNode targetShape = ActiveDrawingMotionShape ?? SelectedShape;
+                    if (targetShape != null)
+                    {
+                        float scx = targetShape.Transform.X + targetShape.Transform.Width / 2f;
+                        float scy = targetShape.Transform.Y + targetShape.Transform.Height / 2f;
+                        CurrentDrawingMotionPoints.Add(new PointF(0, 0));
+                        CurrentDrawingMotionPoints.Add(new PointF(mouseSlideX - scx, mouseSlideY - scy));
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+
+                // Xử lý Kéo thả chấm đỏ đổi đích đến của Đường chuyển động (Motion Path End Point Handle Dragging)
+                if (ActiveSlide != null && ActiveSlide.Animations != null && ActiveSlide.Animations.Count > 0)
+                {
+                    for (int a = 0; a < ActiveSlide.Animations.Count; a++)
+                    {
+                        ShapeAnimation anim = ActiveSlide.Animations[a];
+                        if (anim == null || !anim.IsMotionPath) continue;
+
+                        ShapeNode targetShape = null;
+                        for (int s = 0; s < ActiveSlide.Shapes.Count; s++)
+                        {
+                            if (ActiveSlide.Shapes[s].Id == anim.ShapeId) { targetShape = ActiveSlide.Shapes[s]; break; }
+                        }
+                        if (targetShape == null) continue;
+
+                        float scx = slideX + (targetShape.Transform.X + targetShape.Transform.Width / 2f) * scale;
+                        float scy = slideY + (targetShape.Transform.Y + targetShape.Transform.Height / 2f) * scale;
+
+                        float endOffX, endOffY;
+                        EvaluateMotionPathOffset(anim, 1.0f, out endOffX, out endOffY);
+                        float endPtX = scx + endOffX * scale;
+                        float endPtY = scy + endOffY * scale;
+
+                        float dX = mousePos.X - endPtX;
+                        float dY = mousePos.Y - endPtY;
+                        if (dX * dX + dY * dY <= 144f) // 12px hit radius
+                        {
+                            SaveUndoState();
+                            IsDraggingMotionEndDot = true;
+                            DraggingMotionAnim = anim;
+                            DraggingMotionShape = targetShape;
+                            DraggingMotionStartMouse = mousePos;
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+                }
+
+                if (IsDrawingShapeMode)
+                {
+                    IsDrawingActive = true;
+                    ShapeDrawStart = mousePos;
+                    ShapeDrawCurrent = mousePos;
+                    return;
+                }
+
+                // Xử lý Chế độ Chọn màu xóa (Chroma Keying / Phông xanh CapCut)
+                if (IsColorPickingMode && SelectedShape != null && SelectedShape.CachedImage != null)
+                {
+                    ShapeNode cpShape = SelectedShape;
+                    float imgX = slideX + cpShape.Transform.X * scale;
+                    float imgY = slideY + cpShape.Transform.Y * scale;
+                    float imgW = cpShape.Transform.Width * scale;
+                    float imgH = cpShape.Transform.Height * scale;
+
+                    if (mousePos.X >= imgX && mousePos.X <= imgX + imgW && mousePos.Y >= imgY && mousePos.Y <= imgY + imgH)
+                    {
+                        float normX = Math.Max(0f, Math.Min(1f, (mousePos.X - imgX) / imgW));
+                        float normY = Math.Max(0f, Math.Min(1f, (mousePos.Y - imgY) / imgH));
+                        Color pickedCol = GetPixelColorFromImage(cpShape.CachedImage, normX, normY);
+                        ExecuteColorPickRemoval(cpShape, pickedCol, normX, normY);
+                        return;
+                    }
+                    else
+                    {
+                        IsColorPickingMode = false;
+                        HasColorPickHover = false;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                }
+
+                // Xử lý vẽ nét cọ đánh dấu Giữ lại (+) hoặc Xóa bỏ (-) khi đang ở Chế độ Xóa nền
+                if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
+                {
+                    ShapeNode bgShape = SelectedShape;
+                    float imgX = slideX + bgShape.Transform.X * scale;
+                    float imgY = slideY + bgShape.Transform.Y * scale;
+                    float imgW = bgShape.Transform.Width * scale;
+                    float imgH = bgShape.Transform.Height * scale;
+
+                    if (mousePos.X >= imgX && mousePos.X <= imgX + imgW && mousePos.Y >= imgY && mousePos.Y <= imgY + imgH)
+                    {
+                        SaveUndoState();
+                        float normX = Math.Max(0f, Math.Min(1f, (mousePos.X - imgX) / imgW));
+                        float normY = Math.Max(0f, Math.Min(1f, (mousePos.Y - imgY) / imgH));
+                        IsDrawingBgStroke = true;
+                        CurrentDrawingStroke = new BgRemovalStroke
+                        {
+                            IsKeep = (BgRemovalTool == "Keep"),
+                            BrushRadius = BgBrushRadius
+                        };
+                        CurrentDrawingStroke.Points.Add(new PointF(normX, normY));
+                        return;
+                    }
+                }
+
+                // Xử lý Chế độ Cắt ảnh Tương tác (Interactive Crop Mode)
+                if (IsCropping && SelectedShape != null)
+                {
+                    ShapeNode cropShape = SelectedShape;
+                    int csx = slideX + (int)(cropShape.Transform.X * scale);
+                    int csy = slideY + (int)(cropShape.Transform.Y * scale);
+                    int csw = (int)(cropShape.Transform.Width * scale);
+                    int csh = (int)(cropShape.Transform.Height * scale);
+                    float hitR = Math.Max(12f, 16f * scale);
+
+                    CropHandleType clickedHandle = CropHandleType.None;
+
+                    if (Math.Abs(mousePos.X - csx) <= hitR && Math.Abs(mousePos.Y - csy) <= hitR) clickedHandle = CropHandleType.TopLeft;
+                    else if (Math.Abs(mousePos.X - (csx + csw)) <= hitR && Math.Abs(mousePos.Y - csy) <= hitR) clickedHandle = CropHandleType.TopRight;
+                    else if (Math.Abs(mousePos.X - csx) <= hitR && Math.Abs(mousePos.Y - (csy + csh)) <= hitR) clickedHandle = CropHandleType.BottomLeft;
+                    else if (Math.Abs(mousePos.X - (csx + csw)) <= hitR && Math.Abs(mousePos.Y - (csy + csh)) <= hitR) clickedHandle = CropHandleType.BottomRight;
+                    else if (Math.Abs(mousePos.X - (csx + csw / 2f)) <= hitR && Math.Abs(mousePos.Y - csy) <= hitR) clickedHandle = CropHandleType.Top;
+                    else if (Math.Abs(mousePos.X - (csx + csw / 2f)) <= hitR && Math.Abs(mousePos.Y - (csy + csh)) <= hitR) clickedHandle = CropHandleType.Bottom;
+                    else if (Math.Abs(mousePos.X - csx) <= hitR && Math.Abs(mousePos.Y - (csy + csh / 2f)) <= hitR) clickedHandle = CropHandleType.Left;
+                    else if (Math.Abs(mousePos.X - (csx + csw)) <= hitR && Math.Abs(mousePos.Y - (csy + csh / 2f)) <= hitR) clickedHandle = CropHandleType.Right;
+                    else if (mousePos.X >= csx && mousePos.X <= csx + csw && mousePos.Y >= csy && mousePos.Y <= csy + csh) clickedHandle = CropHandleType.PanImage;
+
+                    if (clickedHandle != CropHandleType.None)
+                    {
+                        SaveUndoState();
+                        ActiveCropHandle = clickedHandle;
+                        CropDragStartMouse = mousePos;
+                        CropInitialLeft = cropShape.CropLeft;
+                        CropInitialTop = cropShape.CropTop;
+                        CropInitialRight = cropShape.CropRight;
+                        CropInitialBottom = cropShape.CropBottom;
+                        CropInitialShapeX = cropShape.Transform.X;
+                        CropInitialShapeY = cropShape.Transform.Y;
+                        CropInitialShapeW = cropShape.Transform.Width;
+                        CropInitialShapeH = cropShape.Transform.Height;
+                        return;
+                    }
+                    else
+                    {
+                        // Nhấp vùng trống bên ngoài -> Xác nhận Cắt ảnh và thoát chế độ Crop
+                        ConfirmCrop();
+                        return;
+                    }
+                }
+
+                SlideNode slide = ActiveSlide;
+                if (slide == null) return;
+
+                // Check 8-handles & rotation knob & table move handle for selected shape
+                if (SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
+                {
+                    ShapeNode shape = slide.Shapes[SelectedShapeIndex];
+                    int sx = slideX + (int)(shape.Transform.X * scale);
+                    int sy = slideY + (int)(shape.Transform.Y * scale);
+                    int sw = (int)(shape.Transform.Width * scale);
+                    int sh = (int)(shape.Transform.Height * scale);
+
+                    // Table Move Handle (Nút kéo bảng 4 chiều ✥ ở góc trên bên trái)
+                    if (shape.Type == ShapeType.Table)
+                    {
+                        Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
+                        if (moveHandleRect.Contains(mousePos))
+                        {
+                            SaveUndoState();
+                            IsDraggingShape = true;
+                            IsSelectingTableCells = false;
+                            DragStartMouse = mousePos;
+                            DragStartTransform = shape.Transform.Clone();
+                            return;
+                        }
+                    }
+
+                    // Rotation knob (Mũi tên xoay)
+                    PointF rotH = GetRotatedRotationHandle(sx, sy, sw, sh, shape.Transform.Rotation);
+                    float dRotX = mousePos.X - rotH.X;
+                    float dRotY = mousePos.Y - rotH.Y;
+                    if (dRotX * dRotX + dRotY * dRotY <= 144f) // 12px hit radius
+                    {
+                        SaveUndoState();
+                        IsRotatingShape = true;
+                        DragStartMouse = mousePos;
+                        DragStartTransform = shape.Transform.Clone();
+                        return;
+                    }
+
+                    // 8 resize handles
+                    PointF[] handles = GetRotatedHandleCoordinates(sx, sy, sw, sh, shape.Transform.Rotation);
+                    for (int hIdx = 0; hIdx < handles.Length; hIdx++)
+                    {
+                        float dHX = mousePos.X - handles[hIdx].X;
+                        float dHY = mousePos.Y - handles[hIdx].Y;
+                        if (dHX * dHX + dHY * dHY <= 64f) // 8px hit radius
+                        {
+                            SaveUndoState();
+                            IsResizingShape = true;
+                            DragResizeHandleIndex = hIdx;
+                            DragStartMouse = mousePos;
+                            DragStartTransform = shape.Transform.Clone();
+                            return;
+                        }
+                    }
+                }
+
+                // Hit test shapes in reverse Z-order (supporting rotated shape bodies & table move handles)
+                int hitIndex = -1;
+                for (int i = slide.Shapes.Count - 1; i >= 0; i--)
+                {
+                    ShapeNode shape = slide.Shapes[i];
+                    int sx = slideX + (int)(shape.Transform.X * scale);
+                    int sy = slideY + (int)(shape.Transform.Y * scale);
+                    int sw = (int)(shape.Transform.Width * scale);
+                    int sh = (int)(shape.Transform.Height * scale);
+
+                    if (shape.Type == ShapeType.Table)
+                    {
+                        Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
+                        if (moveHandleRect.Contains(mousePos))
+                        {
+                            hitIndex = i;
+                            break;
+                        }
+                    }
+
+                    PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+                    PointF unrotatedMouse = RotatePoint(mousePos, center, -shape.Transform.Rotation);
+                    RectangleF shapeBounds = (shape.Type == ShapeType.Line)
+                        ? new RectangleF(sx - 8f, sy - 8f, Math.Max(16f, sw + 16f), Math.Max(16f, sh + 16f))
+                        : new RectangleF(sx, sy, sw, sh);
+                    if (shapeBounds.Contains(unrotatedMouse))
+                    {
+                        hitIndex = i;
+                        break;
+                    }
+                }
+
+                if (hitIndex >= 0)
+                {
+                    int prevSelectedShapeIndex = (SelectedShapeIndices != null && SelectedShapeIndices.Count == 1) ? SelectedShapeIndex : -1;
+                    ShapeNode hitShape = slide.Shapes[hitIndex];
+                    bool isCtrlOrShift = (Control.ModifierKeys & Keys.Control) != 0 || (Control.ModifierKeys & Keys.Shift) != 0;
+                    if (isCtrlOrShift)
+                    {
+                        if (SelectedShapeIndices.Contains(hitIndex))
+                        {
+                            SelectedShapeIndices.Remove(hitIndex);
+                            SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
+                        }
+                        else
+                        {
+                            SelectedShapeIndices.Add(hitIndex);
+                            SelectedShapeIndex = hitIndex;
+                        }
+                    }
+                    else
+                    {
+                        if (!SelectedShapeIndices.Contains(hitIndex) || SelectedShapeIndices.Count > 1)
+                        {
+                            EndInlineEditing();
+                            SelectedShapeIndices.Clear();
+                            SelectedShapeIndices.Add(hitIndex);
+                            SelectedShapeIndex = hitIndex;
+                        }
+                    }
+
+                    if (hitShape.Type == ShapeType.Table)
+                    {
+                        int sx = slideX + (int)(hitShape.Transform.X * scale);
+                        int sy = slideY + (int)(hitShape.Transform.Y * scale);
+                        int sw = (int)(hitShape.Transform.Width * scale);
+                        int sh = (int)(hitShape.Transform.Height * scale);
+
+                        Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
+                        bool isMoveHandle = moveHandleRect.Contains(mousePos);
+                        bool isNearOuterBorder = (mousePos.X <= sx + 6 || mousePos.X >= sx + sw - 6 || mousePos.Y <= sy + 6 || mousePos.Y >= sy + sh - 6);
+
+                        int cols = Math.Max(1, hitShape.TableColumns);
+                        int rows = Math.Max(1, hitShape.TableRows);
+                        float cellW = sw / (float)cols;
+                        float cellH = sh / (float)rows;
+
+                        int c = (int)((mousePos.X - sx) / cellW);
+                        int r = (int)((mousePos.Y - sy) / cellH);
+                        c = Math.Max(0, Math.Min(cols - 1, c));
+                        r = Math.Max(0, Math.Min(rows - 1, r));
+
+                        hitShape.TableSelectedCellRow = r;
+                        hitShape.TableSelectedCellCol = c;
+                        hitShape.TableSelectedEndRow = r;
+                        hitShape.TableSelectedEndCol = c;
+
+                        // 1. Nhấp vào Nút Kéo 4 chiều ✥ HOẶC Viền ngoài của bảng -> KÉO DI CHUYỂN BẢNG
+                        if (isMoveHandle || isNearOuterBorder)
+                        {
+                            SaveUndoState();
+                            IsDraggingShape = true;
+                            IsSelectingTableCells = false;
+                            DragStartMouse = mousePos;
+                            DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+
+                            if (buttons == MouseButtons.Right)
+                            {
+                                ShowTableContextMenu(parentControl, mousePos, hitIndex, r, c);
+                            }
+                            return;
+                        }
+                        else
+                        {
+                            // 2. Nhấp bên trong các ô của bảng -> QUÉT KHỐI CHỌN Ô NGAY LẬP TỨC!
+                            IsSelectingTableCells = true;
+                            IsDraggingShape = false;
+                            TableDragStartRow = r;
+                            TableDragStartCol = c;
+
+                            if (buttons == MouseButtons.Right)
+                            {
+                                ShowTableContextMenu(parentControl, mousePos, hitIndex, r, c);
+                                return;
+                            }
+                            return;
+                        }
+                    }
+
+                    if (hitShape.Type == ShapeType.Video || !string.IsNullOrEmpty(hitShape.VideoPath))
+                    {
+                        int vx = slideX + (int)(hitShape.Transform.X * scale);
+                        int vy = slideY + (int)(hitShape.Transform.Y * scale);
+                        int vw = (int)(hitShape.Transform.Width * scale);
+                        int vh = (int)(hitShape.Transform.Height * scale);
+                        float barH = Math.Max(26f, 34f * scale);
+
+                        // 1. Playback Bar Click (Play, Timeline, Volume)
+                        if (mousePos.Y >= vy + vh - barH && mousePos.Y <= vy + vh && mousePos.X >= vx && mousePos.X <= vx + vw)
+                        {
+                            float relX = mousePos.X - vx;
+                            float btnSz = barH * 0.55f;
+                            float btnX = 10 * scale;
+                            float timeX = btnX + btnSz + 12 * scale;
+                            float timeW = Math.Max(40f, vw - timeX - (vw > 240 ? 110 * scale : 45 * scale));
+
+                            if (relX < timeX)
+                            {
+                                PlayVideoPreview(hitShape, parentControl);
+                                return;
+                            }
+                            else if (relX >= timeX && relX <= timeX + timeW)
+                            {
+                                float seekFrac = Math.Max(0f, Math.Min(1f, (relX - timeX) / timeW));
+                                float targetSec = seekFrac * (hitShape.VideoTotalTime > 0 ? hitShape.VideoTotalTime : 150f);
+                                if (!SlideVideoPlayerManager.Instance.IsPlaying || SlideVideoPlayerManager.Instance.ActiveShape != hitShape)
+                                {
+                                    PlayVideoPreview(hitShape, parentControl);
+                                }
+                                SlideVideoPlayerManager.Instance.Seek(targetSec);
+                                return;
+                            }
+                            else
+                            {
+                                hitShape.VideoVolume = (hitShape.VideoVolume == VideoVolumeLevel.Mute) ? VideoVolumeLevel.High : VideoVolumeLevel.Mute;
+                                return;
+                            }
+                        }
+
+                        // 2. Center Play button click
+                        if (!SlideVideoPlayerManager.Instance.IsPlaying || SlideVideoPlayerManager.Instance.ActiveShape != hitShape)
+                        {
+                            float iconSz = Math.Min(vw * 0.28f, vh * 0.35f);
+                            float iconX = vx + (vw - iconSz) / 2f;
+                            float iconY = vy + (vh - iconSz) / 2f;
+                            if (new RectangleF(iconX, iconY, iconSz, iconSz).Contains(mousePos))
+                            {
+                                PlayVideoPreview(hitShape, parentControl);
+                                return;
+                            }
+                        }
+                    }
+
+                    SyncSelectedAnimationWithShape();
+                    SaveUndoState();
+                    IsDraggingShape = true;
+                    DragStartMouse = mousePos;
+                    DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+                }
+                else
+                {
+                    SelectedShapeIndex = -1;
+                    SelectedShapeIndices.Clear();
+                    SelectedAnimationIndex = -1;
+                    EndInlineEditing();
+                }
+
+                if (buttons == MouseButtons.Right)
+                {
+                    if (hitIndex >= 0)
+                    {
+                        ShowShapeContextMenu(parentControl, mousePos, hitIndex);
+                    }
+                    else
+                    {
+                        ShowSlideContextMenu(parentControl, mousePos);
+                    }
+                    return;
+                }
+            }
+        }
+
+        public void HandleDoubleClick(Point mousePos, int width, int height, Control parentControl = null)
+        {
+            if (IsPresenting) return;
+            if (ActiveSlide == null) return;
+
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            int slideX, slideY, slideW, slideH;
+            float scale;
+            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+            {
+                ShapeNode shape = ActiveSlide.Shapes[i];
+                int sx = slideX + (int)(shape.Transform.X * scale);
+                int sy = slideY + (int)(shape.Transform.Y * scale);
+                int sw = (int)(shape.Transform.Width * scale);
+                int sh = (int)(shape.Transform.Height * scale);
+
+                Rectangle shapeBounds = new Rectangle(sx, sy, sw, sh);
+                if (shapeBounds.Contains(mousePos))
+                {
+                    SelectedShapeIndex = i;
+                    if (!string.IsNullOrEmpty(shape.SmartArtType) || (shape.Name != null && shape.Name.StartsWith("SmartArt")))
+                    {
+                        OpenSmartArtEditor(shape);
+                        break;
+                    }
+
+                    if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
+                    {
+                        PlayVideoPreview(shape, parentControl);
+                        break;
+                    }
+                    else if (shape.Type == ShapeType.Chart || shape.ChartData != null)
+                    {
+                        DocChartData cd = shape.ChartData ?? DocChartData.CreateDefault(shape.Text);
+                        shape.ChartData = cd;
+
+                        int titleH = (int)(38 * scale);
+                        Rectangle titleZone = new Rectangle(sx, sy, sw, titleH);
+
+                        if (titleZone.Contains(mousePos))
+                        {
+                            // Double clicked on Chart Title -> Open Rename Form!
+                            Point scrPt = parentControl != null ? parentControl.PointToScreen(new Point(sx + sw / 4, sy + 10)) : mousePos;
+                            ChartTitleRenameForm renameDlg = new ChartTitleRenameForm(cd, scrPt);
+                            renameDlg.OnTitleChanged = (newTitle, showTitle) =>
+                            {
+                                cd.Title = newTitle;
+                                cd.ShowTitle = showTitle;
+                                shape.Name = newTitle;
+                                shape.Text = newTitle;
+                                if (parentControl != null) parentControl.Invalidate();
+                            };
+                            renameDlg.ShowDialog(parentControl);
+                        }
+                        else
+                        {
+                            // Double clicked on Chart Body -> Open Excel Data Form!
+                            ChartDataExcelForm excelForm = new ChartDataExcelForm(cd);
+                            excelForm.OnDataChanged = (newData) =>
+                            {
+                                shape.ChartData = newData;
+                                if (parentControl != null) parentControl.Invalidate();
+                            };
+                            excelForm.Show();
+                        }
+                        break;
+                    }
+                    else if (shape.Type == ShapeType.Table)
+                    {
+                        int cols = Math.Max(1, shape.TableColumns);
+                        int rows = Math.Max(1, shape.TableRows);
+                        float cellW = sw / (float)cols;
+                        float cellH = sh / (float)rows;
+
+                        int c = (int)((mousePos.X - sx) / cellW);
+                        int r = (int)((mousePos.Y - sy) / cellH);
+                        c = Math.Max(0, Math.Min(cols - 1, c));
+                        r = Math.Max(0, Math.Min(rows - 1, r));
+
+                        StartTableInlineEditing(shape, r, c);
+                    }
+                    else
+                    {
+                        StartInlineEditing(shape);
+                    }
+                    break;
+                }
+            }
+        }
+
+        public void HandleMouseMove(Point mousePos, int width, int height)
+        {
+            CurrentMouseCanvasPos = mousePos;
+
+            if (IsPresenting)
+            {
+                LastPresenterMouseMovePos = mousePos;
+                LastPresenterMouseMoveTime = DateTime.Now;
+                HoverToolbarButtonIndex = GetHoverToolbarButtonAt(mousePos, height);
+
+                if (LaserPointerMode)
+                {
+                    CurrentLaserPoint = mousePos;
+                }
+                if (AnnotationPenMode && CurrentStroke.Count > 0)
+                {
+                    CurrentStroke.Add(mousePos);
+                }
+                return;
+            }
+
+            if (IsDrawingActive)
+            {
+                ShapeDrawCurrent = mousePos;
+                return;
+            }
+
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            if (IsColorPickingMode && SelectedShape != null && SelectedShape.CachedImage != null)
+            {
+                int cpSlideX, cpSlideY, cpSlideW, cpSlideH;
+                float cpScale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out cpSlideX, out cpSlideY, out cpSlideW, out cpSlideH, out cpScale);
+                ShapeNode cpShape = SelectedShape;
+                float imgX = cpSlideX + cpShape.Transform.X * cpScale;
+                float imgY = cpSlideY + cpShape.Transform.Y * cpScale;
+                float imgW = cpShape.Transform.Width * cpScale;
+                float imgH = cpShape.Transform.Height * cpScale;
+
+                if (mousePos.X >= imgX && mousePos.X <= imgX + imgW && mousePos.Y >= imgY && mousePos.Y <= imgY + imgH)
+                {
+                    float normX = Math.Max(0f, Math.Min(1f, (mousePos.X - imgX) / imgW));
+                    float normY = Math.Max(0f, Math.Min(1f, (mousePos.Y - imgY) / imgH));
+                    Color hovered = GetPixelColorFromImage(cpShape.CachedImage, normX, normY);
+                    ColorPickHoverColor = hovered;
+                    HasColorPickHover = true;
+                    ColorPickMouseCanvasPos = mousePos;
+                }
+                else
+                {
+                    HasColorPickHover = false;
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
+            {
+                int bgSlideX, bgSlideY, bgSlideW, bgSlideH;
+                float bgScale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out bgSlideX, out bgSlideY, out bgSlideW, out bgSlideH, out bgScale);
+                ShapeNode bgShape = SelectedShape;
+                float imgX = bgSlideX + bgShape.Transform.X * bgScale;
+                float imgY = bgSlideY + bgShape.Transform.Y * bgScale;
+                float imgW = bgShape.Transform.Width * bgScale;
+                float imgH = bgShape.Transform.Height * bgScale;
+
+                if (mousePos.X >= imgX && mousePos.X <= imgX + imgW && mousePos.Y >= imgY && mousePos.Y <= imgY + imgH)
+                {
+                    float normX = Math.Max(0f, Math.Min(1f, (mousePos.X - imgX) / imgW));
+                    float normY = Math.Max(0f, Math.Min(1f, (mousePos.Y - imgY) / imgH));
+                    CurrentMouseHoverNorm = new PointF(normX, normY);
+
+                    if (IsDrawingBgStroke && CurrentDrawingStroke != null)
+                    {
+                        PointF lastPt = CurrentDrawingStroke.Points[CurrentDrawingStroke.Points.Count - 1];
+                        float dx = (normX - lastPt.X) * imgW;
+                        float dy = (normY - lastPt.Y) * imgH;
+                        if (dx * dx + dy * dy >= 4f) // at least 2 pixels movement
+                        {
+                            CurrentDrawingStroke.Points.Add(new PointF(normX, normY));
+                        }
+                    }
+                }
+                else
+                {
+                    CurrentMouseHoverNorm = new PointF(-1, -1);
+                }
+                return;
+            }
+
+            if (IsCropping && SelectedShape != null)
+            {
+                if (ActiveCropHandle != CropHandleType.None)
+                {
+                    int cropSlideX, cropSlideY, cropSlideW, cropSlideH;
+                    float cropScale;
+                    GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out cropSlideX, out cropSlideY, out cropSlideW, out cropSlideH, out cropScale);
+                    ShapeNode cropTarget = SelectedShape;
+
+                    float dx = (mousePos.X - CropDragStartMouse.X) / cropScale;
+                    float dy = (mousePos.Y - CropDragStartMouse.Y) / cropScale;
+
+                    float initW = Math.Max(20f, CropInitialShapeW);
+                    float initH = Math.Max(20f, CropInitialShapeH);
+                    float initVisWFrac = Math.Max(0.05f, 1.0f - CropInitialLeft - CropInitialRight);
+                    float initVisHFrac = Math.Max(0.05f, 1.0f - CropInitialTop - CropInitialBottom);
+
+                    switch (ActiveCropHandle)
+                    {
+                        case CropHandleType.Left:
+                        case CropHandleType.TopLeft:
+                        case CropHandleType.BottomLeft:
+                            {
+                                float fracDelta = (dx / initW) * initVisWFrac;
+                                cropTarget.CropLeft = Math.Max(0f, Math.Min(0.85f - CropInitialRight, CropInitialLeft + fracDelta));
+                                float activeVisWFrac = Math.Max(0.05f, 1.0f - cropTarget.CropLeft - cropTarget.CropRight);
+                                cropTarget.Transform.Width = Math.Max(20f, initW * (activeVisWFrac / initVisWFrac));
+                                cropTarget.Transform.X = CropInitialShapeX + (cropTarget.CropLeft - CropInitialLeft) * (initW / initVisWFrac);
+                            }
+                            break;
+                        case CropHandleType.Right:
+                        case CropHandleType.TopRight:
+                        case CropHandleType.BottomRight:
+                            {
+                                float fracDelta = (-dx / initW) * initVisWFrac;
+                                cropTarget.CropRight = Math.Max(0f, Math.Min(0.85f - CropInitialLeft, CropInitialRight + fracDelta));
+                                float activeVisWFrac = Math.Max(0.05f, 1.0f - cropTarget.CropLeft - cropTarget.CropRight);
+                                cropTarget.Transform.Width = Math.Max(20f, initW * (activeVisWFrac / initVisWFrac));
+                            }
+                            break;
+                    }
+
+                    switch (ActiveCropHandle)
+                    {
+                        case CropHandleType.Top:
+                        case CropHandleType.TopLeft:
+                        case CropHandleType.TopRight:
+                            {
+                                float fracDelta = (dy / initH) * initVisHFrac;
+                                cropTarget.CropTop = Math.Max(0f, Math.Min(0.85f - CropInitialBottom, CropInitialTop + fracDelta));
+                                float activeVisHFrac = Math.Max(0.05f, 1.0f - cropTarget.CropTop - cropTarget.CropBottom);
+                                cropTarget.Transform.Height = Math.Max(20f, initH * (activeVisHFrac / initVisHFrac));
+                                cropTarget.Transform.Y = CropInitialShapeY + (cropTarget.CropTop - CropInitialTop) * (initH / initVisHFrac);
+                            }
+                            break;
+                        case CropHandleType.Bottom:
+                        case CropHandleType.BottomLeft:
+                        case CropHandleType.BottomRight:
+                            {
+                                float fracDelta = (-dy / initH) * initVisHFrac;
+                                cropTarget.CropBottom = Math.Max(0f, Math.Min(0.85f - CropInitialTop, CropInitialBottom + fracDelta));
+                                float activeVisHFrac = Math.Max(0.05f, 1.0f - cropTarget.CropTop - cropTarget.CropBottom);
+                                cropTarget.Transform.Height = Math.Max(20f, initH * (activeVisHFrac / initVisHFrac));
+                            }
+                            break;
+                        case CropHandleType.PanImage:
+                            {
+                                float panFracX = (-dx / initW) * initVisWFrac;
+                                float panFracY = (-dy / initH) * initVisHFrac;
+                                cropTarget.CropLeft = Math.Max(0f, CropInitialLeft + panFracX);
+                                cropTarget.CropRight = Math.Max(0f, CropInitialRight - panFracX);
+                                cropTarget.CropTop = Math.Max(0f, CropInitialTop + panFracY);
+                                cropTarget.CropBottom = Math.Max(0f, CropInitialBottom - panFracY);
+                            }
+                            break;
+                    }
+                }
+                return;
+            }
+
+            if (IsSelectingTableCells && SelectedShape != null && SelectedShape.Type == ShapeType.Table)
+            {
+                int tblSlideX, tblSlideY, tblSlideW, tblSlideH;
+                float tblScale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out tblSlideX, out tblSlideY, out tblSlideW, out tblSlideH, out tblScale);
+
+                int sx = tblSlideX + (int)(SelectedShape.Transform.X * tblScale);
+                int sy = tblSlideY + (int)(SelectedShape.Transform.Y * tblScale);
+                int sw = (int)(SelectedShape.Transform.Width * tblScale);
+                int sh = (int)(SelectedShape.Transform.Height * tblScale);
+
+                int cols = Math.Max(1, SelectedShape.TableColumns);
+                int rows = Math.Max(1, SelectedShape.TableRows);
+                float cellW = sw / (float)cols;
+                float cellH = sh / (float)rows;
+
+                int c = (int)((mousePos.X - sx) / cellW);
+                int r = (int)((mousePos.Y - sy) / cellH);
+                c = Math.Max(0, Math.Min(cols - 1, c));
+                r = Math.Max(0, Math.Min(rows - 1, r));
+
+                SelectedShape.TableSelectedEndRow = r;
+                SelectedShape.TableSelectedEndCol = c;
+                return;
+            }
+
+            if (DraggingSelectionPaneIndex >= 0 && ActiveSlide != null)
+            {
+                int sy = 155 + 42 + SidebarScrollY;
+                int listStartY = sy + 34;
+                int r = (mousePos.Y - listStartY) / 28;
+                if (r >= 0 && r < ActiveSlide.Shapes.Count)
+                {
+                    DraggingSelectionPaneTargetIndex = ActiveSlide.Shapes.Count - 1 - r;
+                }
+                return;
+            }
+
+            if (DraggingAnimationPaneIndex >= 0 && ActiveSlide != null && ActiveSlide.Animations.Count > 0)
+            {
+                int sy = 155 + 42 + SidebarScrollY;
+                int animStartY = sy + 34;
+                int r = (mousePos.Y - animStartY + 18) / 36;
+                if (r < 0) r = 0;
+                if (r >= ActiveSlide.Animations.Count) r = ActiveSlide.Animations.Count - 1;
+                DraggingAnimationPaneTargetIndex = r;
+                return;
+            }
+
+            if (IsDraggingGradientStop && ActiveSlide != null && ActiveSlide.BgGradientStops != null)
+            {
+                int trackX = width - rightSidebarW + 24;
+                int trackW = rightSidebarW - 106;
+                float frac = (float)(mousePos.X - trackX) / trackW;
+                frac = Math.Max(0.0f, Math.Min(1.0f, frac));
+                if (ActiveSlide.SelectedGradientStopIndex >= 0 && ActiveSlide.SelectedGradientStopIndex < ActiveSlide.BgGradientStops.Count)
+                {
+                    ActiveSlide.BgGradientStops[ActiveSlide.SelectedGradientStopIndex].Position = frac;
+                }
+                return;
+            }
+
+            if (DraggingBgSliderType > 0 && ActiveSlide != null)
+            {
+                int trackX = width - rightSidebarW + 115;
+                int trackW = 65;
+                float frac = Math.Max(0.0f, Math.Min(1.0f, (float)(mousePos.X - trackX) / trackW));
+                GradientStop activeStop = (ActiveSlide.BgGradientStops != null && ActiveSlide.SelectedGradientStopIndex >= 0 && ActiveSlide.SelectedGradientStopIndex < ActiveSlide.BgGradientStops.Count)
+                    ? ActiveSlide.BgGradientStops[ActiveSlide.SelectedGradientStopIndex] : null;
+
+                if (DraggingBgSliderType == 1) // Transparency
+                {
+                    if (ActiveSlide.BgFillType == BackgroundFillType.Gradient && activeStop != null)
+                        activeStop.Transparency = frac;
+                    else
+                        ActiveSlide.BgTransparency = frac;
+                }
+                else if (DraggingBgSliderType == 2 && activeStop != null) // Position
+                {
+                    activeStop.Position = frac;
+                }
+                else if (DraggingBgSliderType == 3 && activeStop != null) // Brightness (-1 to +1)
+                {
+                    activeStop.Brightness = (frac * 2.0f) - 1.0f;
+                }
+                return;
+            }
+
+            if (IsDraggingHScrollBar)
+            {
+                int minScrollX, maxScrollX, minScrollY, maxScrollY;
+                GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+
+                bool hasVScroll = (minScrollY < maxScrollY);
+                int sbW = 14;
+                int hTrackW = hasVScroll ? (canvasW - sbW) : canvasW;
+                int totalW = maxScrollX - minScrollX + canvasW;
+                int thumbW = Math.Max(40, (int)((float)canvasW / totalW * hTrackW));
+                thumbW = Math.Min(thumbW, hTrackW);
+                int trackScrollableW = Math.Max(1, hTrackW - thumbW);
+
+                int deltaMouseX = mousePos.X - ScrollBarDragStartMouseX;
+                float scrollPerPx = (float)(maxScrollX - minScrollX) / trackScrollableW;
+                CanvasScrollX = ScrollBarDragStartScrollX + (int)(deltaMouseX * scrollPerPx);
+                ClampScroll(canvasW, contentH);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (IsDraggingVScrollBar)
+            {
+                int minScrollX, maxScrollX, minScrollY, maxScrollY;
+                GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+
+                bool hasHScroll = (minScrollX < maxScrollX);
+                int sbH = 14;
+                int vTrackH = hasHScroll ? (contentH - sbH) : contentH;
+                int totalH = maxScrollY - minScrollY + contentH;
+                int thumbH = Math.Max(40, (int)((float)contentH / totalH * vTrackH));
+                thumbH = Math.Min(thumbH, vTrackH);
+                int trackScrollableH = Math.Max(1, vTrackH - thumbH);
+
+                int deltaMouseY = mousePos.Y - ScrollBarDragStartMouseY;
+                float scrollPerPx = (float)(maxScrollY - minScrollY) / trackScrollableH;
+                CanvasScrollY = ScrollBarDragStartScrollY + (int)(deltaMouseY * scrollPerPx);
+                ClampScroll(canvasW, contentH);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            // Hover check for scrollbars
+            {
+                int minScrollX, maxScrollX, minScrollY, maxScrollY;
+                GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+                bool hasVScroll = (minScrollY < maxScrollY);
+                bool hasHScroll = (minScrollX < maxScrollX);
+                int sbH = 14;
+                int sbW = 14;
+
+                bool oldHoverH = IsHoverHScrollBarThumb;
+                bool oldHoverV = IsHoverVScrollBarThumb;
+
+                IsHoverHScrollBarThumb = hasHScroll && (mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH &&
+                    mousePos.X >= leftSidebarW && mousePos.X <= leftSidebarW + (hasVScroll ? (canvasW - sbW) : canvasW));
+
+                IsHoverVScrollBarThumb = hasVScroll && (mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW &&
+                    mousePos.Y >= contentY && mousePos.Y <= contentY + (hasHScroll ? (contentH - sbH) : contentH));
+
+                if (oldHoverH != IsHoverHScrollBarThumb || oldHoverV != IsHoverVScrollBarThumb)
+                {
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+            }
+
+            if (IsPanningCanvas)
+            {
+                int dx = mousePos.X - PanStartMouse.X;
+                int dy = mousePos.Y - PanStartMouse.Y;
+                CanvasScrollX = PanStartScroll.X - dx;
+                CanvasScrollY = PanStartScroll.Y - dy;
+                ClampScroll(canvasW, contentH);
+                return;
+            }
+
+            int slideX, slideY, slideW, slideH;
+            float scale;
+            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            // 1. Motion Path Freehand Sketching MouseMove
+            if (IsDrawingMotionPathMode && IsDrawingMotionPathActive)
+            {
+                ShapeNode targetShape = ActiveDrawingMotionShape ?? SelectedShape;
+                if (targetShape != null)
+                {
+                    float mouseSlideX = (mousePos.X - slideX) / scale;
+                    float mouseSlideY = (mousePos.Y - slideY) / scale;
+                    float scx = targetShape.Transform.X + targetShape.Transform.Width / 2f;
+                    float scy = targetShape.Transform.Y + targetShape.Transform.Height / 2f;
+                    PointF newPt = new PointF(mouseSlideX - scx, mouseSlideY - scy);
+
+                    if (CurrentDrawingMotionPoints.Count > 0)
+                    {
+                        PointF lastPt = CurrentDrawingMotionPoints[CurrentDrawingMotionPoints.Count - 1];
+                        float distSq = (newPt.X - lastPt.X) * (newPt.X - lastPt.X) + (newPt.Y - lastPt.Y) * (newPt.Y - lastPt.Y);
+                        if (distSq >= 9f) // 3px delta
+                        {
+                            CurrentDrawingMotionPoints.Add(newPt);
+                        }
+                    }
+                    else
+                    {
+                        CurrentDrawingMotionPoints.Add(newPt);
+                    }
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            // 2. Motion Path End Point Handle Dragging MouseMove
+            if (IsDraggingMotionEndDot && DraggingMotionAnim != null && DraggingMotionShape != null)
+            {
+                float mouseSlideX = (mousePos.X - slideX) / scale;
+                float mouseSlideY = (mousePos.Y - slideY) / scale;
+                float scx = DraggingMotionShape.Transform.X + DraggingMotionShape.Transform.Width / 2f;
+                float scy = DraggingMotionShape.Transform.Y + DraggingMotionShape.Transform.Height / 2f;
+                DraggingMotionAnim.EndOffsetX = mouseSlideX - scx;
+                DraggingMotionAnim.EndOffsetY = mouseSlideY - scy;
+                DraggingMotionAnim.HasCustomEndOffset = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            ShapeNode shape = SelectedShape;
+
+            if (IsRotatingShape && shape != null)
+            {
+                PointF center = new PointF(slideX + (shape.Transform.X + shape.Transform.Width / 2.0f) * scale,
+                                           slideY + (shape.Transform.Y + shape.Transform.Height / 2.0f) * scale);
+                double rawAngle = Math.Atan2(mousePos.Y - center.Y, mousePos.X - center.X) * 180.0 / Math.PI + 90.0;
+                while (rawAngle < 0) rawAngle += 360.0;
+                while (rawAngle >= 360.0) rawAngle -= 360.0;
+
+                // Soft magnetic angle snap: holds at 0, 45, 90, 135, 180, 225, 270, 315 within ±2.2° tolerance
+                float snappedAngle = (float)rawAngle;
+                int[] landmarkAngles = new int[] { 0, 45, 90, 135, 180, 225, 270, 315, 360 };
+                foreach (int target in landmarkAngles)
+                {
+                    double diff = Math.Abs(rawAngle - target);
+                    if (diff <= 2.2)
+                    {
+                        snappedAngle = target % 360;
+                        break;
+                    }
+                }
+
+                shape.Transform.Rotation = snappedAngle;
+                return;
+            }
+
+            if (IsDraggingShape && shape != null)
+            {
+                float rawDx = (mousePos.X - DragStartMouse.X) / scale;
+                float rawDy = (mousePos.Y - DragStartMouse.Y) / scale;
+
+                float rawX = DragStartTransform.X + rawDx;
+                float rawY = DragStartTransform.Y + rawDy;
+
+                float snappedX, snappedY;
+                ApplySmartSnapping(shape, rawX, rawY, out snappedX, out snappedY);
+
+                shape.Transform.X = snappedX;
+                shape.Transform.Y = snappedY;
+
+                if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
+                {
+                    int vx = slideX + (int)(shape.Transform.X * scale);
+                    int vy = slideY + (int)(shape.Transform.Y * scale);
+                    int vw = (int)(shape.Transform.Width * scale);
+                    int vh = (int)(shape.Transform.Height * scale);
+                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
+                }
+                return;
+            }
+
+            if (IsResizingShape && shape != null)
+            {
+                float dx = (mousePos.X - DragStartMouse.X) / scale;
+                float dy = (mousePos.Y - DragStartMouse.Y) / scale;
+                float startW = DragStartTransform.Width;
+                float startH = DragStartTransform.Height;
+                float ratio = startW / Math.Max(1.0f, startH);
+
+                switch (DragResizeHandleIndex)
+                {
+                    case 0: // Top-Left (Góc: Kéo đều tỉ lệ vuông góc)
+                        {
+                            float drag = (Math.Abs(dx) > Math.Abs(dy * ratio)) ? -dx : -(dy * ratio);
+                            float newW = Math.Max(20f, startW + drag);
+                            float newH = newW / ratio;
+                            shape.Transform.X = DragStartTransform.X + (startW - newW);
+                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                            shape.Transform.Width = newW;
+                            shape.Transform.Height = newH;
+                        }
+                        break;
+                    case 1: // Top-Center (Cạnh trên)
+                        {
+                            float newH = Math.Max(20f, startH - dy);
+                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                            shape.Transform.Height = newH;
+                        }
+                        break;
+                    case 2: // Top-Right (Góc: Kéo đều tỉ lệ vuông góc)
+                        {
+                            float drag = (Math.Abs(dx) > Math.Abs(-dy * ratio)) ? dx : -(dy * ratio);
+                            float newW = Math.Max(20f, startW + drag);
+                            float newH = newW / ratio;
+                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                            shape.Transform.Width = newW;
+                            shape.Transform.Height = newH;
+                        }
+                        break;
+                    case 3: // Right-Center (Cạnh phải)
+                        {
+                            shape.Transform.Width = Math.Max(20f, startW + dx);
+                        }
+                        break;
+                    case 4: // Bottom-Right (Góc: Kéo đều tỉ lệ vuông góc)
+                        {
+                            float drag = (Math.Abs(dx) > Math.Abs(dy * ratio)) ? dx : (dy * ratio);
+                            float newW = Math.Max(20f, startW + drag);
+                            float newH = newW / ratio;
+                            shape.Transform.Width = newW;
+                            shape.Transform.Height = newH;
+                        }
+                        break;
+                    case 5: // Bottom-Center (Cạnh dưới)
+                        {
+                            shape.Transform.Height = Math.Max(20f, startH + dy);
+                        }
+                        break;
+                    case 6: // Bottom-Left (Góc: Kéo đều tỉ lệ vuông góc)
+                        {
+                            float drag = (Math.Abs(-dx) > Math.Abs(dy * ratio)) ? -dx : (dy * ratio);
+                            float newW = Math.Max(20f, startW + drag);
+                            float newH = newW / ratio;
+                            shape.Transform.X = DragStartTransform.X + (startW - newW);
+                            shape.Transform.Width = newW;
+                            shape.Transform.Height = newH;
+                        }
+                        break;
+                    case 7: // Left-Center (Cạnh trái)
+                        {
+                            float newW = Math.Max(20f, startW - dx);
+                            shape.Transform.X = DragStartTransform.X + (startW - newW);
+                            shape.Transform.Width = newW;
+                        }
+                        break;
+                }
+
+                if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
+                {
+                    int vx = slideX + (int)(shape.Transform.X * scale);
+                    int vy = slideY + (int)(shape.Transform.Y * scale);
+                    int vw = (int)(shape.Transform.Width * scale);
+                    int vh = (int)(shape.Transform.Height * scale);
+                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
+                }
+                return;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ICONINFO
+        {
+            public bool fIcon;
+            public int xHotspot;
+            public int yHotspot;
+            public IntPtr hbmMask;
+            public IntPtr hbmColor;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr CreateIconIndirect(ref ICONINFO icon);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetIconInfo(IntPtr hIcon, ref ICONINFO piconinfo);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyIcon(IntPtr hIcon);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        private static Cursor _penCursorKeep;
+        private static Cursor _penCursorRemove;
+        private static Cursor _penCursorGeneral;
+        private static Cursor _eyedropperCursor;
+
+        public static Cursor GetPenCursor(string toolType)
+        {
+            try
+            {
+                if (toolType == "Keep")
+                {
+                    if (_penCursorKeep == null) _penCursorKeep = CreateCustomPenCursor(Color.FromArgb(34, 197, 94));
+                    return _penCursorKeep;
+                }
+                else if (toolType == "Remove")
+                {
+                    if (_penCursorRemove == null) _penCursorRemove = CreateCustomPenCursor(Color.FromArgb(239, 68, 68));
+                    return _penCursorRemove;
+                }
+                if (_penCursorGeneral == null) _penCursorGeneral = CreateCustomPenCursor(Color.FromArgb(59, 130, 246));
+                return _penCursorGeneral;
+            }
+            catch
+            {
+                return Cursors.Default;
+            }
+        }
+
+        public static Cursor GetEyedropperCursor()
+        {
+            try
+            {
+                if (_eyedropperCursor == null)
+                {
+                    _eyedropperCursor = CreateEyedropperCursor();
+                }
+                return _eyedropperCursor;
+            }
+            catch
+            {
+                return Cursors.Cross;
+            }
+        }
+
+        private static Cursor CreateEyedropperCursor()
+        {
+            using (Bitmap bmp = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.Clear(Color.Transparent);
+
+                    PointF tip = new PointF(1f, 30f);
+                    PointF t1 = new PointF(4f, 27f);
+                    PointF t2 = new PointF(7f, 30f);
+
+                    PointF b1 = new PointF(14f, 17f);
+                    PointF b2 = new PointF(19f, 22f);
+
+                    PointF top1 = new PointF(23f, 8f);
+                    PointF top2 = new PointF(28f, 13f);
+
+                    PointF bulb = new PointF(28f, 3f);
+                    PointF bulb2 = new PointF(31f, 6f);
+
+                    // 1. Viền ngoài trắng tương phản cao
+                    using (Pen wp = new Pen(Color.FromArgb(230, 255, 255, 255), 3.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                    {
+                        PointF[] outline = new PointF[] { tip, t1, b1, top1, bulb, bulb2, top2, b2, t2, tip };
+                        g.DrawPolygon(wp, outline);
+                    }
+
+                    // 2. Đầu bóp cao su màu xanh ngọc CapCut
+                    using (SolidBrush bb = new SolidBrush(Color.FromArgb(14, 165, 233)))
+                    {
+                        g.FillPolygon(bb, new PointF[] { top1, bulb, bulb2, top2 });
+                    }
+
+                    // 3. Thân ống thủy tinh
+                    using (SolidBrush gb = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    {
+                        g.FillPolygon(gb, new PointF[] { t1, b1, b2, t2 });
+                    }
+
+                    // 4. Giọt màu phông xanh lá / màu hút bên trong
+                    using (SolidBrush lb = new SolidBrush(Color.FromArgb(34, 197, 94)))
+                    {
+                        g.FillPolygon(lb, new PointF[] { tip, t1, t2 });
+                    }
+
+                    // 5. Viền nét đen đậm sắc sảo
+                    using (Pen dp = new Pen(Color.FromArgb(15, 23, 42), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                    {
+                        PointF[] outline = new PointF[] { tip, t1, b1, top1, bulb, bulb2, top2, b2, t2, tip };
+                        g.DrawPolygon(dp, outline);
+                        g.DrawLine(dp, top1, top2);
+                        g.DrawLine(dp, t1, t2);
+                    }
+                }
+
+                IntPtr hIcon = bmp.GetHicon();
+                ICONINFO info = new ICONINFO();
+                if (GetIconInfo(hIcon, ref info))
+                {
+                    info.xHotspot = 1;
+                    info.yHotspot = 30;
+                    info.fIcon = false;
+                    IntPtr hCursor = CreateIconIndirect(ref info);
+
+                    if (info.hbmColor != IntPtr.Zero) DeleteObject(info.hbmColor);
+                    if (info.hbmMask != IntPtr.Zero) DeleteObject(info.hbmMask);
+                    DestroyIcon(hIcon);
+
+                    if (hCursor != IntPtr.Zero)
+                        return new Cursor(hCursor);
+                }
+                return new Cursor(hIcon);
+            }
+        }
+
+        private static Cursor CreateCustomPenCursor(Color bodyColor)
+        {
+            using (Bitmap bmp = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.Clear(Color.Transparent);
+
+                    PointF tip = new PointF(1f, 30f);
+                    PointF w1 = new PointF(4.5f, 26.5f);
+                    PointF w2 = new PointF(7.5f, 29.5f);
+
+                    PointF b1 = new PointF(10f, 21f);
+                    PointF b2 = new PointF(15f, 26f);
+
+                    PointF f1 = new PointF(22f, 9f);
+                    PointF f2 = new PointF(27f, 14f);
+
+                    PointF e1 = new PointF(25f, 6f);
+                    PointF e2 = new PointF(30f, 11f);
+
+                    PointF top = new PointF(28f, 3f);
+                    PointF top2 = new PointF(31f, 6f);
+
+                    // 1. Viền ngoài màu trắng tương phản cao để hiển thị rõ trên mọi nền ảnh sáng/tối
+                    using (Pen whitePen = new Pen(Color.FromArgb(230, 255, 255, 255), 3.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                    {
+                        PointF[] contour = new PointF[] { tip, b1, f1, e1, top, top2, e2, f2, b2, tip };
+                        g.DrawPolygon(whitePen, contour);
+                    }
+
+                    // 2. Đầu gôm tẩy màu hồng
+                    using (SolidBrush eb = new SolidBrush(Color.FromArgb(244, 114, 182)))
+                    {
+                        g.FillPolygon(eb, new PointF[] { e1, top, top2, e2 });
+                    }
+
+                    // 3. Khuyên kim loại bạc
+                    using (SolidBrush fb = new SolidBrush(Color.FromArgb(203, 213, 225)))
+                    {
+                        g.FillPolygon(fb, new PointF[] { f1, e1, e2, f2 });
+                    }
+
+                    // 4. Thân bút chì (Xanh lá nếu Giữ vùng / Đỏ nếu Xóa vùng)
+                    using (SolidBrush bb = new SolidBrush(bodyColor))
+                    {
+                        g.FillPolygon(bb, new PointF[] { b1, f1, f2, b2 });
+                    }
+                    using (SolidBrush hb = new SolidBrush(Color.FromArgb(90, 255, 255, 255)))
+                    {
+                        PointF midTop = new PointF((b1.X + b2.X) / 2f, (b1.Y + b2.Y) / 2f);
+                        PointF midEnd = new PointF((f1.X + f2.X) / 2f, (f1.Y + f2.Y) / 2f);
+                        g.FillPolygon(hb, new PointF[] { b1, f1, midEnd, midTop });
+                    }
+
+                    // 5. Phần gỗ gọt nhọn
+                    using (SolidBrush wb = new SolidBrush(Color.FromArgb(254, 240, 138)))
+                    {
+                        g.FillPolygon(wb, new PointF[] { w1, b1, b2, w2, tip });
+                    }
+
+                    // 6. Ngòi chì đậm ở chóp nhọn
+                    using (SolidBrush lb = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                    {
+                        g.FillPolygon(lb, new PointF[] { tip, w1, w2 });
+                    }
+
+                    // 7. Viền đen sắc nét
+                    using (Pen darkPen = new Pen(Color.FromArgb(30, 41, 59), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                    {
+                        PointF[] contour = new PointF[] { tip, b1, f1, e1, top, top2, e2, f2, b2, tip };
+                        g.DrawPolygon(darkPen, contour);
+                        g.DrawLine(darkPen, b1, b2);
+                        g.DrawLine(darkPen, f1, f2);
+                        g.DrawLine(darkPen, e1, e2);
+                    }
+                }
+
+                IntPtr hIcon = bmp.GetHicon();
+                ICONINFO info = new ICONINFO();
+                if (GetIconInfo(hIcon, ref info))
+                {
+                    info.xHotspot = 1;
+                    info.yHotspot = 30;
+                    info.fIcon = false;
+                    IntPtr hCursor = CreateIconIndirect(ref info);
+
+                    if (info.hbmColor != IntPtr.Zero) DeleteObject(info.hbmColor);
+                    if (info.hbmMask != IntPtr.Zero) DeleteObject(info.hbmMask);
+                    DestroyIcon(hIcon);
+
+                    if (hCursor != IntPtr.Zero)
+                        return new Cursor(hCursor);
+                }
+                return new Cursor(hIcon);
+            }
+        }
+
+        public Cursor GetCursorForPosition(Point mousePos, int width, int height)
+        {
+            int topBarY = 155;
+            int contentY = topBarY;
+            int contentH = height - contentY - 26;
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            // 1. Khi rê chuột qua thanh thumbnail bên trái, ribbon ở trên, task pane bên phải hoặc thanh trạng thái ở dưới:
+            // Luôn trả về con trỏ chuột bình thường (Cursors.Default)
+            if (mousePos.Y < topBarY || mousePos.Y >= height - 26 || mousePos.X < leftSidebarW || mousePos.X >= width - rightSidebarW)
+            {
+                return Cursors.Default;
+            }
+
+            // 1.1 Khi rê chuột lên thanh cuộn ngang hoặc thanh cuộn dọc -> Con trỏ Default
+            int minScrollX, maxScrollX, minScrollY, maxScrollY;
+            GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+            bool hasVScroll = (minScrollY < maxScrollY);
+            bool hasHScroll = (minScrollX < maxScrollX);
+            int sbH = 14;
+            int sbW = 14;
+
+            if (hasHScroll && mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH)
+            {
+                return Cursors.Default;
+            }
+            if (hasVScroll && mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW)
+            {
+                return Cursors.Default;
+            }
+
+            // 2. Chế độ vẽ hình hoặc vẽ đường chuyển động trên slide canvas
+            if (IsDrawingShapeMode || IsDrawingActive || IsDrawingMotionPathMode || IsDrawingMotionPathActive)
+            {
+                return Cursors.Cross;
+            }
+
+            // Chế độ Chọn màu xóa (Chroma Keying / Phông xanh CapCut)
+            if (IsColorPickingMode)
+            {
+                return GetEyedropperCursor();
+            }
+
+            // Chế độ Xóa nền (Background Removal: Trả về con trỏ hình cây bút hoặc ống hút màu)
+            if (IsRemovingBackground)
+            {
+                if (BgRemovalTool == "PickColor")
+                {
+                    return GetEyedropperCursor();
+                }
+                if (BgRemovalTool == "Keep" || BgRemovalTool == "Remove")
+                {
+                    return GetPenCursor(BgRemovalTool);
+                }
+            }
+
+            int slideX, slideY, slideW, slideH;
+            float scale;
+            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            // Kiểm tra con trỏ trên chấm đỏ End Dot của Đường chuyển động
+            if (ActiveSlide != null && ActiveSlide.Animations != null && ActiveSlide.Animations.Count > 0)
+            {
+                for (int a = 0; a < ActiveSlide.Animations.Count; a++)
+                {
+                    ShapeAnimation anim = ActiveSlide.Animations[a];
+                    if (anim == null || !anim.IsMotionPath) continue;
+
+                    ShapeNode targetShape = null;
+                    for (int s = 0; s < ActiveSlide.Shapes.Count; s++)
+                    {
+                        if (ActiveSlide.Shapes[s].Id == anim.ShapeId) { targetShape = ActiveSlide.Shapes[s]; break; }
+                    }
+                    if (targetShape == null) continue;
+
+                    float scx = slideX + (targetShape.Transform.X + targetShape.Transform.Width / 2f) * scale;
+                    float scy = slideY + (targetShape.Transform.Y + targetShape.Transform.Height / 2f) * scale;
+
+                    float endOffX, endOffY;
+                    EvaluateMotionPathOffset(anim, 1.0f, out endOffX, out endOffY);
+                    float endPtX = scx + endOffX * scale;
+                    float endPtY = scy + endOffY * scale;
+
+                    float dX = mousePos.X - endPtX;
+                    float dY = mousePos.Y - endPtY;
+                    if (dX * dX + dY * dY <= 144f) // 12px hit radius
+                    {
+                        return Cursors.SizeAll;
+                    }
+                }
+            }
+
+            if (SelectedShapeIndex >= 0 && ActiveSlide != null && SelectedShapeIndex < ActiveSlide.Shapes.Count)
+            {
+                ShapeNode shape = ActiveSlide.Shapes[SelectedShapeIndex];
+                int sx = slideX + (int)(shape.Transform.X * scale);
+                int sy = slideY + (int)(shape.Transform.Y * scale);
+                int sw = (int)(shape.Transform.Width * scale);
+                int sh = (int)(shape.Transform.Height * scale);
+
+                if (IsCropping && shape == SelectedShape)
+                {
+                    float hitR = Math.Max(12f, 16f * scale);
+                    if (Math.Abs(mousePos.X - sx) <= hitR && Math.Abs(mousePos.Y - sy) <= hitR) return Cursors.SizeNWSE;
+                    if (Math.Abs(mousePos.X - (sx + sw)) <= hitR && Math.Abs(mousePos.Y - sy) <= hitR) return Cursors.SizeNESW;
+                    if (Math.Abs(mousePos.X - sx) <= hitR && Math.Abs(mousePos.Y - (sy + sh)) <= hitR) return Cursors.SizeNESW;
+                    if (Math.Abs(mousePos.X - (sx + sw)) <= hitR && Math.Abs(mousePos.Y - (sy + sh)) <= hitR) return Cursors.SizeNWSE;
+                    if (Math.Abs(mousePos.X - (sx + sw / 2f)) <= hitR && Math.Abs(mousePos.Y - sy) <= hitR) return Cursors.SizeNS;
+                    if (Math.Abs(mousePos.X - (sx + sw / 2f)) <= hitR && Math.Abs(mousePos.Y - (sy + sh)) <= hitR) return Cursors.SizeNS;
+                    if (Math.Abs(mousePos.X - sx) <= hitR && Math.Abs(mousePos.Y - (sy + sh / 2f)) <= hitR) return Cursors.SizeWE;
+                    if (Math.Abs(mousePos.X - (sx + sw)) <= hitR && Math.Abs(mousePos.Y - (sy + sh / 2f)) <= hitR) return Cursors.SizeWE;
+
+                    if (mousePos.X >= sx && mousePos.X <= sx + sw && mousePos.Y >= sy && mousePos.Y <= sy + sh)
+                    {
+                        return Cursors.SizeAll;
+                    }
+                    return Cursors.Default;
+                }
+
+                // Rotation knob (Mũi tên xoay)
+                PointF rotH = GetRotatedRotationHandle(sx, sy, sw, sh, shape.Transform.Rotation);
+                float dRotX = mousePos.X - rotH.X;
+                float dRotY = mousePos.Y - rotH.Y;
+                if (dRotX * dRotX + dRotY * dRotY <= 144f) // 12px radius
+                {
+                    return Cursors.Hand;
+                }
+
+                // 8 resize handles
+                PointF[] handles = GetRotatedHandleCoordinates(sx, sy, sw, sh, shape.Transform.Rotation);
+                Cursor[] handleCursors = new Cursor[] {
+                    Cursors.SizeNWSE, Cursors.SizeNS, Cursors.SizeNESW,
+                    Cursors.SizeWE, Cursors.SizeNWSE, Cursors.SizeNS,
+                    Cursors.SizeNESW, Cursors.SizeWE
+                };
+
+                for (int hIdx = 0; hIdx < handles.Length; hIdx++)
+                {
+                    float dHX = mousePos.X - handles[hIdx].X;
+                    float dHY = mousePos.Y - handles[hIdx].Y;
+                    if (dHX * dHX + dHY * dHY <= 64f) // 8px radius
+                    {
+                        return handleCursors[hIdx];
+                    }
+                }
+
+                // Table Move Handle & Border check (Nút kéo 4 chiều ✥ và viền ngoài)
+                if (shape.Type == ShapeType.Table)
+                {
+                    Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
+                    if (moveHandleRect.Contains(mousePos))
+                    {
+                        return Cursors.SizeAll;
+                    }
+
+                    // Outer border edges (within 6px) -> Kéo bảng
+                    if (mousePos.X >= sx - 6 && mousePos.X <= sx + sw + 6 && mousePos.Y >= sy - 6 && mousePos.Y <= sy + sh + 6)
+                    {
+                        if (mousePos.X <= sx + 6 || mousePos.X >= sx + sw - 6 || mousePos.Y <= sy + 6 || mousePos.Y >= sy + sh - 6)
+                        {
+                            return Cursors.SizeAll;
+                        }
+                        if (IsEditingTableCell && EditingTableShape == shape)
+                        {
+                            return Cursors.IBeam;
+                        }
+                        return Cursors.Default;
+                    }
+                }
+
+                PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+                PointF unrotatedMouse = RotatePoint(mousePos, center, -shape.Transform.Rotation);
+                RectangleF shapeBounds = (shape.Type == ShapeType.Line)
+                    ? new RectangleF(sx - 8f, sy - 8f, Math.Max(16f, sw + 16f), Math.Max(16f, sh + 16f))
+                    : new RectangleF(sx, sy, sw, sh);
+                if (shapeBounds.Contains(unrotatedMouse))
+                {
+                    return Cursors.SizeAll;
+                }
+            }
+
+            return Cursors.Default;
+        }
+
+        public void HandleMouseUp(Point mousePos, int width, int height)
+        {
+            if (IsPresenting)
+            {
+                if (AnnotationPenMode && CurrentStroke.Count > 0)
+                {
+                    PenStrokes.Add(new List<Point>(CurrentStroke));
+                    CurrentStroke.Clear();
+                }
+                return;
+            }
+
+            // 1. Motion Path Freehand Sketching MouseUp
+            if (IsDrawingMotionPathMode && IsDrawingMotionPathActive)
+            {
+                IsDrawingMotionPathActive = false;
+                IsDrawingMotionPathMode = false;
+                ShapeNode targetShape = ActiveDrawingMotionShape ?? SelectedShape;
+                if (targetShape != null && CurrentDrawingMotionPoints != null && CurrentDrawingMotionPoints.Count >= 2 && ActiveSlide != null)
+                {
+                    SaveUndoState();
+                    ShapeAnimation anim = null;
+                    for (int i = 0; i < ActiveSlide.Animations.Count; i++)
+                    {
+                        if (ActiveSlide.Animations[i].ShapeId == targetShape.Id)
+                        {
+                            anim = ActiveSlide.Animations[i];
+                            break;
+                        }
+                    }
+                    if (anim == null)
+                    {
+                        anim = new ShapeAnimation
+                        {
+                            ShapeId = targetShape.Id,
+                            OrderIndex = ActiveSlide.Animations.Count
+                        };
+                        ActiveSlide.Animations.Add(anim);
+                    }
+                    anim.Type = AnimationType.MotionCustom;
+                    anim.Duration = 2.0f;
+                    anim.CustomPoints = new List<PointF>(CurrentDrawingMotionPoints);
+                    anim.EndOffsetX = CurrentDrawingMotionPoints[CurrentDrawingMotionPoints.Count - 1].X;
+                    anim.EndOffsetY = CurrentDrawingMotionPoints[CurrentDrawingMotionPoints.Count - 1].Y;
+                    anim.HasCustomEndOffset = true;
+                    SelectedAnimationIndex = ActiveSlide.Animations.IndexOf(anim);
+                    CurrentDrawingMotionPoints.Clear();
+                    PlayAnimationPreview();
+                }
+                else
+                {
+                    CurrentDrawingMotionPoints.Clear();
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            // 2. Motion Path End Point Handle Dragging MouseUp
+            if (IsDraggingMotionEndDot)
+            {
+                IsDraggingMotionEndDot = false;
+                DraggingMotionAnim = null;
+                DraggingMotionShape = null;
+                PlayAnimationPreview();
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (IsCropping && ActiveCropHandle != CropHandleType.None)
+            {
+                ActiveCropHandle = CropHandleType.None;
+                return;
+            }
+
+            if (IsRemovingBackground && IsDrawingBgStroke && CurrentDrawingStroke != null && SelectedShape != null)
+            {
+                IsDrawingBgStroke = false;
+                BgRemovalStrokes.Add(CurrentDrawingStroke);
+                ApplyStrokeSegmentation(SelectedShape, CurrentDrawingStroke);
+                CurrentDrawingStroke = null;
+                return;
+            }
+
+            if (IsDrawingActive)
+            {
+                int x1, y1, w1, h1;
+                bool isSquare;
+                GetConstrainedDrawBounds(out x1, out y1, out w1, out h1, out isSquare);
+
+                IsDrawingActive = false;
+                IsDrawingShapeMode = false;
+
+                int topBarY = 155;
+                int contentY = topBarY;
+                int contentH = height - contentY - 26;
+                int rightSidebarW = IsSidebarOpen ? 280 : 0;
+                int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+                int canvasW = width - leftSidebarW - rightSidebarW;
+
+                int slideX, slideY, slideW, slideH;
+                float scale;
+                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+                bool canCreateShape = (PendingShapeType == ShapeType.Line)
+                    ? (w1 > 4 || h1 > 4)
+                    : (w1 > 6 && h1 > 6);
+
+                if (canCreateShape && ActiveSlide != null)
+                {
+                    SaveUndoState();
+                    float canvasXPos = (x1 - slideX) / scale;
+                    float canvasYPos = (y1 - slideY) / scale;
+                    float canvasWPos = Math.Max(0f, w1 / scale);
+                    float canvasHPos = Math.Max(0f, h1 / scale);
+
+                    ShapeNode newShape = new ShapeNode
+                    {
+                        Type = PendingShapeType,
+                        Transform = new Transform2D(canvasXPos, canvasYPos, canvasWPos, canvasHPos),
+                        FillColor = (PendingShapeType == ShapeType.TextBox || PendingShapeType == ShapeType.Line) ? 0x00FFFFFF : 0x4472C4,
+                        StrokeColor = (PendingShapeType == ShapeType.TextBox) ? 0x00FFFFFF : 0x203864,
+                        StrokeWidth = (PendingShapeType == ShapeType.TextBox) ? 0.0f : 1.5f,
+                        Text = (PendingShapeType == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : ""
+                    };
+
+                    ActiveSlide.AddShape(newShape);
+                    SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+
+                    if (PendingShapeType == ShapeType.TextBox)
+                    {
+                        StartInlineEditing(newShape);
+                    }
+                }
+            }
+
+            if (DraggingSelectionPaneIndex >= 0 && ActiveSlide != null)
+            {
+                if (DraggingSelectionPaneTargetIndex >= 0 && DraggingSelectionPaneTargetIndex != DraggingSelectionPaneIndex &&
+                    DraggingSelectionPaneIndex < ActiveSlide.Shapes.Count && DraggingSelectionPaneTargetIndex < ActiveSlide.Shapes.Count)
+                {
+                    ShapeNode s = ActiveSlide.Shapes[DraggingSelectionPaneIndex];
+                    ActiveSlide.Shapes.RemoveAt(DraggingSelectionPaneIndex);
+                    ActiveSlide.Shapes.Insert(DraggingSelectionPaneTargetIndex, s);
+                    SelectedShapeIndex = DraggingSelectionPaneTargetIndex;
+                    SelectedShapeIndices.Clear();
+                    SelectedShapeIndices.Add(SelectedShapeIndex);
+                }
+                DraggingSelectionPaneIndex = -1;
+                DraggingSelectionPaneTargetIndex = -1;
+            }
+
+            if (DraggingAnimationPaneIndex >= 0 && ActiveSlide != null && ActiveSlide.Animations.Count > 0)
+            {
+                if (DraggingAnimationPaneTargetIndex >= 0 && DraggingAnimationPaneTargetIndex != DraggingAnimationPaneIndex &&
+                    DraggingAnimationPaneIndex < ActiveSlide.Animations.Count && DraggingAnimationPaneTargetIndex < ActiveSlide.Animations.Count)
+                {
+                    ShapeAnimation a = ActiveSlide.Animations[DraggingAnimationPaneIndex];
+                    ActiveSlide.Animations.RemoveAt(DraggingAnimationPaneIndex);
+                    ActiveSlide.Animations.Insert(DraggingAnimationPaneTargetIndex, a);
+                    SelectedAnimationIndex = DraggingAnimationPaneTargetIndex;
+                }
+                DraggingAnimationPaneIndex = -1;
+                DraggingAnimationPaneTargetIndex = -1;
+            }
+
+            IsPanningCanvas = false;
+            IsDraggingHScrollBar = false;
+            IsDraggingVScrollBar = false;
+            IsDraggingShape = false;
+            IsSelectingTableCells = false;
+            IsResizingShape = false;
+            IsRotatingShape = false;
+            IsDraggingGradientStop = false;
+            DraggingBgSliderType = 0;
+            ShowSnapGuideX = false;
+            ShowSnapGuideY = false;
+            if (ActiveSmartGuides != null) ActiveSmartGuides.Clear();
+            if (ActiveSpacingIndicators != null) ActiveSpacingIndicators.Clear();
+        }
+
+        public void AdvancePresenterStep()
+        {
+            if (IsEndSlideShowScreen)
+            {
+                if (LoopUntilEsc || ShowType == 2)
+                {
+                    IsEndSlideShowScreen = false;
+                    ActiveSlideIndex = (ShowSlideRangeStart > 1 && Presentation != null && ShowSlideRangeStart <= Presentation.Slides.Count) ? ShowSlideRangeStart - 1 : 0;
+                    CurrentAnimationStep = 0;
+                    IsPlayingSlideAnimation = false;
+                    _animStopwatch.Stop();
+                    return;
+                }
+                IsEndSlideShowScreen = false;
+                StopPresenting();
+                return;
+            }
+
+            SlideNode slide = ActiveSlide;
+            if (slide == null || Presentation == null) return;
+
+            int totalAnimSteps = GetTotalAnimationSteps(slide);
+
+            // Nếu slide có hoạt họa và chưa phát hết các bước nhấp chuột (Click Steps)
+            if (CurrentAnimationStep < totalAnimSteps)
+            {
+                CurrentAnimationStep++;
+                PlayCurrentStepAnimation(CurrentAnimationStep);
+                return;
+            }
+
+            int maxSlideLimit = (ShowSlideRangeEnd > 0 && Presentation != null && ShowSlideRangeEnd <= Presentation.Slides.Count) ? ShowSlideRangeEnd - 1 : (Presentation != null ? Presentation.Slides.Count - 1 : 0);
+
+            // Đã phát hết toàn bộ hoạt họa của slide này -> Chuyển sang slide tiếp theo không bị ẩn
+            int nextIdx = ActiveSlideIndex + 1;
+            while (nextIdx <= maxSlideLimit && Presentation.Slides[nextIdx].IsHidden)
+            {
+                nextIdx++;
+            }
+
+            if (nextIdx <= maxSlideLimit)
+            {
+                int prevIdx = ActiveSlideIndex;
+                ActiveSlideIndex = nextIdx;
+                CurrentAnimationStep = 0;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+                TriggerTransition(prevIdx, ActiveSlideIndex, false);
+            }
+            else
+            {
+                if (LoopUntilEsc || ShowType == 2)
+                {
+                    // Lặp lại từ đầu slide range hoặc slide 1 trong chế độ Kiosk / Loop until Esc
+                    int prevIdx = ActiveSlideIndex;
+                    ActiveSlideIndex = (ShowSlideRangeStart > 1 && Presentation != null && ShowSlideRangeStart <= Presentation.Slides.Count) ? ShowSlideRangeStart - 1 : 0;
+                    CurrentAnimationStep = 0;
+                    IsPlayingSlideAnimation = false;
+                    _animStopwatch.Stop();
+                    TriggerTransition(prevIdx, ActiveSlideIndex, false);
+                }
+                else
+                {
+                    // Khi hết slide cuối cùng: Hiển thị màn hình đen thông báo kết thúc (Black End Screen)
+                    IsEndSlideShowScreen = true;
+                }
+            }
+        }
+
+        public void PreviousPresenterStep()
+        {
+            if (IsEndSlideShowScreen)
+            {
+                IsEndSlideShowScreen = false;
+                return;
+            }
+
+            if (Presentation == null) return;
+            SlideNode slide = ActiveSlide;
+
+            // Nếu đang ở bước hoạt họa lớn hơn 0: Lùi lại 1 bước hoạt họa mà KHÔNG phát ngược hiệu ứng (chỉ phục hồi trạng thái tĩnh trước lúc phát)
+            if (CurrentAnimationStep > 0)
+            {
+                CurrentAnimationStep--;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+                return;
+            }
+
+            // Đang ở đầu slide (bước 0) -> Lùi về slide trước đó
+            int minSlideLimit = (ShowSlideRangeStart > 1 && Presentation != null && ShowSlideRangeStart <= Presentation.Slides.Count) ? ShowSlideRangeStart - 1 : 0;
+            int prevTarget = ActiveSlideIndex - 1;
+            while (prevTarget >= minSlideLimit && Presentation.Slides[prevTarget].IsHidden)
+            {
+                prevTarget--;
+            }
+
+            if (prevTarget >= minSlideLimit)
+            {
+                int prevIdx = ActiveSlideIndex;
+                ActiveSlideIndex = prevTarget;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+                // Đặt slide trước đó ở trạng thái đã hoàn thành toàn bộ bước hoạt họa
+                CurrentAnimationStep = GetTotalAnimationSteps(ActiveSlide);
+                TriggerTransition(prevIdx, ActiveSlideIndex, true);
+            }
+        }
+
+        public void HandleKeyDown(Keys key)
+        {
+            if (IsPresenting)
+            {
+                if (IsEndSlideShowScreen)
+                {
+                    if (key == Keys.Down || key == Keys.Left || key == Keys.PageUp || key == Keys.Back)
+                    {
+                        IsEndSlideShowScreen = false;
+                        return;
+                    }
+                    else
+                    {
+                        IsEndSlideShowScreen = false;
+                        StopPresenting();
+                        return;
+                    }
+                }
+
+                if (key == Keys.Escape) { StopPresenting(); return; }
+                
+                // Điều hướng bàn phím: Lên/Phải/Space/Enter/PageDown -> TIẾN; Xuống/Trái/Back/PageUp -> LÙI
+                if (key == Keys.Up || key == Keys.Right || key == Keys.Space || key == Keys.PageDown || key == Keys.Enter || key == Keys.Return)
+                {
+                    AdvancePresenterStep();
+                }
+                else if (key == Keys.Down || key == Keys.Left || key == Keys.PageUp || key == Keys.Back)
+                {
+                    PreviousPresenterStep();
+                }
+                else if (key == Keys.L) LaserPointerMode = !LaserPointerMode;
+                else if (key == Keys.P) AnnotationPenMode = !AnnotationPenMode;
+                else if (key == Keys.E) { PenStrokes.Clear(); CurrentStroke.Clear(); }
+                else if (key == Keys.B) BlackScreenMode = !BlackScreenMode;
+                else if (key == Keys.W) WhiteScreenMode = !WhiteScreenMode;
+                return;
+            }
+
+            if (IsEditingTableCell && EditingTableShape != null)
+            {
+                if (key == Keys.Escape)
+                {
+                    EndTableInlineEditing();
+                    return;
+                }
+                if (key == Keys.Tab)
+                {
+                    bool isShift = (Control.ModifierKeys & Keys.Shift) != 0;
+                    int nextR = EditingTableRow;
+                    int nextC = isShift ? EditingTableCol - 1 : EditingTableCol + 1;
+                    if (nextC >= EditingTableShape.TableColumns)
+                    {
+                        nextC = 0;
+                        nextR++;
+                        if (nextR >= EditingTableShape.TableRows)
+                        {
+                            InsertTableRow(false);
+                        }
+                    }
+                    else if (nextC < 0)
+                    {
+                        nextC = EditingTableShape.TableColumns - 1;
+                        nextR = Math.Max(0, nextR - 1);
+                    }
+                    StartTableInlineEditing(EditingTableShape, nextR, nextC);
+                    return;
+                }
+                if (key == Keys.Enter || key == Keys.Return)
+                {
+                    int nextR = EditingTableRow + 1;
+                    if (nextR < EditingTableShape.TableRows)
+                    {
+                        StartTableInlineEditing(EditingTableShape, nextR, EditingTableCol);
+                    }
+                    else
+                    {
+                        EndTableInlineEditing();
+                    }
+                    return;
+                }
+                if (key == Keys.Left)
+                {
+                    TableCaretIndex = Math.Max(0, TableCaretIndex - 1);
+                    return;
+                }
+                if (key == Keys.Right)
+                {
+                    TableCaretIndex = Math.Min(EditingTableCellBuffer.Length, TableCaretIndex + 1);
+                    return;
+                }
+                if (key == Keys.Home)
+                {
+                    TableCaretIndex = 0;
+                    return;
+                }
+                if (key == Keys.End)
+                {
+                    TableCaretIndex = EditingTableCellBuffer.Length;
+                    return;
+                }
+                if (key == Keys.Delete)
+                {
+                    if (TableCaretIndex < EditingTableCellBuffer.Length)
+                    {
+                        EditingTableCellBuffer = EditingTableCellBuffer.Remove(TableCaretIndex, 1);
+                    }
+                    return;
+                }
+                return;
+            }
+
+            if (IsInlineEditing && EditingShape != null)
+            {
+                if (key == Keys.Escape)
+                {
+                    EndInlineEditing();
+                    return;
+                }
+                if (key == Keys.Left)
+                {
+                    CaretIndex = Math.Max(0, CaretIndex - 1);
+                    return;
+                }
+                if (key == Keys.Right)
+                {
+                    CaretIndex = Math.Min(EditingTextBuffer.Length, CaretIndex + 1);
+                    return;
+                }
+                if (key == Keys.Home)
+                {
+                    CaretIndex = 0;
+                    return;
+                }
+                if (key == Keys.End)
+                {
+                    CaretIndex = EditingTextBuffer.Length;
+                    return;
+                }
+                if (key == Keys.Delete)
+                {
+                    if (CaretIndex < EditingTextBuffer.Length)
+                    {
+                        EditingTextBuffer = EditingTextBuffer.Remove(CaretIndex, 1);
+                        EditingShape.Text = EditingTextBuffer;
+                    }
+                    return;
+                }
+                return;
+            }
+
+            if (IsCropping)
+            {
+                if (key == Keys.Escape || key == Keys.Enter || key == Keys.Return)
+                {
+                    ConfirmCrop();
+                    return;
+                }
+            }
+
+            if (key == Keys.Escape)
+            {
+                if (IsColorPickingMode)
+                {
+                    IsColorPickingMode = false;
+                    HasColorPickHover = false;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (IsDrawingShapeMode || IsDrawingActive)
+                {
+                    IsDrawingShapeMode = false;
+                    IsDrawingActive = false;
+                    return;
+                }
+                if (SelectedShapeIndex >= 0 || (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0))
+                {
+                    SelectedShapeIndex = -1;
+                    if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                    EndInlineEditing();
+                    return;
+                }
+            }
+
+            if ((Control.ModifierKeys & Keys.Control) != 0)
+            {
+                if (key == Keys.Z)
+                {
+                    Undo();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Y)
+                {
+                    Redo();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+            }
+
+            if (key == Keys.F5) StartPresenting(true);
+            else if (key == Keys.Delete && SelectedShapeIndex >= 0 && ActiveSlide != null)
+            {
+                SaveUndoState();
+                ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+                SelectedShapeIndex = -1;
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+            else if (SelectedShape != null)
+            {
+                if (key == Keys.Left) SelectedShape.Transform.X -= 5f;
+                else if (key == Keys.Right) SelectedShape.Transform.X += 5f;
+                else if (key == Keys.Up) SelectedShape.Transform.Y -= 5f;
+                else if (key == Keys.Down) SelectedShape.Transform.Y += 5f;
+            }
+            else
+            {
+                // Điều hướng chuyển slide ở chế độ soạn thảo khi không chọn shape nào
+                if (key == Keys.Up || key == Keys.Right || key == Keys.PageDown)
+                {
+                    if (ActiveSlideIndex < Presentation.Slides.Count - 1)
+                    {
+                        int prevIdx = ActiveSlideIndex;
+                        ActiveSlideIndex++;
+                        SelectedShapeIndex = -1;
+                        if (ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                        {
+                            TriggerTransition(prevIdx, ActiveSlideIndex, false);
+                        }
+                    }
+                }
+                else if (key == Keys.Down || key == Keys.Left || key == Keys.PageUp)
+                {
+                    if (ActiveSlideIndex > 0)
+                    {
+                        int prevIdx = ActiveSlideIndex;
+                        ActiveSlideIndex--;
+                        SelectedShapeIndex = -1;
+                        if (ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                        {
+                            TriggerTransition(prevIdx, ActiveSlideIndex, true);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void HandleKeyPress(char keyChar)
+        {
+            if (IsEditingTableCell && EditingTableShape != null)
+            {
+                if (keyChar == '\b')
+                {
+                    if (EditingTableCellBuffer.Length > 0 && TableCaretIndex > 0)
+                    {
+                        EditingTableCellBuffer = EditingTableCellBuffer.Remove(TableCaretIndex - 1, 1);
+                        TableCaretIndex--;
+                    }
+                }
+                else if (!char.IsControl(keyChar))
+                {
+                    EditingTableCellBuffer = EditingTableCellBuffer.Insert(TableCaretIndex, keyChar.ToString());
+                    TableCaretIndex++;
+                }
+                return;
+            }
+
+            if (IsInlineEditing && EditingShape != null)
+            {
+                if (keyChar == '\b')
+                {
+                    if (EditingTextBuffer.Length > 0 && CaretIndex > 0)
+                    {
+                        EditingTextBuffer = EditingTextBuffer.Remove(CaretIndex - 1, 1);
+                        CaretIndex--;
+                    }
+                }
+                else if (keyChar == '\r' || keyChar == '\n')
+                {
+                    EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, "\n");
+                    CaretIndex++;
+                }
+                else if (!char.IsControl(keyChar))
+                {
+                    EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, keyChar.ToString());
+                    CaretIndex++;
+                }
+            }
+        }
+        #endregion
+    }
+}
