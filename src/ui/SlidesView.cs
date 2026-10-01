@@ -4086,6 +4086,10 @@ namespace GenOffice.UI
                     UpdateShapeSearchBox();
                     return;
                 }
+                else 
+                {
+                    HideSearchBox();
+                }
 
                 // Task Pane Light Background & Right Border (280px Office style)
                 Rectangle drawerRect = new Rectangle(0, contentY, totalW, totalH);
