@@ -66,6 +66,7 @@ namespace GenOffice.Core
         public int BgColor { get; set; }
         public int Align { get; set; } // 0: Left, 1: Center, 2: Right
         public int VAlign { get; set; } // 0: Top, 1: Middle, 2: Bottom
+        public int Indent { get; set; } // Indent level (0..15)
         public bool WrapText { get; set; }
         public string NumberFormat { get; set; } // General, Number, Currency, Percent, Comma, Date, Text
         public int DecimalPlaces { get; set; }
@@ -97,6 +98,7 @@ namespace GenOffice.Core
             BgColor = unchecked((int)0xFFFFFFFF);
             Align = 0;
             VAlign = 1;
+            Indent = 0;
             WrapText = false;
             NumberFormat = "General";
             DecimalPlaces = 2;
@@ -125,6 +127,7 @@ namespace GenOffice.Core
             copy.BgColor = BgColor;
             copy.Align = Align;
             copy.VAlign = VAlign;
+            copy.Indent = Indent;
             copy.WrapText = WrapText;
             copy.NumberFormat = NumberFormat;
             copy.DecimalPlaces = DecimalPlaces;
@@ -320,6 +323,28 @@ namespace GenOffice.Core
             return null;
         }
 
+        public uint GetMaxRow()
+        {
+            uint maxR = 0;
+            foreach (var key in grid.Keys)
+            {
+                var pos = DecodeKey(key);
+                if (pos.Item1 > maxR) maxR = pos.Item1;
+            }
+            return maxR;
+        }
+
+        public uint GetMaxCol()
+        {
+            uint maxC = 0;
+            foreach (var key in grid.Keys)
+            {
+                var pos = DecodeKey(key);
+                if (pos.Item2 > maxC) maxC = pos.Item2;
+            }
+            return maxC;
+        }
+
         public CellData GetOrCreateCell(uint row, uint col)
         {
             ulong key = EncodeKey(row, col);
@@ -342,6 +367,24 @@ namespace GenOffice.Core
             {
                 grid[EncodeKey(row, col)] = cell;
             }
+        }
+
+        public void SetCellFormula(uint row, uint col, string formula)
+        {
+            CellData cell = GetOrCreateCell(row, col);
+            cell.SetFormula(formula);
+        }
+
+        public void SetCellNumber(uint row, uint col, double number)
+        {
+            CellData cell = GetOrCreateCell(row, col);
+            cell.SetNumber(number);
+        }
+
+        public void SetCellString(uint row, uint col, string text)
+        {
+            CellData cell = GetOrCreateCell(row, col);
+            cell.SetString(text);
         }
 
         public void SetCellText(uint row, uint col, string text)
@@ -380,6 +423,11 @@ namespace GenOffice.Core
         public void ClearCell(uint row, uint col)
         {
             grid.Remove(EncodeKey(row, col));
+        }
+
+        public void ClearAll()
+        {
+            grid.Clear();
         }
 
         public void MergeCells(uint r1, uint c1, uint r2, uint c2)

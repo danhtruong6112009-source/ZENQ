@@ -181,7 +181,7 @@ namespace GenOffice.Core
             Color = color;
             Opacity = (type == PdfAnnotationType.Highlight) ? 0.35f : 1.0f;
             Content = "";
-            Author = "Người dùng GenOffice";
+            Author = "Người dùng ZENQ OFFICE";
             CreatedAt = DateTime.Now;
             InkPoints = new List<PointF>();
             StrokeWidth = 2.5f;
@@ -215,7 +215,7 @@ namespace GenOffice.Core
         public Color SignatureColor { get; set; }
         public List<List<PointF>> SignatureStrokes { get; set; }
 
-        public PdfSignatureElement(RectangleF bounds, string signerName = "GenOffice Signer")
+        public PdfSignatureElement(RectangleF bounds, string signerName = "ZENQ Signer")
         {
             Id = Guid.NewGuid().ToString("N");
             Bounds = bounds;
@@ -424,8 +424,8 @@ namespace GenOffice.Core
             Title = title;
             FilePath = "";
             PrimaryFontName = "Times New Roman";
-            Author = "Người dùng GenOffice";
-            Creator = "GenOffice Master Suite PDF Engine";
+            Author = "Người dùng ZENQ OFFICE";
+            Creator = "ZENQ OFFICE Suite PDF Engine";
             Subject = "Tài liệu PDF";
             CreatedDate = DateTime.Now;
             ModifiedDate = DateTime.Now;

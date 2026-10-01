@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <StartupObject>GenOffice.Tests.Program</StartupObject>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Optimize>true</Optimize>
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);CA1416;CS1685;CS0168;CS0219;CS0414;CS0649;WFO1000;WFO5001;WFO5002</NoWarn>
+    <WarningsNotAsErrors>WFO1000;WFO5001;WFO5002</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZenQOffice.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="TestHarness.cs" />
+    <Compile Include="Tier1FeatureTests.cs" />
+    <Compile Include="Tier2BoundaryTests.cs" />
+    <Compile Include="Tier3CrossFeatureTests.cs" />
+    <Compile Include="Tier4RealWorldTests.cs" />
+  </ItemGroup>
+
+</Project>

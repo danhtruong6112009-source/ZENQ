@@ -154,9 +154,9 @@ namespace GenOffice.UI
             // A. Hào quang ánh sáng bao quanh khi Hover
             if (isHovered)
             {
-                RectangleF auraRect = new RectangleF(rect.X - 8, rect.Y - 6, rect.Width + 16, rect.Height + 14);
-                using (GraphicsPath auraPath = CreateRoundedRectanglePath(auraRect, radius + 6))
-                using (Pen auraPen = new Pen(Color.FromArgb(45, accentGlow.R, accentGlow.G, accentGlow.B), 4f))
+                RectangleF auraRect = new RectangleF(rect.X - 6, rect.Y - 5, rect.Width + 12, rect.Height + 10);
+                using (GraphicsPath auraPath = CreateRoundedRectanglePath(auraRect, radius + 4))
+                using (Pen auraPen = new Pen(Color.FromArgb(50, accentGlow.R, accentGlow.G, accentGlow.B), 3f))
                 {
                     g.DrawPath(auraPen, auraPath);
                 }
@@ -164,7 +164,7 @@ namespace GenOffice.UI
 
             // B. Bóng đổ tiếp xúc chân thực (Drop Shadow)
             using (GraphicsPath sp = CreateRoundedRectanglePath(new RectangleF(rect.X, rect.Y + (isHovered ? 4 : 2), rect.Width, rect.Height), radius))
-            using (SolidBrush sb = new SolidBrush(Color.FromArgb(isHovered ? 22 : 12, 15, 23, 42)))
+            using (SolidBrush sb = new SolidBrush(Color.FromArgb(isHovered ? 25 : 12, 15, 23, 42)))
             {
                 g.FillPath(sb, sp);
             }
@@ -172,46 +172,18 @@ namespace GenOffice.UI
             using (GraphicsPath cardPath = CreateRoundedRectanglePath(rect, radius))
             {
                 // C. Thân kính trong suốt tinh khiết (Crystal Clear Translucent Glass Fill)
-                // Trong suốt cao, cho phép nhìn thấu hoàn hảo ánh sáng nền phía sau
-                Color topGlass = Color.FromArgb(isHovered ? 85 : 55, 255, 255, 255);
-                Color botGlass = Color.FromArgb(isHovered ? 35 : 18, 255, 255, 255);
-                using (LinearGradientBrush glassBrush = new LinearGradientBrush(rect, topGlass, botGlass, 55f))
+                Color topGlass = Color.FromArgb(isHovered ? 95 : 65, 255, 255, 255);
+                Color botGlass = Color.FromArgb(isHovered ? 45 : 25, 255, 255, 255);
+                using (LinearGradientBrush glassBrush = new LinearGradientBrush(rect, topGlass, botGlass, 90f))
                 {
                     g.FillPath(glassBrush, cardPath);
                 }
 
-                // D. Viền trắng mờ đổ vô trong (Inner Soft White Bevel / Glow Inward)
-                // Tạo ảo giác mặt kính vát cong khúc xạ ánh sáng trắng đổ vào lòng tấm kính
-                using (Pen inGlow = new Pen(Color.FromArgb(isHovered ? 120 : 75, 255, 255, 255), 2.2f))
-                {
-                    g.DrawPath(inGlow, cardPath);
-                }
-
-                // E. Hiệu ứng ánh sáng bóng kính cong vòm (Glossy Specular Glare)
-                RectangleF glossRect = new RectangleF(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height * 0.45f);
-                if (glossRect.Height > 10)
-                {
-                    using (GraphicsPath glossPath = CreateRoundedRectanglePath(glossRect, radius - 2))
-                    using (LinearGradientBrush glossBrush = new LinearGradientBrush(
-                        glossRect,
-                        Color.FromArgb(isHovered ? 110 : 70, 255, 255, 255),
-                        Color.FromArgb(0, 255, 255, 255), 90f))
-                    {
-                        g.FillPath(glossBrush, glossPath);
-                    }
-                }
-
-                // F. Vệt sáng cạnh trên (Top Gleam Specular Edge)
-                using (Pen gleamPen = new Pen(Color.FromArgb(isHovered ? 235 : 185, 255, 255, 255), 1.5f))
-                {
-                    g.DrawLine(gleamPen, rect.X + radius, rect.Y + 1f, rect.Right - radius, rect.Y + 1f);
-                }
-
-                // G. Đường viền phản quang ngoài cùng (Outer Specular Border)
-                Color borderTopLeft = Color.FromArgb(isHovered ? 245 : 200, 255, 255, 255);
-                Color borderBotRight = isHovered ? Color.FromArgb(140, accentGlow.R, accentGlow.G, accentGlow.B) : Color.FromArgb(80, 255, 255, 255);
-                using (LinearGradientBrush borderGrad = new LinearGradientBrush(rect, borderTopLeft, borderBotRight, 45f))
-                using (Pen borderPen = new Pen(borderGrad, 1.2f))
+                // D. Đường viền phản quang ngoài cùng (Outer Border)
+                Color borderTop = Color.FromArgb(isHovered ? 240 : 200, 255, 255, 255);
+                Color borderBot = isHovered ? Color.FromArgb(160, accentGlow.R, accentGlow.G, accentGlow.B) : Color.FromArgb(100, 255, 255, 255);
+                using (LinearGradientBrush borderGrad = new LinearGradientBrush(rect, borderTop, borderBot, 90f))
+                using (Pen borderPen = new Pen(borderGrad, isHovered ? 1.5f : 1.0f))
                 {
                     g.DrawPath(borderPen, cardPath);
                 }
@@ -229,42 +201,28 @@ namespace GenOffice.UI
             {
                 if (isSelected)
                 {
-                    // Viên thuốc được chọn: Màu thương hiệu rực rỡ với bóng kính
-                    Color topC = Color.FromArgb(245, accent.R, accent.G, accent.B);
-                    Color botC = Color.FromArgb(210, Math.Max(0, accent.R - 25), Math.Max(0, accent.G - 25), Math.Max(0, accent.B - 25));
+                    // Nút bấm khi hover / chọn: Màu thương hiệu đồng nhất rực rỡ và sang trọng
+                    Color topC = Color.FromArgb(245, Math.Min(255, accent.R + 15), Math.Min(255, accent.G + 15), Math.Min(255, accent.B + 15));
+                    Color botC = Color.FromArgb(235, Math.Max(0, accent.R - 15), Math.Max(0, accent.G - 15), Math.Max(0, accent.B - 15));
                     using (LinearGradientBrush b = new LinearGradientBrush(rect, topC, botC, 90f))
                     {
                         g.FillPath(b, path);
                     }
 
-                    // Vệt bóng kính đỉnh
-                    RectangleF specR = new RectangleF(rect.X + 2, rect.Y + 1, rect.Width - 4, rect.Height * 0.45f);
-                    using (GraphicsPath sp = CreateRoundedRectanglePath(specR, radius - 1))
-                    using (LinearGradientBrush sb = new LinearGradientBrush(specR, Color.FromArgb(95, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90f))
-                    {
-                        g.FillPath(sb, sp);
-                    }
-
-                    // Viền sáng
-                    using (Pen p = new Pen(Color.FromArgb(220, 255, 255, 255), 1.2f))
+                    // Viền sáng tinh tế
+                    using (Pen p = new Pen(Color.FromArgb(180, 255, 255, 255), 1.0f))
                     {
                         g.DrawPath(p, path);
                     }
                 }
                 else
                 {
-                    // Viên thuốc chưa chọn: Kính trong suốt có viền trắng mờ đổ vô trong
-                    Color topC = Color.FromArgb(isHovered ? 90 : 45, 255, 255, 255);
-                    Color botC = Color.FromArgb(isHovered ? 40 : 18, 255, 255, 255);
+                    // Nút bấm khi chưa hover: Kính mờ trong suốt thanh lịch
+                    Color topC = Color.FromArgb(isHovered ? 80 : 40, 255, 255, 255);
+                    Color botC = Color.FromArgb(isHovered ? 35 : 15, 255, 255, 255);
                     using (LinearGradientBrush b = new LinearGradientBrush(rect, topC, botC, 90f))
                     {
                         g.FillPath(b, path);
-                    }
-
-                    // Viền mờ đổ vô trong (Inner Glow)
-                    using (Pen inGlow = new Pen(Color.FromArgb(isHovered ? 90 : 50, 255, 255, 255), 2.2f))
-                    {
-                        g.DrawPath(inGlow, path);
                     }
 
                     // Viền ngoài

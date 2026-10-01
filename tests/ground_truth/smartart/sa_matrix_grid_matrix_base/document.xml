@@ -1,0 +1,59 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:ns1="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ns2="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:ns3="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:ns4="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:ns5="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:ns6="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns7="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ns1:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14">
+  <ns0:body>
+    <ns0:p ns2:paraId="4D1E42B7" ns2:textId="189E4DFD" ns0:rsidR="00844CB8" ns0:rsidRPr="00844CB8" ns0:rsidRDefault="00844CB8">
+      <ns0:pPr>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="28" />
+        </ns0:rPr>
+      </ns0:pPr>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:noProof />
+          <ns0:sz ns0:val="28" />
+        </ns0:rPr>
+        <ns0:drawing>
+          <ns3:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1" ns4:anchorId="0C229E2F" ns4:editId="00D8E50A">
+            <ns3:simplePos x="0" y="0" />
+            <ns3:positionH relativeFrom="column">
+              <ns3:posOffset>635000</ns3:posOffset>
+            </ns3:positionH>
+            <ns3:positionV relativeFrom="paragraph">
+              <ns3:posOffset>889000</ns3:posOffset>
+            </ns3:positionV>
+            <ns3:extent cx="6096000" cy="4064000" />
+            <ns3:effectExtent l="0" t="19050" r="0" b="31750" />
+            <ns3:wrapNone />
+            <ns3:docPr id="1" name="Diagram 1" />
+            <ns3:cNvGraphicFramePr />
+            <ns5:graphic>
+              <ns5:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram">
+                <ns6:relIds ns7:dm="rId4" ns7:lo="rId5" ns7:qs="rId6" ns7:cs="rId7" />
+              </ns5:graphicData>
+            </ns5:graphic>
+            <ns4:sizeRelH relativeFrom="margin">
+              <ns4:pctWidth>0</ns4:pctWidth>
+            </ns4:sizeRelH>
+            <ns4:sizeRelV relativeFrom="margin">
+              <ns4:pctHeight>0</ns4:pctHeight>
+            </ns4:sizeRelV>
+          </ns3:anchor>
+        </ns0:drawing>
+      </ns0:r>
+      <ns0:r ns0:rsidRPr="00844CB8">
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="28" />
+        </ns0:rPr>
+        <ns0:t>SmartArt Canonical Sample: [list] Alternating Hexagons (Base Default)</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:sectPr ns0:rsidR="00844CB8" ns0:rsidRPr="00844CB8">
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+      <ns0:pgMar ns0:top="1440" ns0:right="1440" ns0:bottom="1440" ns0:left="1440" ns0:header="720" ns0:footer="720" ns0:gutter="0" />
+      <ns0:cols ns0:space="720" />
+      <ns0:docGrid ns0:linePitch="360" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

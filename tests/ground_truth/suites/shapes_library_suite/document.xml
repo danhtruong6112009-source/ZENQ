@@ -1,0 +1,271 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:ns1="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:ns2="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:ns3="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+  <ns0:body>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="36" />
+        </ns0:rPr>
+        <ns0:t>GenOffice Canonical Shapes, Borders &amp; 3D Test Suite</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1778000" cy="889000" />
+            <ns1:docPr id="1" name="SolidRect" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="762000" y="1397000" />
+                      <ns2:ext cx="1778000" cy="889000" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="rect">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="4472C4" />
+                    </ns2:solidFill>
+                    <ns2:ln w="25400" cmpd="sng">
+                      <ns2:solidFill>
+                        <ns2:srgbClr val="000000" />
+                      </ns2:solidFill>
+                      <ns2:prstDash val="solid" />
+                    </ns2:ln>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Solid 2pt</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1778000" cy="889000" />
+            <ns1:docPr id="2" name="DoubleRect" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="2794000" y="1397000" />
+                      <ns2:ext cx="1778000" cy="889000" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="rect">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="ED7D31" />
+                    </ns2:solidFill>
+                    <ns2:ln w="57150" cmpd="dbl">
+                      <ns2:solidFill>
+                        <ns2:srgbClr val="000000" />
+                      </ns2:solidFill>
+                      <ns2:prstDash val="solid" />
+                    </ns2:ln>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Double 4.5pt</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1778000" cy="889000" />
+            <ns1:docPr id="3" name="DashRoundRect" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="4826000" y="1397000" />
+                      <ns2:ext cx="1778000" cy="889000" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="roundRect">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="70AD47" />
+                    </ns2:solidFill>
+                    <ns2:ln w="28575" cmpd="sng">
+                      <ns2:solidFill>
+                        <ns2:srgbClr val="000000" />
+                      </ns2:solidFill>
+                      <ns2:prstDash val="dash" />
+                    </ns2:ln>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Dash 2.25pt</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1143000" cy="1143000" />
+            <ns1:docPr id="4" name="Circle1to1" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="762000" y="2921000" />
+                      <ns2:ext cx="1143000" cy="1143000" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="ellipse">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="5B9BD5" />
+                    </ns2:solidFill>
+                    <ns2:ln w="25400">
+                      <ns2:solidFill>
+                        <ns2:srgbClr val="000000" />
+                      </ns2:solidFill>
+                    </ns2:ln>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Circle 1:1</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1651000" cy="952500" />
+            <ns1:docPr id="8" name="ShadowRect" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="762000" y="4572000" />
+                      <ns2:ext cx="1651000" cy="952500" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="rect">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="4472C4" />
+                    </ns2:solidFill>
+                    <ns2:effectLst>
+                      <ns2:outerShdw blurRad="50800" dist="38100" dir="5400000">
+                        <ns2:srgbClr val="000000">
+                          <ns2:alpha val="40000" />
+                        </ns2:srgbClr>
+                      </ns2:outerShdw>
+                    </ns2:effectLst>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Drop Shadow</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:drawing>
+          <ns1:inline distT="0" distB="0" distL="0" distR="0">
+            <ns1:extent cx="1206500" cy="1206500" />
+            <ns1:docPr id="10" name="BevelCircle" />
+            <ns2:graphic>
+              <ns2:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                <ns3:wsp>
+                  <ns3:spPr>
+                    <ns2:xfrm>
+                      <ns2:off x="4572000" y="4445000" />
+                      <ns2:ext cx="1206500" cy="1206500" />
+                    </ns2:xfrm>
+                    <ns2:prstGeom prst="ellipse">
+                      <ns2:avLst />
+                    </ns2:prstGeom>
+                    <ns2:solidFill>
+                      <ns2:srgbClr val="ED7D31" />
+                    </ns2:solidFill>
+                    <ns2:sp3d>
+                      <ns2:bevelT w="76200" h="76200" prst="circle" />
+                    </ns2:sp3d>
+                  </ns3:spPr>
+                  <ns3:txbx>
+                    <ns0:txbxContent>
+                      <ns0:p>
+                        <ns0:r>
+                          <ns0:t>Bevel 3D</ns0:t>
+                        </ns0:r>
+                      </ns0:p>
+                    </ns0:txbxContent>
+                  </ns3:txbx>
+                </ns3:wsp>
+              </ns2:graphicData>
+            </ns2:graphic>
+          </ns1:inline>
+        </ns0:drawing>
+      </ns0:r>
+    </ns0:p>
+    <ns0:sectPr>
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

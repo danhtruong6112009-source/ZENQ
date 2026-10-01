@@ -29,7 +29,12 @@ namespace GenOffice.Core
         }
     }
 
-    public class ParagraphNode
+    public abstract class BlockNode 
+    { 
+        public abstract BlockNode Clone(); 
+    }
+
+    public class ParagraphNode : BlockNode
     {
         public Alignment Align { get; set; }
         public float IndentLeft { get; set; }
@@ -55,6 +60,23 @@ namespace GenOffice.Core
         public void AddRun(RunNode run)
         {
             Runs.Add(run);
+        }
+
+        public override BlockNode Clone()
+        {
+            var clone = new ParagraphNode();
+            clone.Align = Align;
+            clone.IndentLeft = IndentLeft;
+            clone.IndentRight = IndentRight;
+            clone.IndentFirstLine = IndentFirstLine;
+            clone.SpaceBefore = SpaceBefore;
+            clone.SpaceAfter = SpaceAfter;
+            clone.LineSpacing = LineSpacing;
+            foreach (var r in Runs)
+            {
+                clone.Runs.Add(new RunNode { Text = r.Text, FontName = r.FontName, FontSize = r.FontSize, Bold = r.Bold, Italic = r.Italic, Underline = r.Underline, TextColor = r.TextColor, BgColor = r.BgColor });
+            }
+            return clone;
         }
     }
 
@@ -133,6 +155,167 @@ namespace GenOffice.Core
         public ParagraphBorderInfo Clone()
         {
             return new ParagraphBorderInfo(Top, Bottom, Left, Right, Color, SizePt, IsHorizontalLine);
+        }
+    }
+
+    public class TextBorderRange
+    {
+        public int StartIndex { get; set; }
+        public int Length { get; set; }
+        public bool Top { get; set; }
+        public bool Bottom { get; set; }
+        public bool Left { get; set; }
+        public bool Right { get; set; }
+        public System.Drawing.Color Color { get; set; }
+        public float SizePt { get; set; }
+
+        public TextBorderRange()
+        {
+            Top = true;
+            Bottom = true;
+            Left = true;
+            Right = true;
+            Color = System.Drawing.Color.Black;
+            SizePt = 1.0f;
+        }
+
+        public TextBorderRange(int start, int len, bool top = true, bool bottom = true, bool left = true, bool right = true, System.Drawing.Color? col = null, float sizePt = 1.0f)
+        {
+            StartIndex = start;
+            Length = len;
+            Top = top;
+            Bottom = bottom;
+            Left = left;
+            Right = right;
+            Color = col ?? System.Drawing.Color.Black;
+            SizePt = sizePt > 0 ? sizePt : 1.0f;
+        }
+
+        public bool HasAnyBorder
+        {
+            get { return Top || Bottom || Left || Right; }
+        }
+
+        public TextBorderRange Clone()
+        {
+            return new TextBorderRange(StartIndex, Length, Top, Bottom, Left, Right, Color, SizePt);
+        }
+    }
+
+    public class TableColumnNode
+    {
+        public float WidthPt { get; set; }
+        public TableColumnNode() { WidthPt = 50.0f; }
+        public TableColumnNode Clone() { return new TableColumnNode { WidthPt = WidthPt }; }
+    }
+
+    public class TableCellNode
+    {
+        public int ColumnSpan { get; set; }
+        public int RowSpan { get; set; }
+        public List<BlockNode> Blocks { get; set; }
+        public int BackgroundColor { get; set; }
+        public ParagraphBorderInfo Border { get; set; }
+        public float Padding { get; set; }
+
+        public TableCellNode()
+        {
+            ColumnSpan = 1;
+            RowSpan = 1;
+            Blocks = new List<BlockNode>();
+            BackgroundColor = 0xFFFFFF;
+            Border = new ParagraphBorderInfo();
+            Padding = 2.0f;
+        }
+        
+        public TableCellNode Clone()
+        {
+            var clone = new TableCellNode();
+            clone.ColumnSpan = ColumnSpan;
+            clone.RowSpan = RowSpan;
+            clone.BackgroundColor = BackgroundColor;
+            clone.Padding = Padding;
+            clone.Border = Border != null ? Border.Clone() : new ParagraphBorderInfo();
+            foreach (var b in Blocks) clone.Blocks.Add(b.Clone());
+            return clone;
+        }
+    }
+
+    public class TableRowNode
+    {
+        public List<TableCellNode> Cells { get; set; }
+        public float HeightPt { get; set; }
+
+        public TableRowNode()
+        {
+            Cells = new List<TableCellNode>();
+            HeightPt = 0;
+        }
+        
+        public TableRowNode Clone()
+        {
+            var clone = new TableRowNode();
+            clone.HeightPt = HeightPt;
+            foreach (var c in Cells) clone.Cells.Add(c.Clone());
+            return clone;
+        }
+    }
+
+    public class TableRowGroupNode
+    {
+        public List<TableRowNode> Rows { get; set; }
+        public TableRowGroupNode()
+        {
+            Rows = new List<TableRowNode>();
+        }
+        
+        public TableRowGroupNode Clone()
+        {
+            var clone = new TableRowGroupNode();
+            foreach (var r in Rows) clone.Rows.Add(r.Clone());
+            return clone;
+        }
+    }
+
+    public class TableNode : BlockNode
+    {
+        public List<TableColumnNode> Columns { get; set; }
+        public List<TableRowGroupNode> RowGroups { get; set; }
+        public int BorderColor { get; set; }
+        public float BorderThickness { get; set; }
+        
+        public int WrapMode { get; set; }
+        public int PageX { get; set; }
+        public int PageY { get; set; }
+        public float CustomWidth { get; set; }
+        public float CustomHeight { get; set; }
+
+        public TableNode()
+        {
+            Columns = new List<TableColumnNode>();
+            RowGroups = new List<TableRowGroupNode>();
+            BorderColor = 0x000000;
+            BorderThickness = 1.0f;
+            WrapMode = 0;
+            PageX = 0;
+            PageY = 0;
+            CustomWidth = 0;
+            CustomHeight = 0;
+        }
+        
+        public override BlockNode Clone()
+        {
+            var clone = new TableNode();
+            clone.BorderColor = BorderColor;
+            clone.BorderThickness = BorderThickness;
+            clone.WrapMode = WrapMode;
+            clone.PageX = PageX;
+            clone.PageY = PageY;
+            clone.CustomWidth = CustomWidth;
+            clone.CustomHeight = CustomHeight;
+            foreach (var c in Columns) clone.Columns.Add(c.Clone());
+            foreach (var rg in RowGroups) clone.RowGroups.Add(rg.Clone());
+            return clone;
         }
     }
 }

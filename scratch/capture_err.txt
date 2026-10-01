@@ -1,0 +1,4 @@
+System.ComponentModel.Win32Exception (6): The handle is invalid.
+   at System.Drawing.Graphics.CopyFromScreen(Int32 sourceX, Int32 sourceY, Int32 destinationX, Int32 destinationY, Size blockRegionSize, CopyPixelOperation copyPixelOperation)
+   at System.Drawing.Graphics.CopyFromScreen(Point upperLeftSource, Point upperLeftDestination, Size blockRegionSize)
+   at GenOffice.Program.CaptureWindowPreview() in C:\Users\Danh\Desktop\genofficepy\src\Program.cs:line 441

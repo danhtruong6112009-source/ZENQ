@@ -77,7 +77,7 @@ namespace GenOffice.UI
                 TargetUrl = txtUrl.Text.Trim();
                 ScreenTip = txtScreenTip.Text.Trim();
                 if (string.IsNullOrEmpty(DisplayText)) DisplayText = TargetUrl;
-                if (string.IsNullOrEmpty(TargetUrl)) TargetUrl = "https://genoffice.vn";
+                if (string.IsNullOrEmpty(TargetUrl)) TargetUrl = "https://zenqoffice.vn";
             };
             bottomPanel.Controls.Add(btnOk);
 

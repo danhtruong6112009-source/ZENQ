@@ -41,7 +41,7 @@ namespace GenOffice.UI
 
         public PdfSignatureInputDialog(string defaultSigner = "Ban Giám Đốc", string defaultReason = "Đã phê duyệt tài liệu", Color? defaultColor = null, int initialTab = 0)
         {
-            this.Text = "Ký Tên Điện Tử - GenOffice E-Sign (3 Phương thức Ký)";
+            this.Text = "Ký Tên Điện Tử - ZENQ PDF E-Sign (3 Phương thức Ký)";
             this.Size = new Size(580, 570);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;

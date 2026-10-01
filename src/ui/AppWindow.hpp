@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_APP_WINDOW_HPP
-#ifndef GENOFFICE_APP_WINDOW_HPP
 #define GENOFFICE_APP_WINDOW_HPP
 
 #include <windows.h>

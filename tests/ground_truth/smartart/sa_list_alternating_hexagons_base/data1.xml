@@ -1,0 +1,403 @@
+<ns0:dataModel xmlns:ns0="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns1="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:ns2="http://schemas.microsoft.com/office/drawing/2008/diagram">
+  <ns0:ptLst>
+    <ns0:pt modelId="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" type="doc">
+      <ns0:prSet loTypeId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" loCatId="list" qsTypeId="urn:microsoft.com/office/officeart/2005/8/quickstyle/simple1" qsCatId="simple" csTypeId="urn:microsoft.com/office/officeart/2005/8/colors/accent1_2" csCatId="accent1" phldr="1" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{C0EC0CAA-4767-4F66-B848-149CDA859F56}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 1: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{C5E91084-58C6-4DCC-B4FA-0BD493E1DAD9}" type="parTrans" cxnId="{E353C737-8D03-47D0-85A2-4E109666D9CF}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{F153762E-E0B3-46DB-92D0-E5297BB66F50}" type="sibTrans" cxnId="{E353C737-8D03-47D0-85A2-4E109666D9CF}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{93D6E284-B3AB-4F35-98F7-9C79B002754A}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 2: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{2EAF21FD-865D-4F4E-9D7B-8D7EC2316CF9}" type="parTrans" cxnId="{AD956052-2437-49BD-AB5C-B003C659B414}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{2BE3B020-1013-4CB2-8492-FABA64C5625E}" type="sibTrans" cxnId="{AD956052-2437-49BD-AB5C-B003C659B414}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 3: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{5D2E55BC-8898-459C-90D5-B6869659BBFF}" type="parTrans" cxnId="{D7A65DFF-827C-4844-818E-595AA9131750}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{304A28FF-5371-4EC2-8C11-8FE3EE679130}" type="sibTrans" cxnId="{D7A65DFF-827C-4844-818E-595AA9131750}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{012BB0C2-BDD0-45FC-B68A-BEA5B8808498}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 4: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{EEB39135-9C98-4797-9FAE-522195FB59CB}" type="parTrans" cxnId="{256A571E-FD1D-454E-92BC-5B9A530DD8FD}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{F04FF38A-C5A7-417C-9C6F-A0AF8B6A9E28}" type="sibTrans" cxnId="{256A571E-FD1D-454E-92BC-5B9A530DD8FD}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 5: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{DF3B36AF-C972-46B5-9D3A-5F0BC23F192E}" type="parTrans" cxnId="{3C9243BD-2A23-487E-8A58-A7D13C38C3FF}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{DFE87389-5D51-423E-8B2E-A4C6ACE7B30B}" type="sibTrans" cxnId="{3C9243BD-2A23-487E-8A58-A7D13C38C3FF}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{69161CAB-EF5B-4DDD-81C1-BC558FBB57C4}">
+      <ns0:prSet phldrT="[Text]" />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:r>
+            <ns1:rPr lang="en-US" />
+            <ns1:t>Step 6: Alternating Hexagons</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{1A9D2E49-AE64-43F0-9FAF-319F021806E8}" type="parTrans" cxnId="{3CCE51A2-4943-4E28-B8C3-70B3ECE41733}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{761FDD47-4AC8-4AFA-9763-B23FD5B117D5}" type="sibTrans" cxnId="{3CCE51A2-4943-4E28-B8C3-70B3ECE41733}">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:endParaRPr lang="en-US" />
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" type="pres">
+      <ns0:prSet presAssocID="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" presName="Name0" presStyleCnt="0">
+        <ns0:presLayoutVars>
+          <ns0:chMax />
+          <ns0:chPref />
+          <ns0:dir />
+          <ns0:animLvl val="lvl" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{8C57A3A5-A933-4A58-986A-263895592194}" type="pres">
+      <ns0:prSet presAssocID="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" presName="composite" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{2432A3AE-59A7-42DD-9825-C09F4BCBC395}" type="pres">
+      <ns0:prSet presAssocID="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" presName="Parent1" presStyleLbl="node1" presStyleIdx="0" presStyleCnt="6">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="1" />
+          <ns0:chPref val="1" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{8F93C52F-BDB4-4EFA-9285-21F7C5572A3F}" type="pres">
+      <ns0:prSet presAssocID="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" presName="Childtext1" presStyleLbl="revTx" presStyleIdx="0" presStyleCnt="3">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="0" />
+          <ns0:chPref val="0" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{671C6E5E-AEF7-4482-BB2A-BAEB30DBC6CE}" type="pres">
+      <ns0:prSet presAssocID="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" presName="BalanceSpacing" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{06C5FC3E-ECC3-4176-8F63-B16A7A229065}" type="pres">
+      <ns0:prSet presAssocID="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" presName="BalanceSpacing1" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{4AD7782B-C2C4-4BBE-9897-750D88FFDD2F}" type="pres">
+      <ns0:prSet presAssocID="{F153762E-E0B3-46DB-92D0-E5297BB66F50}" presName="Accent1Text" presStyleLbl="node1" presStyleIdx="1" presStyleCnt="6" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{33CAC5E7-0474-474B-89D7-6E44A9D570EB}" type="pres">
+      <ns0:prSet presAssocID="{F153762E-E0B3-46DB-92D0-E5297BB66F50}" presName="spaceBetweenRectangles" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" type="pres">
+      <ns0:prSet presAssocID="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" presName="composite" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{E1EB3FEC-23C9-4A79-B6F3-69A884FA3E9C}" type="pres">
+      <ns0:prSet presAssocID="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" presName="Parent1" presStyleLbl="node1" presStyleIdx="2" presStyleCnt="6">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="1" />
+          <ns0:chPref val="1" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{956B7981-9C0F-4527-9CEF-DDE851108F18}" type="pres">
+      <ns0:prSet presAssocID="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" presName="Childtext1" presStyleLbl="revTx" presStyleIdx="1" presStyleCnt="3">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="0" />
+          <ns0:chPref val="0" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{9852D9AA-F9CD-481C-869C-4D7F7A66F5A1}" type="pres">
+      <ns0:prSet presAssocID="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" presName="BalanceSpacing" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{FC32CDF7-E4C4-47A1-A742-3F6B0F23D086}" type="pres">
+      <ns0:prSet presAssocID="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" presName="BalanceSpacing1" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{96A73AEE-9871-48F9-B851-57696AF4FD27}" type="pres">
+      <ns0:prSet presAssocID="{304A28FF-5371-4EC2-8C11-8FE3EE679130}" presName="Accent1Text" presStyleLbl="node1" presStyleIdx="3" presStyleCnt="6" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{3ED68938-5820-4511-978F-2C3EF5E63BCD}" type="pres">
+      <ns0:prSet presAssocID="{304A28FF-5371-4EC2-8C11-8FE3EE679130}" presName="spaceBetweenRectangles" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" type="pres">
+      <ns0:prSet presAssocID="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" presName="composite" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{DE383EA3-BA94-4F24-9CFF-4BCBACE155A0}" type="pres">
+      <ns0:prSet presAssocID="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" presName="Parent1" presStyleLbl="node1" presStyleIdx="4" presStyleCnt="6">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="1" />
+          <ns0:chPref val="1" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{CD7B4965-C7E5-4E9C-B73D-2E705922BEFD}" type="pres">
+      <ns0:prSet presAssocID="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" presName="Childtext1" presStyleLbl="revTx" presStyleIdx="2" presStyleCnt="3">
+        <ns0:presLayoutVars>
+          <ns0:chMax val="0" />
+          <ns0:chPref val="0" />
+          <ns0:bulletEnabled val="1" />
+        </ns0:presLayoutVars>
+      </ns0:prSet>
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{CC57A76B-3815-4098-9DB6-59DEA771A3FF}" type="pres">
+      <ns0:prSet presAssocID="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" presName="BalanceSpacing" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{119E94B5-8AE3-4769-88BC-7F9C1CCBD104}" type="pres">
+      <ns0:prSet presAssocID="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" presName="BalanceSpacing1" presStyleCnt="0" />
+      <ns0:spPr />
+    </ns0:pt>
+    <ns0:pt modelId="{C9EDA349-2523-473B-ACB7-A30A80C317EC}" type="pres">
+      <ns0:prSet presAssocID="{DFE87389-5D51-423E-8B2E-A4C6ACE7B30B}" presName="Accent1Text" presStyleLbl="node1" presStyleIdx="5" presStyleCnt="6" />
+      <ns0:spPr />
+    </ns0:pt>
+  </ns0:ptLst>
+  <ns0:cxnLst>
+    <ns0:cxn modelId="{9D2E420B-E956-424C-9D57-B1F43D41F3A1}" type="presOf" srcId="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" destId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{256A571E-FD1D-454E-92BC-5B9A530DD8FD}" srcId="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" destId="{012BB0C2-BDD0-45FC-B68A-BEA5B8808498}" srcOrd="0" destOrd="0" parTransId="{EEB39135-9C98-4797-9FAE-522195FB59CB}" sibTransId="{F04FF38A-C5A7-417C-9C6F-A0AF8B6A9E28}" />
+    <ns0:cxn modelId="{BC46AE1E-3E4F-451F-B27B-FE0E442DC47F}" type="presOf" srcId="{304A28FF-5371-4EC2-8C11-8FE3EE679130}" destId="{96A73AEE-9871-48F9-B851-57696AF4FD27}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{CA1AFC26-D214-4F1B-ABE8-590652C27A01}" type="presOf" srcId="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" destId="{DE383EA3-BA94-4F24-9CFF-4BCBACE155A0}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{4E3E362C-7364-4C9B-BC79-8F2736F3A1BD}" type="presOf" srcId="{93D6E284-B3AB-4F35-98F7-9C79B002754A}" destId="{8F93C52F-BDB4-4EFA-9285-21F7C5572A3F}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{E353C737-8D03-47D0-85A2-4E109666D9CF}" srcId="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" destId="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" srcOrd="0" destOrd="0" parTransId="{C5E91084-58C6-4DCC-B4FA-0BD493E1DAD9}" sibTransId="{F153762E-E0B3-46DB-92D0-E5297BB66F50}" />
+    <ns0:cxn modelId="{B93FA544-479F-4598-B965-139065F27D27}" type="presOf" srcId="{F153762E-E0B3-46DB-92D0-E5297BB66F50}" destId="{4AD7782B-C2C4-4BBE-9897-750D88FFDD2F}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{AD956052-2437-49BD-AB5C-B003C659B414}" srcId="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" destId="{93D6E284-B3AB-4F35-98F7-9C79B002754A}" srcOrd="0" destOrd="0" parTransId="{2EAF21FD-865D-4F4E-9D7B-8D7EC2316CF9}" sibTransId="{2BE3B020-1013-4CB2-8492-FABA64C5625E}" />
+    <ns0:cxn modelId="{CEE4FE59-4776-4F35-87F5-50692C6E5381}" type="presOf" srcId="{69161CAB-EF5B-4DDD-81C1-BC558FBB57C4}" destId="{CD7B4965-C7E5-4E9C-B73D-2E705922BEFD}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{9683C77A-A185-4999-8731-BA4076AD8883}" type="presOf" srcId="{DFE87389-5D51-423E-8B2E-A4C6ACE7B30B}" destId="{C9EDA349-2523-473B-ACB7-A30A80C317EC}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{3CCE51A2-4943-4E28-B8C3-70B3ECE41733}" srcId="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" destId="{69161CAB-EF5B-4DDD-81C1-BC558FBB57C4}" srcOrd="0" destOrd="0" parTransId="{1A9D2E49-AE64-43F0-9FAF-319F021806E8}" sibTransId="{761FDD47-4AC8-4AFA-9763-B23FD5B117D5}" />
+    <ns0:cxn modelId="{C60D43B1-FAF4-4486-A0F6-F2FC9A2DEE23}" type="presOf" srcId="{C0EC0CAA-4767-4F66-B848-149CDA859F56}" destId="{2432A3AE-59A7-42DD-9825-C09F4BCBC395}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{3C9243BD-2A23-487E-8A58-A7D13C38C3FF}" srcId="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" destId="{FEB86CA7-625C-47B0-B26C-A0C2CF06580C}" srcOrd="2" destOrd="0" parTransId="{DF3B36AF-C972-46B5-9D3A-5F0BC23F192E}" sibTransId="{DFE87389-5D51-423E-8B2E-A4C6ACE7B30B}" />
+    <ns0:cxn modelId="{86007ECF-DF2B-4FE6-A459-16BB68FA6DC1}" type="presOf" srcId="{012BB0C2-BDD0-45FC-B68A-BEA5B8808498}" destId="{956B7981-9C0F-4527-9CEF-DDE851108F18}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{48E562DF-8695-40CB-B473-A5922C37921D}" type="presOf" srcId="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" destId="{E1EB3FEC-23C9-4A79-B6F3-69A884FA3E9C}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{D7A65DFF-827C-4844-818E-595AA9131750}" srcId="{2BA368CB-2BD0-4D53-9B01-FE21D0B9A52A}" destId="{D23FCDC9-0752-4BB4-ACBD-0E2C229FB769}" srcOrd="1" destOrd="0" parTransId="{5D2E55BC-8898-459C-90D5-B6869659BBFF}" sibTransId="{304A28FF-5371-4EC2-8C11-8FE3EE679130}" />
+    <ns0:cxn modelId="{155BAE0B-351D-43D7-85B0-4863E575CCF2}" type="presParOf" srcId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" destId="{8C57A3A5-A933-4A58-986A-263895592194}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{42F9D210-4FC7-4172-8CD8-32C261D1B8F2}" type="presParOf" srcId="{8C57A3A5-A933-4A58-986A-263895592194}" destId="{2432A3AE-59A7-42DD-9825-C09F4BCBC395}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{C4228A42-9C43-45F1-84C6-32AF3457D3E2}" type="presParOf" srcId="{8C57A3A5-A933-4A58-986A-263895592194}" destId="{8F93C52F-BDB4-4EFA-9285-21F7C5572A3F}" srcOrd="1" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{5002DC3A-903A-4BC5-B8ED-ED584BEBB081}" type="presParOf" srcId="{8C57A3A5-A933-4A58-986A-263895592194}" destId="{671C6E5E-AEF7-4482-BB2A-BAEB30DBC6CE}" srcOrd="2" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{6527BA96-ECEF-496A-B158-147288D6D4F3}" type="presParOf" srcId="{8C57A3A5-A933-4A58-986A-263895592194}" destId="{06C5FC3E-ECC3-4176-8F63-B16A7A229065}" srcOrd="3" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{51AB8971-1C68-4BD7-A713-74804EFD4F4A}" type="presParOf" srcId="{8C57A3A5-A933-4A58-986A-263895592194}" destId="{4AD7782B-C2C4-4BBE-9897-750D88FFDD2F}" srcOrd="4" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{BD076AF6-FF58-447F-BE11-22C185D39CF1}" type="presParOf" srcId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" destId="{33CAC5E7-0474-474B-89D7-6E44A9D570EB}" srcOrd="1" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{8764C785-6822-4610-A6CF-CD4FE844D434}" type="presParOf" srcId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" destId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" srcOrd="2" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{CDB6968D-E902-4DD1-AC17-EFB35E5AEDB4}" type="presParOf" srcId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" destId="{E1EB3FEC-23C9-4A79-B6F3-69A884FA3E9C}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{F600B26C-42F7-4095-9A87-872BD0BB9C58}" type="presParOf" srcId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" destId="{956B7981-9C0F-4527-9CEF-DDE851108F18}" srcOrd="1" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{4BF20AF0-EE6C-41D6-824C-13AC82B3473F}" type="presParOf" srcId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" destId="{9852D9AA-F9CD-481C-869C-4D7F7A66F5A1}" srcOrd="2" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{AF9EBDF8-B88F-4E84-B74F-BE767AF815B5}" type="presParOf" srcId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" destId="{FC32CDF7-E4C4-47A1-A742-3F6B0F23D086}" srcOrd="3" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{8BF566D0-FE69-4477-B0BB-EA088E5B6278}" type="presParOf" srcId="{567B7070-8303-49F9-AF17-E60FC261B1DE}" destId="{96A73AEE-9871-48F9-B851-57696AF4FD27}" srcOrd="4" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{A6CD578D-8BEE-4D9F-967C-012723310E92}" type="presParOf" srcId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" destId="{3ED68938-5820-4511-978F-2C3EF5E63BCD}" srcOrd="3" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{3DD4FF77-0814-4359-B576-8BCB0C66A0A6}" type="presParOf" srcId="{854F88F6-03DB-450D-B08C-2A6F8DE70A3E}" destId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" srcOrd="4" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{92D53C29-889B-48D5-83CF-3B47817D2A48}" type="presParOf" srcId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" destId="{DE383EA3-BA94-4F24-9CFF-4BCBACE155A0}" srcOrd="0" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{061D600F-90A0-4BB9-87DA-EE4937DCCBC5}" type="presParOf" srcId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" destId="{CD7B4965-C7E5-4E9C-B73D-2E705922BEFD}" srcOrd="1" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{7BBD0039-AD35-4036-8E17-0747933E4893}" type="presParOf" srcId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" destId="{CC57A76B-3815-4098-9DB6-59DEA771A3FF}" srcOrd="2" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{8F9FBDA8-AD9D-42E5-BF4A-D6C1A70242E4}" type="presParOf" srcId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" destId="{119E94B5-8AE3-4769-88BC-7F9C1CCBD104}" srcOrd="3" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+    <ns0:cxn modelId="{AAD67B7F-65B0-45C3-993D-0742F9DBAB08}" type="presParOf" srcId="{B69ADB9E-9E0F-4B41-9687-AA327016332A}" destId="{C9EDA349-2523-473B-ACB7-A30A80C317EC}" srcOrd="4" destOrd="0" presId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons" />
+  </ns0:cxnLst>
+  <ns0:bg />
+  <ns0:whole />
+  <ns0:extLst>
+    <ns1:ext uri="http://schemas.microsoft.com/office/drawing/2008/diagram">
+      <ns2:dataModelExt relId="rId8" minVer="http://schemas.openxmlformats.org/drawingml/2006/diagram" />
+    </ns1:ext>
+  </ns0:extLst>
+</ns0:dataModel>

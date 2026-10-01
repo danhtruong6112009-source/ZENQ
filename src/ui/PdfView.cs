@@ -275,23 +275,25 @@ namespace GenOffice.UI
             if (Math.Abs(TargetScrollY - ScrollY) > 0.5f)
             {
                 ScrollY += (TargetScrollY - ScrollY) * 0.55f;
+                if (Math.Abs(TargetScrollY - ScrollY) < 0.5f) ScrollY = TargetScrollY;
                 moved = true;
             }
             else if (ScrollY != TargetScrollY)
             {
                 ScrollY = TargetScrollY;
-                moved = true;
+                // moved = false → snap xong, không cần redraw thêm
             }
 
             if (Math.Abs(TargetSidebarScrollY - SidebarScrollY) > 0.5f)
             {
                 SidebarScrollY += (TargetSidebarScrollY - SidebarScrollY) * 0.55f;
+                if (Math.Abs(TargetSidebarScrollY - SidebarScrollY) < 0.5f) SidebarScrollY = TargetSidebarScrollY;
                 moved = true;
             }
             else if (SidebarScrollY != TargetSidebarScrollY)
             {
                 SidebarScrollY = TargetSidebarScrollY;
-                moved = true;
+                // moved = false → snap xong
             }
 
             return moved;
@@ -775,14 +777,7 @@ namespace GenOffice.UI
         {
             PdfPageModel page = Document.Pages[pageIndex];
 
-            // 1. Đổ bóng 3D sắc nét cho trang (Page Drop Shadow)
-            RectangleF shadowRect = new RectangleF(bounds.X + 4, bounds.Y + 4, bounds.Width, bounds.Height);
-            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
-            {
-                g.FillRectangle(shadowB, shadowRect);
-            }
-
-            // 2. Kiểm tra Cache để đạt 60+ FPS mượt mà tuyệt đối khi cuộn/kéo
+            // 1. Kiểm tra Cache để đạt 60+ FPS mượt mà tuyệt đối khi cuộn/kéo
             int targetW = Math.Max(10, (int)Math.Round(page.Width * ZoomLevel));
             int targetH = Math.Max(10, (int)Math.Round(page.Height * ZoomLevel));
 
@@ -816,6 +811,12 @@ namespace GenOffice.UI
                 {
                     g.FillRectangle(pageBg, bounds);
                 }
+            }
+
+            // 2. Viền trang phẳng, sắc nét (Flat clean page border)
+            using (Pen pageBorder = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            {
+                g.DrawRectangle(pageBorder, (int)Math.Round(bounds.X), (int)Math.Round(bounds.Y), targetW, targetH);
             }
 
             // 3. Vẽ các lớp tương tác trực tiếp trên nền trang gốc (Shapes, Annotations, Chữ ký, Inks)
@@ -3631,7 +3632,7 @@ namespace GenOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Xoay Trang PDF - GenOffice PDF Engine";
+                dlg.Text = "Xoay Trang PDF - ZENQ PDF Engine";
                 dlg.Size = new Size(380, 240);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -3698,7 +3699,7 @@ namespace GenOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Xóa Trang PDF - GenOffice PDF Engine";
+                dlg.Text = "Xóa Trang PDF - ZENQ PDF Engine";
                 dlg.Size = new Size(360, 200);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -3727,7 +3728,7 @@ namespace GenOffice.UI
                         if (ActivePageIndex >= Document.Pages.Count) ActivePageIndex = Document.Pages.Count - 1;
                         InvalidateAllCaches();
                         if (parentForm != null) parentForm.Invalidate();
-                        MessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "GenOffice PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "ZENQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                 }
@@ -3770,7 +3771,7 @@ namespace GenOffice.UI
                                         onMerged(mergedDoc, sfd.FileName);
                                     }
 
-                                    MessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    MessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }
@@ -3791,7 +3792,7 @@ namespace GenOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Tách Tệp PDF - GenOffice PDF Engine";
+                dlg.Text = "Tách Tệp PDF - ZENQ PDF Engine";
                 dlg.Size = new Size(420, 240);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -3833,7 +3834,7 @@ namespace GenOffice.UI
                                     {
                                         onSplit(splitDoc, sfd.FileName);
                                     }
-                                    MessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    MessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }

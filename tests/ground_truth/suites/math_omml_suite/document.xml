@@ -1,0 +1,225 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:ns1="http://schemas.openxmlformats.org/officeDocument/2006/math">
+  <ns0:body>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="36" />
+        </ns0:rPr>
+        <ns0:t>GenOffice Canonical OMML Math Equations Test Suite</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Formula: Quadratic Formula</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMathPara>
+        <ns1:oMath>
+          <ns1:r>
+            <ns1:t>x=</ns1:t>
+          </ns1:r>
+          <ns1:f>
+            <ns1:num>
+              <ns1:r>
+                <ns1:t>-b±</ns1:t>
+              </ns1:r>
+              <ns1:rad>
+                <ns1:deg />
+                <ns1:e>
+                  <ns1:sSup>
+                    <ns1:e>
+                      <ns1:r>
+                        <ns1:t>b</ns1:t>
+                      </ns1:r>
+                    </ns1:e>
+                    <ns1:sup>
+                      <ns1:r>
+                        <ns1:t>2</ns1:t>
+                      </ns1:r>
+                    </ns1:sup>
+                  </ns1:sSup>
+                  <ns1:r>
+                    <ns1:t>-4ac</ns1:t>
+                  </ns1:r>
+                </ns1:e>
+              </ns1:rad>
+            </ns1:num>
+            <ns1:den>
+              <ns1:r>
+                <ns1:t>2a</ns1:t>
+              </ns1:r>
+            </ns1:den>
+          </ns1:f>
+        </ns1:oMath>
+      </ns1:oMathPara>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Formula: Einstein Mass-Energy Equivalence</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMath>
+        <ns1:r>
+          <ns1:t>E=m</ns1:t>
+        </ns1:r>
+        <ns1:sSup>
+          <ns1:e>
+            <ns1:r>
+              <ns1:t>c</ns1:t>
+            </ns1:r>
+          </ns1:e>
+          <ns1:sup>
+            <ns1:r>
+              <ns1:t>2</ns1:t>
+            </ns1:r>
+          </ns1:sup>
+        </ns1:sSup>
+      </ns1:oMath>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Formula: Pythagorean Theorem</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMath>
+        <ns1:sSup>
+          <ns1:e>
+            <ns1:r>
+              <ns1:t>a</ns1:t>
+            </ns1:r>
+          </ns1:e>
+          <ns1:sup>
+            <ns1:r>
+              <ns1:t>2</ns1:t>
+            </ns1:r>
+          </ns1:sup>
+        </ns1:sSup>
+        <ns1:r>
+          <ns1:t>+</ns1:t>
+        </ns1:r>
+        <ns1:sSup>
+          <ns1:e>
+            <ns1:r>
+              <ns1:t>b</ns1:t>
+            </ns1:r>
+          </ns1:e>
+          <ns1:sup>
+            <ns1:r>
+              <ns1:t>2</ns1:t>
+            </ns1:r>
+          </ns1:sup>
+        </ns1:sSup>
+        <ns1:r>
+          <ns1:t>=</ns1:t>
+        </ns1:r>
+        <ns1:sSup>
+          <ns1:e>
+            <ns1:r>
+              <ns1:t>c</ns1:t>
+            </ns1:r>
+          </ns1:e>
+          <ns1:sup>
+            <ns1:r>
+              <ns1:t>2</ns1:t>
+            </ns1:r>
+          </ns1:sup>
+        </ns1:sSup>
+      </ns1:oMath>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Formula: Definite Integral</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMath>
+        <ns1:nary>
+          <ns1:naryPr>
+            <ns1:chr ns1:val="∫" />
+            <ns1:limLoc ns1:val="subSup" />
+          </ns1:naryPr>
+          <ns1:sub>
+            <ns1:r>
+              <ns1:t>a</ns1:t>
+            </ns1:r>
+          </ns1:sub>
+          <ns1:sup>
+            <ns1:r>
+              <ns1:t>b</ns1:t>
+            </ns1:r>
+          </ns1:sup>
+          <ns1:e>
+            <ns1:r>
+              <ns1:t>f(x)dx=F(b)-F(a)</ns1:t>
+            </ns1:r>
+          </ns1:e>
+        </ns1:nary>
+      </ns1:oMath>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Formula: 2x2 Matrix</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMath>
+        <ns1:d>
+          <ns1:dPr>
+            <ns1:begChr ns1:val="[" />
+            <ns1:endChr ns1:val="]" />
+          </ns1:dPr>
+          <ns1:e>
+            <ns1:m>
+              <ns1:mr>
+                <ns1:e>
+                  <ns1:r>
+                    <ns1:t>a</ns1:t>
+                  </ns1:r>
+                </ns1:e>
+                <ns1:e>
+                  <ns1:r>
+                    <ns1:t>b</ns1:t>
+                  </ns1:r>
+                </ns1:e>
+              </ns1:mr>
+              <ns1:mr>
+                <ns1:e>
+                  <ns1:r>
+                    <ns1:t>c</ns1:t>
+                  </ns1:r>
+                </ns1:e>
+                <ns1:e>
+                  <ns1:r>
+                    <ns1:t>d</ns1:t>
+                  </ns1:r>
+                </ns1:e>
+              </ns1:mr>
+            </ns1:m>
+          </ns1:e>
+        </ns1:d>
+      </ns1:oMath>
+    </ns0:p>
+    <ns0:sectPr>
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

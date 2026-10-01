@@ -125,7 +125,7 @@ namespace GenOffice.UI
                 int actionY = 400;
                 g.DrawLine(Pens.LightGray, 0, actionY - 6, Width, actionY - 6);
 
-                DrawActionRow(g, 0, actionY, Width, 28, "🌐  Thêm " + (IsHeaderMode ? "Đầu trang" : "Chân trang") + " từ GenOffice.com", itemFont, HoveredIndex == 4);
+                DrawActionRow(g, 0, actionY, Width, 28, "🌐  Thêm " + (IsHeaderMode ? "Đầu trang" : "Chân trang") + " từ ZenQOffice.com", itemFont, HoveredIndex == 4);
                 actionY += 28;
                 DrawActionRow(g, 0, actionY, Width, 28, "✏️  Chỉnh sửa " + (IsHeaderMode ? "Đầu trang" : "Chân trang"), itemFont, HoveredIndex == 5);
                 actionY += 28;

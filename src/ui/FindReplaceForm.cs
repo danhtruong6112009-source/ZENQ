@@ -19,7 +19,7 @@ namespace GenOffice.UI
 
         public FindReplaceForm()
         {
-            Text = "Tìm kiếm & Thay thế - GenOffice Writer";
+            Text = "Tìm kiếm & Thay thế - ZenQ Writer";
             Size = new Size(420, 200);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;

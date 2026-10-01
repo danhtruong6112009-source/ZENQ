@@ -88,7 +88,7 @@ namespace GenOffice.UI
                     ofd.Filter = "Tệp hình ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|Tất cả tệp (*.*)|*.*";
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                     {
-                        MessageBox.Show("Đã chọn ảnh làm hình mờ: " + System.IO.Path.GetFileName(ofd.FileName), "GenOffice Watermark", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("Đã chọn ảnh làm hình mờ: " + System.IO.Path.GetFileName(ofd.FileName), "ZENQ Watermark", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             };

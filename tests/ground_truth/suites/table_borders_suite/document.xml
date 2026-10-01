@@ -1,0 +1,250 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <ns0:body>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="36" />
+        </ns0:rPr>
+        <ns0:t>GenOffice Canonical Table Borders &amp; Shading Test Suite</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Table 1: Single Solid Borders (sz=8 / 1.0pt)</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:left ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:bottom ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:right ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideH ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideV ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T1 [1,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T1 [1,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T1 [2,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T1 [2,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Table 2: Double Line Borders (sz=12 / 1.5pt)</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+          <ns0:left ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+          <ns0:bottom ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+          <ns0:right ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+          <ns0:insideH ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+          <ns0:insideV ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="ED7D31" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T2 [1,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T2 [1,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T2 [2,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T2 [2,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Table 3: Dashed &amp; Dotted Borders</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="dashed" ns0:sz="12" ns0:space="0" ns0:color="70AD47" />
+          <ns0:left ns0:val="dashed" ns0:sz="12" ns0:space="0" ns0:color="70AD47" />
+          <ns0:bottom ns0:val="dashed" ns0:sz="12" ns0:space="0" ns0:color="70AD47" />
+          <ns0:right ns0:val="dashed" ns0:sz="12" ns0:space="0" ns0:color="70AD47" />
+          <ns0:insideH ns0:val="dotted" ns0:sz="8" ns0:space="0" ns0:color="70AD47" />
+          <ns0:insideV ns0:val="dotted" ns0:sz="8" ns0:space="0" ns0:color="70AD47" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T3 [1,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T3 [1,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T3 [2,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T3 [2,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Table 4: 3D Emboss Borders</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+          <ns0:left ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+          <ns0:bottom ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+          <ns0:right ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+          <ns0:insideH ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+          <ns0:insideV ns0:val="threeDEmboss" ns0:sz="18" ns0:space="0" ns0:color="auto" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T4 [1,1]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>T4 [1,2]</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Table 5: Cell Shading</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="4472C4" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Accent 1</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="ED7D31" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Accent 2</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="70AD47" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Accent 3</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:sectPr>
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

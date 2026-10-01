@@ -1,0 +1,10 @@
+Started RenderRibbonPreview
+Form opened. Ribbon is null? False
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_home.png and scratch/slides_wpf_home.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_insert.png and scratch/slides_wpf_insert.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_design.png and scratch/slides_wpf_design.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_transitions.png and scratch/slides_wpf_transitions.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_animations.png and scratch/slides_wpf_animations.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_slideshow.png and scratch/slides_wpf_slideshow.png
+Saved C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c\slides_wpf_view.png and scratch/slides_wpf_view.png
+Finished successfully!

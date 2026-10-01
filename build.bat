@@ -1,9 +1,16 @@
 @echo off
+setlocal
+taskkill /f /im ZenQOffice.exe >nul 2>&1
 taskkill /f /im GenOffice.exe >nul 2>&1
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /optimize /win32icon:GenOffice.ico /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Xml.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.CSharp.dll /r:PdfiumViewer.dll /r:PdfSharp.dll /out:GenOffice.exe /recurse:src\*.cs
+
+echo [BUILD] Compiling ZenQ Office on Modern .NET 10 (Release)...
+dotnet build ZenQOffice.csproj -c Release -v:m
+
 if %ERRORLEVEL% EQU 0 (
-    echo [SUCCESS] GenOffice.exe built successfully!
-    dir GenOffice.exe
+    echo [DEPLOY] Copying binaries to root directory...
+    copy /y bin\Release\net10.0-windows\* . >nul 2>&1
+    echo [SUCCESS] ZenQOffice.exe built successfully with .NET 10!
+    dir ZenQOffice.exe
 ) else (
     echo [ERROR] Build failed!
     exit /b 1

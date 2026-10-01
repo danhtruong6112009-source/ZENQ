@@ -1,0 +1,128 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:ns1="http://schemas.openxmlformats.org/officeDocument/2006/math">
+  <ns0:body>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="36" />
+        </ns0:rPr>
+        <ns0:t>BUSINESS PLAN &amp; FINANCIAL FORECAST 2026</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Forecast &amp; Milestone Data:</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:left ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:bottom ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:right ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideH ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideV ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="4472C4" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:rPr>
+                <ns0:b />
+                <ns0:color ns0:val="FFFFFF" />
+              </ns0:rPr>
+              <ns0:t>Phase / Qtr</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="4472C4" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:rPr>
+                <ns0:b />
+                <ns0:color ns0:val="FFFFFF" />
+              </ns0:rPr>
+              <ns0:t>Target Metric</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Stage 1</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Initial Rollout</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Stage 2</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Full Operational Delivery</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Operational Metric Formula:</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns1:oMath>
+        <ns1:r>
+          <ns1:t>Metric=</ns1:t>
+        </ns1:r>
+        <ns1:f>
+          <ns1:num>
+            <ns1:r>
+              <ns1:t>Total Value</ns1:t>
+            </ns1:r>
+          </ns1:num>
+          <ns1:den>
+            <ns1:r>
+              <ns1:t>Operational Cost</ns1:t>
+            </ns1:r>
+          </ns1:den>
+        </ns1:f>
+        <ns1:r>
+          <ns1:t>×100%</ns1:t>
+        </ns1:r>
+      </ns1:oMath>
+    </ns0:p>
+    <ns0:sectPr>
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

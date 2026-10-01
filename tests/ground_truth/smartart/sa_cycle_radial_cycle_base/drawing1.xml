@@ -1,0 +1,126 @@
+<ns0:drawing xmlns:ns0="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns1="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <ns0:spTree>
+    <ns0:nvGrpSpPr>
+      <ns0:cNvPr id="1" name="" />
+      <ns0:cNvGrpSpPr />
+    </ns0:nvGrpSpPr>
+    <ns0:grpSpPr>
+      <ns1:xfrm>
+        <ns1:off x="0" y="0" />
+        <ns1:ext cx="6096000" cy="4064000" />
+        <ns1:chOff x="0" y="0" />
+        <ns1:chExt cx="6096000" cy="4064000" />
+      </ns1:xfrm>
+    </ns0:grpSpPr>
+    <ns0:sp modelId="node_0">
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2413000" y="1397000" />
+          <ns1:ext cx="1270000" cy="1270000" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="ellipse">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent1" />
+        </ns1:solidFill>
+      </ns0:spPr>
+      <ns0:txBody>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Central Hub: Radial Cycle</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+    </ns0:sp>
+    <ns0:sp modelId="node_1">
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2571750" y="-44250" />
+          <ns1:ext cx="952500" cy="952500" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="ellipse">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent2" />
+        </ns1:solidFill>
+      </ns0:spPr>
+      <ns0:txBody>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Satellite 1</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+    </ns0:sp>
+    <ns0:sp modelId="node_2">
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="4171750" y="1555750" />
+          <ns1:ext cx="952500" cy="952500" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="ellipse">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent3" />
+        </ns1:solidFill>
+      </ns0:spPr>
+      <ns0:txBody>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Satellite 2</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+    </ns0:sp>
+    <ns0:sp modelId="node_3">
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2571750" y="3155750" />
+          <ns1:ext cx="952500" cy="952500" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="ellipse">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent4" />
+        </ns1:solidFill>
+      </ns0:spPr>
+      <ns0:txBody>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Satellite 3</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+    </ns0:sp>
+    <ns0:sp modelId="node_4">
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="971750" y="1555750" />
+          <ns1:ext cx="952500" cy="952500" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="ellipse">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent5" />
+        </ns1:solidFill>
+      </ns0:spPr>
+      <ns0:txBody>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Satellite 4</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+    </ns0:sp>
+  </ns0:spTree>
+</ns0:drawing>

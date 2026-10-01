@@ -1,0 +1,334 @@
+src\AssemblyInfo.cs:4: [assembly: AssemblyTitle("GENOFFICE")]
+src\AssemblyInfo.cs:8: [assembly: AssemblyProduct("GENOFFICE")]
+src\AssemblyInfo.cs:10: [assembly: AssemblyTrademark("GENOFFICE")]
+src\Program.cs:20: string appId = "GenOffice.Suite.Hub";
+src\Program.cs:24: if (first == "-calc" || first == "-excel" || first == "-sheet") appId = "GenOffice.Suite.Calc";
+src\Program.cs:25: else if (first == "-word" || first == "-writer" || first == "-doc") appId = "GenOffice.Suite.Writer";
+src\Program.cs:26: else if (first == "-slides" || first == "-present" || first == "-ppt") appId = "GenOffice.Suite.Slides";
+src\Program.cs:27: else if (first == "-pdf") appId = "GenOffice.Suite.Pdf";
+src\Program.cs:31: if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") appId = "GenOffice.Suite.Calc";
+src\Program.cs:32: else if (ext == ".pptx" || ext == ".ppt") appId = "GenOffice.Suite.Slides";
+src\Program.cs:33: else if (ext == ".pdf") appId = "GenOffice.Suite.Pdf";
+src\Program.cs:34: else appId = "GenOffice.Suite.Writer";
+src\Program.cs:44: MessageBox.Show("Chi tiết sự cố:\n" + e.Exception.Message + "\n\nTại:\n" + e.Exception.StackTrace, "GenOffice - Thông báo lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+src\Program.cs:50: MessageBox.Show("Sự cố hệ thống:\n" + msg, "GenOffice - Lỗi hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+src\Program.cs:57: MessageBox.Show("Lỗi khởi động GenOffice:\n" + ex.ToString(), "GenOffice Crash Report", MessageBoxButtons.OK, MessageBoxIcon.Error);
+src\core\AiActionEngine.cs:143: private static readonly Regex ActionRegex = new Regex(@"\[(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION):([A-Za-z0-9_]+)\]([\s\S]*?)(?:\[/(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION)\]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+src\core\AiActionEngine.cs:321: if (string.IsNullOrEmpty(l) || l.StartsWith("{") || l.StartsWith("}") || l.StartsWith("[GENOFFICE_ACTION")) continue;
+src\core\AiActionEngine.cs:2432: if (clean.Contains("canvaflow") || clean.Contains("chaytran") || clean == "flow") return TransitionType.GenOffice_CanvaFlow;
+src\core\AiActionEngine.cs:2433: if (clean.Contains("liquid") || clean.Contains("fluid") || clean.Contains("thuydich")) return TransitionType.GenOffice_LiquidFluid;
+src\core\AiActionEngine.cs:2434: if (clean.Contains("goldenribbon") || clean.Contains("ribbon") || clean.Contains("luavang")) return TransitionType.GenOffice_GoldenRibbon;
+src\core\AiActionEngine.cs:2435: if (clean.Contains("prism") || clean.Contains("langkinh")) return TransitionType.GenOffice_CinematicPrism;
+src\core\AiActionEngine.cs:2436: if (clean.Contains("matrix") || clean.Contains("muaso")) return TransitionType.GenOffice_MatrixRain;
+src\core\AiActionEngine.cs:2437: if (clean.Contains("neon") || clean.Contains("xungneon")) return TransitionType.GenOffice_NeonPulse;
+src\core\AiActionEngine.cs:2438: if (clean.Contains("portal") || clean.Contains("losau")) return TransitionType.GenOffice_PortalWarp;
+src\core\AiActionEngine.cs:2439: if (clean.Contains("supernova") || clean.Contains("sieutantinh")) return TransitionType.GenOffice_Supernova;
+src\core\AiActionEngine.cs:2440: if (clean.Contains("glitch") || clean.Contains("hologram")) return TransitionType.GenOffice_HologramGlitch;
+src\core\AiActionEngine.cs:2441: if (clean.Contains("kaleidoscope") || clean.Contains("vanhoa")) return TransitionType.GenOffice_Kaleidoscope;
+src\core\AiActionEngine.cs:2442: if (clean.Contains("starlight") || clean.Contains("baosao")) return TransitionType.GenOffice_Starlight;
+src\core\AiConfig.cs:257: SystemInstructions = "Bạn là một trợ lý AI thông minh trong phần mềm văn phòng GenOffice. Hãy luôn giao tiếp và trả lời bằng Tiếng Việt một cách ngắn gọn, súc tích và chuyên nghiệp.";
+src\core\AiConfig.cs:262: return "Bạn là Trợ lý AI GenOffice - Trợ lý trí tuệ nhân tạo toàn năng tích hợp trong bộ ứng dụng văn phòng GenOffice. " +
+src\core\AiConfig.cs:463: string dir = Path.Combine(appData, "GenOffice");
+src\core\AiService.cs:124: string testPrompt = "Chào bạn! Hãy trả lời ngắn đúng 1 câu: 'GenOffice AI kết nối thành công!'";
+src\core\AiService.cs:528: request.Headers["HTTP-Referer"] = "https://genoffice.app";
+src\core\AiService.cs:529: request.Headers["X-Title"] = "GenOffice Suite";
+src\core\AiService.cs:785: request.Headers["HTTP-Referer"] = "https://genoffice.app";
+src\core\AiService.cs:786: request.Headers["X-Title"] = "GenOffice Suite";
+src\core\AppSettings.cs:73: string dir = Path.Combine(appData, "GenOffice");
+src\core\AppSettings.cs:95: XmlElement root = doc.CreateElement("GenOfficeSettings");
+src\core\AppSettings.cs:158: XmlNode root = doc.SelectSingleNode("GenOfficeSettings");
+src\core\AutoSaveEngine.cs:14: autoSaveDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "AutoSave");
+src\core\DesktopShortcutManager.cs:148: string appId = "GenOffice.Suite.Hub";
+src\core\DesktopShortcutManager.cs:152: if (a.Contains("-writer") || a.Contains("-word") || a.Contains("-doc")) appId = "GenOffice.Suite.Writer";
+src\core\DesktopShortcutManager.cs:153: else if (a.Contains("-calc") || a.Contains("-excel") || a.Contains("-sheet")) appId = "GenOffice.Suite.Calc";
+src\core\DesktopShortcutManager.cs:154: else if (a.Contains("-slides") || a.Contains("-present") || a.Contains("-ppt")) appId = "GenOffice.Suite.Slides";
+src\core\DesktopShortcutManager.cs:155: else if (a.Contains("-pdf")) appId = "GenOffice.Suite.Pdf";
+src\core\PdfDocumentModel.cs:184: Author = "Người dùng GenOffice";
+src\core\PdfDocumentModel.cs:218: public PdfSignatureElement(RectangleF bounds, string signerName = "GenOffice Signer")
+src\core\PdfDocumentModel.cs:427: Author = "Người dùng GenOffice";
+src\core\PdfDocumentModel.cs:428: Creator = "GenOffice Master Suite PDF Engine";
+src\core\SessionManager.cs:62: string dir = Path.Combine(appData, "GenOffice");
+src\core\SessionManager.cs:73: string dir = Path.Combine(appData, "GenOffice", "autosave");
+src\core\SessionManager.cs:228: sw.WriteLine("<GenOfficeSession>");
+src\core\SessionManager.cs:246: sw.WriteLine("</GenOfficeSession>");
+src\core\UpdateManager.cs:33: DownloadFileName = "GenOffice.exe";
+src\core\UpdateManager.cs:44: public const string GITHUB_REPO = "GENOFFICE";
+src\core\UpdateManager.cs:109: request.UserAgent = "GenOffice-AutoUpdater";
+src\core\UpdateManager.cs:186: else if (lower == "genoffice.exe")
+src\core\UpdateManager.cs:309: string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_Update");
+src\core\UpdateManager.cs:312: string targetDownloadPath = Path.Combine(tempDir, release.DownloadFileName ?? "GenOffice_new.exe");
+src\core\UpdateManager.cs:320: req.UserAgent = "GenOffice-AutoUpdater";
+src\core\UpdateManager.cs:369: bat.AppendLine("tasklist /fi \"imagename eq GenOffice.exe\" 2>nul | find /i \"GenOffice.exe\" >nul");
+src\format\FormatHandlers.cs:2687: string tempPath = Path.Combine(Path.GetTempPath(), "genoffice_sa_draw_" + Guid.NewGuid().ToString("N") + ".png");
+src\format\FormatHandlers.cs:3235: tempFile = Path.Combine(Path.GetTempPath(), "genoffice_img_" + Guid.NewGuid().ToString("N") + ext);
+src\format\FormatHandlers.cs:3446: tempFile = Path.Combine(Path.GetTempPath(), "genoffice_sa_" + Guid.NewGuid().ToString("N") + ".png");
+src\format\FormatHandlers.cs:3489: tempFile = Path.Combine(Path.GetTempPath(), "genoffice_shp_" + Guid.NewGuid().ToString("N") + ".png");
+src\format\OcrHandler.cs:21: string tempImg = Path.Combine(Path.GetTempPath(), "genoffice_ocr_" + Guid.NewGuid().ToString("N") + ".png");
+src\format\OcrHandler.cs:22: string psScriptPath = Path.Combine(Path.GetTempPath(), "genoffice_ocr_script_" + Guid.NewGuid().ToString("N") + ".ps1");
+src\format\PdfHandler.cs:2202: ? Path.Combine(Path.GetTempPath(), "GenOffice_Merged_" + Guid.NewGuid().ToString("N") + ".pdf")
+src\format\PdfHandler.cs:2322: ? Path.Combine(Path.GetTempPath(), "GenOffice_Split_" + Guid.NewGuid().ToString("N") + ".pdf")
+src\setup\SetupForm.cs:239: g.DrawString("ĐIỀU KHOẢN VÀ CHÍNH SÁCH SỬ DỤNG GENOFFICE", hFont, hBrush, 14, curY);
+src\setup\SetupForm.cs:252: string b1 = "GENOFFICE là bộ giải pháp phần mềm văn phòng thông minh được phát triển bởi NEXTGENEDUSPACE STUDIO nhằm mang lại công cụ xử lý văn bản, bảng tính, trình chiếu và tích hợp trí tuệ nhân tạo toàn diện cho người dùng.";
+src\setup\SetupForm.cs:381: Text = "Cài đặt GENOFFICE";
+src\setup\SetupForm.cs:389: else if (File.Exists("GenOffice.ico")) Icon = new Icon("GenOffice.ico");
+src\setup\SetupForm.cs:482: Text = "Tôi đã đọc và đồng ý với điều khoản sử dụng của GENOFFICE",
+src\setup\SetupForm.cs:541: fbd.Description = "Chọn thư mục cài đặt GENOFFICE";
+src\setup\SetupForm.cs:553: Text = "Tạo lối tắt GENOFFICE trên màn hình nền Desktop",
+src\setup\SetupForm.cs:562: Text = "Thêm lối tắt GENOFFICE vào Start Menu",
+src\setup\SetupForm.cs:645: SetStatus("Đang giải nén tập tin ứng dụng GENOFFICE...", 0.35f);
+src\setup\SetupForm.cs:676: "GenOffice.exe", "PdfSharp.dll", "PdfiumViewer.dll", "pdfium.dll", "GenOffice.ico", "GENOFFICE.png"
+src\setup\SetupForm.cs:707: string exePath = Path.Combine(chosenPath, "GenOffice.exe");
+src\setup\SetupForm.cs:708: string icoPath = Path.Combine(chosenPath, "GenOffice.ico");
+src\setup\SetupForm.cs:713: ShortcutHelper.CreateShortcut(exePath, Path.Combine(desktop, "GENOFFICE.lnk"), "GENOFFICE", icoPath);
+src\setup\SetupForm.cs:719: ShortcutHelper.CreateShortcut(exePath, Path.Combine(startMenu, "GENOFFICE.lnk"), "GENOFFICE", icoPath);
+src\setup\SetupForm.cs:725: SetStatus("Cài đặt hoàn tất! Đang khởi động GENOFFICE...", 1.0f);
+src\setup\SetupForm.cs:758: string exePath = Path.Combine(chosenPath, "GenOffice.exe");
+src\setup\SetupForm.cs:800: string titleText = "Cài đặt GENOFFICE";
+src\setup\SetupForm.cs:802: titleText = "Chào mừng bạn đến với GENOFFICE";
+src\setup\SetupForm.cs:804: titleText = "Tùy chọn cài đặt GENOFFICE";
+src\setup\SetupForm.cs:806: titleText = "Đang cài đặt GENOFFICE...";
+src\setup\ShortcutHelper.cs:15: return Path.Combine(localApp, "Programs", "GenOffice");
+src\setup\ShortcutHelper.cs:54: string exePath = Path.Combine(installDir, "GenOffice.exe");
+src\setup\ShortcutHelper.cs:55: string icoPath = Path.Combine(installDir, "GenOffice.ico");
+src\setup\ShortcutHelper.cs:59: string desktopLnk = Path.Combine(desktop, "GENOFFICE.lnk");
+src\setup\ShortcutHelper.cs:60: CreateShortcut(exePath, desktopLnk, "GENOFFICE", icoPath);
+src\setup\ShortcutHelper.cs:64: string startMenuLnk = Path.Combine(startMenu, "GENOFFICE.lnk");
+src\setup\ShortcutHelper.cs:65: CreateShortcut(exePath, startMenuLnk, "GENOFFICE", icoPath);
+src\setup\ShortcutHelper.cs:73: string desktopLnk = Path.Combine(desktop, "GENOFFICE.lnk");
+src\setup\ShortcutHelper.cs:75: string oldDesktopLnk = Path.Combine(desktop, "GenOffice.lnk");
+src\setup\ShortcutHelper.cs:79: string startMenuLnk = Path.Combine(startMenu, "GENOFFICE.lnk");
+src\setup\ShortcutHelper.cs:81: string oldStartMenuLnk = Path.Combine(startMenu, "GenOffice.lnk");
+src\setup\ShortcutHelper.cs:91: string keyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\GENOFFICE";
+src\setup\ShortcutHelper.cs:96: string exePath = Path.Combine(installDir, "GenOffice.exe");
+src\setup\ShortcutHelper.cs:98: string icoPath = Path.Combine(installDir, "GenOffice.ico");
+src\setup\ShortcutHelper.cs:100: key.SetValue("DisplayName", "GENOFFICE");
+src\setup\ShortcutHelper.cs:127: parent.DeleteSubKeyTree("GENOFFICE", false);
+src\setup\ShortcutHelper.cs:128: parent.DeleteSubKeyTree("GenOffice", false);
+src\setup\UninstallForm.cs:37: Text = "Gỡ cài đặt GENOFFICE";
+src\setup\UninstallForm.cs:45: else if (File.Exists("GenOffice.ico")) Icon = new Icon("GenOffice.ico");
+src\setup\UninstallForm.cs:114: Text = "Ở lại với GENOFFICE",
+src\setup\UninstallForm.cs:180: SetStatus("Đang đóng các tiến trình GENOFFICE...", 0.20f);
+src\setup\UninstallForm.cs:183: foreach (var p in Process.GetProcessesByName("GenOffice"))
+src\setup\UninstallForm.cs:202: string tempBat = Path.Combine(Path.GetTempPath(), "cleanup_genoffice.bat");
+src\setup\UninstallForm.cs:270: string title = _isUninstalling ? "Đang gỡ cài đặt GENOFFICE..." : "Bạn muốn gỡ cài đặt GENOFFICE?";
+src\ui\AiAssistantForm.cs:47: this.Text = "GenOffice AI Assistant - Trợ lý Trí tuệ Nhân tạo";
+src\ui\AiAssistantForm.cs:76: Text = "✨ GenOffice AI Assistant",
+src\ui\AiAssistantForm.cs:419: contextDesc = "Màn hình chính GenOffice: Trợ lý sẵn sàng hỗ trợ mọi việc.";
+src\ui\AiAssistantForm.cs:457: MessageBox.Show("Vui lòng nhập yêu cầu của bạn trước khi gửi.", "GenOffice AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+src\ui\AiAssistantForm.cs:463: var dr = MessageBox.Show("Bạn chưa nhập API Key cho Trợ lý AI.\nBạn có muốn mở bảng Cấu hình để nhập API Key ngay không?", "GenOffice AI - Chưa có API Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+src\ui\AiChatSidebarPanel.cs:907: clean = Regex.Replace(clean, @"\[(?:QUY TẮC|HƯỚNG DẪN)[^\]]*\][\s\S]*?\[/GENOFFICE_ACTION\]", "", RegexOptions.IgnoreCase);
+src\ui\AiChatSidebarPanel.cs:912: clean = Regex.Replace(clean, @"\[[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_:]*\][\s\S]*?(?:\[/[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_]*\])", "", RegexOptions.IgnoreCase);
+src\ui\AiChatSidebarPanel.cs:913: clean = Regex.Replace(clean, @"\[[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_:]*\][\s\S]*", "", RegexOptions.IgnoreCase);
+src\ui\AiChatSidebarPanel.cs:914: clean = Regex.Replace(clean, @"\[/?[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_]*\]", "", RegexOptions.IgnoreCase);
+src\ui\AiChatSidebarPanel.cs:1039: MessageBox.Show(ex.ToString(), "GenOffice - Lỗi Chèn Text");
+src\ui\AiChatSidebarPanel.cs:1467: MessageBox.Show(ex.ToString(), "GenOffice - Lỗi Chèn Text");
+src\ui\AiChatSidebarPanel.cs:1582: sb.AppendLine("     + BẮT BUỘC DÙNG [GENOFFICE_ACTION:GENERATE_SLIDE_CANVAS] với danh sách \"slides\" chứa tất cả các slide!");
+src\ui\AiChatSidebarPanel.cs:1584: sb.AppendLine("     + Phải giữ nguyên toàn bộ chủ đề & nội dung bài thuyết trình hiện tại nhưng TÁI CẤU TRÚC lại thành các thẻ bài (Cards), tiêu đề to rõ, icon pill, căn lề trái sang trọng, màu nền gradient sáng hoặc tối theo yêu cầu, và khai báo \"transition\": \"GenOffice_CanvaFlow\" cho từng slide.");
+src\ui\AiChatSidebarPanel.cs:1586: sb.AppendLine("     [GENOFFICE_ACTION:GENERATE_SLIDE_CANVAS]");
+src\ui\AiChatSidebarPanel.cs:1592: sb.AppendLine("           \"transition\": \"GenOffice_CanvaFlow\",");
+src\ui\AiChatSidebarPanel.cs:1598: sb.AppendLine("           \"transition\": \"GenOffice_CanvaFlow\",");
+src\ui\AiChatSidebarPanel.cs:1604: sb.AppendLine("     [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:1607: sb.AppendLine("   - Cấu trúc JSON khi tạo 1 slide: [GENOFFICE_ACTION:GENERATE_SLIDE_CANVAS] { \"theme\": \"CleanLight\", \"title\": \"...\", \"background\": { ... }, \"elements\": [ ... ] } [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:1622: sb.AppendLine("     [GENOFFICE_ACTION:MODIFY_SLIDE]");
+src\ui\AiChatSidebarPanel.cs:1627: sb.AppendLine("     [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:1641: sb.AppendLine("     [GENOFFICE_ACTION:MODIFY_SLIDE]");
+src\ui\AiChatSidebarPanel.cs:1646: sb.AppendLine("     [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:1648: sb.AppendLine("     * 'Chảy tràn' -> BẮT BUỘC dùng: \"GenOffice_CanvaFlow\" (hoặc 'Chảy tràn') - TUYỆT ĐỐI KHÔNG DÙNG 'Thủy dịch'!");
+src\ui\AiChatSidebarPanel.cs:1649: sb.AppendLine("     * 'Thủy dịch' -> Dùng: \"GenOffice_LiquidFluid\"");
+src\ui\AiChatSidebarPanel.cs:1650: sb.AppendLine("     * 'Lụa Vàng' -> Dùng: \"GenOffice_GoldenRibbon\"");
+src\ui\AiChatSidebarPanel.cs:1651: sb.AppendLine("     * 'Lăng kính' -> Dùng: \"GenOffice_CinematicPrism\"");
+src\ui\AiChatSidebarPanel.cs:1652: sb.AppendLine("     * 'Mưa số' -> Dùng: \"GenOffice_MatrixRain\"");
+src\ui\AiChatSidebarPanel.cs:1653: sb.AppendLine("     * 'Xung Neon' -> Dùng: \"GenOffice_NeonPulse\"");
+src\ui\AiChatSidebarPanel.cs:1654: sb.AppendLine("     * 'Lỗ sâu' -> Dùng: \"GenOffice_PortalWarp\"");
+src\ui\AiChatSidebarPanel.cs:1655: sb.AppendLine("     * 'Siêu tân tinh' -> Dùng: \"GenOffice_Supernova\"");
+src\ui\AiChatSidebarPanel.cs:1656: sb.AppendLine("     * 'Hologram' -> Dùng: \"GenOffice_HologramGlitch\"");
+src\ui\AiChatSidebarPanel.cs:1657: sb.AppendLine("     * 'Vạn hoa' -> Dùng: \"GenOffice_Kaleidoscope\"");
+src\ui\AiChatSidebarPanel.cs:1658: sb.AppendLine("     * 'Bão sao' -> Dùng: \"GenOffice_Starlight\"");
+src\ui\AiChatSidebarPanel.cs:1698: sb.AppendLine("     [GENOFFICE_ACTION:APPLY_SPELL_CORRECTIONS]");
+src\ui\AiChatSidebarPanel.cs:1705: sb.AppendLine("     [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:1860: sb.AppendLine("   - BẮT BUỘC XUẤT RA KHỐI HÀNH ĐỘNG: [GENOFFICE_ACTION:SET_CALC_DATA] ... [/GENOFFICE_ACTION] (hoặc bảng Markdown | Cột 1 | Cột 2 | ...)");
+src\ui\AiChatSidebarPanel.cs:1867: sb.AppendLine("     [GENOFFICE_ACTION:SET_CALC_DATA]");
+src\ui\AiChatSidebarPanel.cs:1882: sb.AppendLine("         { \"cell\": \"B4\", \"value\": \"GenOffice Suite\" },");
+src\ui\AiChatSidebarPanel.cs:1890: sb.AppendLine("     [/GENOFFICE_ACTION]");
+src\ui\AiChatSidebarPanel.cs:2923: "GenOffice",
+src\ui\AiChatSidebarPanel.cs:2929: "GenOffice",
+src\ui\AiConfigDialog.cs:41: this.Text = "Cấu hình & Thiết lập Trợ lý AI - GenOffice AI";
+src\ui\AiConfigDialog.cs:84: Text = "✨ Thiết lập Trí tuệ Nhân tạo - GenOffice AI Engine",
+src\ui\AiConfigDialog.cs:436: MessageBox.Show("Đã lưu thiết lập Trợ lý AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "GenOffice AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AiConfigPanel.cs:1247: MessageBox.Show("Không có cấu hình nào để xóa.", "GenOffice AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+src\ui\AiConfigPanel.cs:1317: MessageBox.Show("Không có cấu hình nào để lưu.\nHãy nhập API Key trước.", "GenOffice AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+src\ui\AiConfigPanel.cs:1365: MessageBox.Show("Đã lưu thiết lập AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "GenOffice AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AnimationsGalleryDropDownForm.cs:38: AddCategory(scrollPanel, ref curY, "Hiệu ứng Độc quyền GenOffice (Exclusive Animations)", currentAnimation, new Tuple<AnimationType, string>[] {
+src\ui\AnimationsGalleryDropDownForm.cs:291: "🌟 Thêm hiệu ứng độc quyền GenOffice (More Exclusive Effects)...",
+src\ui\AppForm.cs:125: if (Ribbon.CurrentMode == OfficeAppMode.Writer) modeStr = "GenOffice Writer";
+src\ui\AppForm.cs:126: else if (Ribbon.CurrentMode == OfficeAppMode.Calc) modeStr = "GenOffice Calc";
+src\ui\AppForm.cs:127: else if (Ribbon.CurrentMode == OfficeAppMode.Slides) modeStr = "GenOffice Slides";
+src\ui\AppForm.cs:128: else if (Ribbon.CurrentMode == OfficeAppMode.Pdf) modeStr = "GenOffice PDF";
+src\ui\AppForm.cs:160: MessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "GENOFFICE PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:168: sfd.Title = "Lưu Bảng tính GENOFFICE Calc";
+src\ui\AppForm.cs:180: MessageBox.Show("Đã lưu bảng tính thành công!", "GENOFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:200: MessageBox.Show("Đã lưu tệp PDF thành công!", "GENOFFICE PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:213: ofd.Title = "Mở tài liệu GenOffice Writer";
+src\ui\AppForm.cs:234: ofd.Title = "Mở bảng tính GenOffice Calc";
+src\ui\AppForm.cs:255: ofd.Title = "Mở bản trình chiếu GenOffice Slides";
+src\ui\AppForm.cs:375: string hubIconPath = System.IO.Path.Combine(baseDir, "GenOffice.ico");
+src\ui\AppForm.cs:441: string appId = "GenOffice.Suite.Hub";
+src\ui\AppForm.cs:444: if (Ribbon.CurrentMode == OfficeAppMode.Writer) appId = "GenOffice.Suite.Writer";
+src\ui\AppForm.cs:445: else if (Ribbon.CurrentMode == OfficeAppMode.Calc) appId = "GenOffice.Suite.Calc";
+src\ui\AppForm.cs:446: else if (Ribbon.CurrentMode == OfficeAppMode.Slides) appId = "GenOffice.Suite.Slides";
+src\ui\AppForm.cs:447: else if (Ribbon.CurrentMode == OfficeAppMode.Pdf) appId = "GenOffice.Suite.Pdf";
+src\ui\AppForm.cs:673: Text = "GENOFFICE - Bộ Ứng Dụng Văn Phòng Đa Năng";
+src\ui\AppForm.cs:730: string hubIconPath = System.IO.Path.Combine(baseDir, "GenOffice.ico");
+src\ui\AppForm.cs:3192: MessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "GENOFFICE PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3200: sfd.Title = "Lưu Bảng tính GENOFFICE Calc (Chuẩn Microsoft Excel .xlsx / .csv)";
+src\ui\AppForm.cs:3211: MessageBox.Show("Đã lưu bảng tính thành công!", "GENOFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3232: MessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công (Chuẩn PDF 1.7 tương thích 100% với Adobe Acrobat & Chrome)!", "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3244: ofd.Title = "Mở tài liệu GENOFFICE Writer (Chuẩn Microsoft Word OpenXML .docx)";
+src\ui\AppForm.cs:3255: MessageBox.Show("Đã mở tài liệu '" + fName + "' thành công!", "GENOFFICE Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3282: MessageBox.Show("Đã mở bản trình chiếu '" + fName + "' thành công!", "GenOffice PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3290: ofd.Title = "Mở Bảng tính GenOffice Calc (Chuẩn Microsoft Excel .xlsx / .csv)";
+src\ui\AppForm.cs:3306: MessageBox.Show("Đã mở bảng tính '" + fName + "' thành công!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3332: MessageBox.Show("Đã mở tệp PDF '" + fName + "' thành công!", "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3958: sfd.Title = "Lưu Tài liệu GENOFFICE Writer với tên khác (Save As)";
+src\ui\AppForm.cs:3974: MessageBox.Show("Đã lưu tài liệu '" + sfd.FileName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:3998: MessageBox.Show("Đã lưu bản trình chiếu thành công!", "GenOffice PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:4022: MessageBox.Show("Đã lưu bảng tính thành công!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:4046: MessageBox.Show("Đã lưu tệp PDF thành công!", "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\AppForm.cs:4108: MessageBox.Show("Đã gửi lệnh in tài liệu đến máy in: " + pd.PrinterSettings.PrinterName, "In Ấn - GenOffice Suite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\CalcView.cs:926: sheet.SetCellText(1, 1, "BÁO CÁO DOANH THU & LỢI NHUẬN GENOFFICE Q3/2026");
+src\ui\CalcView.cs:941: sheet.SetCellText(4, 2, "GenOffice Suite Pro 2026");
+src\ui\CalcView.cs:4765: dlg.Text = isReplace ? "Thay thế - GenOffice Calc" : "Tìm kiếm - GenOffice Calc";
+src\ui\CalcView.cs:5498: MessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "GenOffice Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\CalcView.cs:6584: TextContent = "GenOffice Calc",
+src\ui\ChartDataExcelForm.cs:165: this.Text = "Bảng dữ liệu Biểu đồ (GenOffice Calc Mini)";
+src\ui\CustomWatermarkDialogForm.cs:91: MessageBox.Show("Đã chọn ảnh làm hình mờ: " + System.IO.Path.GetFileName(ofd.FileName), "GenOffice Watermark", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\EnvelopeLabelsForm.cs:86: txtReturnAddress.Text = "Người gửi: Ban Giám Đốc GenOffice\r\nĐịa chỉ: Tòa nhà Văn phòng Quốc tế, Hà Nội, Việt Nam";
+src\ui\FindReplaceForm.cs:22: Text = "Tìm kiếm & Thay thế - GenOffice Writer";
+src\ui\GenOfficeLogoRenderer.cs:26: Path.Combine(Application.StartupPath, "GENOFFICE.png"),
+src\ui\GenOfficeLogoRenderer.cs:27: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GENOFFICE.png"),
+src\ui\GenOfficeLogoRenderer.cs:28: Path.Combine(Directory.GetCurrentDirectory(), "GENOFFICE.png")
+src\ui\GenOfficeLogoRenderer.cs:38: return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GENOFFICE.png");
+src\ui\GenOfficeLogoRenderer.cs:45: Path.Combine(Application.StartupPath, "GenOffice.ico"),
+src\ui\GenOfficeLogoRenderer.cs:46: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GenOffice.ico"),
+src\ui\GenOfficeLogoRenderer.cs:47: Path.Combine(Directory.GetCurrentDirectory(), "GenOffice.ico")
+src\ui\GenOfficeLogoRenderer.cs:57: return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GenOffice.ico");
+src\ui\GenOfficeLogoRenderer.cs:71: string[] resNames = new string[] { "app_logo.png", "GENOFFICE.png", "logo.png" };
+src\ui\GenOfficeLogoRenderer.cs:264: g.DrawString("GENOFFICE", brandFont, tb, textX, textY);
+src\ui\GenOfficeSplashScreen.cs:85: SetStatus("Đang khởi động GENOFFICE...", 0.20f);
+src\ui\GenOfficeSplashScreen.cs:220: // Tên "GENOFFICE" viết hoa toàn bộ
+src\ui\GenOfficeSplashScreen.cs:224: g.DrawString("GENOFFICE", titleFont, titleB, textX, textY);
+src\ui\HeaderFooterDropDownForm.cs:128: DrawActionRow(g, 0, actionY, Width, 28, "🌐  Thêm " + (IsHeaderMode ? "Đầu trang" : "Chân trang") + " từ GenOffice.com", itemFont, HoveredIndex == 4);
+src\ui\HomeView.cs:476: DesktopShortcutManager.DeleteShortcut("GenOffice");
+src\ui\HomeView.cs:484: string dir = Path.Combine(appData, "GenOffice");
+src\ui\HomeView.cs:642: System.Xml.XmlElement root = outDoc.CreateElement("GenOfficeDocs");
+src\ui\HomeView.cs:832: System.Xml.XmlElement root = doc.CreateElement("GenOfficeDocs");
+src\ui\HomeView.cs:1403: dlg.Text = "Giới thiệu & Hướng dẫn - GENOFFICE";
+src\ui\HomeView.cs:1417: Text = "GENOFFICE v3.5",
+src\ui\HomeView.cs:1492: Text = "GENOFFICE luôn nỗ lực tối đa để hiển thị và xử lý tài liệu chuẩn xác nhất. Tuy nhiên, do sự khác biệt về đặc tả kỹ thuật và tiêu chuẩn phần mềm giữa các nền tảng, chúng tôi không thể cam kết rằng mọi định dạng nâng cao sẽ hiển thị giống hệt 100% như trên các bộ ứng dụng Office khác.",
+src\ui\HomeView.cs:1804: string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+src\ui\HomeView.cs:1859: string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+src\ui\HomeView.cs:1866: new TemplateLineInfo("Tháng 09/2026 • Ban Quản lý Dự án GenOffice", 1, false, true, 12f),
+src\ui\HomeView.cs:1870: new TemplateLineInfo("• Tên dự án: Triển khai Hệ thống Văn phòng Thông minh GenOffice", 0, false, false, 13f),
+src\ui\HomeView.cs:1907: string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+src\ui\HomeView.cs:1988: string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+src\ui\HomeView.cs:2189: // ── 4. "Tính năng nổi bật" section (TÍNH NĂNG THẬT 100% CỦA GENOFFICE) ──
+src\ui\HomeView.cs:2251: g.DrawString("GenOffice", brandFont, brandBrush, 56f, 18f);
+src\ui\HomeView.cs:2954: g.DrawString("GenOffice Writer (Soạn thảo văn bản)", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 11f);
+src\ui\HomeView.cs:2957: bool hasWriterSc = DesktopShortcutManager.IsShortcutExists("GenOffice Writer");
+src\ui\HomeView.cs:2964: g.DrawString("GenOffice Calc (Bảng tính)", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 11f);
+src\ui\HomeView.cs:2967: bool hasCalcSc = DesktopShortcutManager.IsShortcutExists("GenOffice Calc");
+src\ui\HomeView.cs:2974: g.DrawString("GenOffice Slides (Trình chiếu)", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 11f);
+src\ui\HomeView.cs:2977: bool hasSlidesSc = DesktopShortcutManager.IsShortcutExists("GenOffice Slides");
+src\ui\HomeView.cs:2984: g.DrawString("GenOffice PDF (Tài liệu PDF)", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 11f);
+src\ui\HomeView.cs:2987: bool hasPdfSc = DesktopShortcutManager.IsShortcutExists("GenOffice PDF");
+src\ui\HomeView.cs:3066: g.DrawString("GENOFFICE Professional Suite v1.5.0", rTitleFont, rTitleBrush, card5.X + 16f, card5.Y + 12f);
+src\ui\HomeView.cs:3669: ofd.Title = "Mở tài liệu văn phòng - GenOffice";
+src\ui\HomeView.cs:3829: if (SettingShortcutWriterRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("GenOffice Writer", "-writer", "icon\\writer.ico", "Soạn thảo văn bản GenOffice Writer"); return null; }
+src\ui\HomeView.cs:3830: if (SettingShortcutCalcRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("GenOffice Calc", "-calc", "icon\\calc.ico", "Bảng tính GenOffice Calc"); return null; }
+src\ui\HomeView.cs:3831: if (SettingShortcutSlidesRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("GenOffice Slides", "-slides", "icon\\present.ico", "Trình chiếu GenOffice Slides"); return null; }
+src\ui\HomeView.cs:3832: if (SettingShortcutPdfRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("GenOffice PDF", "-pdf", "icon\\pdf.ico", "Đọc và chỉnh sửa GenOffice PDF"); return null; }
+src\ui\InsertHyperlinkForm.cs:80: if (string.IsNullOrEmpty(TargetUrl)) TargetUrl = "https://genoffice.vn";
+src\ui\InsertOnlineVideoForm.cs:44: txtTitle = new TextBox { Text = "Video Giới Thiệu GenOffice", Location = new Point(20, curY), Width = 445 };
+src\ui\MoreAnimationsModalForm.cs:42: Text = "Thêm hiệu ứng hoạt họa - GenOffice Slides";
+src\ui\MoreAnimationsModalForm.cs:146: Text = "Khám phá & áp dụng các hiệu ứng hoạt họa tiêu chuẩn và hiệu ứng độc quyền GenOffice",
+src\ui\NewCommentDialogForm.cs:125: MessageBox.Show("Vui lòng nhập nội dung bình luận!", "GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+src\ui\PdfSignatureInputDialog.cs:44: this.Text = "Ký Tên Điện Tử - GenOffice E-Sign (3 Phương thức Ký)";
+src\ui\PdfView.cs:3635: dlg.Text = "Xoay Trang PDF - GenOffice PDF Engine";
+src\ui\PdfView.cs:3702: dlg.Text = "Xóa Trang PDF - GenOffice PDF Engine";
+src\ui\PdfView.cs:3731: MessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "GenOffice PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\PdfView.cs:3774: MessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\PdfView.cs:3795: dlg.Text = "Tách Tệp PDF - GenOffice PDF Engine";
+src\ui\PdfView.cs:3837: MessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:1114: string autoSaveDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "autosave");
+src\ui\RibbonBar.cs:1228: "Cảnh báo chưa lưu - GenOffice",
+src\ui\RibbonBar.cs:1258: string autoSaveDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "autosave");
+src\ui\RibbonBar.cs:2153: // 3. App Name (e.g. "GenOffice Calc")
+src\ui\RibbonBar.cs:2154: string appName = "GenOffice " + CurrentMode.ToString();
+src\ui\RibbonBar.cs:2155: if (CurrentMode == OfficeAppMode.Writer) appName = "GenOffice Writer";
+src\ui\RibbonBar.cs:2156: else if (CurrentMode == OfficeAppMode.Calc) appName = "GenOffice Calc";
+src\ui\RibbonBar.cs:2157: else if (CurrentMode == OfficeAppMode.Slides) appName = "GenOffice Slides";
+src\ui\RibbonBar.cs:2158: else if (CurrentMode == OfficeAppMode.Pdf) appName = "GenOffice PDF";
+src\ui\RibbonBar.cs:2466: // NOTE: Logo badge and "GENOFFICE" text removed per user request:
+src\ui\RibbonBar.cs:2467: // "bỏ cái logo và chữ genoffice ở đó"
+src\ui\RibbonBar.cs:16116: ofd.Title = "Mở tài liệu GenOffice Writer (Chuẩn Microsoft Word OpenXML .docx)";
+src\ui\RibbonBar.cs:16126: MessageBox.Show("Đã mở tài liệu '" + fileName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:16137: sfd.Title = "Lưu tài liệu GenOffice Writer (Chuẩn Microsoft Word OpenXML .docx)";
+src\ui\RibbonBar.cs:16150: MessageBox.Show("Đã lưu tài liệu '" + fileName + "' thành công (Chuẩn OpenXML DOCX tương thích 100% với MS Word)!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:16567: MessageBox.Show("Đã thay thế tất cả " + c + " vị trí trùng khớp trong tài liệu!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:16872: qpMenu.Items.Add("👤 Tác giả (Author)", null, (s1, e1) => { writerView.InsertText(" [Tác giả: Người dùng GenOffice] "); if (parentForm != null) parentForm.Invalidate(); });
+src\ui\RibbonBar.cs:16873: qpMenu.Items.Add("🏢 Tổ chức (Company)", null, (s1, e1) => { writerView.InsertText(" [Công ty: GenOffice Enterprise] "); if (parentForm != null) parentForm.Invalidate(); });
+src\ui\RibbonBar.cs:17153: MessageBox.Show("Đã lưu các thiết lập làm mặc định cho tất cả tài liệu mới!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:17184: "GenOffice Writer - Đặt làm mặc định",
+src\ui\RibbonBar.cs:17190: MessageBox.Show("Đã lưu thành công bộ thiết lập làm mặc định cho các tài liệu mới!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:17804: MessageBox.Show("Chế độ chia tách cửa sổ (Split View) đã được kích hoạt!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:17839: else if (x >= 472 && x <= 554) { MessageBox.Show("Đã chuyển đổi chiều biểu diễn Hàng ➔ Cột dữ liệu!", "GenOffice Biểu đồ", MessageBoxButtons.OK, MessageBoxIcon.Information); return true; }
+src\ui\RibbonBar.cs:17981: MessageBox.Show("Mô tả văn bản thay thế (Alt Text) cho ảnh:\n" + (string.IsNullOrEmpty(sh.AltText) ? "[Chưa có chú thích]" : sh.AltText), "GenOffice Định dạng Hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:18023: MessageBox.Show("Chế độ Cắt ảnh (Crop) đã sẵn sàng! Bạn có thể kéo các điểm neo để điều chỉnh khung ảnh.", "GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:18176: MessageBox.Show("Chức năng Viết công thức tay: Đã sẵn sàng hỗ trợ bút cảm ứng!", "GenOffice Ink Equation", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:18273: string infoStr = "Tài liệu GenOffice - Tác giả: Người dùng";
+src\ui\RibbonBar.cs:18332: MessageBox.Show("Đã liên kết với phần đầu trang/chân trang trước!", "GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:18538: MessageBox.Show("Đã áp dụng định dạng nhánh cân bằng cho các nút cấp dưới!", "GenOffice SmartArt", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:19048: ofd.Title = "Mở Bảng tính GenOffice Calc (Chuẩn Microsoft Excel .xlsx / .csv)";
+src\ui\RibbonBar.cs:19064: MessageBox.Show("Đã mở bảng tính thành công!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:19085: sfd.Title = "Lưu Bảng tính GenOffice Calc (Chuẩn Microsoft Excel .xlsx / .csv)";
+src\ui\RibbonBar.cs:19100: MessageBox.Show("Đã lưu bảng tính thành công!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:20186: MessageBox.Show("Đã quét và làm sạch các dòng dữ liệu trùng lặp trong bảng " + tbl.Name + "!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:20193: if (MessageBox.Show("Bạn có muốn chuyển đổi bảng này thành vùng dữ liệu thông thường không?", "GenOffice Calc", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+src\ui\RibbonBar.cs:20209: MessageBox.Show("Xuất dữ liệu bảng ra tệp CSV / Excel thành công!", "GenOffice Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:20390: MessageBox.Show("Đã mở tệp PowerPoint thành công!", "GenOffice PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:20418: MessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "GenOffice PowerPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:21014: slidesView.InsertHyperlink("https://genoffice.vn");
+src\ui\RibbonBar.cs:21360: MessageBox.Show("Đã áp dụng hiệu ứng chuyển cảnh, thời lượng và hướng cho toàn bộ trang chiếu!", "GenOffice Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:24144: MessageBox.Show("Đã mở tệp PDF '" + ofd.FileName + "' thành công!", "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:24167: MessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công (Chuẩn PDF 1.7 tương thích 100% với Adobe Acrobat & Chrome)!", "GenOffice PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\RibbonBar.cs:24844: MessageBox.Show("Tài liệu PDF hiện đã được mã hóa bảo vệ theo tiêu chuẩn bảo mật PDF 1.7.", "Bảo mật GenOffice PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\ShapeRenderer.cs:1301: string text = !string.IsNullOrEmpty(shape.TextContent) ? shape.TextContent : "GenOffice WordArt";
+src\ui\ShortcutsHelpForm.cs:11: this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - GenOffice Suite";
+src\ui\ShortcutsHelpForm.cs:31: Text = "⌨ BẢNG TRA CỨU PHÍM TẮT GENOFFICE / MICROSOFT WORD",
+src\ui\SlideShowAudienceForm.cs:23: Text = "GenOffice Slide Show - Màn hình Khán giả";
+src\ui\SlidesView.cs:866: Text = "GENOFFICE LUXURY",
+src\ui\SlidesView.cs:1485: MessageBox.Show("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "GenOffice Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\SlidesView.cs:1523: MessageBox.Show("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "GenOffice Hoạt họa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\SlidesView.cs:2961: data.SetData("GenOffice.SlideShape", true);
+src\ui\SlidesView.cs:3026: try { isInternalShape = Clipboard.ContainsData("GenOffice.SlideShape"); } catch { }
+src\ui\SlidesView.cs:3136: string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GenOffice_Media");
+src\ui\SlidesView.cs:9921: public void InsertWordArt(string text = "GENOFFICE WORDART", int styleIndex = 0)
+src\ui\SlidesView.cs:9925: if (string.IsNullOrEmpty(text)) text = "GENOFFICE WORDART";
+src\ui\SlidesView.cs:10342: if (string.IsNullOrEmpty(SelectedShape.Text)) SelectedShape.Text = !string.IsNullOrEmpty(urlOrSlide) ? urlOrSlide : "https://genoffice.vn";
+src\ui\SlidesView.cs:10373: public void InsertHeaderFooter(string footerText = "Trình bày bởi GenOffice | Trang trình chiếu")
+src\ui\SlidesView.cs:14767: "Trợ giúp Trình chiếu GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\StyleSetsGalleryDropDownForm.cs:284: MessageBox.Show("Đã lưu và xuất bộ kiểu ra tệp '" + sfd.FileName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\StyleSetsGalleryDropDownForm.cs:321: MessageBox.Show("Đã nạp và áp dụng bộ kiểu '" + fName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\TransitionsGalleryDropDownForm.cs:94: AddCategory(scrollPanel, ref curY, "⭐ Độc quyền GenOffice (GenOffice Exclusive)", currentTransition, new Tuple<TransitionType, string>[] {
+src\ui\TranslationDialogForm.cs:53: e.Graphics.DrawString("Chuyển ngữ văn bản đa ngôn ngữ trực tiếp trong GenOffice", sub, Brushes.WhiteSmoke, 16, 30);
+src\ui\UpdateDialogForm.cs:27: Text = "Cập nhật ứng dụng GENOFFICE";
+src\ui\UpdateDialogForm.cs:78: Text = "Cập nhật Phần mềm GENOFFICE",
+src\ui\WordArtGalleryForm.cs:62: txtInput = new TextBox { Text = "GENOFFICE WORDART", Location = new Point(20, 36), Width = 485, Font = new Font("Segoe UI", 10.0f, FontStyle.Bold) };
+src\ui\WriterThemesDropDownForm.cs:257: MessageBox.Show("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\WriterThemesDropDownForm.cs:295: MessageBox.Show("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "GenOffice Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\WriterView.cs:3738: if (string.IsNullOrEmpty(FooterText)) FooterText = string.IsNullOrEmpty(text) ? "Chân trang GenOffice" : text;
+src\ui\WriterView.cs:3836: string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GenOffice_Media");
+src\ui\WriterView.cs:5002: MessageBox.Show("Không tìm thấy chú thích (Footnote / Endnote) nào trong tài liệu!", "GenOffice Chú thích", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\WriterView.cs:5014: MessageBox.Show(string.Format("Không có {0} nào trong tài liệu!", isEndnote ? "chú thích cuối tài liệu (Endnote)" : "chú thích chân trang (Footnote)"), "GenOffice Chú thích", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\WriterView.cs:15554: MessageBox.Show("Chế độ ngắt dòng biểu đồ hiện tại: " + (ActiveChart.WrapMode == 0 ? "Cùng dòng với văn bản" : (ActiveChart.WrapMode == 1 ? "Vuông (Square)" : (ActiveChart.WrapMode == 2 ? "Chặt (Tight)" : (ActiveChart.WrapMode == 3 ? "Xuyên qua (Through)" : (ActiveChart.WrapMode == 4 ? "Trên và Dưới (Top/Bottom)" : (ActiveChart.WrapMode == 5 ? "Dưới văn bản (Behind)" : "Trước văn bản (In Front)")))))) + "\n\nBạn có thể nhấp và kéo trực tiếp biểu đồ đến bất kỳ vị trí nào trên trang tài liệu.", "Tùy chọn bố trí Biểu đồ GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+src\ui\WriterView.cs:15701: MessageBox.Show("Chế độ ngắt dòng hiện tại: " + (ActiveShape.WrapMode == 0 ? "Cùng dòng với văn bản" : (ActiveShape.WrapMode == 1 ? "Vuông (Square)" : (ActiveShape.WrapMode == 2 ? "Chặt (Tight)" : (ActiveShape.WrapMode == 3 ? "Xuyên qua (Through)" : (ActiveShape.WrapMode == 4 ? "Trên và Dưới (Top/Bottom)" : (ActiveShape.WrapMode == 5 ? "Dưới văn bản (Behind)" : "Trước văn bản (In Front)")))))) + "\n\nBạn có thể nhấp và kéo trực tiếp đối tượng đến bất kỳ vị trí nào trên trang tài liệu.", "Tùy chọn bố trí GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);

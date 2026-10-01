@@ -41,7 +41,7 @@ namespace GenOffice.UI
             this.Controls.Add(lblTitle);
             curY += 22;
 
-            txtTitle = new TextBox { Text = "Video Giới Thiệu GenOffice", Location = new Point(20, curY), Width = 445 };
+            txtTitle = new TextBox { Text = "Video Giới Thiệu ZENQ OFFICE", Location = new Point(20, curY), Width = 445 };
             this.Controls.Add(txtTitle);
             curY += 32;
 

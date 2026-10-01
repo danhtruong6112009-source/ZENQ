@@ -13,6 +13,17 @@ namespace GenOffice.UI
         public Rectangle Bounds { get; set; }
     }
 
+    public class ShapeGalleryGroup
+    {
+        public string Title { get; set; }
+        public int Y { get; set; }
+        public List<ShapeGalleryItem> Items { get; set; }
+        public ShapeGalleryGroup()
+        {
+            Items = new List<ShapeGalleryItem>();
+        }
+    }
+
     public class ShapeDoubleBufferedPanel : Panel
     {
         public ShapeDoubleBufferedPanel()
@@ -28,8 +39,11 @@ namespace GenOffice.UI
         public Action<string> OnShapeSelected;
 
         private Panel scrollContainer;
+        private ShapeDoubleBufferedPanel canvas;
+        private List<ShapeGalleryGroup> groups = new List<ShapeGalleryGroup>();
         private List<ShapeGalleryItem> shapeItems = new List<ShapeGalleryItem>();
         private ShapeGalleryItem hoveredItem = null;
+        private ToolTip tooltip;
 
         public ShapeGalleryPopup()
         {
@@ -37,9 +51,17 @@ namespace GenOffice.UI
             this.StartPosition = FormStartPosition.Manual;
             this.ShowInTaskbar = false;
             this.TopMost = true;
-            this.Size = new Size(270, 480);
+            this.Size = new Size(304, 520);
             this.BackColor = Color.White;
             this.DoubleBuffered = true;
+            this.Padding = new Padding(1);
+
+            tooltip = new ToolTip
+            {
+                InitialDelay = 200,
+                ReshowDelay = 100,
+                AutoPopDelay = 4000
+            };
 
             scrollContainer = new Panel
             {
@@ -49,21 +71,48 @@ namespace GenOffice.UI
             };
             this.Controls.Add(scrollContainer);
 
-            // Inner Double-Buffered Canvas to eliminate ALL flicker
-            ShapeDoubleBufferedPanel canvas = new ShapeDoubleBufferedPanel
+            canvas = new ShapeDoubleBufferedPanel
             {
                 Location = new Point(0, 0),
-                Size = new Size(250, 950),
+                Size = new Size(280, 1850),
                 BackColor = Color.White
             };
             canvas.Paint += Canvas_Paint;
             canvas.MouseMove += Canvas_MouseMove;
-            canvas.MouseLeave += (s, e) => { hoveredItem = null; canvas.Invalidate(); };
+            canvas.MouseLeave += (s, e) => {
+                hoveredItem = null;
+                tooltip.SetToolTip(canvas, null);
+                canvas.Invalidate();
+            };
             canvas.MouseClick += Canvas_MouseClick;
 
             scrollContainer.Controls.Add(canvas);
 
             BuildGalleryLayout();
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            Screen scr = Screen.FromControl(this);
+            Rectangle work = scr.WorkingArea;
+            if (this.Bottom > work.Bottom)
+            {
+                this.Top = Math.Max(work.Top, work.Bottom - this.Height - 8);
+            }
+            if (this.Right > work.Right)
+            {
+                this.Left = Math.Max(work.Left, work.Right - this.Width - 8);
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using (Pen borderPen = new Pen(Color.FromArgb(170, 180, 195), 1.0f))
+            {
+                e.Graphics.DrawRectangle(borderPen, 0, 0, this.Width - 1, this.Height - 1);
+            }
         }
 
         protected override void OnDeactivate(EventArgs e)
@@ -74,6 +123,7 @@ namespace GenOffice.UI
 
         private void BuildGalleryLayout()
         {
+            groups.Clear();
             shapeItems.Clear();
 
             int startY = 10;
@@ -81,108 +131,144 @@ namespace GenOffice.UI
             int itemH = 24;
             int gap = 3;
             int cols = 8;
-            int leftMargin = 12;
+            int leftMargin = 14;
 
-            // 1. Recently Used
-            string[] recent = new string[] { "TextBox", "Line", "ArrowLine", "Rectangle", "Oval", "RoundedRectangle", "Triangle", "RightArrow", "DownArrow", "Cloud", "Star5" };
-            startY = AddGroup("Hình dạng đã dùng gần đây", recent, startY, leftMargin, itemW, itemH, gap, cols);
+            // 1. Hình dạng đã dùng gần đây (Recently Used Shapes)
+            string[] recent = new string[] {
+                "TextBox", "Line", "ArrowLine", "Rectangle", "Oval", "RoundedRectangle", "Triangle", "RightArrow",
+                "DownArrow", "Cross", "Star5", "CalloutRect"
+            };
+            startY = AddGroupSection("Hình dạng đã dùng gần đây", recent, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 2. Lines
-            string[] lines = new string[] { "Line", "ArrowLine", "DoubleArrowLine" };
-            startY = AddGroup("Đường thẳng (Lines)", lines, startY, leftMargin, itemW, itemH, gap, cols);
+            // 2. Đường thẳng (Lines)
+            string[] lines = new string[] {
+                "Line", "ArrowLine", "DoubleArrowLine", "ElbowConnector", "ElbowArrowConnector", "CurvedConnector"
+            };
+            startY = AddGroupSection("Đường thẳng (Lines)", lines, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 3. Rectangles
-            string[] rects = new string[] { "Rectangle", "RoundedRectangle", "SingleCornerSnipped", "TopCornersSnipped" };
-            startY = AddGroup("Hình chữ nhật (Rectangles)", rects, startY, leftMargin, itemW, itemH, gap, cols);
+            // 3. Hình chữ nhật (Rectangles)
+            string[] rects = new string[] {
+                "Rectangle", "RoundedRectangle", "SingleCornerSnipped", "TopCornersSnipped", "SnippedAndRounded",
+                "RoundSingleCorner", "RoundSameSideCorner", "RoundDiagonalCorner", "SnipSameSideCorner"
+            };
+            startY = AddGroupSection("Hình chữ nhật (Rectangles)", rects, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 4. Basic Shapes
-            string[] basic = new string[] { "TextBox", "Oval", "Triangle", "RightTriangle", "Parallelogram", "Trapezoid", "Diamond", "Pentagon", "Hexagon", "Octagon", "Cross", "Cylinder", "Cube", "SmileFace", "Heart", "Lightning", "Sun", "Moon", "Cloud" };
-            startY = AddGroup("Hình dạng cơ bản (Basic Shapes)", basic, startY, leftMargin, itemW, itemH, gap, cols);
+            // 4. Hình dạng cơ bản (Basic Shapes)
+            string[] basic = new string[] {
+                "TextBox", "Oval", "Triangle", "RightTriangle", "Parallelogram", "Trapezoid", "Diamond", "Pentagon",
+                "Hexagon", "Octagon", "Decagon", "Cross", "Cylinder", "Cube", "Bevel", "Donut",
+                "SmileFace", "Heart", "Lightning", "Sun", "Moon", "Cloud", "Teardrop", "Arc"
+            };
+            startY = AddGroupSection("Hình dạng cơ bản (Basic Shapes)", basic, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 5. Block Arrows
-            string[] arrows = new string[] { "RightArrow", "LeftArrow", "UpArrow", "DownArrow", "LeftRightArrow", "UpDownArrow" };
-            startY = AddGroup("Mũi tên khối (Block Arrows)", arrows, startY, leftMargin, itemW, itemH, gap, cols);
+            // 5. Mũi tên khối (Block Arrows)
+            string[] arrows = new string[] {
+                "RightArrow", "LeftArrow", "UpArrow", "DownArrow", "LeftRightArrow", "UpDownArrow", "QuadArrow", "BentArrow",
+                "UTurnArrow", "Chevron"
+            };
+            startY = AddGroupSection("Mũi tên khối (Block Arrows)", arrows, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 6. Equation Shapes
-            string[] equations = new string[] { "Plus", "Minus", "Multiply", "Equal" };
-            startY = AddGroup("Phương trình (Equation Shapes)", equations, startY, leftMargin, itemW, itemH, gap, cols);
+            // 6. Phương trình (Equation Shapes)
+            string[] equations = new string[] {
+                "Plus", "Minus", "Multiply", "Divide", "Equal", "NotEqual"
+            };
+            startY = AddGroupSection("Phương trình (Equation Shapes)", equations, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 7. Flowchart
-            string[] flowchart = new string[] { "Rectangle", "FlowchartDecision", "Parallelogram", "FlowchartPreparation", "FlowchartDocument", "Oval" };
-            startY = AddGroup("Lưu trình (Flowchart)", flowchart, startY, leftMargin, itemW, itemH, gap, cols);
+            // 7. Lưu trình (Flowchart)
+            string[] flowchart = new string[] {
+                "Rectangle", "FlowchartAlternateProcess", "FlowchartDecision", "FlowchartData", "FlowchartPredefinedProcess", "FlowchartInternalStorage",
+                "FlowchartDocument", "FlowchartMultidocument", "FlowchartTerminator", "FlowchartPreparation", "FlowchartManualInput", "FlowchartManualOperation",
+                "FlowchartConnector", "FlowchartOffpageConnector", "FlowchartCard", "FlowchartPunchedTape"
+            };
+            startY = AddGroupSection("Lưu trình (Flowchart)", flowchart, startY, leftMargin, itemW, itemH, gap, cols);
 
-            // 8. Stars and Banners
-            string[] stars = new string[] { "Star4", "Star5", "Star6", "Star8", "Star12", "CalloutRect" };
-            startY = AddGroup("Ngôi sao & Chú thích (Stars & Callouts)", stars, startY, leftMargin, itemW, itemH, gap, cols);
+            // 8. Sao và Biểu ngữ (Stars and Banners)
+            string[] stars = new string[] {
+                "Explosion1", "Explosion2", "Star4", "Star5", "Star6", "Star8", "Star10", "Star12",
+                "Star16", "Star24", "Star32", "HorizontalScroll", "VerticalScroll"
+            };
+            startY = AddGroupSection("Sao và Biểu ngữ (Stars and Banners)", stars, startY, leftMargin, itemW, itemH, gap, cols);
+
+            // 9. Chú thích (Callouts)
+            string[] callouts = new string[] {
+                "CalloutRect", "CalloutRoundedRect", "CalloutOval", "CalloutCloud"
+            };
+            startY = AddGroupSection("Chú thích (Callouts)", callouts, startY, leftMargin, itemW, itemH, gap, cols);
+
+            // 10. Nút tác vụ (Action Buttons)
+            string[] buttons = new string[] {
+                "ActionButtonBack", "ActionButtonForward", "ActionButtonBeginning", "ActionButtonEnd",
+                "ActionButtonHome", "ActionButtonInformation", "ActionButtonReturn", "ActionButtonMovie",
+                "ActionButtonDocument", "ActionButtonSound", "ActionButtonHelp", "ActionButtonBlank"
+            };
+            startY = AddGroupSection("Nút tác vụ (Action Buttons)", buttons, startY, leftMargin, itemW, itemH, gap, cols);
+
+            canvas.Height = startY + 20;
         }
 
-        private int AddGroup(string groupTitle, string[] types, int startY, int leftMargin, int itemW, int itemH, int gap, int cols)
+        private int AddGroupSection(string groupTitle, string[] types, int startY, int leftMargin, int itemW, int itemH, int gap, int cols)
         {
-            // Title height is 22
-            startY += 22;
+            ShapeGalleryGroup grp = new ShapeGalleryGroup();
+            grp.Title = groupTitle;
+            grp.Y = startY;
+
+            int itemsStartY = startY + 22;
 
             for (int i = 0; i < types.Length; i++)
             {
                 int r = i / cols;
                 int c = i % cols;
                 int ix = leftMargin + c * (itemW + gap);
-                int iy = startY + r * (itemH + gap);
+                int iy = itemsStartY + r * (itemH + gap);
 
-                shapeItems.Add(new ShapeGalleryItem
+                ShapeGalleryItem item = new ShapeGalleryItem
                 {
                     ShapeType = types[i],
-                    DisplayName = types[i],
+                    DisplayName = GetFriendlyName(types[i]),
                     Bounds = new Rectangle(ix, iy, itemW, itemH)
-                });
+                };
+                grp.Items.Add(item);
+                shapeItems.Add(item);
             }
 
+            groups.Add(grp);
+
             int numRows = (int)Math.Ceiling(types.Length / (double)cols);
-            return startY + numRows * (itemH + gap) + 12;
+            return itemsStartY + numRows * (itemH + gap) + 14;
         }
 
-        private void Canvas_Paint(object sender, PaintEventArgs e)
+        public void RenderGallery(Graphics g, int width, int height)
         {
-            Graphics g = e.Graphics;
+            g.Clear(Color.White);
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            // Outer Border
-            using (Pen borderPen = new Pen(Color.FromArgb(200, 205, 215), 1.0f))
-            {
-                g.DrawRectangle(borderPen, 0, 0, ((Control)sender).Width - 1, ((Control)sender).Height - 1);
-            }
-
-            // Group Titles
             using (Font groupFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             using (SolidBrush groupBrush = new SolidBrush(Color.FromArgb(0, 51, 102)))
-            {
-                g.DrawString("Hình dạng đã dùng gần đây", groupFont, groupBrush, 10, 10);
-                g.DrawString("Đường thẳng (Lines)", groupFont, groupBrush, 10, 95);
-                g.DrawString("Hình chữ nhật (Rectangles)", groupFont, groupBrush, 10, 155);
-                g.DrawString("Hình dạng cơ bản (Basic Shapes)", groupFont, groupBrush, 10, 215);
-                g.DrawString("Mũi tên khối (Block Arrows)", groupFont, groupBrush, 10, 335);
-                g.DrawString("Phương trình (Equation Shapes)", groupFont, groupBrush, 10, 395);
-                g.DrawString("Lưu trình (Flowchart)", groupFont, groupBrush, 10, 455);
-                g.DrawString("Ngôi sao & Chú thích (Stars & Callouts)", groupFont, groupBrush, 10, 515);
-            }
-
-            // Draw Separator Lines
             using (Pen sepPen = new Pen(Color.FromArgb(235, 238, 245), 1.0f))
-            {
-                g.DrawLine(sepPen, 10, 90, 240, 90);
-                g.DrawLine(sepPen, 10, 150, 240, 150);
-                g.DrawLine(sepPen, 10, 210, 240, 210);
-                g.DrawLine(sepPen, 10, 330, 240, 330);
-                g.DrawLine(sepPen, 10, 390, 240, 390);
-                g.DrawLine(sepPen, 10, 450, 240, 450);
-                g.DrawLine(sepPen, 10, 510, 240, 510);
-            }
-
-            // Draw Items
             using (Pen itemPen = new Pen(Color.FromArgb(45, 55, 72), 1.2f))
             {
-                foreach (var item in shapeItems)
+                for (int i = 0; i < groups.Count; i++)
                 {
+                    ShapeGalleryGroup grp = groups[i];
+                    if (grp.Y > height) break;
+
+                    // Separator line before group (except first)
+                    if (i > 0)
+                    {
+                        g.DrawLine(sepPen, 10, grp.Y - 6, width - 15, grp.Y - 6);
+                    }
+
+                    // Group Title
+                    g.DrawString(grp.Title, groupFont, groupBrush, 12, grp.Y);
+                }
+
+                // Draw Items
+                for (int idx = 0; idx < shapeItems.Count; idx++)
+                {
+                    ShapeGalleryItem item = shapeItems[idx];
+                    if (item.Bounds.Bottom > height) continue;
+
                     bool isHover = (hoveredItem == item);
                     if (isHover)
                     {
@@ -209,7 +295,7 @@ namespace GenOffice.UI
                     }
                     else if (item.ShapeType == "ArrowLine")
                     {
-                        using (Pen aPen = new Pen(Color.FromArgb(45, 55, 72), 1.4f))
+                        using (Pen aPen = new Pen(Color.FromArgb(45, 55, 72), 1.3f))
                         {
                             aPen.CustomEndCap = new AdjustableArrowCap(3, 3);
                             g.DrawLine(aPen, iconBounds.Left, iconBounds.Bottom, iconBounds.Right, iconBounds.Top);
@@ -217,11 +303,40 @@ namespace GenOffice.UI
                     }
                     else if (item.ShapeType == "DoubleArrowLine")
                     {
-                        using (Pen aPen = new Pen(Color.FromArgb(45, 55, 72), 1.4f))
+                        using (Pen aPen = new Pen(Color.FromArgb(45, 55, 72), 1.3f))
                         {
                             aPen.CustomStartCap = new AdjustableArrowCap(3, 3);
                             aPen.CustomEndCap = new AdjustableArrowCap(3, 3);
                             g.DrawLine(aPen, iconBounds.Left, iconBounds.Bottom, iconBounds.Right, iconBounds.Top);
+                        }
+                    }
+                    else if (item.ShapeType.StartsWith("ActionButton"))
+                    {
+                        g.DrawRectangle(itemPen, iconBounds);
+                        // Draw symbol inside button
+                        using (Brush b = new SolidBrush(Color.FromArgb(45, 55, 72)))
+                        {
+                            float cx = iconBounds.X + iconBounds.Width / 2f;
+                            float cy = iconBounds.Y + iconBounds.Height / 2f;
+                            if (item.ShapeType == "ActionButtonBack")
+                            {
+                                PointF[] pts = new PointF[] { new PointF(cx + 4, cy - 4), new PointF(cx - 4, cy), new PointF(cx + 4, cy + 4) };
+                                g.FillPolygon(b, pts);
+                            }
+                            else if (item.ShapeType == "ActionButtonForward")
+                            {
+                                PointF[] pts = new PointF[] { new PointF(cx - 4, cy - 4), new PointF(cx + 4, cy), new PointF(cx - 4, cy + 4) };
+                                g.FillPolygon(b, pts);
+                            }
+                            else if (item.ShapeType == "ActionButtonHome")
+                            {
+                                PointF[] pts = new PointF[] { new PointF(cx, cy - 5), new PointF(cx + 5, cy), new PointF(cx + 3, cy), new PointF(cx + 3, cy + 5), new PointF(cx - 3, cy + 5), new PointF(cx - 3, cy), new PointF(cx - 5, cy) };
+                                g.FillPolygon(b, pts);
+                            }
+                            else
+                            {
+                                g.FillEllipse(b, cx - 3, cy - 3, 6, 6);
+                            }
                         }
                     }
                     else
@@ -235,14 +350,19 @@ namespace GenOffice.UI
             }
         }
 
+        private void Canvas_Paint(object sender, PaintEventArgs e)
+        {
+            RenderGallery(e.Graphics, ((Control)sender).Width, ((Control)sender).Height);
+        }
+
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
             ShapeGalleryItem hit = null;
-            foreach (var item in shapeItems)
+            for (int i = 0; i < shapeItems.Count; i++)
             {
-                if (item.Bounds.Contains(e.Location))
+                if (shapeItems[i].Bounds.Contains(e.Location))
                 {
-                    hit = item;
+                    hit = shapeItems[i];
                     break;
                 }
             }
@@ -250,6 +370,14 @@ namespace GenOffice.UI
             if (hoveredItem != hit)
             {
                 hoveredItem = hit;
+                if (hoveredItem != null)
+                {
+                    tooltip.SetToolTip(canvas, hoveredItem.DisplayName);
+                }
+                else
+                {
+                    tooltip.SetToolTip(canvas, null);
+                }
                 ((Control)sender).Invalidate();
             }
         }
@@ -264,6 +392,114 @@ namespace GenOffice.UI
                 {
                     OnShapeSelected(chosenType);
                 }
+            }
+        }
+
+        private static string GetFriendlyName(string type)
+        {
+            switch (type)
+            {
+                case "TextBox": return "Hộp văn bản (Text Box)";
+                case "Line": return "Đường thẳng (Line)";
+                case "ArrowLine": return "Đường mũi tên (Arrow Line)";
+                case "DoubleArrowLine": return "Đường hai đầu mũi tên (Double Arrow)";
+                case "ElbowConnector": return "Đường nối khuỷu (Elbow Connector)";
+                case "ElbowArrowConnector": return "Đường nối khuỷu mũi tên (Elbow Arrow Connector)";
+                case "CurvedConnector": return "Đường nối cong (Curved Connector)";
+                case "Rectangle": return "Hình chữ nhật (Rectangle)";
+                case "RoundedRectangle": return "Hình chữ nhật bo góc (Rounded Rectangle)";
+                case "SingleCornerSnipped": return "Cắt một góc (Single Corner Snipped)";
+                case "TopCornersSnipped": return "Cắt hai góc trên (Top Corners Snipped)";
+                case "SnippedAndRounded": return "Cắt và bo tròn góc (Snipped and Rounded)";
+                case "RoundSingleCorner": return "Bo tròn một góc (Round Single Corner)";
+                case "RoundSameSideCorner": return "Bo tròn hai góc cùng phía (Round Same Side Corner)";
+                case "RoundDiagonalCorner": return "Bo tròn góc đối diện (Round Diagonal Corner)";
+                case "SnipSameSideCorner": return "Cắt hai góc cùng phía (Snip Same Side Corner)";
+                case "Oval": return "Hình oval / Tròn (Oval)";
+                case "Triangle": return "Hình tam giác cân (Isosceles Triangle)";
+                case "RightTriangle": return "Hình tam giác vuông (Right Triangle)";
+                case "Parallelogram": return "Hình bình hành (Parallelogram)";
+                case "Trapezoid": return "Hình thang (Trapezoid)";
+                case "Diamond": return "Hình thoi (Diamond)";
+                case "Pentagon": return "Hình ngũ giác đều (Regular Pentagon)";
+                case "Hexagon": return "Hình lục giác (Hexagon)";
+                case "Octagon": return "Hình bát giác (Octagon)";
+                case "Decagon": return "Hình thập giác (Decagon)";
+                case "Cross": return "Dấu chữ thập (Cross)";
+                case "Cylinder": return "Hình trụ (Cylinder)";
+                case "Cube": return "Khối lập phương 3D (Cube)";
+                case "Bevel": return "Khung vát góc (Bevel)";
+                case "Donut": return "Vành khuyên (Donut)";
+                case "SmileFace": return "Mặt cười (Smiley Face)";
+                case "Heart": return "Hình trái tim (Heart)";
+                case "Lightning": return "Tia chớp (Lightning Bolt)";
+                case "Sun": return "Mặt trời (Sun)";
+                case "Moon": return "Mặt trăng (Moon)";
+                case "Cloud": return "Đám mây (Cloud)";
+                case "Teardrop": return "Giọt nước (Teardrop)";
+                case "Arc": return "Cung tròn (Arc)";
+                case "RightArrow": return "Mũi tên sang phải (Right Arrow)";
+                case "LeftArrow": return "Mũi tên sang trái (Left Arrow)";
+                case "UpArrow": return "Mũi tên lên trên (Up Arrow)";
+                case "DownArrow": return "Mũi tên xuống dưới (Down Arrow)";
+                case "LeftRightArrow": return "Mũi tên hai chiều trái-phải (Left-Right Arrow)";
+                case "UpDownArrow": return "Mũi tên hai chiều lên-xuống (Up-Down Arrow)";
+                case "QuadArrow": return "Mũi tên bốn hướng (Quad Arrow)";
+                case "BentArrow": return "Mũi tên gập (Bent Arrow)";
+                case "UTurnArrow": return "Mũi tên chữ U (U-Turn Arrow)";
+                case "Chevron": return "Mũi tên Chevron (Chevron Arrow)";
+                case "Plus": return "Dấu cộng (Plus)";
+                case "Minus": return "Dấu trừ (Minus)";
+                case "Multiply": return "Dấu nhân (Multiply)";
+                case "Divide": return "Dấu chia (Divide)";
+                case "Equal": return "Dấu bằng (Equal)";
+                case "NotEqual": return "Dấu khác (Not Equal)";
+                case "FlowchartProcess": return "Lưu trình: Tiến trình (Process)";
+                case "FlowchartAlternateProcess": return "Lưu trình: Tiến trình thay thế (Alternate Process)";
+                case "FlowchartDecision": return "Lưu trình: Quyết định (Decision)";
+                case "FlowchartData": return "Lưu trình: Dữ liệu (Data)";
+                case "FlowchartPredefinedProcess": return "Lưu trình: Tiến trình định sẵn (Predefined Process)";
+                case "FlowchartInternalStorage": return "Lưu trình: Lưu trữ nội bộ (Internal Storage)";
+                case "FlowchartDocument": return "Lưu trình: Tài liệu (Document)";
+                case "FlowchartMultidocument": return "Lưu trình: Đa tài liệu (Multidocument)";
+                case "FlowchartTerminator": return "Lưu trình: Điểm đầu/cuối (Terminator)";
+                case "FlowchartPreparation": return "Lưu trình: Chuẩn bị (Preparation)";
+                case "FlowchartManualInput": return "Lưu trình: Nhập thủ công (Manual Input)";
+                case "FlowchartManualOperation": return "Lưu trình: Thao tác thủ công (Manual Operation)";
+                case "FlowchartConnector": return "Lưu trình: Điểm nối (Connector)";
+                case "FlowchartOffpageConnector": return "Lưu trình: Nối ngoài trang (Offpage Connector)";
+                case "FlowchartCard": return "Lưu trình: Thẻ đục lỗ (Card)";
+                case "FlowchartPunchedTape": return "Lưu trình: Băng đục lỗ (Punched Tape)";
+                case "Explosion1": return "Nổ 1 (Explosion 1)";
+                case "Explosion2": return "Nổ 2 (Explosion 2)";
+                case "Star4": return "Sao 4 cánh (4-Point Star)";
+                case "Star5": return "Sao 5 cánh (5-Point Star)";
+                case "Star6": return "Sao 6 cánh (6-Point Star)";
+                case "Star8": return "Sao 8 cánh (8-Point Star)";
+                case "Star10": return "Sao 10 cánh (10-Point Star)";
+                case "Star12": return "Sao 12 cánh (12-Point Star)";
+                case "Star16": return "Sao 16 cánh (16-Point Star)";
+                case "Star24": return "Sao 24 cánh (24-Point Star)";
+                case "Star32": return "Sao 32 cánh (32-Point Star)";
+                case "HorizontalScroll": return "Cuộn giấy ngang (Horizontal Scroll)";
+                case "VerticalScroll": return "Cuộn giấy dọc (Vertical Scroll)";
+                case "CalloutRect": return "Chú thích chữ nhật (Rectangular Callout)";
+                case "CalloutRoundedRect": return "Chú thích bo góc (Rounded Rectangular Callout)";
+                case "CalloutOval": return "Chú thích oval (Oval Callout)";
+                case "CalloutCloud": return "Chú thích đám mây (Cloud Callout)";
+                case "ActionButtonBack": return "Nút tác vụ: Quay lại (Action Button: Back)";
+                case "ActionButtonForward": return "Nút tác vụ: Tiến tới (Action Button: Forward)";
+                case "ActionButtonBeginning": return "Nút tác vụ: Về đầu (Action Button: Beginning)";
+                case "ActionButtonEnd": return "Nút tác vụ: Đến cuối (Action Button: End)";
+                case "ActionButtonHome": return "Nút tác vụ: Trang chủ (Action Button: Home)";
+                case "ActionButtonInformation": return "Nút tác vụ: Thông tin (Action Button: Information)";
+                case "ActionButtonReturn": return "Nút tác vụ: Trở lại (Action Button: Return)";
+                case "ActionButtonMovie": return "Nút tác vụ: Phim (Action Button: Movie)";
+                case "ActionButtonDocument": return "Nút tác vụ: Tài liệu (Action Button: Document)";
+                case "ActionButtonSound": return "Nút tác vụ: Âm thanh (Action Button: Sound)";
+                case "ActionButtonHelp": return "Nút tác vụ: Trợ giúp (Action Button: Help)";
+                case "ActionButtonBlank": return "Nút tác vụ: Trống (Action Button: Blank)";
+                default: return type;
             }
         }
     }

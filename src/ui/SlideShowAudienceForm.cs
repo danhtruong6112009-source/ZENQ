@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using GenOffice.Core;
 
@@ -11,6 +12,9 @@ namespace GenOffice.UI
     /// </summary>
     public class SlideShowAudienceForm : Form
     {
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
         private SlidesView _slidesView;
         private AppForm _appForm;
         private Timer _syncTimer;
@@ -20,7 +24,7 @@ namespace GenOffice.UI
             _slidesView = slidesView;
             _appForm = appForm;
 
-            Text = "GenOffice Slide Show - Màn hình Khán giả";
+            Text = "ZenQ Slide Show - Màn hình Khán giả";
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             Bounds = targetScreen.Bounds;
@@ -28,8 +32,15 @@ namespace GenOffice.UI
             TopMost = true;
             ShowInTaskbar = false;
             DoubleBuffered = true;
+            KeyPreview = true;
 
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+
+            try
+            {
+                SetWindowPos(Handle, (IntPtr)(-1) /* HWND_TOPMOST */, targetScreen.Bounds.X, targetScreen.Bounds.Y, targetScreen.Bounds.Width, targetScreen.Bounds.Height, 0x0040 | 0x0020);
+            }
+            catch { }
 
             // Timer đồng bộ khung hình 60 FPS
             _syncTimer = new Timer();
@@ -48,12 +59,52 @@ namespace GenOffice.UI
             _syncTimer.Start();
         }
 
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == 0x0084 /* WM_NCHITTEST */)
+            {
+                m.Result = (IntPtr)1; // HTCLIENT
+                return;
+            }
+            if (m.Msg == 0x0112 /* WM_SYSCOMMAND */)
+            {
+                int sc = (int)(m.WParam.ToInt64() & 0xFFF0);
+                if (sc == 0xF010 /* SC_MOVE */ || sc == 0xF000 /* SC_SIZE */ || sc == 0xF030 /* SC_MAXIMIZE */ || sc == 0xF120 /* SC_RESTORE */)
+                {
+                    m.Result = IntPtr.Zero;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys keyCode = keyData & Keys.KeyCode;
+            if (keyCode == Keys.Escape || keyCode == Keys.Left || keyCode == Keys.Right ||
+                keyCode == Keys.Up || keyCode == Keys.Down || keyCode == Keys.PageUp ||
+                keyCode == Keys.PageDown || keyCode == Keys.Space || keyCode == Keys.Back ||
+                keyCode == Keys.Return || keyCode == Keys.Home || keyCode == Keys.End ||
+                keyCode == Keys.B || keyCode == Keys.W || keyCode == Keys.L || keyCode == Keys.P || keyCode == Keys.E)
+            {
+                if (_appForm != null)
+                {
+                    _appForm.HandleSlideShowKeyDown(keyCode);
+                    return true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            // AntiAlias for smooth sub-pixel text during slide animations / transitions.
+            // ClearTypeGridFit would snap glyphs to integer pixels, causing jitter when shapes move.
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
             if (_slidesView != null)

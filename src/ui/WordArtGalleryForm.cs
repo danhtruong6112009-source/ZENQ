@@ -59,7 +59,7 @@ namespace GenOffice.UI
             Label lblText = new Label { Text = "Văn bản chữ nghệ thuật:", Location = new Point(20, 14), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblText);
 
-            txtInput = new TextBox { Text = "GENOFFICE WORDART", Location = new Point(20, 36), Width = 485, Font = new Font("Segoe UI", 10.0f, FontStyle.Bold) };
+            txtInput = new TextBox { Text = "ZENQ WORDART", Location = new Point(20, 36), Width = 485, Font = new Font("Segoe UI", 10.0f, FontStyle.Bold) };
             this.Controls.Add(txtInput);
 
             Label lblPick = new Label { Text = "Chọn phong cách nghệ thuật (Click để chọn):", Location = new Point(20, 72), AutoSize = true };

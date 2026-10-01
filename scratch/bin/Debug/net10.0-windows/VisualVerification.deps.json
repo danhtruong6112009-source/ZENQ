@@ -1,0 +1,65 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "VisualVerification/1.0.0": {
+        "dependencies": {
+          "ZenQOffice": "3.5.0.0"
+        },
+        "runtime": {
+          "VisualVerification.dll": {}
+        }
+      },
+      "ZenQOffice/3.5.0.0": {
+        "runtime": {
+          "ZenQOffice.dll": {
+            "assemblyVersion": "3.5.0.0",
+            "fileVersion": "3.5.0.0"
+          }
+        }
+      },
+      "PdfSharp/1.50.5147.0": {
+        "runtime": {
+          "PdfSharp.dll": {
+            "assemblyVersion": "1.50.5147.0",
+            "fileVersion": "1.50.5147.0"
+          }
+        }
+      },
+      "PdfiumViewer/2.13.0.0": {
+        "runtime": {
+          "PdfiumViewer.dll": {
+            "assemblyVersion": "2.13.0.0",
+            "fileVersion": "2.13.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "VisualVerification/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ZenQOffice/3.5.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "PdfSharp/1.50.5147.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "PdfiumViewer/2.13.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

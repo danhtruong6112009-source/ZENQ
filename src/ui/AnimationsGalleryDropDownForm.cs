@@ -34,8 +34,8 @@ namespace GenOffice.UI
             // 0. None (Không có)
             AddNoneCategory(scrollPanel, ref curY, currentAnimation);
 
-            // 1. 🌟 Độc Quyền GenOffice (GenOffice Exclusive Animations - Tím/Vàng Kim 🌟)
-            AddCategory(scrollPanel, ref curY, "Hiệu ứng Độc quyền GenOffice (Exclusive Animations)", currentAnimation, new Tuple<AnimationType, string>[] {
+            // 1. 🌟 Độc Quyền ZenQ (ZenQ Exclusive Animations - Tím/Vàng Kim 🌟)
+            AddCategory(scrollPanel, ref curY, "Hiệu ứng Độc quyền ZenQ (Exclusive Animations)", currentAnimation, new Tuple<AnimationType, string>[] {
                 Tuple.Create(AnimationType.GenOffice_NeonPulse, "Neon Glow"),
                 Tuple.Create(AnimationType.GenOffice_LiquidMorph, "Liquid Fluid"),
                 Tuple.Create(AnimationType.GenOffice_Cinematic3DFlip, "3D Flip & Flare"),
@@ -288,7 +288,7 @@ namespace GenOffice.UI
             };
 
             string[] linkTexts = new string[] {
-                "🌟 Thêm hiệu ứng độc quyền GenOffice (More Exclusive Effects)...",
+                "🌟 Thêm hiệu ứng độc quyền ZenQ (More Exclusive Effects)...",
                 "⭐ Thêm hiệu ứng xuất hiện (More Entrance Effects)...",
                 "⭐ Thêm hiệu ứng nhấn mạnh (More Emphasis Effects)...",
                 "⭐ Thêm hiệu ứng biến mất (More Exit Effects)...",

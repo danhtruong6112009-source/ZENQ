@@ -90,8 +90,8 @@ namespace GenOffice.UI
                 Tuple.Create(TransitionType.FlyThrough, "Bay xuyên")
             }, true);
 
-            // Section 4: Độc quyền GenOffice (GenOffice Exclusive) - 10 items
-            AddCategory(scrollPanel, ref curY, "⭐ Độc quyền GenOffice (GenOffice Exclusive)", currentTransition, new Tuple<TransitionType, string>[] {
+            // Section 4: Độc quyền ZenQ (ZenQ Exclusive) - 10 items
+            AddCategory(scrollPanel, ref curY, "⭐ Độc quyền ZenQ (ZenQ Exclusive)", currentTransition, new Tuple<TransitionType, string>[] {
                 Tuple.Create(TransitionType.GenOffice_CinematicPrism, "Lăng kính"),
                 Tuple.Create(TransitionType.GenOffice_LiquidFluid, "Thủy dịch"),
                 Tuple.Create(TransitionType.GenOffice_MatrixRain, "Mưa số"),
@@ -102,7 +102,7 @@ namespace GenOffice.UI
                 Tuple.Create(TransitionType.GenOffice_Kaleidoscope, "Vạn hoa"),
                 Tuple.Create(TransitionType.GenOffice_Starlight, "Bão sao"),
                 Tuple.Create(TransitionType.GenOffice_GoldenRibbon, "Lụa Vàng"),
-                Tuple.Create(TransitionType.GenOffice_CanvaFlow, "Chảy tràn")
+                Tuple.Create(TransitionType.GenOffice_SmoothFlow, "Chảy tràn")
             }, false);
 
             Controls.Add(scrollPanel);
@@ -1070,8 +1070,8 @@ namespace GenOffice.UI
                     }
                     break;
 
-                case TransitionType.GenOffice_CanvaFlow:
-                    // Organic Canva Flow fluid spill
+                case TransitionType.GenOffice_SmoothFlow:
+                    // Organic fluid spill
                     DrawSlideFrame(g, x, y, w, h, Color.FromArgb(13, 148, 136));
                     using (GraphicsPath flowPath = new GraphicsPath())
                     {

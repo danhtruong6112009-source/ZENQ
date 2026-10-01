@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_XLSX_HANDLER_HPP
-#ifndef GENOFFICE_XLSX_HANDLER_HPP
 #define GENOFFICE_XLSX_HANDLER_HPP
 
 #include "../core/SparseMatrix.hpp"

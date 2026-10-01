@@ -177,7 +177,7 @@ void SlidesView::draw(HDC hdc, int width, int height) {
     // Slide White Canvas
     RECT slideRect = {slideX, slideY, slideX + slideW, slideY + slideH};
     HBRUSH paperBrush = CreateSolidBrush(RGB(255, 255, 255));
-    FillRect(hdc, &paperRect, paperBrush);
+    FillRect(hdc, &slideRect, paperBrush);
     DeleteObject(paperBrush);
 
     // Render Active Slide Shapes

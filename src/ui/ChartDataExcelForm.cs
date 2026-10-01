@@ -162,7 +162,7 @@ namespace GenOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Bảng dữ liệu Biểu đồ (GenOffice Calc Mini)";
+            this.Text = "Bảng dữ liệu Biểu đồ (ZenQ Calc Mini)";
             this.Size = new Size(640, 380);
             this.MinimumSize = new Size(420, 240);
             this.StartPosition = FormStartPosition.Manual;

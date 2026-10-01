@@ -320,7 +320,7 @@ namespace GenOffice.UI
             {
                 case 0: // Font
                     Point fontPt = this.PointToScreen(new Point(_btnRects[0].Left, _btnRects[0].Bottom));
-                    FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(summary.FontName) ? summary.FontName : "Calibri", fontPt, _ribbon != null ? _ribbon.AvailableSystemFonts : null);
+                    FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(summary.FontName) ? summary.FontName : "Calibri", fontPt, _ribbon != null ? _ribbon.AvailableSystemFonts : null, Color.FromArgb(16, 124, 65));
                     fDlg.OnFontSelected += (font) =>
                     {
                         _calcView.ApplyFontName(font);
@@ -332,7 +332,7 @@ namespace GenOffice.UI
 
                 case 1: // Font Size
                     Point szPt = this.PointToScreen(new Point(_btnRects[1].Left, _btnRects[1].Bottom));
-                    SizeDropDownForm szDlg = new SizeDropDownForm(summary.FontSize > 0 ? summary.FontSize : 11f, szPt);
+                    SizeDropDownForm szDlg = new SizeDropDownForm(summary.FontSize > 0 ? summary.FontSize : 11f, szPt, Color.FromArgb(16, 124, 65));
                     szDlg.OnSizeSelected += (sz) =>
                     {
                         _calcView.ApplyFontSize(sz);
@@ -499,74 +499,58 @@ namespace GenOffice.UI
             cms.Items.Add(new ToolStripSeparator());
 
             // 2. Cut (Ctrl+X)
-            cms.Items.Add(CreateMenuItem("Cut", CreateCutIcon(), (s, e) =>
+            cms.Items.Add(CreateMenuItem("Cắt (Cut - Ctrl+X)", CreateCutIcon(), (s, e) =>
             {
-                CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
-                if (cd != null && !string.IsNullOrEmpty(cd.RawValue))
-                {
-                    calcView.SaveUndoState();
-                    Clipboard.SetText(cd.RawValue);
-                    calcView.CurrentSheet.ClearCell(calcView.SelectedRow, calcView.SelectedCol);
-                    FormulaEngine.EvaluateSheet(calcView.CurrentSheet);
-                    if (parentForm != null) parentForm.Invalidate();
-                }
+                calcView.Cut();
+                if (parentForm != null) parentForm.Invalidate();
             }));
 
             // 3. Copy (Ctrl+C)
-            cms.Items.Add(CreateMenuItem("Copy", CreateCopyIcon(), (s, e) =>
+            cms.Items.Add(CreateMenuItem("Sao chép (Copy - Ctrl+C)", CreateCopyIcon(), (s, e) =>
             {
-                CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
-                if (cd != null && !string.IsNullOrEmpty(cd.EvaluatedStr ?? cd.RawValue))
-                {
-                    Clipboard.SetText(cd.EvaluatedStr ?? cd.RawValue);
-                }
+                calcView.Copy();
             }));
 
             // 4. Paste Options
-            ToolStripMenuItem pasteMenu = new ToolStripMenuItem("Paste Options:");
+            ToolStripMenuItem pasteMenu = new ToolStripMenuItem("Tùy chọn Dán (Paste):");
             pasteMenu.Image = CreatePasteIcon();
-            pasteMenu.DropDownItems.Add("Paste (All)", CreatePasteIcon(), (s, e) =>
+            pasteMenu.DropDownItems.Add("Dán (Paste All - Ctrl+V)", CreatePasteIcon(), (s, e) =>
             {
-                if (Clipboard.ContainsText())
-                {
-                    calcView.SaveUndoState();
-                    calcView.CurrentSheet.SetCellText(calcView.SelectedRow, calcView.SelectedCol, Clipboard.GetText());
-                    FormulaEngine.EvaluateSheet(calcView.CurrentSheet);
-                    if (parentForm != null) parentForm.Invalidate();
-                }
+                calcView.Paste();
+                if (parentForm != null) parentForm.Invalidate();
             });
-            pasteMenu.DropDownItems.Add("Values (123)", CreatePasteValuesIcon(), (s, e) =>
+            pasteMenu.DropDownItems.Add("Dán giá trị (Values - 123)", CreatePasteValuesIcon(), (s, e) =>
             {
-                if (Clipboard.ContainsText())
-                {
-                    calcView.SaveUndoState();
-                    calcView.CurrentSheet.SetCellText(calcView.SelectedRow, calcView.SelectedCol, Clipboard.GetText());
-                    FormulaEngine.EvaluateSheet(calcView.CurrentSheet);
-                    if (parentForm != null) parentForm.Invalidate();
-                }
+                calcView.PasteValues();
+                if (parentForm != null) parentForm.Invalidate();
+            });
+            pasteMenu.DropDownItems.Add("Dán công thức (Formulas - fx)", null, (s, e) =>
+            {
+                calcView.PasteFormulas();
+                if (parentForm != null) parentForm.Invalidate();
+            });
+            pasteMenu.DropDownItems.Add("Hoán vị hàng / cột (Transpose)", null, (s, e) =>
+            {
+                calcView.PasteTranspose();
+                if (parentForm != null) parentForm.Invalidate();
             });
             pasteMenu.DropDownItems.Add(new ToolStripSeparator());
-            pasteMenu.DropDownItems.Add("Paste Special...", null, (s, e) =>
+            pasteMenu.DropDownItems.Add("Dán đặc biệt (Paste Special...)", null, (s, e) =>
             {
-                if (Clipboard.ContainsText())
-                {
-                    calcView.SaveUndoState();
-                    calcView.CurrentSheet.SetCellText(calcView.SelectedRow, calcView.SelectedCol, Clipboard.GetText());
-                    FormulaEngine.EvaluateSheet(calcView.CurrentSheet);
-                    if (parentForm != null) parentForm.Invalidate();
-                }
+                calcView.OpenPasteSpecialDialog(parentForm);
+                if (parentForm != null) parentForm.Invalidate();
             });
             cms.Items.Add(pasteMenu);
 
-            cms.Items.Add(CreateMenuItem("Paste Special...", null, (s, e) =>
+            cms.Items.Add(CreateMenuItem("Điền nhanh (Flash Fill - Ctrl+E)", null, (s, e) =>
             {
-                if (Clipboard.ContainsText())
-                {
-                    calcView.SaveUndoState();
-                    calcView.CurrentSheet.SetCellText(calcView.SelectedRow, calcView.SelectedCol, Clipboard.GetText());
-                    FormulaEngine.EvaluateSheet(calcView.CurrentSheet);
-                    if (parentForm != null) parentForm.Invalidate();
-                }
+                calcView.FlashFill();
+                if (parentForm != null) parentForm.Invalidate();
+            }));
+            cms.Items.Add(CreateMenuItem("Dò tìm mục tiêu (Goal Seek...)", null, (s, e) =>
+            {
+                calcView.OpenGoalSeekDialog(parentForm);
+                if (parentForm != null) parentForm.Invalidate();
             }));
 
             cms.Items.Add(new ToolStripSeparator());
@@ -580,6 +564,12 @@ namespace GenOffice.UI
                 {
                     try { System.Diagnostics.Process.Start("https://www.google.com/search?q=" + Uri.EscapeDataString(query)); } catch { }
                 }
+            }));
+
+            // 5b. Expand & Scroll Viewer
+            cms.Items.Add(CreateMenuItem("Sổ xuống xem nội dung dài... (Expand & Scroll - Alt+Down)", null, (s, e) =>
+            {
+                calcView.OpenCellDropdownViewer(parentForm);
             }));
 
             cms.Items.Add(new ToolStripSeparator());

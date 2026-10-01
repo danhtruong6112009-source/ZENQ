@@ -1,0 +1,57 @@
+<ns0:dataModel xmlns:ns0="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns1="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <ns0:ptLst>
+    <ns0:pt modelId="node_1" type="node">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Node 1: Basic Block List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="node_2" type="node">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Node 2: Basic Block List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="node_3" type="node">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Node 3: Basic Block List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+    <ns0:pt modelId="node_4" type="node">
+      <ns0:prSet />
+      <ns0:spPr />
+      <ns0:t>
+        <ns1:bodyPr />
+        <ns1:p>
+          <ns1:r>
+            <ns1:t>Node 4: Basic Block List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:t>
+    </ns0:pt>
+  </ns0:ptLst>
+  <ns0:cxnLst>
+    <ns0:cxn modelId="cxn_1" type="parOf" srcId="node_1" destId="node_2" />
+    <ns0:cxn modelId="cxn_2" type="parOf" srcId="node_1" destId="node_3" />
+    <ns0:cxn modelId="cxn_3" type="parOf" srcId="node_1" destId="node_4" />
+  </ns0:cxnLst>
+</ns0:dataModel>

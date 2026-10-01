@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_SLIDE_MODEL_HPP
-#ifndef GENOFFICE_SLIDE_MODEL_HPP
 #define GENOFFICE_SLIDE_MODEL_HPP
 
 #include <string>

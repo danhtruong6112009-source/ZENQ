@@ -173,6 +173,137 @@ namespace GenOffice.UI
                 scrollPanel.Controls.Add(card);
             }
 
+            // Bottom Actions (Reset, Browse/Import, Save/Export) matching Microsoft Word
+            int bottomY = startY + ((_themes.Count + 1) / 2) * (cardH + gapY) + 4;
+
+            // Separator
+            Panel sepLine = new Panel
+            {
+                Location = new Point(12, bottomY),
+                Size = new Size(cardW * 2 + gapX, 1),
+                BackColor = Color.FromArgb(226, 232, 240)
+            };
+            scrollPanel.Controls.Add(sepLine);
+            bottomY += 8;
+
+            Button btnReset = new Button
+            {
+                Text = "🔄  Đặt lại về chủ đề từ mẫu (Reset to Template Theme)",
+                Location = new Point(12, bottomY),
+                Size = new Size(cardW * 2 + gapX, 28),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                BackColor = Color.White,
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            btnReset.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnReset.Click += (s, e) =>
+            {
+                if (_themes.Count > 0 && OnThemeSelected != null)
+                {
+                    OnThemeSelected(_themes[0]);
+                }
+                Close();
+            };
+            scrollPanel.Controls.Add(btnReset);
+            bottomY += 34;
+
+            Button btnBrowse = new Button
+            {
+                Text = "📂  Duyệt tìm chủ đề / Nhập chủ đề từ tệp... (Browse for Themes)",
+                Location = new Point(12, bottomY),
+                Size = new Size(cardW * 2 + gapX, 28),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                BackColor = Color.White,
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            btnBrowse.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnBrowse.Click += (s, e) =>
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Title = "Duyệt tìm tệp chủ đề Office (Nhập chủ đề)";
+                    ofd.Filter = "Tệp chủ đề Office (*.json;*.thmx)|*.json;*.thmx|Tất cả tệp (*.*)|*.*";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        try
+                        {
+                            string content = System.IO.File.ReadAllText(ofd.FileName, System.Text.Encoding.UTF8);
+                            string tName = System.IO.Path.GetFileNameWithoutExtension(ofd.FileName);
+                            string hf = "Segoe UI Semibold";
+                            string bf = "Segoe UI";
+                            Color[] cols = new Color[] { Color.FromArgb(68, 114, 196), Color.FromArgb(237, 125, 49), Color.FromArgb(165, 165, 165), Color.FromArgb(255, 192, 0) };
+
+                            if (content.Contains("\"HeadingFont\""))
+                            {
+                                int idx = content.IndexOf("\"HeadingFont\"");
+                                int startQuote = content.IndexOf("\"", idx + 13) + 1;
+                                int endQuote = content.IndexOf("\"", startQuote);
+                                if (startQuote > 0 && endQuote > startQuote) hf = content.Substring(startQuote, endQuote - startQuote);
+                            }
+                            if (content.Contains("\"BodyFont\""))
+                            {
+                                int idx = content.IndexOf("\"BodyFont\"");
+                                int startQuote = content.IndexOf("\"", idx + 10) + 1;
+                                int endQuote = content.IndexOf("\"", startQuote);
+                                if (startQuote > 0 && endQuote > startQuote) bf = content.Substring(startQuote, endQuote - startQuote);
+                            }
+
+                            var importedTheme = new WriterThemeItem(tName, hf, bf, cols);
+                            if (OnThemeSelected != null) OnThemeSelected(importedTheme);
+                            MessageBox.Show("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Lỗi khi nhập tệp chủ đề: " + ex.Message, "Lỗi nhập chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+                Close();
+            };
+            scrollPanel.Controls.Add(btnBrowse);
+            bottomY += 34;
+
+            Button btnSave = new Button
+            {
+                Text = "💾  Lưu chủ đề hiện tại / Xuất chủ đề... (Save Current Theme)",
+                Location = new Point(12, bottomY),
+                Size = new Size(cardW * 2 + gapX, 28),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                BackColor = Color.White,
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            btnSave.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnSave.Click += (s, e) =>
+            {
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.Title = "Lưu chủ đề tài liệu hiện tại (Xuất chủ đề)";
+                    sfd.Filter = "Tệp chủ đề Office (*.json)|*.json|Tệp Office Theme (*.thmx)|*.thmx";
+                    sfd.FileName = (_activeThemeName ?? "CustomTheme") + ".json";
+                    if (sfd.ShowDialog() == DialogResult.OK)
+                    {
+                        try
+                        {
+                            string json = string.Format("{{\n  \"Name\": \"{0}\",\n  \"HeadingFont\": \"Calibri Light\",\n  \"BodyFont\": \"Calibri\",\n  \"Colors\": [\"#4472C4\", \"#ED7D31\", \"#A5A5A5\", \"#FFC000\"]\n}}", _activeThemeName ?? "Office");
+                            System.IO.File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
+                            MessageBox.Show("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Lỗi khi xuất tệp chủ đề: " + ex.Message, "Lỗi xuất chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+                Close();
+            };
+            scrollPanel.Controls.Add(btnSave);
+
             Controls.Add(scrollPanel);
             Deactivate += (s, e) => Close();
         }

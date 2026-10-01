@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using GenOffice.Core;
 
 namespace GenOffice.UI
@@ -277,7 +278,8 @@ namespace GenOffice.UI
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cboApplyTo.Items.AddRange(new object[] { "Paragraph (Đoạn văn)", "Text (Văn bản chọn)" });
-            cboApplyTo.SelectedIndex = 0;
+            bool hasSel = (writerView != null && writerView.SelectionStart != writerView.SelectionEnd);
+            cboApplyTo.SelectedIndex = hasSel ? 1 : 0;
 
             grpPreview.Controls.AddRange(new Control[] { previewPanel, btnTop, btnBottom, btnLeft, btnRight, lblApply, cboApplyTo });
             tabBorders.Controls.Add(grpPreview);
@@ -357,30 +359,64 @@ namespace GenOffice.UI
         {
             if (writerView != null)
             {
-                var pStarts = writerView.GetSelectedOrCurrentParagraphStarts();
                 writerView.SaveUndoState();
+                bool applyToText = (cboApplyTo != null && cboApplyTo.SelectedIndex == 1);
+                int selMin = Math.Min(writerView.SelectionStart, writerView.SelectionEnd);
+                int selMax = Math.Max(writerView.SelectionStart, writerView.SelectionEnd);
 
-                foreach (int pStart in pStarts)
+                if (applyToText && selMax > selMin)
                 {
-                    if (!topBorder && !bottomBorder && !leftBorder && !rightBorder)
+                    string fullText = writerView.PieceTable != null ? writerView.PieceTable.GetText() : "";
+                    while (selMax > selMin && selMax <= fullText.Length && (fullText[selMax - 1] == '\r' || fullText[selMax - 1] == '\n'))
+                    {
+                        selMax--;
+                    }
+
+                    int targetStart = selMin;
+                    int targetLen = selMax - selMin;
+
+                    if (writerView.TextBorders == null) writerView.TextBorders = new List<TextBorderRange>();
+                    writerView.TextBorders.RemoveAll(tb => (tb.StartIndex + tb.Length > targetStart && tb.StartIndex < targetStart + targetLen));
+
+                    var pStarts = writerView.GetSelectedOrCurrentParagraphStarts();
+                    foreach (int pStart in pStarts)
                     {
                         if (writerView.ParagraphBorders.ContainsKey(pStart)) writerView.ParagraphBorders.Remove(pStart);
                     }
-                    else
+
+                    if (topBorder || bottomBorder || leftBorder || rightBorder)
                     {
-                        ParagraphBorderInfo info = new ParagraphBorderInfo
-                        {
-                            Top = topBorder,
-                            Bottom = bottomBorder,
-                            Left = leftBorder,
-                            Right = rightBorder,
-                            Color = selectedColor,
-                            SizePt = selectedWidthPt,
-                            IsHorizontalLine = false
-                        };
-                        writerView.ParagraphBorders[pStart] = info;
+                        writerView.TextBorders.Add(new TextBorderRange(targetStart, targetLen, topBorder, bottomBorder, leftBorder, rightBorder, selectedColor, selectedWidthPt));
                     }
                 }
+                else
+                {
+                    var pStarts = writerView.GetSelectedOrCurrentParagraphStarts();
+                    foreach (int pStart in pStarts)
+                    {
+                        if (!topBorder && !bottomBorder && !leftBorder && !rightBorder)
+                        {
+                            if (writerView.ParagraphBorders.ContainsKey(pStart)) writerView.ParagraphBorders.Remove(pStart);
+                        }
+                        else
+                        {
+                            ParagraphBorderInfo info = new ParagraphBorderInfo
+                            {
+                                Top = topBorder,
+                                Bottom = bottomBorder,
+                                Left = leftBorder,
+                                Right = rightBorder,
+                                Color = selectedColor,
+                                SizePt = selectedWidthPt,
+                                IsHorizontalLine = false
+                            };
+                            writerView.ParagraphBorders[pStart] = info;
+                        }
+                    }
+                }
+
+                writerView.InvalidateLayoutAndTextCache();
+                if (writerView.InvalidateCallback != null) writerView.InvalidateCallback();
             }
             Close();
         }

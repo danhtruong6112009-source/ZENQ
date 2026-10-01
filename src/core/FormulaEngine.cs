@@ -107,6 +107,20 @@ namespace GenOffice.Core
             }
 
             expr = expr.Substring(1).Trim();
+            if (IsCellReference(expr))
+            {
+                var pos = SparseMatrix.ParseCellAddress(expr);
+                CellData src = sheet.GetCell(pos.Item1, pos.Item2);
+                if (src != null)
+                {
+                    res.NumericValue = src.NumericValue;
+                    res.EvaluatedStr = src.EvaluatedStr ?? src.RawValue;
+                    res.RawValue = src.RawValue;
+                    res.Type = src.Type;
+                    return res;
+                }
+            }
+
             int openParen = expr.IndexOf('(');
             int closeParen = expr.LastIndexOf(')');
 
@@ -368,25 +382,7 @@ namespace GenOffice.Core
                 {
                     bool condition = EvaluateCondition(args.Length > 0 ? args[0] : "0", sheet);
                     string chosenBranch = condition ? (args.Length > 1 ? args[1] : "TRUE") : (args.Length > 2 ? args[2] : "FALSE");
-                    chosenBranch = chosenBranch.Trim();
-                    if (chosenBranch.StartsWith("\"") && chosenBranch.EndsWith("\"") && chosenBranch.Length >= 2)
-                    {
-                        res.SetString(chosenBranch.Substring(1, chosenBranch.Length - 2));
-                    }
-                    else
-                    {
-                        double num;
-                        if (double.TryParse(chosenBranch, NumberStyles.Any, CultureInfo.InvariantCulture, out num))
-                        {
-                            res.SetNumber(num);
-                            res.EvaluatedStr = FormatCellDisplay(res);
-                        }
-                        else
-                        {
-                            // Try evaluating as cell or nested formula
-                            res.SetString(chosenBranch);
-                        }
-                    }
+                    SetResultFromToken(res, chosenBranch, sheet);
                     return res;
                 }
                 else if (funcName == "AND")
@@ -416,6 +412,268 @@ namespace GenOffice.Core
                     bool cond = args.Length > 0 && EvaluateCondition(args[0], sheet);
                     res.SetString(!cond ? "TRUE" : "FALSE");
                     res.NumericValue = !cond ? 1 : 0;
+                    return res;
+                }
+                else if (funcName == "CHOOSE" && args.Length >= 2)
+                {
+                    int idx = (int)ParseAndEvaluateNumeric(args[0], sheet);
+                    if (idx >= 1 && idx < args.Length)
+                    {
+                        SetResultFromToken(res, args[idx], sheet);
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+
+                // Conditional Math & Stats Functions (SUMIF, COUNTIF, AVERAGEIF, etc.)
+                else if (funcName == "COUNTIF" && args.Length >= 2)
+                {
+                    var range = ParseRange(args[0]);
+                    string crit = args[1];
+                    int matchCount = 0;
+                    foreach (var cellPos in range)
+                    {
+                        CellData c = sheet.GetCell(cellPos.Item1, cellPos.Item2);
+                        if (MatchesCriteria(c, crit, sheet)) matchCount++;
+                    }
+                    res.SetNumber(matchCount);
+                    res.EvaluatedStr = matchCount.ToString();
+                    return res;
+                }
+                else if (funcName == "SUMIF" && args.Length >= 2)
+                {
+                    var critRange = ParseRange(args[0]);
+                    string crit = args[1];
+                    var sumRange = args.Length >= 3 ? ParseRange(args[2]) : critRange;
+
+                    double totalSum = 0.0;
+                    int n = Math.Min(critRange.Count, sumRange.Count);
+                    for (int i = 0; i < n; i++)
+                    {
+                        CellData cCrit = sheet.GetCell(critRange[i].Item1, critRange[i].Item2);
+                        if (MatchesCriteria(cCrit, crit, sheet))
+                        {
+                            CellData cSum = sheet.GetCell(sumRange[i].Item1, sumRange[i].Item2);
+                            if (cSum != null) totalSum += cSum.NumericValue;
+                        }
+                    }
+                    res.SetNumber(totalSum);
+                    res.EvaluatedStr = FormatCellDisplay(res);
+                    return res;
+                }
+                else if (funcName == "AVERAGEIF" && args.Length >= 2)
+                {
+                    var critRange = ParseRange(args[0]);
+                    string crit = args[1];
+                    var avgRange = args.Length >= 3 ? ParseRange(args[2]) : critRange;
+
+                    double totalSum = 0.0;
+                    int matchCount = 0;
+                    int n = Math.Min(critRange.Count, avgRange.Count);
+                    for (int i = 0; i < n; i++)
+                    {
+                        CellData cCrit = sheet.GetCell(critRange[i].Item1, critRange[i].Item2);
+                        if (MatchesCriteria(cCrit, crit, sheet))
+                        {
+                            CellData cAvg = sheet.GetCell(avgRange[i].Item1, avgRange[i].Item2);
+                            if (cAvg != null)
+                            {
+                                totalSum += cAvg.NumericValue;
+                                matchCount++;
+                            }
+                        }
+                    }
+                    if (matchCount > 0)
+                    {
+                        res.SetNumber(totalSum / matchCount);
+                        res.EvaluatedStr = FormatCellDisplay(res);
+                    }
+                    else
+                    {
+                        res.SetString("#DIV/0!");
+                    }
+                    return res;
+                }
+                else if (funcName == "MOD" && args.Length >= 2)
+                {
+                    double nVal = ParseAndEvaluateNumeric(args[0], sheet);
+                    double dVal = ParseAndEvaluateNumeric(args[1], sheet);
+                    if (Math.Abs(dVal) > 1e-12)
+                    {
+                        double m = nVal % dVal;
+                        if ((m < 0 && dVal > 0) || (m > 0 && dVal < 0)) m += dVal;
+                        res.SetNumber(m);
+                        res.EvaluatedStr = FormatCellDisplay(res);
+                    }
+                    else
+                    {
+                        res.SetString("#DIV/0!");
+                    }
+                    return res;
+                }
+                else if (funcName == "INT" && args.Length >= 1)
+                {
+                    double nVal = ParseAndEvaluateNumeric(args[0], sheet);
+                    res.SetNumber(Math.Floor(nVal));
+                    res.EvaluatedStr = FormatCellDisplay(res);
+                    return res;
+                }
+                else if (funcName == "TRUNC" && args.Length >= 1)
+                {
+                    double nVal = ParseAndEvaluateNumeric(args[0], sheet);
+                    int numDigits = args.Length > 1 ? (int)ParseAndEvaluateNumeric(args[1], sheet) : 0;
+                    double mult = Math.Pow(10, numDigits);
+                    double truncRes = Math.Truncate(nVal * mult) / mult;
+                    res.SetNumber(truncRes);
+                    res.EvaluatedStr = FormatCellDisplay(res);
+                    return res;
+                }
+                else if (funcName == "MEDIAN" && args.Length >= 1)
+                {
+                    List<double> vals = new List<double>();
+                    foreach (var a in args)
+                    {
+                        var r = ParseRange(a);
+                        if (r.Count > 0)
+                        {
+                            foreach (var p in r)
+                            {
+                                var c = sheet.GetCell(p.Item1, p.Item2);
+                                if (c != null && c.Type == CellType.Number) vals.Add(c.NumericValue);
+                            }
+                        }
+                        else
+                        {
+                            vals.Add(ParseAndEvaluateNumeric(a, sheet));
+                        }
+                    }
+                    if (vals.Count > 0)
+                    {
+                        vals.Sort();
+                        double med = (vals.Count % 2 == 1) ? vals[vals.Count / 2] : (vals[vals.Count / 2 - 1] + vals[vals.Count / 2]) / 2.0;
+                        res.SetNumber(med);
+                        res.EvaluatedStr = FormatCellDisplay(res);
+                    }
+                    else
+                    {
+                        res.SetNumber(0);
+                    }
+                    return res;
+                }
+                else if (funcName == "LARGE" && args.Length >= 2)
+                {
+                    var r = ParseRange(args[0]);
+                    int k = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    List<double> vals = new List<double>();
+                    foreach (var p in r)
+                    {
+                        var c = sheet.GetCell(p.Item1, p.Item2);
+                        if (c != null && c.Type == CellType.Number) vals.Add(c.NumericValue);
+                    }
+                    vals.Sort((a, b) => b.CompareTo(a)); // Descending
+                    if (k >= 1 && k <= vals.Count)
+                    {
+                        res.SetNumber(vals[k - 1]);
+                        res.EvaluatedStr = FormatCellDisplay(res);
+                    }
+                    else
+                    {
+                        res.SetString("#NUM!");
+                    }
+                    return res;
+                }
+                else if (funcName == "SMALL" && args.Length >= 2)
+                {
+                    var r = ParseRange(args[0]);
+                    int k = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    List<double> vals = new List<double>();
+                    foreach (var p in r)
+                    {
+                        var c = sheet.GetCell(p.Item1, p.Item2);
+                        if (c != null && c.Type == CellType.Number) vals.Add(c.NumericValue);
+                    }
+                    vals.Sort(); // Ascending
+                    if (k >= 1 && k <= vals.Count)
+                    {
+                        res.SetNumber(vals[k - 1]);
+                        res.EvaluatedStr = FormatCellDisplay(res);
+                    }
+                    else
+                    {
+                        res.SetString("#NUM!");
+                    }
+                    return res;
+                }
+                else if (funcName == "PROPER" && args.Length >= 1)
+                {
+                    string text = GetStringValue(args[0], sheet);
+                    res.SetString(CultureInfo.CurrentCulture.TextInfo.ToTitleCase(text.ToLower()));
+                    return res;
+                }
+                else if (funcName == "SUBSTITUTE" && args.Length >= 3)
+                {
+                    string text = GetStringValue(args[0], sheet);
+                    string oldText = GetStringValue(args[1], sheet);
+                    string newText = GetStringValue(args[2], sheet);
+                    if (args.Length >= 4)
+                    {
+                        int instance = (int)ParseAndEvaluateNumeric(args[3], sheet);
+                        int count = 0;
+                        int idx = -1;
+                        while ((idx = text.IndexOf(oldText, idx + 1, StringComparison.Ordinal)) >= 0)
+                        {
+                            count++;
+                            if (count == instance)
+                            {
+                                text = text.Substring(0, idx) + newText + text.Substring(idx + oldText.Length);
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        text = text.Replace(oldText, newText);
+                    }
+                    res.SetString(text);
+                    return res;
+                }
+                else if (funcName == "EXACT" && args.Length >= 2)
+                {
+                    string s1 = GetStringValue(args[0], sheet);
+                    string s2 = GetStringValue(args[1], sheet);
+                    bool eq = string.Equals(s1, s2, StringComparison.Ordinal);
+                    res.SetString(eq ? "TRUE" : "FALSE");
+                    res.NumericValue = eq ? 1 : 0;
+                    return res;
+                }
+                else if (funcName == "DATE" && args.Length >= 3)
+                {
+                    int y = (int)ParseAndEvaluateNumeric(args[0], sheet);
+                    int m = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    int d = (int)ParseAndEvaluateNumeric(args[2], sheet);
+                    try
+                    {
+                        DateTime dt = new DateTime(y, m, d);
+                        res.SetNumber(dt.ToOADate());
+                        res.EvaluatedStr = dt.ToString("dd/MM/yyyy");
+                    }
+                    catch
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "TIME" && args.Length >= 3)
+                {
+                    int h = (int)ParseAndEvaluateNumeric(args[0], sheet);
+                    int m = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    int s = (int)ParseAndEvaluateNumeric(args[2], sheet);
+                    double timeFrac = (h * 3600 + m * 60 + s) / 86400.0;
+                    res.SetNumber(timeFrac);
+                    res.EvaluatedStr = string.Format("{0:D2}:{1:D2}:{2:D2}", h % 24, m % 60, s % 60);
                     return res;
                 }
 
@@ -841,6 +1099,407 @@ namespace GenOffice.Core
                     res.EvaluatedStr = dt.Second.ToString();
                     return res;
                 }
+                else if (funcName == "ROW")
+                {
+                    if (args.Length > 0 && !string.IsNullOrEmpty(args[0]))
+                    {
+                        var range = ParseRange(args[0]);
+                        if (range.Count > 0)
+                        {
+                            res.SetNumber((double)range[0].Item1);
+                            res.EvaluatedStr = range[0].Item1.ToString();
+                            return res;
+                        }
+                    }
+                    res.SetNumber(1.0);
+                    res.EvaluatedStr = "1";
+                    return res;
+                }
+                else if (funcName == "COLUMN")
+                {
+                    if (args.Length > 0 && !string.IsNullOrEmpty(args[0]))
+                    {
+                        var range = ParseRange(args[0]);
+                        if (range.Count > 0)
+                        {
+                            res.SetNumber((double)range[0].Item2);
+                            res.EvaluatedStr = range[0].Item2.ToString();
+                            return res;
+                        }
+                    }
+                    res.SetNumber(1.0);
+                    res.EvaluatedStr = "1";
+                    return res;
+                }
+                else if (funcName == "IFNA" && args.Length >= 2)
+                {
+                    CellData valCell = GetCellReferenceOrData(args[0], sheet);
+                    string errStr = valCell != null ? (valCell.EvaluatedStr ?? valCell.RawValue ?? "") : "";
+                    if (errStr == "#N/A")
+                    {
+                        SetResultFromToken(res, args[1], sheet);
+                    }
+                    else
+                    {
+                        if (valCell != null)
+                        {
+                            res.NumericValue = valCell.NumericValue;
+                            res.EvaluatedStr = valCell.EvaluatedStr ?? valCell.RawValue;
+                            res.RawValue = valCell.RawValue;
+                            res.Type = valCell.Type;
+                        }
+                    }
+                    return res;
+                }
+                else if (funcName == "WEEKDAY" && args.Length >= 1)
+                {
+                    double oa = ParseAndEvaluateNumeric(args[0], sheet);
+                    DateTime dt = DateTime.FromOADate(oa);
+                    int returnType = args.Length >= 2 ? (int)ParseAndEvaluateNumeric(args[1], sheet) : 1;
+                    int dayOfWeek;
+                    if (returnType == 2)
+                    {
+                        dayOfWeek = (dt.DayOfWeek == DayOfWeek.Sunday) ? 7 : (int)dt.DayOfWeek;
+                    }
+                    else
+                    {
+                        dayOfWeek = (int)dt.DayOfWeek + 1;
+                    }
+                    res.SetNumber((double)dayOfWeek);
+                    res.EvaluatedStr = dayOfWeek.ToString();
+                    return res;
+                }
+                else if (funcName == "EDATE" && args.Length >= 2)
+                {
+                    double oa = ParseAndEvaluateNumeric(args[0], sheet);
+                    int months = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    DateTime dt = DateTime.FromOADate(oa);
+                    DateTime target = dt.AddMonths(months);
+                    res.SetNumber(target.ToOADate());
+                    res.EvaluatedStr = target.ToString("dd/MM/yyyy");
+                    return res;
+                }
+                else if (funcName == "NETWORKDAYS" && args.Length >= 2)
+                {
+                    DateTime d1 = DateTime.FromOADate(ParseAndEvaluateNumeric(args[0], sheet));
+                    DateTime d2 = DateTime.FromOADate(ParseAndEvaluateNumeric(args[1], sheet));
+                    if (d1 > d2) { DateTime tmp = d1; d1 = d2; d2 = tmp; }
+                    int businessDays = 0;
+                    for (DateTime cur = d1.Date; cur <= d2.Date; cur = cur.AddDays(1))
+                    {
+                        if (cur.DayOfWeek != DayOfWeek.Saturday && cur.DayOfWeek != DayOfWeek.Sunday)
+                            businessDays++;
+                    }
+                    res.SetNumber((double)businessDays);
+                    res.EvaluatedStr = businessDays.ToString();
+                    return res;
+                }
+                else if (funcName == "DATEDIF" && args.Length >= 3)
+                {
+                    DateTime d1 = DateTime.FromOADate(ParseAndEvaluateNumeric(args[0], sheet));
+                    DateTime d2 = DateTime.FromOADate(ParseAndEvaluateNumeric(args[1], sheet));
+                    string unit = GetStringValue(args[2], sheet).Trim().ToUpper();
+                    if (d1 > d2)
+                    {
+                        res.SetString("#NUM!");
+                        return res;
+                    }
+                    double diff = 0;
+                    if (unit == "Y")
+                    {
+                        diff = d2.Year - d1.Year;
+                        if (d2 < d1.AddYears((int)diff)) diff--;
+                    }
+                    else if (unit == "M")
+                    {
+                        diff = (d2.Year - d1.Year) * 12 + d2.Month - d1.Month;
+                        if (d2.Day < d1.Day) diff--;
+                    }
+                    else
+                    {
+                        diff = (d2.Date - d1.Date).TotalDays;
+                    }
+                    res.SetNumber(diff);
+                    res.EvaluatedStr = diff.ToString();
+                    return res;
+                }
+                else if (funcName == "VALUE" && args.Length >= 1)
+                {
+                    string str = GetStringValue(args[0], sheet).Trim();
+                    double v;
+                    if (double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out v) ||
+                        double.TryParse(str, NumberStyles.Any, CultureInfo.CurrentCulture, out v))
+                    {
+                        res.SetNumber(v);
+                        res.EvaluatedStr = v.ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "FIND" && args.Length >= 2)
+                {
+                    string findWhat = GetStringValue(args[0], sheet);
+                    string withinText = GetStringValue(args[1], sheet);
+                    int startIdx = args.Length >= 3 ? Math.Max(0, (int)ParseAndEvaluateNumeric(args[2], sheet) - 1) : 0;
+                    int idx = withinText.IndexOf(findWhat, startIdx, StringComparison.Ordinal);
+                    if (idx >= 0)
+                    {
+                        res.SetNumber((double)(idx + 1));
+                        res.EvaluatedStr = (idx + 1).ToString();
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "SEARCH" && args.Length >= 2)
+                {
+                    string findWhat = GetStringValue(args[0], sheet);
+                    string withinText = GetStringValue(args[1], sheet);
+                    int startIdx = args.Length >= 3 ? Math.Max(0, (int)ParseAndEvaluateNumeric(args[2], sheet) - 1) : 0;
+                    int idx = withinText.IndexOf(findWhat, startIdx, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        res.SetNumber((double)(idx + 1));
+                        res.EvaluatedStr = (idx + 1).ToString();
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "TEXTBEFORE" && args.Length >= 2)
+                {
+                    string text = GetStringValue(args[0], sheet);
+                    string delim = GetStringValue(args[1], sheet);
+                    int idx = text.IndexOf(delim, StringComparison.Ordinal);
+                    if (idx >= 0)
+                    {
+                        res.SetString(text.Substring(0, idx));
+                    }
+                    else
+                    {
+                        res.SetString("#N/A");
+                    }
+                    return res;
+                }
+                else if (funcName == "TEXTAFTER" && args.Length >= 2)
+                {
+                    string text = GetStringValue(args[0], sheet);
+                    string delim = GetStringValue(args[1], sheet);
+                    int idx = text.IndexOf(delim, StringComparison.Ordinal);
+                    if (idx >= 0)
+                    {
+                        res.SetString(text.Substring(idx + delim.Length));
+                    }
+                    else
+                    {
+                        res.SetString("#N/A");
+                    }
+                    return res;
+                }
+                else if (funcName == "CHAR" && args.Length >= 1)
+                {
+                    int code = (int)ParseAndEvaluateNumeric(args[0], sheet);
+                    if (code >= 1 && code <= 255)
+                    {
+                        res.SetString(((char)code).ToString());
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "CODE" && args.Length >= 1)
+                {
+                    string s = GetStringValue(args[0], sheet);
+                    if (!string.IsNullOrEmpty(s))
+                    {
+                        res.SetNumber((double)(int)s[0]);
+                        res.EvaluatedStr = ((int)s[0]).ToString();
+                    }
+                    else
+                    {
+                        res.SetString("#VALUE!");
+                    }
+                    return res;
+                }
+                else if (funcName == "REPT" && args.Length >= 2)
+                {
+                    string s = GetStringValue(args[0], sheet);
+                    double cnt = ParseAndEvaluateNumeric(args[1], sheet);
+                    if (cnt < 0)
+                    {
+                        res.SetString("#VALUE!");
+                        return res;
+                    }
+                    int rep = (int)cnt;
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < rep; i++) sb.Append(s);
+                    res.SetString(sb.ToString());
+                    return res;
+                }
+                else if (funcName == "RANDBETWEEN" && args.Length >= 2)
+                {
+                    double btm = ParseAndEvaluateNumeric(args[0], sheet);
+                    double top = ParseAndEvaluateNumeric(args[1], sheet);
+                    if (btm > top)
+                    {
+                        res.SetString("#NUM!");
+                        return res;
+                    }
+                    Random rnd = new Random();
+                    int rVal = rnd.Next((int)Math.Floor(btm), (int)Math.Floor(top) + 1);
+                    res.SetNumber((double)rVal);
+                    res.EvaluatedStr = rVal.ToString();
+                    return res;
+                }
+                else if (funcName == "CEILING" && args.Length >= 2)
+                {
+                    double num = ParseAndEvaluateNumeric(args[0], sheet);
+                    double sig = ParseAndEvaluateNumeric(args[1], sheet);
+                    if (sig == 0) { res.SetNumber(0); return res; }
+                    double ceil = Math.Ceiling(num / sig) * sig;
+                    res.SetNumber(ceil);
+                    res.EvaluatedStr = ceil.ToString(CultureInfo.InvariantCulture);
+                    return res;
+                }
+                else if (funcName == "FLOOR" && args.Length >= 2)
+                {
+                    double num = ParseAndEvaluateNumeric(args[0], sheet);
+                    double sig = ParseAndEvaluateNumeric(args[1], sheet);
+                    if (sig == 0) { res.SetNumber(0); return res; }
+                    double flr = Math.Floor(num / sig) * sig;
+                    res.SetNumber(flr);
+                    res.EvaluatedStr = flr.ToString(CultureInfo.InvariantCulture);
+                    return res;
+                }
+                else if (funcName == "SIGN" && args.Length >= 1)
+                {
+                    double num = ParseAndEvaluateNumeric(args[0], sheet);
+                    double s = num > 0 ? 1.0 : (num < 0 ? -1.0 : 0.0);
+                    res.SetNumber(s);
+                    res.EvaluatedStr = s.ToString();
+                    return res;
+                }
+                else if (funcName == "STDEV" || funcName == "STDEV.S")
+                {
+                    List<double> vals = CollectNumericValues(args, sheet);
+                    if (vals.Count <= 1) { res.SetString("#DIV/0!"); return res; }
+                    double avg = 0;
+                    foreach (var v in vals) avg += v;
+                    avg /= vals.Count;
+                    double sumSq = 0;
+                    foreach (var v in vals) sumSq += (v - avg) * (v - avg);
+                    double stdev = Math.Sqrt(sumSq / (vals.Count - 1));
+                    res.SetNumber(stdev);
+                    res.EvaluatedStr = stdev.ToString("F3", CultureInfo.InvariantCulture);
+                    return res;
+                }
+                else if (funcName == "VAR" || funcName == "VAR.S")
+                {
+                    List<double> vals = CollectNumericValues(args, sheet);
+                    if (vals.Count <= 1) { res.SetString("#DIV/0!"); return res; }
+                    double avg = 0;
+                    foreach (var v in vals) avg += v;
+                    avg /= vals.Count;
+                    double sumSq = 0;
+                    foreach (var v in vals) sumSq += (v - avg) * (v - avg);
+                    double variance = sumSq / (vals.Count - 1);
+                    res.SetNumber(variance);
+                    res.EvaluatedStr = variance.ToString("F3", CultureInfo.InvariantCulture);
+                    return res;
+                }
+                else if (funcName == "RANK" && args.Length >= 2)
+                {
+                    double num = ParseAndEvaluateNumeric(args[0], sheet);
+                    var range = ParseRange(args[1]);
+                    int order = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : 0;
+                    List<double> vals = new List<double>();
+                    foreach (var p in range)
+                    {
+                        CellData c = sheet.GetCell(p.Item1, p.Item2);
+                        if (c != null && c.Type == CellType.Number) vals.Add(c.NumericValue);
+                    }
+                    if (order == 0) vals.Sort((a, b) => b.CompareTo(a));
+                    else vals.Sort();
+                    int rank = 1;
+                    for (int i = 0; i < vals.Count; i++)
+                    {
+                        if (Math.Abs(vals[i] - num) < 0.000001) { rank = i + 1; break; }
+                    }
+                    res.SetNumber((double)rank);
+                    res.EvaluatedStr = rank.ToString();
+                    return res;
+                }
+                else if (funcName == "MODE" || funcName == "MODE.SNGL")
+                {
+                    List<double> vals = CollectNumericValues(args, sheet);
+                    Dictionary<double, int> counts = new Dictionary<double, int>();
+                    foreach (var v in vals)
+                    {
+                        if (!counts.ContainsKey(v)) counts[v] = 0;
+                        counts[v]++;
+                    }
+                    double bestVal = 0;
+                    int maxCount = 1;
+                    foreach (var kvp in counts)
+                    {
+                        if (kvp.Value > maxCount) { maxCount = kvp.Value; bestVal = kvp.Key; }
+                    }
+                    if (maxCount <= 1) { res.SetString("#N/A"); return res; }
+                    res.SetNumber(bestVal);
+                    res.EvaluatedStr = bestVal.ToString();
+                    return res;
+                }
+                else if (funcName == "ISNUMBER" && args.Length >= 1)
+                {
+                    CellData c = GetCellReferenceOrData(args[0], sheet);
+                    bool isNum = (c != null && c.Type == CellType.Number);
+                    res.SetNumber(isNum ? 1.0 : 0.0);
+                    res.EvaluatedStr = isNum ? "TRUE" : "FALSE";
+                    return res;
+                }
+                else if (funcName == "ISTEXT" && args.Length >= 1)
+                {
+                    CellData c = GetCellReferenceOrData(args[0], sheet);
+                    bool isTxt = (c != null && c.Type == CellType.String);
+                    res.SetNumber(isTxt ? 1.0 : 0.0);
+                    res.EvaluatedStr = isTxt ? "TRUE" : "FALSE";
+                    return res;
+                }
+                else if (funcName == "ISBLANK" && args.Length >= 1)
+                {
+                    CellData c = GetCellReferenceOrData(args[0], sheet);
+                    bool isBlank = (c == null || c.Type == CellType.Empty || (string.IsNullOrEmpty(c.RawValue) && c.NumericValue == 0 && string.IsNullOrEmpty(c.EvaluatedStr)));
+                    res.SetNumber(isBlank ? 1.0 : 0.0);
+                    res.EvaluatedStr = isBlank ? "TRUE" : "FALSE";
+                    return res;
+                }
+                else if (funcName == "ISERROR" && args.Length >= 1)
+                {
+                    CellData c = GetCellReferenceOrData(args[0], sheet);
+                    string val = c != null ? (c.EvaluatedStr ?? c.RawValue ?? "") : "";
+                    bool isErr = val.StartsWith("#") && val.EndsWith("!");
+                    res.SetNumber(isErr ? 1.0 : 0.0);
+                    res.EvaluatedStr = isErr ? "TRUE" : "FALSE";
+                    return res;
+                }
+                else if (funcName == "ISNA" && args.Length >= 1)
+                {
+                    CellData c = GetCellReferenceOrData(args[0], sheet);
+                    string val = c != null ? (c.EvaluatedStr ?? c.RawValue ?? "") : "";
+                    bool isNa = val == "#N/A";
+                    res.SetNumber(isNa ? 1.0 : 0.0);
+                    res.EvaluatedStr = isNa ? "TRUE" : "FALSE";
+                    return res;
+                }
             }
 
             // General Arithmetic Evaluation (e.g. =B2*C2 + D5)
@@ -861,39 +1520,126 @@ namespace GenOffice.Core
         private static void SetResultFromToken(CellData res, string token, SparseMatrix sheet)
         {
             string clean = (token ?? "").Trim();
+            if (string.IsNullOrEmpty(clean))
+            {
+                res.SetString("");
+                return;
+            }
+
             if (clean.StartsWith("\"") && clean.EndsWith("\"") && clean.Length >= 2)
             {
                 res.SetString(clean.Substring(1, clean.Length - 2));
+                return;
             }
-            else
+
+            // Tự động đệ quy đánh giá hàm lồng nhau (Nested Function Call e.g. IF(...), AVERAGE(...), SUM(...))
+            if (clean.Contains("(") && clean.EndsWith(")"))
             {
-                double num;
-                if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out num))
+                string formulaCall = clean.StartsWith("=") ? clean : ("=" + clean);
+                CellData evalInner = EvaluateFormula(formulaCall, sheet);
+                res.Type = evalInner.Type;
+                res.NumericValue = evalInner.NumericValue;
+                res.EvaluatedStr = evalInner.EvaluatedStr;
+                res.RawValue = evalInner.RawValue;
+                return;
+            }
+
+            double num;
+            if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out num))
+            {
+                res.SetNumber(num);
+                res.EvaluatedStr = FormatCellDisplay(res);
+                return;
+            }
+
+            if (IsCellReference(clean))
+            {
+                var pos = SparseMatrix.ParseCellAddress(clean);
+                CellData c = sheet.GetCell(pos.Item1, pos.Item2);
+                if (c != null)
                 {
-                    res.SetNumber(num);
-                    res.EvaluatedStr = FormatCellDisplay(res);
-                }
-                else if (IsCellReference(clean))
-                {
-                    var pos = SparseMatrix.ParseCellAddress(clean);
-                    CellData c = sheet.GetCell(pos.Item1, pos.Item2);
-                    if (c != null)
-                    {
-                        res.Type = c.Type;
-                        res.NumericValue = c.NumericValue;
-                        res.EvaluatedStr = c.EvaluatedStr;
-                        res.RawValue = c.RawValue;
-                    }
-                    else
-                    {
-                        res.SetString("");
-                    }
+                    res.Type = c.Type;
+                    res.NumericValue = c.NumericValue;
+                    res.EvaluatedStr = c.EvaluatedStr;
+                    res.RawValue = c.RawValue;
                 }
                 else
                 {
-                    res.SetString(clean);
+                    res.SetString("");
+                }
+                return;
+            }
+
+            // Xử lý biểu thức toán học trong nhánh rẽ (ví dụ A1*0.1 hay B2+C2)
+            if (clean.Contains("+") || clean.Contains("-") || clean.Contains("*") || clean.Contains("/") || clean.Contains("^"))
+            {
+                double dVal = ParseAndEvaluateNumeric(clean, sheet);
+                if (!double.IsNaN(dVal) && !double.IsInfinity(dVal))
+                {
+                    res.SetNumber(dVal);
+                    res.EvaluatedStr = FormatCellDisplay(res);
+                    return;
                 }
             }
+
+            res.SetString(clean);
+        }
+
+        private static bool MatchesCriteria(CellData cell, string criteria, SparseMatrix sheet)
+        {
+            if (cell == null) return false;
+            string crit = (criteria ?? "").Trim();
+            if (crit.StartsWith("\"") && crit.EndsWith("\"") && crit.Length >= 2)
+                crit = crit.Substring(1, crit.Length - 2);
+
+            string cellStr = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : cell.RawValue;
+            double cellNum = cell.NumericValue;
+
+            string[] ops = new string[] { ">=", "<=", "<>", "!=", ">", "<", "=" };
+            foreach (var op in ops)
+            {
+                if (crit.StartsWith(op))
+                {
+                    string target = crit.Substring(op.Length).Trim();
+                    double targetNum;
+                    if (double.TryParse(target, NumberStyles.Any, CultureInfo.InvariantCulture, out targetNum))
+                    {
+                        switch (op)
+                        {
+                            case ">=": return cellNum >= targetNum;
+                            case "<=": return cellNum <= targetNum;
+                            case ">": return cellNum > targetNum;
+                            case "<": return cellNum < targetNum;
+                            case "<>":
+                            case "!=": return Math.Abs(cellNum - targetNum) > 0.000001;
+                            case "=": return Math.Abs(cellNum - targetNum) < 0.000001;
+                        }
+                    }
+                    else
+                    {
+                        int cmp = string.Compare(cellStr, target, StringComparison.OrdinalIgnoreCase);
+                        switch (op)
+                        {
+                            case "=": return cmp == 0;
+                            case "<>":
+                            case "!=": return cmp != 0;
+                            case ">": return cmp > 0;
+                            case ">=": return cmp >= 0;
+                            case "<": return cmp < 0;
+                            case "<=": return cmp <= 0;
+                        }
+                    }
+                }
+            }
+
+            // So sánh trực tiếp
+            double dCrit;
+            if (double.TryParse(crit, NumberStyles.Any, CultureInfo.InvariantCulture, out dCrit))
+            {
+                return Math.Abs(cellNum - dCrit) < 0.000001;
+            }
+
+            return string.Equals(cellStr, crit, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetStringValue(string token, SparseMatrix sheet)
@@ -916,7 +1662,22 @@ namespace GenOffice.Core
         private static bool EvaluateCondition(string condStr, SparseMatrix sheet)
         {
             string clean = (condStr ?? "").Trim();
-            string[] ops = new string[] { ">=", "<=", "<>", ">", "<", "=" };
+            if (string.IsNullOrEmpty(clean)) return false;
+            if (clean.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) return true;
+            if (clean.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return false;
+
+            if (clean.StartsWith("IS", StringComparison.OrdinalIgnoreCase) || clean.Contains("("))
+            {
+                CellData eval = EvaluateFormula(clean.StartsWith("=") ? clean : ("=" + clean), sheet);
+                if (eval != null)
+                {
+                    if (eval.EvaluatedStr != null && eval.EvaluatedStr.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) return true;
+                    if (eval.NumericValue > 0) return true;
+                    return false;
+                }
+            }
+
+            string[] ops = new string[] { ">=", "<=", "<>", "!=", ">", "<", "=" };
 
             foreach (var op in ops)
             {
@@ -926,17 +1687,40 @@ namespace GenOffice.Core
                     string leftStr = clean.Substring(0, opIdx).Trim();
                     string rightStr = clean.Substring(opIdx + op.Length).Trim();
 
-                    double leftNum = ParseAndEvaluateNumeric(leftStr, sheet);
-                    double rightNum = ParseAndEvaluateNumeric(rightStr, sheet);
+                    bool leftIsString = leftStr.StartsWith("\"") && leftStr.EndsWith("\"");
+                    bool rightIsString = rightStr.StartsWith("\"") && rightStr.EndsWith("\"");
 
-                    switch (op)
+                    if (leftIsString || rightIsString)
                     {
-                        case ">=": return leftNum >= rightNum;
-                        case "<=": return leftNum <= rightNum;
-                        case "<>": return Math.Abs(leftNum - rightNum) > 0.000001;
-                        case ">": return leftNum > rightNum;
-                        case "<": return leftNum < rightNum;
-                        case "=": return Math.Abs(leftNum - rightNum) < 0.000001;
+                        string leftVal = GetStringValue(leftStr, sheet);
+                        string rightVal = GetStringValue(rightStr, sheet);
+                        int cmp = string.Compare(leftVal, rightVal, StringComparison.OrdinalIgnoreCase);
+                        switch (op)
+                        {
+                            case "=": return cmp == 0;
+                            case "<>":
+                            case "!=": return cmp != 0;
+                            case ">": return cmp > 0;
+                            case ">=": return cmp >= 0;
+                            case "<": return cmp < 0;
+                            case "<=": return cmp <= 0;
+                        }
+                    }
+                    else
+                    {
+                        double leftNum = ParseAndEvaluateNumeric(leftStr, sheet);
+                        double rightNum = ParseAndEvaluateNumeric(rightStr, sheet);
+
+                        switch (op)
+                        {
+                            case ">=": return leftNum >= rightNum;
+                            case "<=": return leftNum <= rightNum;
+                            case "<>":
+                            case "!=": return Math.Abs(leftNum - rightNum) > 0.000001;
+                            case ">": return leftNum > rightNum;
+                            case "<": return leftNum < rightNum;
+                            case "=": return Math.Abs(leftNum - rightNum) < 0.000001;
+                        }
                     }
                 }
             }
@@ -1083,6 +1867,43 @@ namespace GenOffice.Core
             }
             if (!string.IsNullOrEmpty(current)) list.Add(current.Trim());
             return list.ToArray();
+        }
+
+        private static List<double> CollectNumericValues(string[] args, SparseMatrix sheet)
+        {
+            List<double> values = new List<double>();
+            foreach (var arg in args)
+            {
+                var range = ParseRange(arg);
+                if (range.Count > 0)
+                {
+                    foreach (var p in range)
+                    {
+                        CellData c = sheet.GetCell(p.Item1, p.Item2);
+                        if (c != null && c.Type == CellType.Number)
+                        {
+                            values.Add(c.NumericValue);
+                        }
+                    }
+                }
+                else
+                {
+                    double d = ParseAndEvaluateNumeric(arg, sheet);
+                    if (!double.IsNaN(d)) values.Add(d);
+                }
+            }
+            return values;
+        }
+
+        private static CellData GetCellReferenceOrData(string token, SparseMatrix sheet)
+        {
+            if (string.IsNullOrEmpty(token)) return null;
+            var range = ParseRange(token);
+            if (range.Count > 0)
+            {
+                return sheet.GetCell(range[0].Item1, range[0].Item2);
+            }
+            return EvaluateFormula("=" + token.Trim(), sheet);
         }
     }
 }

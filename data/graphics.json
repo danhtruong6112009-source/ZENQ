@@ -1,0 +1,1258 @@
+{
+  "version": "2.2",
+  "total": 197,
+  "categories": [
+    {
+      "name": "Mây & Khí quyển",
+      "items": [
+        {
+          "id": "cloud_cloud",
+          "name": "Mây trắng",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloudy",
+          "name": "Nhiều mây",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloudy.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_sun",
+          "name": "Mây và mặt trời",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-sun.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_moon",
+          "name": "Mây và trăng đêm",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-moon.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_rain",
+          "name": "Mây mưa",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-rain.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_snow",
+          "name": "Mây tuyết rơi",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-snow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_lightning",
+          "name": "Mây sấm sét",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-lightning.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_fog",
+          "name": "Mây mù sương",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-fog.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_drizzle",
+          "name": "Mây mưa phùn",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-drizzle.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_hail",
+          "name": "Mây mưa đá",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-hail.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_download",
+          "name": "Tải về đám mây",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-download.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_upload",
+          "name": "Tải lên đám mây",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-upload.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_cog",
+          "name": "Cấu hình đám mây",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-cog.svg",
+          "type": "svg"
+        },
+        {
+          "id": "cloud_cloud_moon_rain",
+          "name": "Mưa đêm",
+          "url": "https://zenq-graphics-api-online.vercel.app/cloud/cloud-moon-rain.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Mưa & Giông bão",
+      "items": [
+        {
+          "id": "rain_cloud_rain_wind",
+          "name": "Mưa bão gió lốc",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/cloud-rain-wind.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_cloud_sun_rain",
+          "name": "Mưa rào có nắng",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/cloud-sun-rain.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_umbrella",
+          "name": "Chiếc ô che mưa",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/umbrella.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_rainbow",
+          "name": "Cầu vồng",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/rainbow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_wind",
+          "name": "Cơn gió thổi",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/wind.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_snowflake",
+          "name": "Bông tuyết trắng",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/snowflake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_sun",
+          "name": "Mặt trời",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/sun.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_sun_medium",
+          "name": "Ánh nắng vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/sun-medium.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_sun_dim",
+          "name": "Nắng dịu",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/sun-dim.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_thermometer",
+          "name": "Nhiệt kế",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/thermometer.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_thermometer_sun",
+          "name": "Nhiệt độ nóng",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/thermometer-sun.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_thermometer_snowflake",
+          "name": "Nhiệt độ lạnh giá",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/thermometer-snowflake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_zap",
+          "name": "Tia chớp sấm sét",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/zap.svg",
+          "type": "svg"
+        },
+        {
+          "id": "rain_tornado",
+          "name": "Cơn lốc xoáy",
+          "url": "https://zenq-graphics-api-online.vercel.app/rain/tornado.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Sông ngòi & Nguồn nước",
+      "items": [
+        {
+          "id": "water_droplet",
+          "name": "Giọt nước",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/droplet.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_droplets",
+          "name": "Nhiều giọt nước",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/droplets.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_waves",
+          "name": "Sóng sông nước",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/waves.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_ship",
+          "name": "Thuyền lướt sóng",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/ship.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_anchor",
+          "name": "Mỏ neo bến sông",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/anchor.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_fish",
+          "name": "Cá sông",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/fish.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_fish_symbol",
+          "name": "Biểu tượng loài cá",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/fish-symbol.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_life_buoy",
+          "name": "Phao cứu sinh",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/life-buoy.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_bath",
+          "name": "Bồn nước thư giãn",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/bath.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_glass_water",
+          "name": "Ly nước mát",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/glass-water.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_cup_soda",
+          "name": "Đồ uống giải khát",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/cup-soda.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_fuel",
+          "name": "Nhiên liệu lỏng",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/fuel.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_droplet_percent",
+          "name": "Độ ẩm nước",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/droplet-percent.svg",
+          "type": "svg"
+        },
+        {
+          "id": "water_sailboat",
+          "name": "Thuyền buồm trên sông",
+          "url": "https://zenq-graphics-api-online.vercel.app/water/sailboat.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Thiên nhiên & Núi rừng",
+      "items": [
+        {
+          "id": "nature_mountain",
+          "name": "Núi non trùng điệp",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/mountain.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_mountain_snow",
+          "name": "Núi tuyết",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/mountain-snow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_trees",
+          "name": "Rừng cây xanh",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/trees.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_sunset",
+          "name": "Hoàng hôn",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/sunset.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_sunrise",
+          "name": "Bình minh",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/sunrise.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_compass",
+          "name": "La bàn định hướng",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/compass.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_tent",
+          "name": "Lều cắm trại",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/tent.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_flame",
+          "name": "Ngọn lửa ấm",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/flame.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_moon",
+          "name": "Mặt trăng",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/moon.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_moon_star",
+          "name": "Trăng và sao",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/moon-star.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_sparkles",
+          "name": "Ánh sáng lấp lánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/sparkles.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_sparkle",
+          "name": "Ngôi sao tỏa sáng",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/sparkle.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_telescope",
+          "name": "Kính thiên văn",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/telescope.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_globe",
+          "name": "Quả địa cầu",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/globe.svg",
+          "type": "svg"
+        },
+        {
+          "id": "nature_earth",
+          "name": "Trái Đất xanh",
+          "url": "https://zenq-graphics-api-online.vercel.app/nature/earth.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Lá cây & Cây cỏ",
+      "items": [
+        {
+          "id": "plants_leaf",
+          "name": "Chiếc lá xanh",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/leaf.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_flower",
+          "name": "Bông hoa tươi",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/flower.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_flower_2",
+          "name": "Bông hoa nở rộ",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/flower-2.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_clover",
+          "name": "Cỏ 4 lá may mắn",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/clover.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_tree_pine",
+          "name": "Cây thông",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/tree-pine.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_tree_deciduous",
+          "name": "Cây cổ thụ",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/tree-deciduous.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_tree_palm",
+          "name": "Cây cọ dừa",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/tree-palm.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_sprout",
+          "name": "Mầm cây đâm chồi",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/sprout.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_wheat",
+          "name": "Bông lúa mạch",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/wheat.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_apple",
+          "name": "Quả táo ngọt",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/apple.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_cherry",
+          "name": "Quả anh đào",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/cherry.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_grape",
+          "name": "Chùm nho",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/grape.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_citrus",
+          "name": "Lát cam tươi",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/citrus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_carrot",
+          "name": "Củ cà rốt",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/carrot.svg",
+          "type": "svg"
+        },
+        {
+          "id": "plants_nut",
+          "name": "Hạt mầm",
+          "url": "https://zenq-graphics-api-online.vercel.app/plants/nut.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Đất nước & Địa danh",
+      "items": [
+        {
+          "id": "countries_flag",
+          "name": "Lá cờ quốc gia",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/flag.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_flag_triangle_right",
+          "name": "Cờ hiệu",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/flag-triangle-right.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_map",
+          "name": "Bản đồ thế giới",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/map.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_map_pin",
+          "name": "Điểm đánh dấu vị trí",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/map-pin.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_map_pinned",
+          "name": "Ghim địa điểm",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/map-pinned.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_landmark",
+          "name": "Địa danh thắng cảnh",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/landmark.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_castle",
+          "name": "Lâu đài kiến trúc",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/castle.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_building",
+          "name": "Tòa nhà cao tầng",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/building.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_hotel",
+          "name": "Khách sạn",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/hotel.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_church",
+          "name": "Công trình tôn giáo",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/church.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_factory",
+          "name": "Khu công nghiệp",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/factory.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_store",
+          "name": "Cửa hàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/store.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_school",
+          "name": "Trường học",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/school.svg",
+          "type": "svg"
+        },
+        {
+          "id": "countries_plane",
+          "name": "Chuyến bay quốc tế",
+          "url": "https://zenq-graphics-api-online.vercel.app/countries/plane.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Con người & Nghề nghiệp",
+      "items": [
+        {
+          "id": "people_user",
+          "name": "Người dùng",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/user.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_users",
+          "name": "Nhóm người",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/users.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_user_check",
+          "name": "Người dùng xác thực",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/user-check.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_user_plus",
+          "name": "Thêm người",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/user-plus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_user_round",
+          "name": "Hình đại diện",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/user-round.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_contact",
+          "name": "Danh bạ",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/contact.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_graduation_cap",
+          "name": "Sinh viên cử nhân",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/graduation-cap.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_briefcase",
+          "name": "Nhân viên công sở",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/briefcase.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_stethoscope",
+          "name": "Bác sĩ y tế",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/stethoscope.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_heart_handshake",
+          "name": "Bắt tay hợp tác",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/heart-handshake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_award",
+          "name": "Giải thưởng vinh danh",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/award.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_medal",
+          "name": "Huy chương trao tặng",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/medal.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_trophy",
+          "name": "Cúp vinh quang",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/trophy.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_heart",
+          "name": "Tình cảm con người",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/heart.svg",
+          "type": "svg"
+        },
+        {
+          "id": "people_handshake",
+          "name": "Giao lưu hữu nghị",
+          "url": "https://zenq-graphics-api-online.vercel.app/people/handshake.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Đồ vật & Dụng cụ",
+      "items": [
+        {
+          "id": "tools_wrench",
+          "name": "Cờ lê sửa chữa",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/wrench.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_hammer",
+          "name": "Búa đóng đinh",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/hammer.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_scissors",
+          "name": "Kéo cắt thủ công",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/scissors.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_pen_tool",
+          "name": "Bút vẽ vector",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/pen-tool.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_pencil",
+          "name": "Bút chì phác thảo",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/pencil.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_brush",
+          "name": "Cọ quét sơn",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/brush.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_paint_bucket",
+          "name": "Thùng sơn",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/paint-bucket.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_palette",
+          "name": "Bảng pha màu",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/palette.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_ruler",
+          "name": "Thước kẻ",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/ruler.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_calculator",
+          "name": "Máy tính cầm tay",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/calculator.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_camera",
+          "name": "Máy chụp ảnh",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/camera.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_clock",
+          "name": "Đồng hồ treo tường",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/clock.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_watch",
+          "name": "Đồng hồ đeo tay",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/watch.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_bell",
+          "name": "Chuông báo",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/bell.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_key",
+          "name": "Chìa khóa",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/key.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_lock",
+          "name": "Ổ khóa bảo mật",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/lock.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_flashlight",
+          "name": "Đèn pin",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/flashlight.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_lightbulb",
+          "name": "Bóng đèn sáng tạo",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/lightbulb.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_glasses",
+          "name": "Kính mắt",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/glasses.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_book_open",
+          "name": "Sách mở",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/book-open.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_coffee",
+          "name": "Tách cà phê",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/coffee.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tools_shield",
+          "name": "Khiên bảo vệ",
+          "url": "https://zenq-graphics-api-online.vercel.app/tools/shield.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Phương tiện giao thông",
+      "items": [
+        {
+          "id": "transport_car",
+          "name": "Xe ô tô",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/car.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_car_front",
+          "name": "Đầu xe ô tô",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/car-front.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_bus",
+          "name": "Xe buýt",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/bus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_bus_front",
+          "name": "Đầu xe buýt",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/bus-front.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_truck",
+          "name": "Xe tải",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/truck.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_bike",
+          "name": "Xe đạp thể thao",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/bike.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_train_front",
+          "name": "Tàu hỏa",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/train-front.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_plane_takeoff",
+          "name": "Máy bay cất cánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/plane-takeoff.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_plane_landing",
+          "name": "Máy bay hạ cánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/plane-landing.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_rocket",
+          "name": "Tên lửa",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/rocket.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_sailboat",
+          "name": "Thuyền buồm",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/sailboat.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_gauge",
+          "name": "Đồng hồ tốc độ",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/gauge.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_traffic_cone",
+          "name": "Cọc phân làn giao thông",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/traffic-cone.svg",
+          "type": "svg"
+        },
+        {
+          "id": "transport_cable_car",
+          "name": "Cáp treo du lịch",
+          "url": "https://zenq-graphics-api-online.vercel.app/transport/cable-car.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Thế giới động vật",
+      "items": [
+        {
+          "id": "animals_bird",
+          "name": "Chim muông",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/bird.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_cat",
+          "name": "Mèo con",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/cat.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_dog",
+          "name": "Cún con",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/dog.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_rabbit",
+          "name": "Thỏ trắng",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/rabbit.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_fish",
+          "name": "Cá bơi",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/fish.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_bug",
+          "name": "Bọ cánh cứng",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/bug.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_snail",
+          "name": "Ốc sên",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/snail.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_paw_print",
+          "name": "Dấu chân thú",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/paw-print.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_feather",
+          "name": "Lông vũ chim",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/feather.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_egg",
+          "name": "Trứng ấp",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/egg.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_bone",
+          "name": "Khúc xương",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/bone.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_worm",
+          "name": "Sâu bọ",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/worm.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_shell",
+          "name": "Vỏ sò biển",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/shell.svg",
+          "type": "svg"
+        },
+        {
+          "id": "animals_turtle",
+          "name": "Rùa biển",
+          "url": "https://zenq-graphics-api-online.vercel.app/animals/turtle.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Khung viền & Nhãn cổ điển",
+      "items": [
+        {
+          "id": "frames_frame_red_gold",
+          "name": "Khung đỏ viền vàng sang trọng",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-red-gold.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_vintage_rect",
+          "name": "Khung viền chữ nhật góc khuyết",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-vintage-rect.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_vintage_vertical",
+          "name": "Khung viền đứng giấy khen",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-vintage-vertical.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_ornate_badge",
+          "name": "Khung nhãn góc lượn cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-ornate-badge.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_divider_vintage_swirl",
+          "name": "Hoa văn phân cách cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/divider-vintage-swirl.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_divider_flourish",
+          "name": "Đường nét hoa văn cách điệu",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/divider-flourish.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_certificate_luxury",
+          "name": "Khung chứng chỉ mạ vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-certificate-luxury.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_floral_corners",
+          "name": "Khung viền góc hoa văn tây phương",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-floral-corners.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_polaroid_shadow",
+          "name": "Khung ảnh nghệ thuật viền nổi",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-polaroid-shadow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_divider_laurel_wreath",
+          "name": "Vòng nguyệt quế vinh danh",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/divider-laurel-wreath.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_classic_double",
+          "name": "Khung viền đôi thanh lịch",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-classic-double.svg",
+          "type": "svg"
+        },
+        {
+          "id": "frames_frame_art_deco",
+          "name": "Khung góc phong cách Art Deco",
+          "url": "https://zenq-graphics-api-online.vercel.app/frames/frame-art-deco.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Sóng nghệ thuật & Làn khói",
+      "items": [
+        {
+          "id": "waves_effects_smoke_golden_swirl",
+          "name": "Dải khói vàng hoàng kim",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/smoke-golden-swirl.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_smoke_golden_flow",
+          "name": "Làn khói vàng uốn lượn",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/smoke-golden-flow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_wave_abstract_blue",
+          "name": "Dải sóng vector xanh nghệ thuật",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/wave-abstract-blue.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_wave_flowing_cyan",
+          "name": "Dải lụa vector phát sáng",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/wave-flowing-cyan.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_light_beam_glow",
+          "name": "Tia sáng lung linh phát quang",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/light-beam-glow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_sparkle_starburst_gold",
+          "name": "Ngôi sao tỏa sáng hoàng kim",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/sparkle-starburst-gold.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_wave_mesh_gradient",
+          "name": "Lưới sóng đa sắc hiện đại",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/wave-mesh-gradient.svg",
+          "type": "svg"
+        },
+        {
+          "id": "waves_effects_sunburst_vintage",
+          "name": "Tia sáng mặt trời tỏa rạng",
+          "url": "https://zenq-graphics-api-online.vercel.app/waves_effects/sunburst-vintage.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Chuyển màu & Gradient",
+      "items": [
+        {
+          "id": "gradients_gradient_scrim_fade_black",
+          "name": "Chuyển mượt đen về trong suốt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-scrim-fade-black.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_scrim_fade_white",
+          "name": "Chuyển mượt trắng về trong suốt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-scrim-fade-white.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_bilateral_sides_to_center",
+          "name": "Chuyển mượt 2 bên vào giữa trong suốt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-bilateral-sides-to-center.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_bilateral_center_to_sides",
+          "name": "Dải sáng tâm tỏa mờ 2 bên",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-bilateral-center-to-sides.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_bilateral_vertical",
+          "name": "Chuyển mượt trên dưới vào giữa trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-bilateral-vertical.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_radial_spotlight_soft",
+          "name": "Tâm phát sáng tỏa mượt về trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-radial-spotlight-soft.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_radial_sunlight_warm",
+          "name": "Hào quang ánh dương ấm áp",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-radial-sunlight-warm.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_curved_arch_fade",
+          "name": "Vòm cầu cong chuyển mượt về trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-curved-arch-fade.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_wave_flow_fade",
+          "name": "Sóng uốn lượn chuyển mượt về trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-wave-flow-fade.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_oval_pill_glow",
+          "name": "Hình con nhộng phát sáng chuyển mượt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-oval-pill-glow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_corner_vignette_l",
+          "name": "Bóng đổ viền trái mờ dần vào trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-corner-vignette-l.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_corner_vignette_r",
+          "name": "Bóng đổ viền phải mờ dần vào trong",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-corner-vignette-r.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_diagonal_cyber_cyan",
+          "name": "Góc neon xanh cyber chuyển mượt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-diagonal-cyber-cyan.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_neon_violet_aura",
+          "name": "Hào quang tím neon phát sáng tròn",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-neon-violet-aura.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_emerald_ambient",
+          "name": "Hào quang xanh ngọc lục bảo mượt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-emerald-ambient.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_split_diagonal_fade",
+          "name": "Chuyển mượt góc chéo về trong suốt",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-split-diagonal-fade.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_dark_fade",
+          "name": "Chuyển sắc đen mờ dần",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-dark-fade.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_vignette_black",
+          "name": "Khung bóng đổ viền mờ tối",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-vignette-black.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_soft_linear",
+          "name": "Chuyển sắc xám trắng mềm mại",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-soft-linear.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_radial_glow",
+          "name": "Vòng sáng tỏa tâm radial",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-radial-glow.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_sunset_warm",
+          "name": "Chuyển sắc hoàng hôn ấm áp",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-sunset-warm.svg",
+          "type": "svg"
+        },
+        {
+          "id": "gradients_gradient_bottom_shadow",
+          "name": "Bóng đổ chân trang tối",
+          "url": "https://zenq-graphics-api-online.vercel.app/gradients/gradient-bottom-shadow.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Hoa & Nghệ thuật minh họa",
+      "items": [
+        {
+          "id": "artistic_floral_flower_glowing_lily",
+          "name": "Bông hoa bách hợp phát sáng",
+          "url": "https://zenq-graphics-api-online.vercel.app/artistic_floral/flower-glowing-lily.svg",
+          "type": "svg"
+        },
+        {
+          "id": "artistic_floral_flower_blooming_lotus",
+          "name": "Hoa sen nở rực rỡ",
+          "url": "https://zenq-graphics-api-online.vercel.app/artistic_floral/flower-blooming-lotus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "artistic_floral_botanical_gold_branch",
+          "name": "Cành lá vàng ánh kim",
+          "url": "https://zenq-graphics-api-online.vercel.app/artistic_floral/botanical-gold-branch.svg",
+          "type": "svg"
+        },
+        {
+          "id": "artistic_floral_flower_vintage_rose",
+          "name": "Hoa hồng cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/artistic_floral/flower-vintage-rose.svg",
+          "type": "svg"
+        }
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ namespace GenOffice.UI
         public bool Underline { get; set; }
         public int Align { get; set; } // 0: Left, 1: Center, 2: Right, -1: Mixed
         public int VAlign { get; set; } // 0: Top, 1: Middle, 2: Bottom, -1: Mixed
+        public int Indent { get; set; }
         public bool WrapText { get; set; }
         public bool IsMerged { get; set; }
         public string NumberFormat { get; set; }
@@ -35,6 +36,7 @@ namespace GenOffice.UI
             Underline = false;
             Align = 0;
             VAlign = 1;
+            Indent = 0;
             WrapText = false;
             IsMerged = false;
             NumberFormat = "General";
@@ -107,6 +109,11 @@ namespace GenOffice.UI
         public Dictionary<uint, int> CustomColWidths { get; set; }
         public Dictionary<uint, int> CustomRowHeights { get; set; }
         public List<DocShapeObject> Shapes { get; set; }
+        public List<DocShapeObject> FloatingObjects
+        {
+            get { return Shapes; }
+            set { Shapes = value; }
+        }
         public List<ExcelTableInfo> Tables { get; set; }
         public Color TabColor { get; set; }
 
@@ -128,6 +135,11 @@ namespace GenOffice.UI
 
     public class CalcView
     {
+        public Action InvalidateCallback;
+        public void Invalidate()
+        {
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
         public List<SparseMatrix> Sheets { get; set; }
         public List<string> SheetNames { get; set; }
         public List<CalcSheetState> SheetStates { get; set; }
@@ -137,9 +149,16 @@ namespace GenOffice.UI
             get { return _activeSheetIndex; }
             set
             {
-                if (value >= 0 && value < Sheets.Count)
+                if (value >= 0 && Sheets != null && value < Sheets.Count)
                 {
-                    SwitchToSheet(value);
+                    if (_activeSheetIndex != value)
+                    {
+                        SwitchToSheet(value);
+                    }
+                    else
+                    {
+                        LoadSheetState(value);
+                    }
                 }
             }
         }
@@ -173,6 +192,16 @@ namespace GenOffice.UI
 
         public int DefaultColWidth { get; set; }
         public int DefaultRowHeight { get; set; }
+
+        public Form ParentForm { get; set; }
+
+        private List<Tuple<uint, uint, CellData>> _clipboardCells = new List<Tuple<uint, uint, CellData>>();
+        private uint _clipRowCount = 0;
+        private uint _clipColCount = 0;
+        private bool _clipboardIsCut = false;
+        private SparseMatrix _clipboardSourceSheet = null;
+        private uint _clipSourceStartRow = 0;
+        private uint _clipSourceStartCol = 0;
 
         public bool IsEditing { get; set; }
         public string EditText { get; set; }
@@ -216,6 +245,16 @@ namespace GenOffice.UI
         public bool ShowGridlines { get; set; }
         public bool ShowHeadings { get; set; }
         public bool ShowFormulaBar { get; set; }
+        public bool IsFormulaBarExpanded { get; set; }
+        public Rectangle FormulaBarChevronBounds { get; set; }
+        public Rectangle ActiveCellDropdownButtonBounds { get; set; }
+        public bool IsHoveringCellDropdown { get; set; }
+        public bool IsHoveringFormulaChevron { get; set; }
+
+        public int FormulaBarHeight
+        {
+            get { return ShowFormulaBar ? (IsFormulaBarExpanded ? 84 : 30) : 0; }
+        }
 
         // Format Painter
         public bool IsFormatPainterActive { get; set; }
@@ -232,9 +271,20 @@ namespace GenOffice.UI
         public List<FormulaSuggestion> AllFormulas { get; set; }
         public List<FormulaSuggestion> ActiveSuggestions { get; set; }
         public int SelectedSuggestionIndex { get; set; }
+        public Rectangle FormulaSuggestionsBounds { get; set; }
+
+        // Caret screen coordinates for word suggestion popup positioning
+        public int CurrentCaretScreenX { get; set; }
+        public int CurrentCaretScreenY { get; set; }
+        public int CurrentCaretScreenH { get; set; }
 
         // Shapes & Pictures (Drawing Objects)
         public List<DocShapeObject> Shapes { get; set; }
+        public List<DocShapeObject> FloatingObjects
+        {
+            get { return Shapes; }
+            set { Shapes = value; }
+        }
         public DocShapeObject SelectedShape { get; set; }
         public int SelectedShapeHandle { get; set; }
         public Point DragStartMouse { get; set; }
@@ -243,6 +293,7 @@ namespace GenOffice.UI
         public Rectangle PlusBtnChartRect { get; set; }
         public Rectangle StyleBtnChartRect { get; set; }
         public Rectangle FilterBtnChartRect { get; set; }
+        private CalcFindReplaceDialog _findReplaceDlg;
 
         // Excel Tables & Filtering
         public List<ExcelTableInfo> Tables { get; set; }
@@ -257,6 +308,16 @@ namespace GenOffice.UI
         public ExcelTableInfo ResizingTable { get; set; }
         public uint TableResizeTargetRow { get; set; }
         public uint TableResizeTargetCol { get; set; }
+
+        // Drag & Drop Cell / Range Move & Copy
+        public bool IsDraggingCellMove { get; set; }
+        public uint MoveSourceStartRow { get; set; }
+        public uint MoveSourceEndRow { get; set; }
+        public uint MoveSourceStartCol { get; set; }
+        public uint MoveSourceEndCol { get; set; }
+        public uint MoveTargetRow { get; set; }
+        public uint MoveTargetCol { get; set; }
+        public bool IsCopyMode { get; set; }
 
         // Sparklines (Mini cell charts)
         public Dictionary<long, SparklineInfo> Sparklines { get; set; }
@@ -557,8 +618,8 @@ namespace GenOffice.UI
                 st.SelEndCol = SelEndCol;
                 st.ScrollRow = ScrollRow;
                 st.ScrollCol = ScrollCol;
-                st.CustomColWidths = new Dictionary<uint, int>(CustomColWidths);
-                st.CustomRowHeights = new Dictionary<uint, int>(CustomRowHeights);
+                st.CustomColWidths = CustomColWidths != null ? new Dictionary<uint, int>(CustomColWidths) : new Dictionary<uint, int>();
+                st.CustomRowHeights = CustomRowHeights != null ? new Dictionary<uint, int>(CustomRowHeights) : new Dictionary<uint, int>();
                 st.Shapes = Shapes != null ? new List<DocShapeObject>(Shapes) : new List<DocShapeObject>();
                 st.Tables = Tables != null ? new List<ExcelTableInfo>(Tables) : new List<ExcelTableInfo>();
             }
@@ -574,6 +635,7 @@ namespace GenOffice.UI
 
             if (sheetIndex >= 0 && sheetIndex < SheetStates.Count)
             {
+                _activeSheetIndex = sheetIndex;
                 var st = SheetStates[sheetIndex];
                 SelectedRow = Math.Max(1, st.SelectedRow);
                 SelectedCol = Math.Max(1, st.SelectedCol);
@@ -581,8 +643,8 @@ namespace GenOffice.UI
                 SelEndCol = Math.Max(1, st.SelEndCol);
                 ScrollRow = Math.Max(1, st.ScrollRow);
                 ScrollCol = Math.Max(1, st.ScrollCol);
-                CustomColWidths = new Dictionary<uint, int>(st.CustomColWidths);
-                CustomRowHeights = new Dictionary<uint, int>(st.CustomRowHeights);
+                CustomColWidths = st.CustomColWidths != null ? new Dictionary<uint, int>(st.CustomColWidths) : new Dictionary<uint, int>();
+                CustomRowHeights = st.CustomRowHeights != null ? new Dictionary<uint, int>(st.CustomRowHeights) : new Dictionary<uint, int>();
                 Shapes = st.Shapes != null ? new List<DocShapeObject>(st.Shapes) : new List<DocShapeObject>();
                 Tables = st.Tables != null ? new List<ExcelTableInfo>(st.Tables) : new List<ExcelTableInfo>();
             }
@@ -905,7 +967,7 @@ namespace GenOffice.UI
 
         public void PopulateDemoData(SparseMatrix sheet)
         {
-            sheet.SetCellText(1, 1, "BÁO CÁO DOANH THU & LỢI NHUẬN GENOFFICE Q3/2026");
+            sheet.SetCellText(1, 1, "BÁO CÁO DOANH THU & LỢI NHUẬN ZENQ OFFICE Q3/2026");
             CellData titleCell = sheet.GetOrCreateCell(1, 1);
             titleCell.Format.Bold = true;
             titleCell.Format.FontSize = 13.0f;
@@ -920,13 +982,13 @@ namespace GenOffice.UI
             sheet.SetCellText(3, 5, "Thành Tiền ($)");
 
             sheet.SetCellText(4, 1, "SP-001");
-            sheet.SetCellText(4, 2, "GenOffice Suite Pro 2026");
+            sheet.SetCellText(4, 2, "ZENQ OFFICE Suite Pro 2026");
             sheet.SetCellText(4, 3, "250");
             sheet.SetCellText(4, 4, "120");
             sheet.SetCellText(4, 5, "=C4*D4");
 
             sheet.SetCellText(5, 1, "SP-002");
-            sheet.SetCellText(5, 2, "GenWriter Cloud Enterprise");
+            sheet.SetCellText(5, 2, "ZenQ Writer Cloud Enterprise");
             sheet.SetCellText(5, 3, "180");
             sheet.SetCellText(5, 4, "85");
             sheet.SetCellText(5, 5, "=C5*D5");
@@ -1041,11 +1103,13 @@ namespace GenOffice.UI
 
         public void Draw(Graphics g, int width, int height)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Default;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
             int fBarY = 155;
-            int fBarH = 30;
+            int fBarH = IsFormulaBarExpanded ? 84 : 30;
 
             // ==================== 1. Formula Bar & Name Box (Y: 155 to 185) ====================
             if (ShowFormulaBar)
@@ -1079,7 +1143,7 @@ namespace GenOffice.UI
                 }
 
                 // Vertical Divider
-                g.DrawLine(Pens.LightGray, nameBox.Right + 6, fBarY + 5, nameBox.Right + 6, fBarY + fBarH - 5);
+                g.DrawLine(Pens.LightGray, nameBox.Right + 6, fBarY + 5, nameBox.Right + 6, fBarY + 28);
 
                 // 1.2 Action Buttons: Cancel (✕), Enter (✓), fx
                 int btnStartX = nameBox.Right + 12;
@@ -1130,12 +1194,14 @@ namespace GenOffice.UI
                 }
 
                 // Vertical Divider
-                g.DrawLine(Pens.LightGray, fxBox.Right + 6, fBarY + 5, fxBox.Right + 6, fBarY + fBarH - 5);
+                g.DrawLine(Pens.LightGray, fxBox.Right + 6, fBarY + 5, fxBox.Right + 6, fBarY + 28);
 
-                // 1.3 Formula Input Box
+                // 1.3 Formula Input Box & Expand/Collapse Chevron (Ctrl+Shift+U)
+                int fChevronW = 24;
                 int fInputX = fxBox.Right + 12;
-                int fInputW = width - fInputX - 10;
-                Rectangle fBox = new Rectangle(fInputX, fBarY + 3, fInputW, 23);
+                int fInputW = width - fInputX - 10 - fChevronW;
+                int fInputH = IsFormulaBarExpanded ? (fBarH - 8) : 23;
+                Rectangle fBox = new Rectangle(fInputX, fBarY + 3, fInputW, fInputH);
                 using (GraphicsPath fPath = CreateRoundedPath(fBox, 3))
                 {
                     g.FillPath(Brushes.White, fPath);
@@ -1145,11 +1211,47 @@ namespace GenOffice.UI
                     }
                 }
 
+                // Expand/Collapse Chevron Button on right of Formula Bar
+                Rectangle chevBox = new Rectangle(width - 10 - fChevronW + 2, fBarY + 3, fChevronW - 2, 23);
+                FormulaBarChevronBounds = chevBox;
+                using (GraphicsPath cPath = CreateRoundedPath(chevBox, 3))
+                {
+                    g.FillPath(IsHoveringFormulaChevron ? Brushes.WhiteSmoke : Brushes.White, cPath);
+                    using (Pen cPen = new Pen(Color.FromArgb(203, 213, 225), 1f)) g.DrawPath(cPen, cPath);
+                }
+                using (Pen cPen = new Pen(Color.FromArgb(100, 116, 139), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    float cx = chevBox.X + chevBox.Width / 2f;
+                    float cy = chevBox.Y + chevBox.Height / 2f;
+                    if (IsFormulaBarExpanded)
+                    {
+                        // Up arrow ▴
+                        g.DrawLine(cPen, cx - 4, cy + 2, cx, cy - 2);
+                        g.DrawLine(cPen, cx, cy - 2, cx + 4, cy + 2);
+                    }
+                    else
+                    {
+                        // Down arrow ▾
+                        g.DrawLine(cPen, cx - 4, cy - 2, cx, cy + 2);
+                        g.DrawLine(cPen, cx, cy + 2, cx + 4, cy - 2);
+                    }
+                }
+
                 using (Font normFont = new Font("Segoe UI", 9f, FontStyle.Regular))
                 {
                     CellData cell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
                     string fDisplay = IsEditing ? EditText : (cell != null ? (!string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "")) : "");
-                    g.DrawString(fDisplay, normFont, Brushes.Black, fBox.X + 8, fBox.Y + 4);
+                    Rectangle fTextBounds = new Rectangle(fBox.X + 8, fBox.Y + 4, fBox.Width - 16, fBox.Height - 8);
+                    TextFormatFlags fFlags = TextFormatFlags.Left | TextFormatFlags.NoPadding;
+                    if (IsFormulaBarExpanded)
+                    {
+                        fFlags |= TextFormatFlags.Top | TextFormatFlags.WordBreak;
+                    }
+                    else
+                    {
+                        fFlags |= TextFormatFlags.SingleLine;
+                    }
+                    TextRenderer.DrawText(g, fDisplay, normFont, fTextBounds, Color.Black, fFlags);
 
                     if (IsEditing)
                     {
@@ -1160,11 +1262,15 @@ namespace GenOffice.UI
                     }
                 }
             }
+            else
+            {
+                FormulaBarChevronBounds = Rectangle.Empty;
+            }
 
             // ==================== 2. Spreadsheet Grid Headers & Rows ====================
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
-            int startY = ShowFormulaBar ? (fBarY + fBarH) : fBarY;
+            int startY = fBarY + FormulaBarHeight;
             int vScrollW = 16;
             int bottomBarH = 56; // Sheet tabs (28px) + Status bar (28px)
             int gridW = width - vScrollW;
@@ -1219,11 +1325,8 @@ namespace GenOffice.UI
                         using (Pen p = new Pen(Color.FromArgb(226, 232, 240))) g.DrawRectangle(p, cRect);
 
                         string colName = SparseMatrix.ColIndexToName(colIdx);
-                        SizeF sz = g.MeasureString(colName, isColSelected ? hSelFont : hFont);
-                        using (SolidBrush txtB = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                        {
-                            g.DrawString(colName, isColSelected ? hSelFont : hFont, isColSelected ? Color.FromArgb(16, 124, 65).ToBrush() : txtB, curX + (cW - sz.Width) / 2, startY + 4);
-                        }
+                        Rectangle colTextRect = new Rectangle(curX, startY, cW, headerH);
+                        TextRenderer.DrawText(g, colName, isColSelected ? hSelFont : hFont, colTextRect, isColSelected ? Color.FromArgb(16, 124, 65) : Color.FromArgb(71, 85, 105), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
                         // Split divider line
                         using (Pen divP = new Pen(Color.FromArgb(203, 213, 225)))
@@ -1272,11 +1375,8 @@ namespace GenOffice.UI
                     using (Font rFont = new Font("Segoe UI", 8.5f, isRowSelected ? FontStyle.Bold : FontStyle.Regular))
                     {
                         string rStr = rowIdx.ToString();
-                        SizeF sz = g.MeasureString(rStr, rFont);
-                        using (SolidBrush txtB = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                        {
-                            g.DrawString(rStr, rFont, isRowSelected ? Color.FromArgb(16, 124, 65).ToBrush() : txtB, headerW - sz.Width - 6, curY + (rH - sz.Height) / 2);
-                        }
+                        Rectangle rowTextRect = new Rectangle(0, curY, headerW - 6, rH);
+                        TextRenderer.DrawText(g, rStr, rFont, rowTextRect, isRowSelected ? Color.FromArgb(16, 124, 65) : Color.FromArgb(71, 85, 105), TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     }
                 }
 
@@ -1319,9 +1419,11 @@ namespace GenOffice.UI
 
                     // Background color
                     Color cellBg = Color.White;
-                    if (cell != null && cell.Format != null && cell.Format.BgColor != unchecked((int)0xFFFFFFFF))
+                    if (cell != null && cell.Format != null && cell.Format.BgColor != unchecked((int)0xFFFFFFFF) && cell.Format.BgColor != 0)
                     {
-                        cellBg = Color.FromArgb(cell.Format.BgColor);
+                        int bg = cell.Format.BgColor;
+                        if ((bg & unchecked((int)0xFF000000)) == 0 && bg != 0) bg |= unchecked((int)0xFF000000);
+                        cellBg = Color.FromArgb(bg);
                     }
 
                     using (SolidBrush bgB = new SolidBrush(cellBg))
@@ -1392,7 +1494,22 @@ namespace GenOffice.UI
                         if (cell != null && (!string.IsNullOrEmpty(cell.EvaluatedStr) || !string.IsNullOrEmpty(cell.RawValue) || (cell.Format != null && cell.Format.IsDiagonalHeader)))
                         {
                             string dispText = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : (cell.RawValue ?? "");
-                            Color txtColor = (cell.Format != null && cell.Format.TextColor != 0) ? Color.FromArgb(cell.Format.TextColor) : Color.Black;
+                            int tc = (cell.Format != null && cell.Format.TextColor != 0) ? cell.Format.TextColor : unchecked((int)0xFF000000);
+                            if ((tc & unchecked((int)0xFF000000)) == 0 && tc != 0) tc |= unchecked((int)0xFF000000);
+                            Color txtColor = Color.FromArgb(tc);
+
+                            // Auto-contrast safeguard: nếu màu chữ trùng/quá gần màu nền ô, tự động đổi màu để luôn nhìn thấy rõ
+                            if (cellBg.A > 0)
+                            {
+                                int diffR = Math.Abs(txtColor.R - cellBg.R);
+                                int diffG = Math.Abs(txtColor.G - cellBg.G);
+                                int diffB = Math.Abs(txtColor.B - cellBg.B);
+                                if (diffR + diffG + diffB < 60)
+                                {
+                                    int bgLum = (cellBg.R * 299 + cellBg.G * 587 + cellBg.B * 114) / 1000;
+                                    txtColor = bgLum > 130 ? Color.FromArgb(15, 23, 42) : Color.White;
+                                }
+                            }
 
                             FontStyle fontStyle = FontStyle.Regular;
                             if (cell.Format != null)
@@ -1448,23 +1565,61 @@ namespace GenOffice.UI
                                 }
                                 else
                                 {
-                                    SizeF sz = g.MeasureString(dispText, font);
-                                    float drawX = curX + 5;
-                                    float drawY = curY + (renderH - sz.Height) / 2;
+                                    bool isTallRow = renderH >= 30;
+                                    bool hasNewlines = dispText.Contains("\r") || dispText.Contains("\n");
+                                    bool isExplicitWrap = cell.Format != null && cell.Format.WrapText;
+                                    bool wrapText = isExplicitWrap || isTallRow || hasNewlines;
+                                    int indentPx = (cell.Format != null && cell.Format.Indent > 0) ? cell.Format.Indent * 10 : 0;
+
+                                    string textToDraw = dispText;
+                                    if (!wrapText && (textToDraw.Contains("\r") || textToDraw.Contains("\n")))
+                                    {
+                                        textToDraw = textToDraw.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+                                    }
+
+                                    // Determine horizontal render bounds (overflow only into truly empty adjacent cells)
+                                    int textRenderW = renderW;
+                                    if (!wrapText && (cell.Format == null || cell.Format.Align == 0))
+                                    {
+                                        uint nextC = colIdx + (cell.Format != null && cell.Format.IsMergedParent ? (uint)Math.Max(1, cell.Format.MergeColSpan) : 1);
+                                        while (curX + textRenderW < gridW)
+                                        {
+                                            CellData nextCell = CurrentSheet.GetCell(rowIdx, nextC);
+                                            bool hasContent = nextCell != null && (!string.IsNullOrEmpty(nextCell.EvaluatedStr) || !string.IsNullOrEmpty(nextCell.RawValue) || (nextCell.Format != null && nextCell.Format.BgColor != 0 && nextCell.Format.BgColor != unchecked((int)0xFFFFFFFF)));
+                                            if (hasContent) break;
+                                            textRenderW += GetColWidth(nextC);
+                                            nextC++;
+                                        }
+                                    }
+
+                                    Rectangle textBounds = new Rectangle(curX + 4 + indentPx, curY + (wrapText ? 2 : 0), Math.Max(0, textRenderW - 8 - indentPx), wrapText ? Math.Max(0, renderH - 4) : renderH);
+                                    TextFormatFlags flags = TextFormatFlags.Left | (wrapText ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter) | TextFormatFlags.NoPadding | TextFormatFlags.PreserveGraphicsClipping;
+
+                                    if (wrapText)
+                                    {
+                                        flags |= TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl;
+                                    }
+                                    else
+                                    {
+                                        flags |= TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+                                    }
 
                                     if (cell.Format != null)
                                     {
-                                        if (cell.Format.Align == 1) drawX = curX + (renderW - sz.Width) / 2; // Center
-                                        else if (cell.Format.Align == 2) drawX = curX + renderW - sz.Width - 6; // Right
+                                        if (cell.Format.Align == 1) { flags &= ~TextFormatFlags.Left; flags |= TextFormatFlags.HorizontalCenter; }
+                                        else if (cell.Format.Align == 2) { flags &= ~TextFormatFlags.Left; flags |= TextFormatFlags.Right; }
 
-                                        if (cell.Format.VAlign == 0) drawY = curY + 2; // Top
-                                        else if (cell.Format.VAlign == 2) drawY = curY + renderH - sz.Height - 2; // Bottom
+                                        if (cell.Format.VAlign == 0) { flags &= ~(TextFormatFlags.VerticalCenter); flags |= TextFormatFlags.Top; }
+                                        else if (cell.Format.VAlign == 1) { flags &= ~TextFormatFlags.Top; flags |= TextFormatFlags.VerticalCenter; }
+                                        else if (cell.Format.VAlign == 2) { flags &= ~(TextFormatFlags.Top | TextFormatFlags.VerticalCenter); flags |= TextFormatFlags.Bottom; }
                                     }
 
-                                    RectangleF clipRect = new RectangleF(curX, curY, renderW, renderH);
-                                    g.SetClip(clipRect);
-                                    g.DrawString(dispText, font, txtB, drawX, drawY);
-                                    g.ResetClip();
+                                    // Strict clipping prevents any vertical bleeding onto rows below or across neighboring data cells
+                                    Region prevCellClip = g.Clip;
+                                    Rectangle cellClip = new Rectangle(curX, curY, textRenderW, renderH);
+                                    g.SetClip(cellClip, CombineMode.Intersect);
+                                    TextRenderer.DrawText(g, textToDraw, font, textBounds, txtColor, flags);
+                                    g.Clip = prevCellClip;
                                 }
                             }
                         }
@@ -1559,6 +1714,89 @@ namespace GenOffice.UI
                 Rectangle handleRect = new Rectangle(selX1 + selW - handleSize / 2, selY1 + selH - handleSize / 2, handleSize, handleSize);
                 g.FillRectangle(Color.FromArgb(16, 124, 65).ToBrush(), handleRect);
                 g.DrawRectangle(Pens.White, handleRect);
+
+                // Dropdown Content Viewer Chevron Button [ ▾ ] (when active cell has long text or newlines)
+                CellData activeCell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
+                string activeText = activeCell != null ? (!string.IsNullOrEmpty(activeCell.EvaluatedStr) ? activeCell.EvaluatedStr : (!string.IsNullOrEmpty(activeCell.FormulaStr) ? activeCell.FormulaStr : (activeCell.RawValue ?? ""))) : "";
+                bool isLongOrMultiline = activeText.Length > 20 || activeText.Contains("\n") || activeText.Contains("\r");
+                if (isLongOrMultiline && minSelR == maxSelR && minSelC == maxSelC && selW >= 32 && selH >= 18)
+                {
+                    int btnSize = 16;
+                    Rectangle dropBtn = new Rectangle(selX1 + selW - btnSize - 1, selY1 + selH - btnSize - 1, btnSize, btnSize);
+                    ActiveCellDropdownButtonBounds = dropBtn;
+                    using (SolidBrush bBg = new SolidBrush(IsHoveringCellDropdown ? Color.FromArgb(235, 245, 238) : Color.FromArgb(248, 250, 252)))
+                    using (Pen pBdr = new Pen(Color.FromArgb(16, 124, 65), 1.2f))
+                    {
+                        g.FillRectangle(bBg, dropBtn);
+                        g.DrawRectangle(pBdr, dropBtn);
+                    }
+                    using (Pen pChev = new Pen(Color.FromArgb(16, 124, 65), 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                    {
+                        g.DrawLine(pChev, dropBtn.X + 4.5f, dropBtn.Y + 6.5f, dropBtn.X + 8f, dropBtn.Y + 10.5f);
+                        g.DrawLine(pChev, dropBtn.X + 8f, dropBtn.Y + 10.5f, dropBtn.X + 11.5f, dropBtn.Y + 6.5f);
+                    }
+                }
+                else
+                {
+                    ActiveCellDropdownButtonBounds = Rectangle.Empty;
+                }
+            }
+
+            // ==================== 3.0b Visual Feedback when Dragging Cell Range ====================
+            if (IsDraggingCellMove && MoveTargetRow > 0 && MoveTargetCol > 0)
+            {
+                uint srcMinR = Math.Min(MoveSourceStartRow, MoveSourceEndRow);
+                uint srcMaxR = Math.Max(MoveSourceStartRow, MoveSourceEndRow);
+                uint srcMinC = Math.Min(MoveSourceStartCol, MoveSourceEndCol);
+                uint srcMaxC = Math.Max(MoveSourceStartCol, MoveSourceEndCol);
+
+                uint spanR = srcMaxR - srcMinR + 1;
+                uint spanC = srcMaxC - srcMinC + 1;
+
+                int dstX = GetColScreenX(MoveTargetCol, headerW);
+                int dstY = GetRowScreenY(MoveTargetRow, startY, headerH);
+
+                int dstW = 0;
+                for (uint c = 0; c < spanC; c++) dstW += GetColWidth(MoveTargetCol + c);
+                int dstH = 0;
+                for (uint r = 0; r < spanR; r++) dstH += GetRowHeight(MoveTargetRow + r);
+
+                if (dstW > 0 && dstH > 0)
+                {
+                    using (SolidBrush ghostB = new SolidBrush(Color.FromArgb(40, 16, 124, 65)))
+                    {
+                        g.FillRectangle(ghostB, dstX, dstY, dstW, dstH);
+                    }
+
+                    using (Pen ghostPen = new Pen(Color.FromArgb(16, 124, 65), 2f))
+                    {
+                        ghostPen.DashStyle = DashStyle.Dash;
+                        g.DrawRectangle(ghostPen, dstX, dstY, dstW, dstH);
+                    }
+
+                    string targetRangeName = string.Format("{0}{1}", SparseMatrix.ColIndexToName(MoveTargetCol), MoveTargetRow);
+                    if (spanR > 1 || spanC > 1)
+                    {
+                        string endRangeName = string.Format("{0}{1}", SparseMatrix.ColIndexToName(MoveTargetCol + spanC - 1), MoveTargetRow + spanR - 1);
+                        targetRangeName = string.Format("{0}:{1}", targetRangeName, endRangeName);
+                    }
+                    string badgeText = IsCopyMode ? string.Format("➕ Sao chép tới [{0}]", targetRangeName) : string.Format("✥ Dời tới [{0}]", targetRangeName);
+
+                    using (Font badgeFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+                    {
+                        SizeF bSz = g.MeasureString(badgeText, badgeFont);
+                        int badgeX = dstX + 6;
+                        int badgeY = Math.Max(startY + headerH + 2, dstY - 24);
+                        Rectangle badgeRect = new Rectangle(badgeX, badgeY, (int)bSz.Width + 12, 20);
+
+                        using (GraphicsPath bPath = CreateRoundedPath(badgeRect, 3))
+                        {
+                            using (SolidBrush bgB = new SolidBrush(Color.FromArgb(220, 15, 23, 42))) g.FillPath(bgB, bPath);
+                            g.DrawPath(Pens.DarkSlateGray, bPath);
+                        }
+                        g.DrawString(badgeText, badgeFont, Brushes.White, badgeX + 6, badgeY + 2);
+                    }
+                }
             }
             g.Restore(gStateSel);
 
@@ -1571,15 +1809,30 @@ namespace GenOffice.UI
                 {
                     g.DrawRectangle(ep, editingCellRect);
                 }
-                using (Font edFont = new Font("Calibri", 11f * ZoomFactor, FontStyle.Regular))
+                CellData editCell = CurrentSheet != null ? CurrentSheet.GetCell(SelectedRow, SelectedCol) : null;
+                string edFName = (editCell != null && editCell.Format != null && !string.IsNullOrEmpty(editCell.Format.FontName)) ? editCell.Format.FontName : "Calibri";
+                float edFSize = (editCell != null && editCell.Format != null && editCell.Format.FontSize > 0) ? editCell.Format.FontSize : 11.0f;
+                FontStyle edFStyle = FontStyle.Regular;
+                if (editCell != null && editCell.Format != null)
                 {
+                    if (editCell.Format.Bold) edFStyle |= FontStyle.Bold;
+                    if (editCell.Format.Italic) edFStyle |= FontStyle.Italic;
+                    if (editCell.Format.Underline) edFStyle |= FontStyle.Underline;
+                }
+
+                using (Font edFont = new Font(edFName, edFSize * ZoomFactor, edFStyle))
+                {
+                    Region prevEdClip = g.Clip;
+                    Rectangle clipBox = new Rectangle(editingCellRect.X + 2, editingCellRect.Y + 2, Math.Max(1, editingCellRect.Width - 4), Math.Max(1, editingCellRect.Height - 4));
+                    g.SetClip(clipBox, CombineMode.Intersect);
+
                     // Selection highlight in editing cell
                     if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
                     {
                         string pre = EditText.Substring(0, EditSelStart);
                         string sel = EditText.Substring(EditSelStart, EditSelLength);
-                        SizeF preSz = pre.Length > 0 ? g.MeasureString(pre, edFont) : SizeF.Empty;
-                        SizeF selSz = g.MeasureString(sel, edFont);
+                        Size preSz = pre.Length > 0 ? TextRenderer.MeasureText(g, pre, edFont, Size.Empty, TextFormatFlags.NoPadding) : Size.Empty;
+                        Size selSz = TextRenderer.MeasureText(g, sel, edFont, Size.Empty, TextFormatFlags.NoPadding);
 
                         float selX = editingCellRect.X + 4 + (pre.Length > 0 ? preSz.Width : 0);
                         RectangleF selBox = new RectangleF(selX, editingCellRect.Y + 3, selSz.Width, editingCellRect.Height - 6);
@@ -1589,15 +1842,32 @@ namespace GenOffice.UI
                         }
                     }
 
-                    g.DrawString(EditText, edFont, Brushes.Black, editingCellRect.X + 4, editingCellRect.Y + 3);
+                    Rectangle edTextBounds = new Rectangle(editingCellRect.X + 4, editingCellRect.Y + 3, Math.Max(0, editingCellRect.Width - 8), editingCellRect.Height - 6);
+                    bool edWrap = (editCell != null && editCell.Format != null && editCell.Format.WrapText) || editingCellRect.Height >= 30 || EditText.Contains("\n") || EditText.Contains("\r");
+                    TextFormatFlags edFlags = TextFormatFlags.Left | (edWrap ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter) | TextFormatFlags.NoPadding;
+                    if (edWrap)
+                    {
+                        edFlags |= TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl;
+                    }
+                    else
+                    {
+                        edFlags |= TextFormatFlags.SingleLine;
+                    }
+                    TextRenderer.DrawText(g, EditText, edFont, edTextBounds, Color.Black, edFlags);
 
+                    float curXPos = editingCellRect.X + 4;
                     if (EditSelLength == 0)
                     {
                         string sub = EditText.Substring(0, Math.Min(EditText.Length, EditCursorPos));
-                        SizeF sz = sub.Length > 0 ? g.MeasureString(sub, edFont) : SizeF.Empty;
-                        float curXPos = editingCellRect.X + 4 + (sub.Length > 0 ? sz.Width : 0);
+                        Size sz = sub.Length > 0 ? TextRenderer.MeasureText(g, sub, edFont, Size.Empty, TextFormatFlags.NoPadding) : Size.Empty;
+                        curXPos = editingCellRect.X + 4 + (sub.Length > 0 ? sz.Width : 0);
                         g.DrawLine(Pens.Black, curXPos, editingCellRect.Y + 3, curXPos, editingCellRect.Y + editingCellRect.Height - 4);
                     }
+                    CurrentCaretScreenX = (int)curXPos;
+                    CurrentCaretScreenY = editingCellRect.Bottom + 2;
+                    CurrentCaretScreenH = editingCellRect.Height;
+
+                    g.Clip = prevEdClip;
                 }
 
                 // Floating Formula Suggestions Popup
@@ -1905,37 +2175,51 @@ namespace GenOffice.UI
         {
             string query = EditText.Length > 1 ? EditText.Substring(1).Trim().ToUpper() : "";
             FilterFormulaSuggestions(query);
-            if (ActiveSuggestions.Count == 0) return;
-
-            int popW = 280;
-            int popH = Math.Min(6, ActiveSuggestions.Count) * 26 + 30;
-            Rectangle popRect = new Rectangle(x, y, popW, popH);
-
-            using (SolidBrush bg = new SolidBrush(Color.FromArgb(250, 250, 250))) g.FillRectangle(bg, popRect);
-            g.DrawRectangle(Pens.DarkSeaGreen, popRect);
-
-            using (Font fFont = new Font("Segoe UI", 9f, FontStyle.Bold))
-            using (Font dFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            if (ActiveSuggestions == null || ActiveSuggestions.Count == 0)
             {
-                int itemY = y + 4;
-                for (int i = 0; i < Math.Min(6, ActiveSuggestions.Count); i++)
+                FormulaSuggestionsBounds = Rectangle.Empty;
+                return;
+            }
+
+            int popW = 320;
+            int count = Math.Min(6, ActiveSuggestions.Count);
+            int popH = count * 26 + 32;
+            Rectangle popRect = new Rectangle(x, y, popW, popH);
+            FormulaSuggestionsBounds = popRect;
+
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(255, 255, 255))) g.FillRectangle(bg, popRect);
+            using (Pen p = new Pen(Color.FromArgb(16, 124, 65), 1.5f)) g.DrawRectangle(p, popRect);
+
+            using (Font fFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (Font dFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+            using (Font codeFont = new Font("Consolas", 8.5f, FontStyle.Regular))
+            {
+                int itemY = y + 3;
+                for (int i = 0; i < count; i++)
                 {
                     var sug = ActiveSuggestions[i];
                     Rectangle itemRect = new Rectangle(x + 2, itemY, popW - 4, 24);
                     if (i == SelectedSuggestionIndex)
                     {
-                        g.FillRectangle(Brushes.LightGreen, itemRect);
+                        using (SolidBrush selB = new SolidBrush(Color.FromArgb(220, 252, 231))) g.FillRectangle(selB, itemRect);
+                        using (Pen selP = new Pen(Color.FromArgb(34, 197, 94))) g.DrawRectangle(selP, itemRect);
+                        g.DrawString("fx", fFont, Color.FromArgb(16, 124, 65).ToBrush(), x + 6, itemY + 3);
+                        g.DrawString(sug.Name, fFont, Brushes.Black, x + 28, itemY + 3);
+                        g.DrawString(sug.Syntax, codeFont, Brushes.DimGray, x + 110, itemY + 4);
                     }
-
-                    g.DrawString(sug.Name, fFont, Brushes.Black, x + 6, itemY + 3);
-                    g.DrawString(sug.Syntax, dFont, Brushes.DimGray, x + 80, itemY + 4);
+                    else
+                    {
+                        g.DrawString("fx", fFont, Brushes.Gray, x + 6, itemY + 3);
+                        g.DrawString(sug.Name, fFont, Brushes.Black, x + 28, itemY + 3);
+                        g.DrawString(sug.Syntax, codeFont, Brushes.DimGray, x + 110, itemY + 4);
+                    }
                     itemY += 26;
                 }
 
                 if (SelectedSuggestionIndex >= 0 && SelectedSuggestionIndex < ActiveSuggestions.Count)
                 {
-                    g.DrawLine(Pens.LightGray, x, itemY, x + popW, itemY);
-                    g.DrawString(ActiveSuggestions[SelectedSuggestionIndex].Description, dFont, Brushes.DarkSlateGray, x + 6, itemY + 4);
+                    g.DrawLine(Pens.LightGray, x + 4, itemY + 1, x + popW - 4, itemY + 1);
+                    g.DrawString("💡 " + ActiveSuggestions[SelectedSuggestionIndex].Description, dFont, Brushes.DarkSlateGray, x + 6, itemY + 4);
                 }
             }
         }
@@ -1959,7 +2243,45 @@ namespace GenOffice.UI
             int fBarY = 155;
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
-            int startY = ShowFormulaBar ? (fBarY + 30) : fBarY;
+            int startY = fBarY + FormulaBarHeight;
+
+            // Check Active Cell Dropdown Reader or Formula Bar Chevron Hover
+            if (!ActiveCellDropdownButtonBounds.IsEmpty && ActiveCellDropdownButtonBounds.Contains(x, y))
+            {
+                return Cursors.Hand;
+            }
+            if (!FormulaBarChevronBounds.IsEmpty && FormulaBarChevronBounds.Contains(x, y))
+            {
+                return Cursors.Hand;
+            }
+
+            // Check Formula Suggestions Hover (Hand Cursor)
+            if (IsEditing && EditText != null && EditText.StartsWith("=") && ActiveSuggestions != null && ActiveSuggestions.Count > 0 && !FormulaSuggestionsBounds.IsEmpty && FormulaSuggestionsBounds.Contains(x, y))
+            {
+                return Cursors.Hand;
+            }
+
+            // 0a. Check In-Place Editing Cell & Formula Bar (Return IBeam text cursor)
+            if (IsEditing)
+            {
+                if (y >= fBarY && y <= fBarY + FormulaBarHeight && x >= 170)
+                {
+                    return Cursors.IBeam;
+                }
+
+                int curEditX = headerW;
+                for (uint c = ScrollCol; c < SelectedCol; c++) curEditX += GetColWidth(c);
+                int curEditY = startY + headerH;
+                for (uint r = ScrollRow; r < SelectedRow; r++) curEditY += GetRowHeight(r);
+                int editCellW = GetColWidth(SelectedCol);
+                int editCellH = GetRowHeight(SelectedRow);
+
+                Rectangle editRect = new Rectangle(curEditX, curEditY, Math.Max(editCellW, 80), Math.Max(editCellH, 24));
+                if (editRect.Contains(x, y))
+                {
+                    return Cursors.IBeam;
+                }
+            }
 
             // 0. Shape & Resize Handles Cursor
             if (SelectedShape != null)
@@ -2058,10 +2380,8 @@ namespace GenOffice.UI
             uint minSelR = Math.Min(SelectedRow, SelEndRow);
             uint maxSelR = Math.Max(SelectedRow, SelEndRow);
 
-            int selX1 = headerW;
-            for (uint c = ScrollCol; c < minSelC; c++) selX1 += GetColWidth(c);
-            int selY1 = startY + headerH;
-            for (uint r = ScrollRow; r < minSelR; r++) selY1 += GetRowHeight(r);
+            int selX1 = GetColScreenX(minSelC, headerW);
+            int selY1 = GetRowScreenY(minSelR, startY, headerH);
 
             int selW = 0;
             for (uint c = minSelC; c <= maxSelC; c++) selW += GetColWidth(c);
@@ -2073,6 +2393,21 @@ namespace GenOffice.UI
             if (Math.Abs(x - handleX) <= 5 && Math.Abs(y - handleY) <= 5)
             {
                 return Cursors.Cross;
+            }
+
+            // 3a. Selection Border Hover (Excel 4-Way Arrow Move Cursor `SizeAll`)
+            if (selW > 0 && selH > 0)
+            {
+                Rectangle selRect = new Rectangle(selX1, selY1, selW, selH);
+                bool onLeft = (Math.Abs(x - selRect.Left) <= 4 && y >= selRect.Top - 2 && y <= selRect.Bottom + 2);
+                bool onRight = (Math.Abs(x - selRect.Right) <= 4 && y >= selRect.Top - 2 && y <= selRect.Bottom + 2);
+                bool onTop = (Math.Abs(y - selRect.Top) <= 4 && x >= selRect.Left - 2 && x <= selRect.Right + 2);
+                bool onBottom = (Math.Abs(y - selRect.Bottom) <= 4 && x >= selRect.Left - 2 && x <= selRect.Right + 2);
+
+                if ((onLeft || onRight || onTop || onBottom) && !(Math.Abs(x - handleX) <= 6 && Math.Abs(y - handleY) <= 6))
+                {
+                    return Cursors.SizeAll;
+                }
             }
 
             // 4. Formula Bar input box
@@ -2096,10 +2431,43 @@ namespace GenOffice.UI
         {
             if (btn != MouseButtons.Left) return false;
 
+            // 0. Check Click on Floating Formula Suggestions Dropdown Item
+            if (IsEditing && EditText != null && EditText.StartsWith("=") && ActiveSuggestions != null && ActiveSuggestions.Count > 0 && !FormulaSuggestionsBounds.IsEmpty && FormulaSuggestionsBounds.Contains(x, y))
+            {
+                int relY = y - (FormulaSuggestionsBounds.Y + 3);
+                int clickedIdx = relY / 26;
+                int maxCount = Math.Min(6, ActiveSuggestions.Count);
+                if (clickedIdx >= 0 && clickedIdx < maxCount)
+                {
+                    SelectedSuggestionIndex = clickedIdx;
+                    string funcName = ActiveSuggestions[clickedIdx].Name;
+                    EditText = "=" + funcName + "(";
+                    EditCursorPos = EditText.Length;
+                    EditSelStart = 0;
+                    EditSelLength = 0;
+                    IsEditing = true;
+                    FormulaSuggestionsBounds = Rectangle.Empty;
+                    return true;
+                }
+                return true;
+            }
+
+            if (!FormulaBarChevronBounds.IsEmpty && FormulaBarChevronBounds.Contains(x, y))
+            {
+                IsFormulaBarExpanded = !IsFormulaBarExpanded;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (!ActiveCellDropdownButtonBounds.IsEmpty && ActiveCellDropdownButtonBounds.Contains(x, y))
+            {
+                OpenCellDropdownViewer(parentForm);
+                return true;
+            }
+
             int fBarY = 155;
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
-            int startY = ShowFormulaBar ? (fBarY + 30) : fBarY;
+            int startY = fBarY + FormulaBarHeight;
             int vScrollW = 16;
             int bottomBarH = 56;
             int maxGridY = height - bottomBarH;
@@ -2476,6 +2844,29 @@ namespace GenOffice.UI
                 return true;
             }
 
+            // 5b. Check Selection Border MouseDown (Start Dragging to Move / Copy Range)
+            if (selW > 0 && selH > 0)
+            {
+                Rectangle selRect = new Rectangle(selX1, selY1, selW, selH);
+                bool onLeft = (Math.Abs(x - selRect.Left) <= 4 && y >= selRect.Top - 2 && y <= selRect.Bottom + 2);
+                bool onRight = (Math.Abs(x - selRect.Right) <= 4 && y >= selRect.Top - 2 && y <= selRect.Bottom + 2);
+                bool onTop = (Math.Abs(y - selRect.Top) <= 4 && x >= selRect.Left - 2 && x <= selRect.Right + 2);
+                bool onBottom = (Math.Abs(y - selRect.Bottom) <= 4 && x >= selRect.Left - 2 && x <= selRect.Right + 2);
+
+                if ((onLeft || onRight || onTop || onBottom) && !(Math.Abs(x - handleX) <= 6 && Math.Abs(y - handleY) <= 6))
+                {
+                    IsDraggingCellMove = true;
+                    MoveSourceStartRow = minSelR;
+                    MoveSourceEndRow = maxSelR;
+                    MoveSourceStartCol = minSelC;
+                    MoveSourceEndCol = maxSelC;
+                    MoveTargetRow = minSelR;
+                    MoveTargetCol = minSelC;
+                    IsCopyMode = Control.ModifierKeys.HasFlag(Keys.Control);
+                    return true;
+                }
+            }
+
             // 6. Check Grid Cell Selection MouseDown
             if (x > headerW && y > startY + headerH && y < maxGridY)
             {
@@ -2521,6 +2912,19 @@ namespace GenOffice.UI
         public void HandleMouseMove(int x, int y, int width, int height, MouseButtons btn)
         {
             LastMousePos = new Point(x, y);
+
+            // Highlight Formula Suggestions on Hover
+            if (IsEditing && EditText != null && EditText.StartsWith("=") && ActiveSuggestions != null && ActiveSuggestions.Count > 0 && !FormulaSuggestionsBounds.IsEmpty && FormulaSuggestionsBounds.Contains(x, y))
+            {
+                int relY = y - (FormulaSuggestionsBounds.Y + 3);
+                int hoverIdx = relY / 26;
+                int maxCount = Math.Min(6, ActiveSuggestions.Count);
+                if (hoverIdx >= 0 && hoverIdx < maxCount)
+                {
+                    SelectedSuggestionIndex = hoverIdx;
+                }
+                return;
+            }
             int fBarY = 155;
             int btnStartX = 8 + 75 + 12;
 
@@ -2528,10 +2932,12 @@ namespace GenOffice.UI
             IsHoveringEnter = (y >= fBarY + 3 && y <= fBarY + 26 && x >= btnStartX + 25 && x <= btnStartX + 48);
             IsHoveringFx = (y >= fBarY + 3 && y <= fBarY + 26 && x >= btnStartX + 50 && x <= btnStartX + 76);
             IsHoveringNameBox = (y >= fBarY + 3 && y <= fBarY + 26 && x >= 8 && x <= 83);
+            IsHoveringCellDropdown = (!ActiveCellDropdownButtonBounds.IsEmpty && ActiveCellDropdownButtonBounds.Contains(x, y));
+            IsHoveringFormulaChevron = (!FormulaBarChevronBounds.IsEmpty && FormulaBarChevronBounds.Contains(x, y));
 
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
-            int startY = ShowFormulaBar ? (fBarY + 30) : fBarY;
+            int startY = fBarY + FormulaBarHeight;
 
             // Handle Shape Dragging or Resizing
             if (SelectedShape != null && SelectedShapeHandle >= 0 && btn == MouseButtons.Left)
@@ -2682,6 +3088,17 @@ namespace GenOffice.UI
                 return;
             }
 
+            // Handle Dragging Cell Move / Copy
+            if (IsDraggingCellMove && btn == MouseButtons.Left)
+            {
+                uint curC = GetColAtX(x, headerW);
+                uint curR = GetRowAtY(y, startY + headerH);
+                MoveTargetRow = Math.Max(1, curR);
+                MoveTargetCol = Math.Max(1, curC);
+                IsCopyMode = Control.ModifierKeys.HasFlag(Keys.Control);
+                return;
+            }
+
             // Handle Full Column Selection Dragging
             if (IsSelectingFullCols && btn == MouseButtons.Left)
             {
@@ -2738,6 +3155,14 @@ namespace GenOffice.UI
             if (IsResizingRow) { IsResizingRow = false; }
             if (IsDraggingVertScroll) { IsDraggingVertScroll = false; }
             if (IsDraggingHorzScroll) { IsDraggingHorzScroll = false; }
+            if (IsDraggingCellMove)
+            {
+                IsDraggingCellMove = false;
+                if (MoveTargetRow > 0 && MoveTargetCol > 0 && (MoveTargetRow != MoveSourceStartRow || MoveTargetCol != MoveSourceStartCol))
+                {
+                    ExecuteMoveRange(MoveSourceStartRow, MoveSourceStartCol, MoveSourceEndRow, MoveSourceEndCol, MoveTargetRow, MoveTargetCol, IsCopyMode);
+                }
+            }
             if (IsSelectingRange) { IsSelectingRange = false; }
             if (IsSelectingFullCols) { IsSelectingFullCols = false; }
             if (IsSelectingFullRows) { IsSelectingFullRows = false; }
@@ -2791,7 +3216,7 @@ namespace GenOffice.UI
             int fBarY = 155;
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
-            int startY = ShowFormulaBar ? (fBarY + 30) : fBarY;
+            int startY = fBarY + FormulaBarHeight;
 
             int dummyHandle;
             DocShapeObject hitSh = HitTestShape(x, y, headerW, startY, headerH, out dummyHandle);
@@ -2927,10 +3352,12 @@ namespace GenOffice.UI
             {
                 shape.TextContent = newText;
                 shape.StylePresetIndex = newColor;
+                this.Invalidate();
             }))
             {
                 dlg.ShowDialog();
             }
+            this.Invalidate();
         }
 
         public void ShowSmartArtContextMenu(int x, int y, DocShapeObject shape, Control parentControl)
@@ -3327,8 +3754,74 @@ namespace GenOffice.UI
                     EditCursorPos = EditSelStart;
                     EditSelLength = 0;
                 }
+
+                // Vietnamese Auto-Correction (Telex / VNI engine for Calc)
+                if (VietnameseAutoCorrect.IsEnabled && !EditText.StartsWith("="))
+                {
+                    if (VietnameseAutoCorrect.IsWordDelimiter(ch))
+                    {
+                        string wordBefore = GetWordBeforePos(EditText, EditCursorPos);
+                        string correctedWord;
+                        if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryCorrectWord(wordBefore, out correctedWord))
+                        {
+                            int wordStart = EditCursorPos - wordBefore.Length;
+                            EditText = EditText.Remove(wordStart, wordBefore.Length).Insert(wordStart, correctedWord);
+                            EditCursorPos = wordStart + correctedWord.Length;
+                        }
+                    }
+                    else if (!char.IsControl(ch))
+                    {
+                        string wordBefore = GetWordBeforePos(EditText, EditCursorPos);
+                        int charsToRemove;
+                        string textToInsert;
+                        if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryProcessChar(wordBefore, ch, out charsToRemove, out textToInsert))
+                        {
+                            int removeStart = EditCursorPos - charsToRemove;
+                            EditText = EditText.Remove(removeStart, charsToRemove).Insert(removeStart, textToInsert);
+                            EditCursorPos = removeStart + textToInsert.Length;
+                            return;
+                        }
+                    }
+                }
+
                 EditText = EditText.Insert(EditCursorPos, ch.ToString());
                 EditCursorPos++;
+            }
+        }
+
+        private string GetWordBeforePos(string text, int pos)
+        {
+            if (string.IsNullOrEmpty(text) || pos <= 0 || pos > text.Length) return "";
+            int start = pos - 1;
+            while (start >= 0 && !VietnameseAutoCorrect.IsWordDelimiter(text[start]))
+            {
+                start--;
+            }
+            start++;
+            if (start >= pos) return "";
+            return text.Substring(start, pos - start);
+        }
+
+        public string GetCurrentWordBeforeCursor(out int wordStart)
+        {
+            if (!IsEditing || string.IsNullOrEmpty(EditText))
+            {
+                wordStart = -1;
+                return "";
+            }
+            return VietnameseWordPredictor.GetWordBeforePos(EditText, EditCursorPos, out wordStart);
+        }
+
+        public void ReplaceWordAtCursor(string newWord)
+        {
+            if (!IsEditing || string.IsNullOrEmpty(EditText)) return;
+            int wordStart;
+            string wordBefore = VietnameseWordPredictor.GetWordBeforePos(EditText, EditCursorPos, out wordStart);
+            if (!string.IsNullOrEmpty(wordBefore) && wordStart >= 0)
+            {
+                EditText = EditText.Remove(wordStart, wordBefore.Length).Insert(wordStart, newWord + " ");
+                EditCursorPos = wordStart + newWord.Length + 1;
+                EditSelLength = 0;
             }
         }
 
@@ -3337,7 +3830,13 @@ namespace GenOffice.UI
             if (IsEditing)
             {
                 SaveUndoState();
-                CurrentSheet.SetCellText(SelectedRow, SelectedCol, EditText);
+                string finalVal = EditText;
+                if (VietnameseAutoCorrect.IsEnabled && !string.IsNullOrEmpty(finalVal) && !finalVal.StartsWith("="))
+                {
+                    finalVal = VietnameseAutoCorrect.CorrectText(finalVal);
+                    EditText = finalVal;
+                }
+                CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
                 FormulaEngine.EvaluateSheet(CurrentSheet);
                 IsEditing = false;
                 EditSelLength = 0;
@@ -3383,6 +3882,17 @@ namespace GenOffice.UI
             if (rawKey == Keys.F9)
             {
                 CalculateNow(true);
+                return;
+            }
+
+            if (ctrl && rawKey == Keys.F)
+            {
+                OpenFindReplaceDialog(Form.ActiveForm, false);
+                return;
+            }
+            if (ctrl && rawKey == Keys.H)
+            {
+                OpenFindReplaceDialog(Form.ActiveForm, true);
                 return;
             }
 
@@ -3547,6 +4057,15 @@ namespace GenOffice.UI
                 }
                 if (rawKey == Keys.Enter)
                 {
+                    if (EditText.StartsWith("=") && !EditText.Contains("(") && ActiveSuggestions != null && ActiveSuggestions.Count > 0 && SelectedSuggestionIndex >= 0 && SelectedSuggestionIndex < ActiveSuggestions.Count)
+                    {
+                        EditText = "=" + ActiveSuggestions[SelectedSuggestionIndex].Name + "(";
+                        EditCursorPos = EditText.Length;
+                        EditSelStart = 0;
+                        EditSelLength = 0;
+                        FormulaSuggestionsBounds = Rectangle.Empty;
+                        return;
+                    }
                     CommitEditAndMove(1, 0);
                     return;
                 }
@@ -3563,6 +4082,23 @@ namespace GenOffice.UI
             }
             else
             {
+                if (alt && rawKey == Keys.Down)
+                {
+                    OpenCellDropdownViewer(Form.ActiveForm);
+                    return;
+                }
+                if (ctrl && shift && rawKey == Keys.U)
+                {
+                    IsFormulaBarExpanded = !IsFormulaBarExpanded;
+                    if (Form.ActiveForm != null) Form.ActiveForm.Invalidate();
+                    return;
+                }
+
+                if (ctrl && rawKey == Keys.C) { Copy(); return; }
+                if (ctrl && rawKey == Keys.X) { Cut(); return; }
+                if (ctrl && rawKey == Keys.V) { Paste(); return; }
+                if (ctrl && rawKey == Keys.E) { FlashFill(); return; }
+
                 if (rawKey == Keys.F2)
                 {
                     if (IsSheetProtected)
@@ -3719,8 +4255,11 @@ namespace GenOffice.UI
             res.TextColor = commonTxtColor;
             res.BgColor = commonBgColor;
 
-            // Merge status check
+            // First cell for indent and merge check
             CellData firstCell = CurrentSheet.GetCell(minR, minC);
+            res.Indent = (firstCell != null && firstCell.Format != null) ? firstCell.Format.Indent : 0;
+
+            // Merge status check
             if (firstCell != null && firstCell.Format != null && firstCell.Format.IsMergedParent)
             {
                 if (minR + firstCell.Format.MergeRowSpan - 1 == maxR && minC + firstCell.Format.MergeColSpan - 1 == maxC)
@@ -3824,6 +4363,33 @@ namespace GenOffice.UI
         {
             SaveUndoState();
             ForEachSelectedCell(cell => cell.Format.TextColor = col.ToArgb());
+        }
+
+        public void SetCellTextExplicit(uint row, uint col, string text)
+        {
+            SaveUndoState();
+            CurrentSheet.SetCellText(row, col, text);
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+        }
+
+        public void OpenCellDropdownViewer(Form parentForm)
+        {
+            CellData cell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
+            string txt = cell != null ? (!string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "")) : "";
+            
+            // Calculate screen anchor for active cell
+            int fBarY = 155;
+            int headerH = ShowHeadings ? 26 : 0;
+            int headerW = ShowHeadings ? 48 : 0;
+            int startY = fBarY + FormulaBarHeight;
+            int cellX = GetColScreenX(SelectedCol, headerW);
+            int cellY = GetRowScreenY(SelectedRow, startY, headerH);
+            int cellW = GetColWidth(SelectedCol);
+            int cellH = GetRowHeight(SelectedRow);
+
+            Point pt = parentForm != null ? parentForm.PointToScreen(new Point(cellX, cellY + cellH + 2)) : new Point(cellX, cellY + cellH + 2);
+            CellContentDropdownForm dlg = new CellContentDropdownForm(this, parentForm, pt, SelectedRow, SelectedCol, txt);
+            dlg.Show();
         }
 
         public void SetSelectedCellAlign(int align, int vAlign = -1)
@@ -4203,6 +4769,869 @@ namespace GenOffice.UI
             FormulaEngine.EvaluateSheet(CurrentSheet);
         }
 
+        // ==================== Indent Operations ====================
+
+        public void IncreaseIndent()
+        {
+            SaveUndoState();
+            ForEachSelectedCell(cell => {
+                if (cell.Format != null && cell.Format.Indent < 15)
+                    cell.Format.Indent++;
+            });
+        }
+
+        public void DecreaseIndent()
+        {
+            SaveUndoState();
+            ForEachSelectedCell(cell => {
+                if (cell.Format != null && cell.Format.Indent > 0)
+                    cell.Format.Indent--;
+            });
+        }
+
+        // ==================== Cell Styles ====================
+
+        public void ApplyCellStylePreset(int styleIdx)
+        {
+            SaveUndoState();
+            ForEachSelectedCell(cell => {
+                if (cell.Format == null) cell.Format = new CellFormat();
+                switch (styleIdx)
+                {
+                    case 0: // Normal
+                        cell.Format.FontName = "Calibri";
+                        cell.Format.FontSize = 11.0f;
+                        cell.Format.Bold = false;
+                        cell.Format.Italic = false;
+                        cell.Format.Underline = false;
+                        cell.Format.BgColor = unchecked((int)0xFFFFFFFF);
+                        cell.Format.TextColor = unchecked((int)0xFF000000);
+                        cell.Format.Borders = new CellBorderSettings();
+                        break;
+                    case 1: // Good / Tốt (Xanh lá)
+                        cell.Format.BgColor = unchecked((int)0xFFC6EFCE);
+                        cell.Format.TextColor = unchecked((int)0xFF006100);
+                        break;
+                    case 2: // Bad / Kém (Đỏ)
+                        cell.Format.BgColor = unchecked((int)0xFFFFC7CE);
+                        cell.Format.TextColor = unchecked((int)0xFF9C0006);
+                        break;
+                    case 3: // Neutral / Trung tính (Vàng cam)
+                        cell.Format.BgColor = unchecked((int)0xFFFFEB9C);
+                        cell.Format.TextColor = unchecked((int)0xFF9C6500);
+                        break;
+                    case 4: // Heading 1 (Tiêu đề 1)
+                        cell.Format.FontName = "Calibri";
+                        cell.Format.FontSize = 15.0f;
+                        cell.Format.Bold = true;
+                        cell.Format.TextColor = unchecked((int)0xFF1F4E78);
+                        cell.Format.Borders.Bottom = true;
+                        cell.Format.Borders.BottomThickness = 2;
+                        cell.Format.Borders.BottomColor = unchecked((int)0xFF5B9BD5);
+                        break;
+                    case 5: // Heading 2 (Tiêu đề 2)
+                        cell.Format.FontName = "Calibri";
+                        cell.Format.FontSize = 13.0f;
+                        cell.Format.Bold = true;
+                        cell.Format.TextColor = unchecked((int)0xFF1F4E78);
+                        cell.Format.Borders.Bottom = true;
+                        cell.Format.Borders.BottomThickness = 1;
+                        cell.Format.Borders.BottomColor = unchecked((int)0xFF5B9BD5);
+                        break;
+                    case 6: // Total (Hàng Tổng)
+                        cell.Format.Bold = true;
+                        cell.Format.Borders.Top = true;
+                        cell.Format.Borders.TopThickness = 1;
+                        cell.Format.Borders.Bottom = true;
+                        cell.Format.Borders.BottomThickness = 2;
+                        break;
+                    case 7: // Accent 1 (Xanh dương)
+                        cell.Format.BgColor = unchecked((int)0xFF4472C4);
+                        cell.Format.TextColor = unchecked((int)0xFFFFFFFF);
+                        cell.Format.Bold = true;
+                        break;
+                    case 8: // Accent 2 (Cam)
+                        cell.Format.BgColor = unchecked((int)0xFFED7D31);
+                        cell.Format.TextColor = unchecked((int)0xFFFFFFFF);
+                        cell.Format.Bold = true;
+                        break;
+                }
+            });
+        }
+
+        // ==================== Cell Format (Row Height & Column Width) ====================
+
+        public void SetSelectedRowsHeight(int height)
+        {
+            if (height < 10) height = 10;
+            if (height > 400) height = 400;
+            SaveUndoState();
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            for (uint r = minR; r <= maxR; r++)
+            {
+                CustomRowHeights[r] = height;
+            }
+        }
+
+        public void SetSelectedColsWidth(int width)
+        {
+            if (width < 10) width = 10;
+            if (width > 600) width = 600;
+            SaveUndoState();
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+            for (uint c = minC; c <= maxC; c++)
+            {
+                CustomColWidths[c] = width;
+            }
+        }
+
+        public void AutoFitSelectedRows()
+        {
+            SaveUndoState();
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            for (uint r = minR; r <= maxR; r++)
+            {
+                float maxH = DefaultRowHeight;
+                foreach (var kvp in CurrentSheet.GetAllCells())
+                {
+                    var coord = SparseMatrix.DecodeKey(kvp.Key);
+                    if (coord.Item1 == r)
+                    {
+                        CellData cell = kvp.Value;
+                        if (cell != null && !string.IsNullOrEmpty(cell.RawValue))
+                        {
+                            float sz = (cell.Format != null && cell.Format.FontSize > 0) ? cell.Format.FontSize : 11.0f;
+                            float needed = sz * 1.6f + 8;
+                            if (needed > maxH) maxH = needed;
+                        }
+                    }
+                }
+                CustomRowHeights[r] = (int)Math.Ceiling(maxH);
+            }
+        }
+
+        public void AutoFitSelectedCols()
+        {
+            SaveUndoState();
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+            using (Bitmap dummyBmp = new Bitmap(1, 1))
+            using (Graphics gMeasure = Graphics.FromImage(dummyBmp))
+            {
+                for (uint c = minC; c <= maxC; c++)
+                {
+                    float maxW = DefaultColWidth;
+                    foreach (var kvp in CurrentSheet.GetAllCells())
+                    {
+                        var coord = SparseMatrix.DecodeKey(kvp.Key);
+                        if (coord.Item2 == c)
+                        {
+                            CellData cell = kvp.Value;
+                            if (cell != null)
+                            {
+                                string txt = cell.EvaluatedStr ?? cell.RawValue;
+                                if (!string.IsNullOrEmpty(txt))
+                                {
+                                    string fName = (cell.Format != null && !string.IsNullOrEmpty(cell.Format.FontName)) ? cell.Format.FontName : "Calibri";
+                                    float fSize = (cell.Format != null && cell.Format.FontSize > 0) ? cell.Format.FontSize : 11.0f;
+                                    FontStyle style = FontStyle.Regular;
+                                    if (cell.Format != null)
+                                    {
+                                        if (cell.Format.Bold) style |= FontStyle.Bold;
+                                        if (cell.Format.Italic) style |= FontStyle.Italic;
+                                    }
+                                    using (Font f = new Font(fName, fSize, style))
+                                    {
+                                        SizeF sz = gMeasure.MeasureString(txt, f);
+                                        float needed = sz.Width + 18;
+                                        if (needed > maxW) maxW = needed;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    CustomColWidths[c] = (int)Math.Min(400, Math.Ceiling(maxW));
+                }
+            }
+        }
+
+        public void HideSelectedRows(bool hide)
+        {
+            SaveUndoState();
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            for (uint r = minR; r <= maxR; r++)
+            {
+                if (hide) CustomRowHeights[r] = 0;
+                else CustomRowHeights[r] = DefaultRowHeight;
+            }
+        }
+
+        public void HideSelectedCols(bool hide)
+        {
+            SaveUndoState();
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+            for (uint c = minC; c <= maxC; c++)
+            {
+                if (hide) CustomColWidths[c] = 0;
+                else CustomColWidths[c] = DefaultColWidth;
+            }
+        }
+
+        // ==================== Find & Replace ====================
+
+        public void EnsureCellVisible(uint row, uint col)
+        {
+            if (row < ScrollRow) ScrollRow = row;
+            else if (row > ScrollRow + 25) ScrollRow = Math.Max(1, row - 10);
+
+            if (col < ScrollCol) ScrollCol = col;
+            else if (col > ScrollCol + 15) ScrollCol = Math.Max(1, col - 5);
+        }
+
+        public bool FindNextCell(string searchText, bool matchCase = false)
+        {
+            if (string.IsNullOrEmpty(searchText)) return false;
+
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            List<ulong> keys = new List<ulong>();
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                CellData cell = kvp.Value;
+                if (cell != null)
+                {
+                    string txt = cell.EvaluatedStr ?? cell.RawValue;
+                    if (!string.IsNullOrEmpty(txt) && txt.IndexOf(searchText, comp) >= 0)
+                    {
+                        keys.Add(kvp.Key);
+                    }
+                }
+            }
+
+            if (keys.Count == 0) return false;
+
+            keys.Sort((k1, k2) =>
+            {
+                var c1 = SparseMatrix.DecodeKey(k1);
+                var c2 = SparseMatrix.DecodeKey(k2);
+                if (c1.Item1 != c2.Item1) return c1.Item1.CompareTo(c2.Item1);
+                return c1.Item2.CompareTo(c2.Item2);
+            });
+
+            ulong curKey = SparseMatrix.EncodeKey(SelectedRow, SelectedCol);
+            ulong chosenKey = keys[0];
+
+            foreach (var k in keys)
+            {
+                if (k > curKey)
+                {
+                    chosenKey = k;
+                    break;
+                }
+            }
+
+            var targetCoord = SparseMatrix.DecodeKey(chosenKey);
+            SelectedRow = targetCoord.Item1;
+            SelectedCol = targetCoord.Item2;
+            SelEndRow = targetCoord.Item1;
+            SelEndCol = targetCoord.Item2;
+
+            EnsureCellVisible(SelectedRow, SelectedCol);
+            return true;
+        }
+
+        public int ReplaceAllInSheet(string findText, string replaceText, bool matchCase = false)
+        {
+            if (string.IsNullOrEmpty(findText)) return 0;
+            SaveUndoState();
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            int count = 0;
+            List<ulong> keysToUpdate = new List<ulong>();
+
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                CellData cell = kvp.Value;
+                if (cell != null && !string.IsNullOrEmpty(cell.RawValue))
+                {
+                    if (cell.RawValue.IndexOf(findText, comp) >= 0)
+                    {
+                        keysToUpdate.Add(kvp.Key);
+                    }
+                }
+            }
+
+            foreach (var k in keysToUpdate)
+            {
+                var coord = SparseMatrix.DecodeKey(k);
+                CellData cell = CurrentSheet.GetCell(coord.Item1, coord.Item2);
+                if (cell != null && !string.IsNullOrEmpty(cell.RawValue))
+                {
+                    if (matchCase)
+                    {
+                        cell.RawValue = cell.RawValue.Replace(findText, replaceText ?? "");
+                    }
+                    else
+                    {
+                        cell.RawValue = Regex.Replace(
+                            cell.RawValue,
+                            Regex.Escape(findText),
+                            replaceText ?? "",
+                            RegexOptions.IgnoreCase
+                        );
+                    }
+                    cell.EvaluatedStr = cell.RawValue;
+                    count++;
+                }
+            }
+
+            if (count > 0)
+            {
+                FormulaEngine.EvaluateSheet(CurrentSheet);
+            }
+            return count;
+        }
+
+        public void OpenFindReplaceDialog(Form parentForm, bool isReplace = false)
+        {
+            if (_findReplaceDlg == null || _findReplaceDlg.IsDisposed)
+            {
+                _findReplaceDlg = new CalcFindReplaceDialog(this, parentForm, isReplace);
+                _findReplaceDlg.Show(parentForm);
+            }
+            else
+            {
+                _findReplaceDlg.SetMode(isReplace);
+                _findReplaceDlg.BringToFront();
+                _findReplaceDlg.Focus();
+            }
+        }
+
+        public bool FindNextCellEx(string query, bool matchCase, bool matchEntire, bool byRows, bool lookInFormulas, bool searchBackwards, out string statusMsg)
+        {
+            if (string.IsNullOrEmpty(query) || CurrentSheet == null)
+            {
+                statusMsg = "Vui lòng nhập nội dung cần tìm.";
+                return false;
+            }
+
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            List<Tuple<uint, uint>> matches = new List<Tuple<uint, uint>>();
+
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                CellData cell = kvp.Value;
+                if (cell == null) continue;
+
+                string targetText = "";
+                if (lookInFormulas)
+                {
+                    if (cell.Type == CellType.Formula)
+                    {
+                        targetText = cell.FormulaStr ?? cell.RawValue ?? "";
+                    }
+                    else
+                    {
+                        targetText = cell.RawValue ?? "";
+                    }
+                }
+                else
+                {
+                    targetText = cell.GetDisplayText() ?? "";
+                }
+
+                bool matched = false;
+                if (matchEntire)
+                {
+                    matched = string.Equals(targetText, query, comp);
+                }
+                else
+                {
+                    matched = (targetText.IndexOf(query, comp) >= 0);
+                }
+
+                if (matched)
+                {
+                    matches.Add(SparseMatrix.DecodeKey(kvp.Key));
+                }
+            }
+
+            if (matches.Count == 0)
+            {
+                statusMsg = "Không tìm thấy nội dung yêu cầu.";
+                return false;
+            }
+
+            if (byRows)
+            {
+                matches.Sort(delegate(Tuple<uint, uint> a, Tuple<uint, uint> b)
+                {
+                    int cmp = a.Item1.CompareTo(b.Item1);
+                    if (cmp != 0) return cmp;
+                    return a.Item2.CompareTo(b.Item2);
+                });
+            }
+            else
+            {
+                matches.Sort(delegate(Tuple<uint, uint> a, Tuple<uint, uint> b)
+                {
+                    int cmp = a.Item2.CompareTo(b.Item2);
+                    if (cmp != 0) return cmp;
+                    return a.Item1.CompareTo(b.Item1);
+                });
+            }
+
+            uint curR = SelectedRow;
+            uint curC = SelectedCol;
+            Tuple<uint, uint> chosen = null;
+
+            if (!searchBackwards)
+            {
+                for (int i = 0; i < matches.Count; i++)
+                {
+                    Tuple<uint, uint> m = matches[i];
+                    if (byRows)
+                    {
+                        if (m.Item1 > curR || (m.Item1 == curR && m.Item2 > curC))
+                        {
+                            chosen = m;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (m.Item2 > curC || (m.Item2 == curC && m.Item1 > curR))
+                        {
+                            chosen = m;
+                            break;
+                        }
+                    }
+                }
+                if (chosen == null)
+                {
+                    chosen = matches[0];
+                }
+            }
+            else
+            {
+                for (int i = matches.Count - 1; i >= 0; i--)
+                {
+                    Tuple<uint, uint> m = matches[i];
+                    if (byRows)
+                    {
+                        if (m.Item1 < curR || (m.Item1 == curR && m.Item2 < curC))
+                        {
+                            chosen = m;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (m.Item2 < curC || (m.Item2 == curC && m.Item1 < curR))
+                        {
+                            chosen = m;
+                            break;
+                        }
+                    }
+                }
+                if (chosen == null)
+                {
+                    chosen = matches[matches.Count - 1];
+                }
+            }
+
+            SelectedRow = chosen.Item1;
+            SelectedCol = chosen.Item2;
+            SelEndRow = chosen.Item1;
+            SelEndCol = chosen.Item2;
+
+            EnsureCellVisible(SelectedRow, SelectedCol);
+            statusMsg = string.Format("Đã tìm thấy tại {0} ({1} kết quả)", SparseMatrix.GetCellReference(SelectedRow, SelectedCol), matches.Count);
+            return true;
+        }
+
+        public int ReplaceCellEx(string find, string replace, bool matchCase, bool matchEntire, bool byRows, bool lookInFormulas)
+        {
+            if (string.IsNullOrEmpty(find) || CurrentSheet == null) return 0;
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return 0;
+            }
+
+            CellData curCell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
+            if (curCell == null) return 0;
+
+            if (!lookInFormulas && curCell.Type == CellType.Formula)
+            {
+                // Formula safety! Cannot replace formula cell when looking in values
+                return 0;
+            }
+
+            string targetText = "";
+            if (lookInFormulas)
+            {
+                targetText = (curCell.Type == CellType.Formula) ? (curCell.FormulaStr ?? curCell.RawValue ?? "") : (curCell.RawValue ?? "");
+            }
+            else
+            {
+                targetText = curCell.GetDisplayText() ?? "";
+            }
+
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            bool matched = matchEntire ? string.Equals(targetText, find, comp) : (targetText.IndexOf(find, comp) >= 0);
+            if (!matched) return 0;
+
+            SaveUndoState();
+            string newText = "";
+            if (matchEntire)
+            {
+                newText = replace ?? "";
+            }
+            else
+            {
+                if (matchCase)
+                {
+                    newText = targetText.Replace(find, replace ?? "");
+                }
+                else
+                {
+                    newText = Regex.Replace(targetText, Regex.Escape(find), replace ?? "", RegexOptions.IgnoreCase);
+                }
+            }
+
+            if (lookInFormulas)
+            {
+                if (newText.StartsWith("="))
+                {
+                    curCell.Type = CellType.Formula;
+                    curCell.FormulaStr = newText;
+                    curCell.RawValue = newText;
+                }
+                else
+                {
+                    curCell.Type = CellType.String;
+                    curCell.FormulaStr = null;
+                    curCell.RawValue = newText;
+                    curCell.EvaluatedStr = newText;
+                }
+            }
+            else
+            {
+                double numVal;
+                if (double.TryParse(newText, NumberStyles.Any, CultureInfo.InvariantCulture, out numVal))
+                {
+                    curCell.SetNumber(numVal);
+                }
+                else
+                {
+                    curCell.SetString(newText);
+                }
+            }
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+            return 1;
+        }
+
+        public int ReplaceAllInSheetEx(string find, string replace, bool matchCase, bool matchEntire, bool lookInFormulas)
+        {
+            if (string.IsNullOrEmpty(find) || CurrentSheet == null) return 0;
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return 0;
+            }
+
+            SaveUndoState();
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            int count = 0;
+            List<Tuple<uint, uint>> targets = new List<Tuple<uint, uint>>();
+
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                CellData cell = kvp.Value;
+                if (cell == null) continue;
+
+                if (!lookInFormulas && cell.Type == CellType.Formula)
+                {
+                    // Formula protection!
+                    continue;
+                }
+
+                string targetText = "";
+                if (lookInFormulas)
+                {
+                    targetText = (cell.Type == CellType.Formula) ? (cell.FormulaStr ?? cell.RawValue ?? "") : (cell.RawValue ?? "");
+                }
+                else
+                {
+                    targetText = cell.GetDisplayText() ?? "";
+                }
+
+                bool matched = matchEntire ? string.Equals(targetText, find, comp) : (targetText.IndexOf(find, comp) >= 0);
+                if (matched)
+                {
+                    targets.Add(SparseMatrix.DecodeKey(kvp.Key));
+                }
+            }
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                Tuple<uint, uint> coord = targets[i];
+                CellData cell = CurrentSheet.GetCell(coord.Item1, coord.Item2);
+                if (cell == null) continue;
+
+                string targetText = lookInFormulas ?
+                    ((cell.Type == CellType.Formula) ? (cell.FormulaStr ?? cell.RawValue ?? "") : (cell.RawValue ?? ""))
+                    : (cell.GetDisplayText() ?? "");
+
+                string newText = matchEntire ? (replace ?? "") :
+                    (matchCase ? targetText.Replace(find, replace ?? "") : Regex.Replace(targetText, Regex.Escape(find), replace ?? "", RegexOptions.IgnoreCase));
+
+                if (lookInFormulas)
+                {
+                    if (newText.StartsWith("="))
+                    {
+                        cell.Type = CellType.Formula;
+                        cell.FormulaStr = newText;
+                        cell.RawValue = newText;
+                    }
+                    else
+                    {
+                        cell.Type = CellType.String;
+                        cell.FormulaStr = null;
+                        cell.RawValue = newText;
+                        cell.EvaluatedStr = newText;
+                    }
+                }
+                else
+                {
+                    double numVal;
+                    if (double.TryParse(newText, NumberStyles.Any, CultureInfo.InvariantCulture, out numVal))
+                    {
+                        cell.SetNumber(numVal);
+                    }
+                    else
+                    {
+                        cell.SetString(newText);
+                    }
+                }
+                count++;
+            }
+
+            if (count > 0)
+            {
+                FormulaEngine.EvaluateSheet(CurrentSheet);
+            }
+            return count;
+        }
+
+        public List<Tuple<string, uint, uint, string>> FindAllCellsEx(string query, bool matchCase, bool matchEntire, bool lookInFormulas)
+        {
+            List<Tuple<string, uint, uint, string>> results = new List<Tuple<string, uint, uint, string>>();
+            if (string.IsNullOrEmpty(query) || CurrentSheet == null) return results;
+
+            string sheetName = (ActiveSheetIndex >= 0 && ActiveSheetIndex < SheetNames.Count) ? SheetNames[ActiveSheetIndex] : "Sheet1";
+            StringComparison comp = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            List<Tuple<uint, uint, string>> matches = new List<Tuple<uint, uint, string>>();
+
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                CellData cell = kvp.Value;
+                if (cell == null) continue;
+
+                string targetText = "";
+                if (lookInFormulas)
+                {
+                    targetText = (cell.Type == CellType.Formula) ? (cell.FormulaStr ?? cell.RawValue ?? "") : (cell.RawValue ?? "");
+                }
+                else
+                {
+                    targetText = cell.GetDisplayText() ?? "";
+                }
+
+                bool matched = matchEntire ? string.Equals(targetText, query, comp) : (targetText.IndexOf(query, comp) >= 0);
+                if (matched)
+                {
+                    var coord = SparseMatrix.DecodeKey(kvp.Key);
+                    matches.Add(Tuple.Create(coord.Item1, coord.Item2, targetText));
+                }
+            }
+
+            matches.Sort(delegate(Tuple<uint, uint, string> a, Tuple<uint, uint, string> b)
+            {
+                int cmp = a.Item1.CompareTo(b.Item1);
+                if (cmp != 0) return cmp;
+                return a.Item2.CompareTo(b.Item2);
+            });
+
+            for (int i = 0; i < matches.Count; i++)
+            {
+                Tuple<uint, uint, string> m = matches[i];
+                results.Add(Tuple.Create(sheetName, m.Item1, m.Item2, m.Item3));
+            }
+
+            return results;
+        }
+
+        public void OpenRemoveDuplicatesDialog(Form parentForm)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            CalcRemoveDuplicatesDialog dlg = new CalcRemoveDuplicatesDialog(this, parentForm);
+            dlg.ShowDialog(parentForm);
+        }
+
+        public void OpenTextToColumnsDialog(Form parentForm)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            CalcTextToColumnsDialog dlg = new CalcTextToColumnsDialog(this, parentForm);
+            dlg.ShowDialog(parentForm);
+        }
+
+        public void ExecuteRemoveDuplicates(uint minR, uint maxR, uint minC, uint maxC, List<uint> checkedCols, bool hasHeaders, out int dupCount, out int uniqueCount)
+        {
+            dupCount = 0;
+            uniqueCount = 0;
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+
+            if (minR > maxR) { uint t = minR; minR = maxR; maxR = t; }
+            if (minC > maxC) { uint t = minC; minC = maxC; maxC = t; }
+            uint startR = hasHeaders ? (minR + 1) : minR;
+            if (startR > maxR || checkedCols == null || checkedCols.Count == 0 || CurrentSheet == null)
+            {
+                return;
+            }
+
+            SaveUndoState();
+            HashSet<string> seenSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<uint> rowsToDelete = new List<uint>();
+
+            for (uint r = startR; r <= maxR; r++)
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                for (int i = 0; i < checkedCols.Count; i++)
+                {
+                    uint col = checkedCols[i];
+                    CellData cell = CurrentSheet.GetCell(r, col);
+                    string val = (cell != null) ? (cell.EvaluatedStr ?? cell.RawValue ?? "") : "";
+                    sb.Append(val.Trim()).Append('\x1F');
+                }
+                string sig = sb.ToString();
+                if (seenSignatures.Contains(sig))
+                {
+                    rowsToDelete.Add(r);
+                }
+                else
+                {
+                    seenSignatures.Add(sig);
+                }
+            }
+
+            dupCount = rowsToDelete.Count;
+            uniqueCount = seenSignatures.Count;
+            if (dupCount == 0) return;
+
+            rowsToDelete.Sort(delegate(uint a, uint b) { return b.CompareTo(a); });
+
+            uint currentMaxR = maxR;
+            for (int i = 0; i < rowsToDelete.Count; i++)
+            {
+                uint r = rowsToDelete[i];
+                for (uint currR = r; currR < currentMaxR; currR++)
+                {
+                    for (uint c = minC; c <= maxC; c++)
+                    {
+                        CellData nextCell = CurrentSheet.GetCell(currR + 1, c);
+                        if (nextCell != null)
+                        {
+                            CurrentSheet.SetCell(currR, c, nextCell.Clone());
+                        }
+                        else
+                        {
+                            CurrentSheet.ClearCell(currR, c);
+                        }
+                    }
+                }
+                for (uint c = minC; c <= maxC; c++)
+                {
+                    CurrentSheet.ClearCell(currentMaxR, c);
+                }
+                currentMaxR--;
+            }
+            SelEndRow = currentMaxR;
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+        }
+
+        public void ExecuteTextToColumns(uint srcCol, uint startRow, uint endRow, uint destCol, uint destRow, List<char> delimiters, bool consecutiveAsOne, char textQualifier, List<int> fixedWidths, bool isFixedWidth)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            if (CurrentSheet == null) return;
+
+            if (startRow > endRow)
+            {
+                uint t = startRow;
+                startRow = endRow;
+                endRow = t;
+            }
+
+            SaveUndoState();
+
+            for (uint r = startRow; r <= endRow; r++)
+            {
+                uint targetRow = destRow + (r - startRow);
+                CellData cell = CurrentSheet.GetCell(r, srcCol);
+                string line = (cell != null) ? (cell.RawValue ?? "") : "";
+
+                List<string> tokens;
+                if (isFixedWidth)
+                {
+                    tokens = CalcTextToColumnsDialog.ParseFixedWidthLine(line, fixedWidths);
+                }
+                else
+                {
+                    tokens = CalcTextToColumnsDialog.ParseDelimitedLine(line, delimiters, consecutiveAsOne, textQualifier);
+                }
+
+                for (int i = 0; i < tokens.Count; i++)
+                {
+                    uint targetCol = destCol + (uint)i;
+                    string tok = (tokens[i] ?? "").Trim();
+                    double numVal;
+                    if (double.TryParse(tok, NumberStyles.Any, CultureInfo.InvariantCulture, out numVal))
+                    {
+                        CellData targetCell = CurrentSheet.GetOrCreateCell(targetRow, targetCol);
+                        targetCell.SetNumber(numVal);
+                    }
+                    else
+                    {
+                        CurrentSheet.SetCellText(targetRow, targetCol, tok);
+                    }
+                }
+            }
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+        }
+
         // ==================== Table Styling & Design Operations ====================
 
         public bool IsSelectionInsideTable(out ExcelTableInfo activeTable)
@@ -4500,6 +5929,60 @@ namespace GenOffice.UI
                 }
             }
 
+            if (ruleType == 3) // Clear Rules (All cells in selection)
+            {
+                for (uint r = minR; r <= maxR; r++)
+                {
+                    for (uint c = minC; c <= maxC; c++)
+                    {
+                        CellData cell = CurrentSheet.GetCell(r, c);
+                        if (cell != null && cell.Format != null)
+                        {
+                            cell.Format.BgColor = unchecked((int)0xFFFFFFFF);
+                            cell.Format.TextColor = unchecked((int)0xFF000000);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (ruleType == 5) // Highlight Duplicate Values (Yellow)
+            {
+                Dictionary<string, int> freq = new Dictionary<string, int>();
+                for (uint r = minR; r <= maxR; r++)
+                {
+                    for (uint c = minC; c <= maxC; c++)
+                    {
+                        CellData cell = CurrentSheet.GetCell(r, c);
+                        if (cell != null)
+                        {
+                            string val = cell.EvaluatedStr ?? cell.RawValue;
+                            if (!string.IsNullOrEmpty(val))
+                            {
+                                int cnt = 0;
+                                freq.TryGetValue(val, out cnt);
+                                freq[val] = cnt + 1;
+                            }
+                        }
+                    }
+                }
+
+                for (uint r = minR; r <= maxR; r++)
+                {
+                    for (uint c = minC; c <= maxC; c++)
+                    {
+                        CellData cell = CurrentSheet.GetOrCreateCell(r, c);
+                        string val = cell.EvaluatedStr ?? cell.RawValue;
+                        if (!string.IsNullOrEmpty(val) && freq.ContainsKey(val) && freq[val] > 1)
+                        {
+                            cell.Format.BgColor = unchecked((int)0xFFFEF3C7);
+                            cell.Format.TextColor = unchecked((int)0xFF92400E);
+                        }
+                    }
+                }
+                return;
+            }
+
             if (numbers.Count == 0) return;
             double minVal = double.MaxValue, maxVal = double.MinValue, sum = 0;
             for (int i = 0; i < numbers.Count; i++)
@@ -4527,7 +6010,7 @@ namespace GenOffice.UI
                         {
                             if (val < avg) { cell.Format.BgColor = unchecked((int)0xFFFEE2E2); cell.Format.TextColor = unchecked((int)0xFF991B1B); }
                         }
-                        else if (ruleType == 2) // Heatmap Scale
+                        else if (ruleType == 2) // Heatmap Scale (Red - Yellow - Green)
                         {
                             double range = Math.Max(1.0, maxVal - minVal);
                             double frac = (val - minVal) / range;
@@ -4535,10 +6018,14 @@ namespace GenOffice.UI
                             else if (frac >= 0.33) { cell.Format.BgColor = unchecked((int)0xFFFEF3C7); cell.Format.TextColor = unchecked((int)0xFF92400E); }
                             else { cell.Format.BgColor = unchecked((int)0xFFFEE2E2); cell.Format.TextColor = unchecked((int)0xFF991B1B); }
                         }
-                        else if (ruleType == 3) // Clear
+                        else if (ruleType == 4) // Data Bars (Blue gradient fill)
                         {
-                            cell.Format.BgColor = unchecked((int)0xFFFFFFFF);
-                            cell.Format.TextColor = unchecked((int)0xFF000000);
+                            double range = Math.Max(1.0, maxVal - minVal);
+                            double frac = (val - minVal) / range;
+                            if (frac >= 0.75) { cell.Format.BgColor = unchecked((int)0xFF93C5FD); cell.Format.TextColor = unchecked((int)0xFF1E3A8A); }
+                            else if (frac >= 0.50) { cell.Format.BgColor = unchecked((int)0xFFBFDBFE); cell.Format.TextColor = unchecked((int)0xFF1E3A8A); }
+                            else if (frac >= 0.25) { cell.Format.BgColor = unchecked((int)0xFFDBEAFE); cell.Format.TextColor = unchecked((int)0xFF1E3A8A); }
+                            else { cell.Format.BgColor = unchecked((int)0xFFEFF6FF); cell.Format.TextColor = unchecked((int)0xFF1E3A8A); }
                         }
                     }
                 }
@@ -4888,6 +6375,34 @@ namespace GenOffice.UI
                         break;
                     }
                 }
+
+                if (VietnameseAutoCorrect.IsEnabled)
+                {
+                    foreach (var wStr in words)
+                    {
+                        string cleanW = wStr.Trim(new char[] { '.', ',', ';', ':', '!', '?', '(', ')', '"', '\'', '-', '–' });
+                        string corrW;
+                        if (!string.IsNullOrEmpty(cleanW) && VietnameseAutoCorrect.TryCorrectWord(cleanW, out corrW))
+                        {
+                            string wordToFix = cleanW;
+                            var scItem = new SpellCheckItem
+                            {
+                                Location = cellCoord,
+                                OriginalText = text,
+                                ProblemWord = cleanW,
+                                Reason = "Lỗi gõ chính tả tiếng Việt (Telex / VNI)",
+                                ApplyCorrection = (newVal) =>
+                                {
+                                    string updatedCell = (cell.RawValue ?? "").Replace(wordToFix, newVal);
+                                    cell.RawValue = updatedCell;
+                                    cell.EvaluatedStr = updatedCell;
+                                }
+                            };
+                            scItem.Suggestions.Add(corrW);
+                            items.Add(scItem);
+                        }
+                    }
+                }
             }
 
             if (items.Count > 0)
@@ -4899,7 +6414,7 @@ namespace GenOffice.UI
             }
             else
             {
-                MessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "GenOffice Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "ZenQ Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -5403,11 +6918,13 @@ namespace GenOffice.UI
                 for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
             }
 
-            int saW = 440;
-            int saH = 190;
+            int saW = 480;
+            int saH = 220;
             DocShapeObject newSh = new DocShapeObject("SmartArt", startX + 20, startY + 20, saW, saH);
             newSh.SmartArtType = type;
             newSh.SmartArtTitle = name;
+            string[] defNodes = SmartArtRenderer.GetSmartArtNodeList(type, "");
+            newSh.TextContent = (defNodes != null && defNodes.Length > 0) ? string.Join("|", defNodes) : "";
             newSh.FillColor = Color.FromArgb(248, 250, 252);
             newSh.OutlineColor = Color.FromArgb(16, 124, 65); // Excel Green accent
             newSh.OutlineWidth = 1.5f;
@@ -5983,7 +7500,7 @@ namespace GenOffice.UI
             {
                 Id = "shape_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                 ShapeType = "WordArt",
-                TextContent = "GenOffice Calc",
+                TextContent = "ZenQ Calc",
                 FillColor = Color.FromArgb(37, 99, 235),
                 OutlineColor = Color.FromArgb(30, 58, 138),
                 OutlineWidth = 1.0f,
@@ -6086,67 +7603,7 @@ namespace GenOffice.UI
 
         public void RemoveDuplicates(Form parentForm)
         {
-            if (IsSheetProtected)
-            {
-                ShowSheetProtectedWarning();
-                return;
-            }
-
-            uint minR = Math.Min(SelectedRow, SelEndRow);
-            uint maxR = Math.Max(SelectedRow, SelEndRow);
-            uint minC = Math.Min(SelectedCol, SelEndCol);
-            uint maxC = Math.Max(SelectedCol, SelEndCol);
-
-            if (minR == maxR && minC == maxC)
-            {
-                GetContiguousDataRange(SelectedRow, SelectedCol, out minR, out maxR, out minC, out maxC);
-            }
-
-            if (maxR <= minR)
-            {
-                MessageBox.Show("Vui lòng chọn một vùng dữ liệu có nhiều dòng để xóa trùng lặp!", "Xóa Trùng Lặp", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            SaveUndoState();
-
-            HashSet<string> seenRows = new HashSet<string>();
-            List<uint> rowsToDelete = new List<uint>();
-
-            for (uint r = minR + 1; r <= maxR; r++)
-            {
-                System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                for (uint c = minC; c <= maxC; c++)
-                {
-                    CellData cd = CurrentSheet.GetCell(r, c);
-                    sb.Append(cd != null ? (cd.EvaluatedStr ?? cd.RawValue ?? "") : "");
-                    sb.Append("|");
-                }
-                string rowSig = sb.ToString();
-                if (seenRows.Contains(rowSig))
-                {
-                    rowsToDelete.Add(r);
-                }
-                else
-                {
-                    seenRows.Add(rowSig);
-                }
-            }
-
-            if (rowsToDelete.Count == 0)
-            {
-                if (parentForm != null) MessageBox.Show("Không tìm thấy giá trị trùng lặp nào trong vùng dữ liệu đã chọn!", "Xóa Trùng Lặp", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            for (int i = rowsToDelete.Count - 1; i >= 0; i--)
-            {
-                CurrentSheet.ShiftCellsUp(rowsToDelete[i], 1, 1000, 100);
-            }
-
-            FormulaEngine.EvaluateSheet(CurrentSheet);
-            if (parentForm != null) MessageBox.Show(string.Format("Đã tìm thấy và xóa {0} dòng trùng lặp!\nGiữ lại {1} dòng dữ liệu duy nhất.", rowsToDelete.Count, seenRows.Count + 1), "Xóa Trùng Lặp Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            if (parentForm != null) parentForm.Invalidate();
+            OpenRemoveDuplicatesDialog(parentForm);
         }
 
         public void SetPrintArea()
@@ -6182,6 +7639,520 @@ namespace GenOffice.UI
         {
             PaperSize = size;
         }
+        public void ExecuteMoveRange(uint srcStartR, uint srcStartC, uint srcEndR, uint srcEndC, uint dstStartR, uint dstStartC, bool copyOnly)
+        {
+            if (CurrentSheet == null) return;
+            SaveUndoState();
+
+            uint minR = Math.Min(srcStartR, srcEndR);
+            uint maxR = Math.Max(srcStartR, srcEndR);
+            uint minC = Math.Min(srcStartC, srcEndC);
+            uint maxC = Math.Max(srcStartC, srcEndC);
+
+            int rowSpan = (int)(maxR - minR + 1);
+            int colSpan = (int)(maxC - minC + 1);
+
+            int dRow = (int)dstStartR - (int)minR;
+            int dCol = (int)dstStartC - (int)minC;
+
+            // 1. Snapshot all source cells
+            List<Tuple<uint, uint, CellData>> sourceCells = new List<Tuple<uint, uint, CellData>>();
+            for (uint r = minR; r <= maxR; r++)
+            {
+                for (uint c = minC; c <= maxC; c++)
+                {
+                    CellData cell = CurrentSheet.GetCell(r, c);
+                    if (cell != null)
+                    {
+                        sourceCells.Add(Tuple.Create(r, c, cell.Clone()));
+                    }
+                }
+            }
+
+            // 2. If moving (not copying), clear source cells
+            if (!copyOnly)
+            {
+                for (uint r = minR; r <= maxR; r++)
+                {
+                    for (uint c = minC; c <= maxC; c++)
+                    {
+                        CurrentSheet.ClearCell(r, c);
+                    }
+                }
+            }
+
+            // 3. Paste into destination cells with adjusted coordinates & formulas
+            foreach (var item in sourceCells)
+            {
+                uint targetR = (uint)(item.Item1 + dRow);
+                uint targetC = (uint)(item.Item2 + dCol);
+                CellData targetCell = CurrentSheet.GetOrCreateCell(targetR, targetC);
+
+                CellData srcCell = item.Item3;
+                targetCell.Type = srcCell.Type;
+                targetCell.RawValue = srcCell.RawValue;
+                targetCell.EvaluatedStr = srcCell.EvaluatedStr;
+                targetCell.NumericValue = srcCell.NumericValue;
+                targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                targetCell.Format = srcCell.Format != null ? srcCell.Format.Clone() : null;
+            }
+
+            // 4. Update Selection to destination
+            SelectedRow = dstStartR;
+            SelectedCol = dstStartC;
+            SelEndRow = (uint)(dstStartR + rowSpan - 1);
+            SelEndCol = (uint)(dstStartC + colSpan - 1);
+
+            // 5. Evaluate and refresh
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+        }
+
+        public static string AdjustFormulaOffset(string formula, int dRow, int dCol)
+        {
+            if (string.IsNullOrEmpty(formula) || !formula.StartsWith("=")) return formula;
+            if (dRow == 0 && dCol == 0) return formula;
+
+            return Regex.Replace(formula, @"(\$?)([A-Za-z]+)(\$?)([0-9]+)", m =>
+            {
+                string colAbs = m.Groups[1].Value;
+                string colLetters = m.Groups[2].Value.ToUpperInvariant();
+                string rowAbs = m.Groups[3].Value;
+                string rowDigits = m.Groups[4].Value;
+
+                uint r, c;
+                if (SparseMatrix.TryParseCellReference(colLetters + rowDigits, out r, out c))
+                {
+                    uint newR = (rowAbs == "$") ? r : (uint)Math.Max(1, (int)r + dRow);
+                    uint newC = (colAbs == "$") ? c : (uint)Math.Max(1, (int)c + dCol);
+                    return string.Format("{0}{1}{2}{3}", colAbs, SparseMatrix.ColIndexToName(newC), rowAbs, newR);
+                }
+                return m.Value;
+            });
+        }
+
+        /// <summary>
+        /// Native vector PDF export honoring orientation, paper size, margins, gridlines, fonts, styling, 2D pagination, and floating objects.
+        /// </summary>
+        public bool ExportToPdf(string filePath)
+        {
+            return ExportToPdf(filePath, false);
+        }
+
+        public bool ExportToPdf(string filePath, bool exportAllSheets)
+        {
+            return GenOffice.Format.CalcPdfExporter.Export(this, filePath, exportAllSheets);
+        }
+
+        #region Clipboard & Paste Special
+
+        public void Copy()
+        {
+            if (CurrentSheet == null) return;
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+
+            _clipboardCells.Clear();
+            _clipboardSourceSheet = CurrentSheet;
+            _clipSourceStartRow = minR;
+            _clipSourceStartCol = minC;
+            _clipRowCount = maxR - minR + 1;
+            _clipColCount = maxC - minC + 1;
+            _clipboardIsCut = false;
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+            for (uint r = minR; r <= maxR; r++)
+            {
+                if (r > minR) sb.AppendLine();
+                for (uint c = minC; c <= maxC; c++)
+                {
+                    if (c > minC) sb.Append('\t');
+                    CellData cell = CurrentSheet.GetCell(r, c);
+                    if (cell != null)
+                    {
+                        _clipboardCells.Add(Tuple.Create(r - minR, c - minC, cell.Clone()));
+                        string text = cell.EvaluatedStr ?? cell.RawValue ?? "";
+                        sb.Append(text);
+                    }
+                }
+            }
+
+            try
+            {
+                if (sb.Length > 0)
+                {
+                    Clipboard.SetText(sb.ToString());
+                }
+            }
+            catch { }
+        }
+
+        public void Cut()
+        {
+            Copy();
+            _clipboardIsCut = true;
+        }
+
+        public void Paste()
+        {
+            if (CurrentSheet == null) return;
+            SaveUndoState();
+
+            if (_clipboardCells != null && _clipboardCells.Count > 0)
+            {
+                uint dstR = SelectedRow;
+                uint dstC = SelectedCol;
+                int dRow = (int)dstR - (int)_clipSourceStartRow;
+                int dCol = (int)dstC - (int)_clipSourceStartCol;
+
+                if (_clipboardIsCut && _clipboardSourceSheet != null)
+                {
+                    for (uint r = _clipSourceStartRow; r < _clipSourceStartRow + _clipRowCount; r++)
+                    {
+                        for (uint c = _clipSourceStartCol; c < _clipSourceStartCol + _clipColCount; c++)
+                        {
+                            _clipboardSourceSheet.ClearCell(r, c);
+                        }
+                    }
+                    _clipboardIsCut = false;
+                }
+
+                foreach (var item in _clipboardCells)
+                {
+                    uint targetR = dstR + item.Item1;
+                    uint targetC = dstC + item.Item2;
+                    CellData targetCell = CurrentSheet.GetOrCreateCell(targetR, targetC);
+                    CellData srcCell = item.Item3;
+
+                    targetCell.Type = srcCell.Type;
+                    targetCell.RawValue = srcCell.RawValue;
+                    targetCell.EvaluatedStr = srcCell.EvaluatedStr;
+                    targetCell.NumericValue = srcCell.NumericValue;
+                    targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                    targetCell.Format = srcCell.Format != null ? srcCell.Format.Clone() : null;
+                }
+
+                SelEndRow = dstR + _clipRowCount - 1;
+                SelEndCol = dstC + _clipColCount - 1;
+            }
+            else
+            {
+                try
+                {
+                    if (Clipboard.ContainsText())
+                    {
+                        string clipText = Clipboard.GetText();
+                        if (!string.IsNullOrEmpty(clipText))
+                        {
+                            string[] lines = clipText.Replace("\r\n", "\n").Split('\n');
+                            uint curR = SelectedRow;
+                            uint maxTargetCol = SelectedCol;
+
+                            for (int i = 0; i < lines.Length; i++)
+                            {
+                                if (i == lines.Length - 1 && string.IsNullOrEmpty(lines[i])) break;
+                                string[] tokens = lines[i].Split('\t');
+                                for (int j = 0; j < tokens.Length; j++)
+                                {
+                                    uint targetCol = SelectedCol + (uint)j;
+                                    if (targetCol > maxTargetCol) maxTargetCol = targetCol;
+                                    CurrentSheet.SetCellText(curR, targetCol, tokens[j]);
+                                }
+                                curR++;
+                            }
+                            SelEndRow = Math.Max(SelectedRow, curR - 1);
+                            SelEndCol = maxTargetCol;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+            Invalidate();
+            if (ParentForm != null) ParentForm.Invalidate();
+        }
+
+        public void PasteValues()
+        {
+            PasteSpecial(PasteSpecialType.Values, PasteOperation.None, false, false);
+        }
+
+        public void PasteFormulas()
+        {
+            PasteSpecial(PasteSpecialType.Formulas, PasteOperation.None, false, false);
+        }
+
+        public void PasteTranspose()
+        {
+            PasteSpecial(PasteSpecialType.All, PasteOperation.None, false, true);
+        }
+
+        public void PasteSpecial(PasteSpecialType type, PasteOperation op, bool skipBlanks, bool transpose)
+        {
+            if (CurrentSheet == null) return;
+            SaveUndoState();
+
+            uint dstR = SelectedRow;
+            uint dstC = SelectedCol;
+
+            if (_clipboardCells != null && _clipboardCells.Count > 0)
+            {
+                int dRow = (int)dstR - (int)_clipSourceStartRow;
+                int dCol = (int)dstC - (int)_clipSourceStartCol;
+
+                foreach (var item in _clipboardCells)
+                {
+                    uint relR = item.Item1;
+                    uint relC = item.Item2;
+                    uint targetR = transpose ? (dstR + relC) : (dstR + relR);
+                    uint targetC = transpose ? (dstC + relR) : (dstC + relC);
+
+                    CellData srcCell = item.Item3;
+                    if (skipBlanks && (srcCell == null || string.IsNullOrEmpty(srcCell.RawValue)))
+                        continue;
+
+                    CellData targetCell = CurrentSheet.GetOrCreateCell(targetR, targetC);
+
+                    if (op != PasteOperation.None)
+                    {
+                        double srcNum = !double.IsNaN(srcCell.NumericValue) ? srcCell.NumericValue : 0.0;
+                        if (double.IsNaN(srcCell.NumericValue) && !string.IsNullOrEmpty(srcCell.RawValue))
+                            double.TryParse(srcCell.RawValue, out srcNum);
+
+                        double dstNum = !double.IsNaN(targetCell.NumericValue) ? targetCell.NumericValue : 0.0;
+                        if (double.IsNaN(targetCell.NumericValue) && !string.IsNullOrEmpty(targetCell.RawValue))
+                            double.TryParse(targetCell.RawValue, out dstNum);
+
+                        double res = dstNum;
+                        if (op == PasteOperation.Add) res = dstNum + srcNum;
+                        else if (op == PasteOperation.Subtract) res = dstNum - srcNum;
+                        else if (op == PasteOperation.Multiply) res = dstNum * srcNum;
+                        else if (op == PasteOperation.Divide) res = (srcNum != 0) ? (dstNum / srcNum) : 0;
+
+                        targetCell.Type = CellType.Number;
+                        targetCell.NumericValue = res;
+                        targetCell.RawValue = res.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        targetCell.FormulaStr = null;
+                    }
+                    else
+                    {
+                        switch (type)
+                        {
+                            case PasteSpecialType.Values:
+                                targetCell.Type = srcCell.Type == CellType.Formula ? (double.IsNaN(srcCell.NumericValue) ? CellType.String : CellType.Number) : srcCell.Type;
+                                targetCell.RawValue = srcCell.EvaluatedStr ?? srcCell.RawValue;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                targetCell.FormulaStr = null;
+                                break;
+
+                            case PasteSpecialType.Formulas:
+                                targetCell.Type = srcCell.Type;
+                                targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                                targetCell.RawValue = srcCell.RawValue;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                break;
+
+                            case PasteSpecialType.Formats:
+                                if (srcCell.Format != null) targetCell.Format = srcCell.Format.Clone();
+                                break;
+
+                            case PasteSpecialType.AllExceptBorders:
+                                targetCell.Type = srcCell.Type;
+                                targetCell.RawValue = srcCell.RawValue;
+                                targetCell.EvaluatedStr = srcCell.EvaluatedStr;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                                if (srcCell.Format != null)
+                                {
+                                    targetCell.Format = srcCell.Format.Clone();
+                                    targetCell.Format.Borders = null;
+                                }
+                                break;
+
+                            case PasteSpecialType.FormulasAndNumberFormats:
+                                targetCell.Type = srcCell.Type;
+                                targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                                targetCell.RawValue = srcCell.RawValue;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                if (srcCell.Format != null)
+                                {
+                                    if (targetCell.Format == null) targetCell.Format = new CellFormat();
+                                    targetCell.Format.NumberFormat = srcCell.Format.NumberFormat;
+                                    targetCell.Format.DecimalPlaces = srcCell.Format.DecimalPlaces;
+                                }
+                                break;
+
+                            case PasteSpecialType.ValuesAndNumberFormats:
+                                targetCell.Type = srcCell.Type == CellType.Formula ? (double.IsNaN(srcCell.NumericValue) ? CellType.String : CellType.Number) : srcCell.Type;
+                                targetCell.RawValue = srcCell.EvaluatedStr ?? srcCell.RawValue;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                targetCell.FormulaStr = null;
+                                if (srcCell.Format != null)
+                                {
+                                    if (targetCell.Format == null) targetCell.Format = new CellFormat();
+                                    targetCell.Format.NumberFormat = srcCell.Format.NumberFormat;
+                                    targetCell.Format.DecimalPlaces = srcCell.Format.DecimalPlaces;
+                                }
+                                break;
+
+                            case PasteSpecialType.ColumnWidths:
+                                if (CustomColWidths != null && CustomColWidths.ContainsKey(_clipSourceStartCol + relC))
+                                {
+                                    int w = CustomColWidths[_clipSourceStartCol + relC];
+                                    CustomColWidths[targetC] = w;
+                                }
+                                break;
+
+                            default: // All
+                                targetCell.Type = srcCell.Type;
+                                targetCell.RawValue = srcCell.RawValue;
+                                targetCell.EvaluatedStr = srcCell.EvaluatedStr;
+                                targetCell.NumericValue = srcCell.NumericValue;
+                                targetCell.FormulaStr = AdjustFormulaOffset(srcCell.FormulaStr, dRow, dCol);
+                                targetCell.Format = srcCell.Format != null ? srcCell.Format.Clone() : null;
+                                break;
+                        }
+                    }
+                }
+            }
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+            Invalidate();
+            if (ParentForm != null) ParentForm.Invalidate();
+        }
+
+        public void OpenPasteSpecialDialog(Form parentForm = null)
+        {
+            Form form = parentForm ?? ParentForm ?? Form.ActiveForm;
+            using (CalcPasteSpecialDialog dlg = new CalcPasteSpecialDialog())
+            {
+                if (dlg.ShowDialog(form) == DialogResult.OK)
+                {
+                    PasteSpecial(dlg.SelectedType, dlg.SelectedOperation, dlg.SkipBlanks, dlg.Transpose);
+                }
+            }
+        }
+
+        public void OpenGoalSeekDialog(Form parentForm = null)
+        {
+            Form form = parentForm ?? ParentForm ?? Form.ActiveForm;
+            using (CalcGoalSeekDialog dlg = new CalcGoalSeekDialog(this))
+            {
+                dlg.ShowDialog(form);
+            }
+        }
+
+        public void FlashFill()
+        {
+            if (CurrentSheet == null || SelectedCol <= 1) return;
+            SaveUndoState();
+
+            uint targetCol = SelectedCol;
+            uint sourceCol = SelectedCol - 1;
+            uint startR = SelectedRow;
+
+            uint exampleRow = startR;
+            CellData exDestCell = CurrentSheet.GetCell(exampleRow, targetCol);
+            CellData exSrcCell = CurrentSheet.GetCell(exampleRow, sourceCol);
+
+            if (exDestCell == null || string.IsNullOrEmpty(exDestCell.RawValue))
+            {
+                if (exampleRow > 1)
+                {
+                    exampleRow--;
+                    exDestCell = CurrentSheet.GetCell(exampleRow, targetCol);
+                    exSrcCell = CurrentSheet.GetCell(exampleRow, sourceCol);
+                }
+            }
+
+            if (exDestCell == null || exSrcCell == null ||
+                string.IsNullOrEmpty(exDestCell.RawValue) || string.IsNullOrEmpty(exSrcCell.RawValue))
+            {
+                return;
+            }
+
+            string srcEx = exSrcCell.RawValue.Trim();
+            string dstEx = exDestCell.RawValue.Trim();
+
+            Func<string, string> rule = null;
+
+            string[] srcParts = srcEx.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (srcParts.Length > 1)
+            {
+                if (string.Equals(srcParts[srcParts.Length - 1], dstEx, StringComparison.OrdinalIgnoreCase))
+                {
+                    rule = (s) =>
+                    {
+                        string[] p = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        return (p.Length > 0) ? p[p.Length - 1] : "";
+                    };
+                }
+                else if (string.Equals(srcParts[0], dstEx, StringComparison.OrdinalIgnoreCase))
+                {
+                    rule = (s) =>
+                    {
+                        string[] p = s.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        return (p.Length > 0) ? p[0] : "";
+                    };
+                }
+            }
+
+            if (rule == null && srcEx.ToUpperInvariant() == dstEx)
+            {
+                rule = (s) => s.ToUpperInvariant();
+            }
+            else if (rule == null && srcEx.ToLowerInvariant() == dstEx)
+            {
+                rule = (s) => s.ToLowerInvariant();
+            }
+            else if (rule == null && srcEx.Contains("@"))
+            {
+                if (dstEx == srcEx.Substring(0, srcEx.IndexOf('@')))
+                {
+                    rule = (s) => { int at = s.IndexOf('@'); return at >= 0 ? s.Substring(0, at) : s; };
+                }
+                else if (dstEx == srcEx.Substring(srcEx.IndexOf('@') + 1))
+                {
+                    rule = (s) => { int at = s.IndexOf('@'); return at >= 0 ? s.Substring(at + 1) : s; };
+                }
+            }
+
+            if (rule == null)
+            {
+                if (dstEx.StartsWith(srcEx))
+                {
+                    string suffix = dstEx.Substring(srcEx.Length);
+                    rule = (s) => s + suffix;
+                }
+                else if (dstEx.EndsWith(srcEx))
+                {
+                    string prefix = dstEx.Substring(0, dstEx.Length - srcEx.Length);
+                    rule = (s) => prefix + s;
+                }
+            }
+
+            if (rule == null) return;
+
+            uint fillStart = exampleRow + 1;
+            for (uint r = fillStart; r < fillStart + 1000; r++)
+            {
+                CellData srcC = CurrentSheet.GetCell(r, sourceCol);
+                if (srcC == null || string.IsNullOrEmpty(srcC.RawValue)) break;
+
+                string generated = rule(srcC.RawValue.Trim());
+                CurrentSheet.SetCellText(r, targetCol, generated);
+            }
+
+            FormulaEngine.EvaluateSheet(CurrentSheet);
+            Invalidate();
+            if (ParentForm != null) ParentForm.Invalidate();
+        }
+
+        #endregion
+
         #endregion
     }
 
@@ -6191,5 +8162,7 @@ namespace GenOffice.UI
         {
             return new SolidBrush(color);
         }
+
+
     }
 }

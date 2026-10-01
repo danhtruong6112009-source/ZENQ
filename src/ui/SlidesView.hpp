@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_SLIDES_VIEW_HPP
-#ifndef GENOFFICE_SLIDES_VIEW_HPP
 #define GENOFFICE_SLIDES_VIEW_HPP
 
 #include <windows.h>

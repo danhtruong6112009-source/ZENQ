@@ -2,12 +2,29 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Windows.Forms;
 
 namespace GenOffice.UI
 {
     public static class ShapeRenderer
     {
+        public static GraphicsPath CreateShapePath(DocShapeObject shape, Rectangle bounds)
+        {
+            if (shape == null) return CreateShapePath("Rectangle", bounds, 0.2f, 0.4f, 0.8f);
+            string st = shape.ShapeType;
+            if (shape.AspectRatioLock && (st == "Oval" || string.Equals(st, "Circle", StringComparison.OrdinalIgnoreCase)))
+            {
+                st = "Circle";
+            }
+            return CreateShapePath(st, bounds, shape.AdjustValue1, shape.AdjustValue2, shape.AdjustValue3);
+        }
+
         public static GraphicsPath CreateShapePath(string shapeType, Rectangle bounds)
+        {
+            return CreateShapePath(shapeType, bounds, 0.2f, 0.4f, 0.8f);
+        }
+
+        public static GraphicsPath CreateShapePath(string shapeType, Rectangle bounds, float adj1, float adj2, float adj3)
         {
             GraphicsPath path = new GraphicsPath();
             float x = bounds.X;
@@ -15,44 +32,114 @@ namespace GenOffice.UI
             float w = Math.Max(4, bounds.Width);
             float h = Math.Max(4, bounds.Height);
 
-            switch (shapeType)
+            switch (shapeType ?? "Rectangle")
             {
+                // Rectangles
                 case "Rectangle":
+                case "rect":
                 case "TextBox":
                 case "Image":
+                case "FlowchartProcess":
                     path.AddRectangle(new RectangleF(x, y, w, h));
                     break;
 
                 case "RoundedRectangle":
-                    float r = Math.Min(w, h) * 0.2f;
-                    path.AddArc(x, y, r * 2, r * 2, 180, 90);
-                    path.AddArc(x + w - r * 2, y, r * 2, r * 2, 270, 90);
-                    path.AddArc(x + w - r * 2, y + h - r * 2, r * 2, r * 2, 0, 90);
-                    path.AddArc(x, y + h - r * 2, r * 2, r * 2, 90, 90);
-                    path.CloseFigure();
+                case "roundRect":
+                    {
+                        float rRatio = (adj1 > 0.01f && adj1 <= 0.5f) ? adj1 : 0.2f;
+                        float r = Math.Min(w, h) * rRatio;
+                        path.AddArc(x, y, r * 2, r * 2, 180, 90);
+                        path.AddArc(x + w - r * 2, y, r * 2, r * 2, 270, 90);
+                        path.AddArc(x + w - r * 2, y + h - r * 2, r * 2, r * 2, 0, 90);
+                        path.AddArc(x, y + h - r * 2, r * 2, r * 2, 90, 90);
+                        path.CloseFigure();
+                    }
                     break;
 
                 case "SingleCornerSnipped":
-                    float snip = Math.Min(w, h) * 0.2f;
-                    path.AddLine(x + snip, y, x + w, y);
-                    path.AddLine(x + w, y, x + w, y + h);
-                    path.AddLine(x + w, y + h, x, y + h);
-                    path.AddLine(x, y + h, x, y + snip);
-                    path.CloseFigure();
+                    {
+                        float snip = Math.Min(w, h) * 0.2f;
+                        path.AddLine(x + snip, y, x + w, y);
+                        path.AddLine(x + w, y, x + w, y + h);
+                        path.AddLine(x + w, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + snip);
+                        path.CloseFigure();
+                    }
                     break;
 
                 case "TopCornersSnipped":
-                    float snip2 = Math.Min(w, h) * 0.2f;
-                    path.AddLine(x + snip2, y, x + w - snip2, y);
-                    path.AddLine(x + w, y + snip2, x + w, y + h);
-                    path.AddLine(x + w, y + h, x, y + h);
-                    path.AddLine(x, y + h, x, y + snip2);
-                    path.CloseFigure();
+                    {
+                        float snip2 = Math.Min(w, h) * 0.2f;
+                        path.AddLine(x + snip2, y, x + w - snip2, y);
+                        path.AddLine(x + w, y + snip2, x + w, y + h);
+                        path.AddLine(x + w, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + snip2);
+                        path.CloseFigure();
+                    }
                     break;
 
+                case "SnippedAndRounded":
+                    {
+                        float snipR = Math.Min(w, h) * 0.22f;
+                        path.AddLine(x + snipR, y, x + w - snipR * 2, y);
+                        path.AddArc(x + w - snipR * 2, y, snipR * 2, snipR * 2, 270, 90);
+                        path.AddLine(x + w, y + snipR, x + w, y + h);
+                        path.AddLine(x + w, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + snipR);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "RoundSingleCorner":
+                    {
+                        float r1 = Math.Min(w, h) * 0.28f;
+                        path.AddArc(x, y, r1 * 2, r1 * 2, 180, 90);
+                        path.AddLine(x + r1, y, x + w, y);
+                        path.AddLine(x + w, y, x + w, y + h);
+                        path.AddLine(x + w, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + r1);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "RoundSameSideCorner":
+                    {
+                        float rS = Math.Min(w, h) * 0.25f;
+                        path.AddArc(x, y, rS * 2, rS * 2, 180, 90);
+                        path.AddArc(x + w - rS * 2, y, rS * 2, rS * 2, 270, 90);
+                        path.AddLine(x + w, y + rS, x + w, y + h);
+                        path.AddLine(x + w, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + rS);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "RoundDiagonalCorner":
+                    {
+                        float rD = Math.Min(w, h) * 0.25f;
+                        path.AddArc(x, y, rD * 2, rD * 2, 180, 90);
+                        path.AddLine(x + rD, y, x + w, y);
+                        path.AddLine(x + w, y, x + w, y + h - rD * 2);
+                        path.AddArc(x + w - rD * 2, y + h - rD * 2, rD * 2, rD * 2, 0, 90);
+                        path.AddLine(x + w - rD, y + h, x, y + h);
+                        path.AddLine(x, y + h, x, y + rD);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                // Basic Shapes
                 case "Oval":
-                case "Circle":
+                case "ellipse":
                     path.AddEllipse(x, y, w, h);
+                    break;
+
+                case "Circle":
+                    {
+                        int dim = Math.Min((int)w, (int)h);
+                        int nx = (int)x + ((int)w - dim) / 2;
+                        int ny = (int)y + ((int)h - dim) / 2;
+                        path.AddEllipse(nx, ny, dim, dim);
+                    }
                     break;
 
                 case "Triangle":
@@ -74,25 +161,45 @@ namespace GenOffice.UI
                     break;
 
                 case "Parallelogram":
-                    float pSkew = w * 0.25f;
-                    path.AddPolygon(new PointF[]
+                case "FlowchartData":
                     {
-                        new PointF(x + pSkew, y),
-                        new PointF(x + w, y),
-                        new PointF(x + w - pSkew, y + h),
-                        new PointF(x, y + h)
-                    });
+                        float pSkew = w * 0.25f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + pSkew, y),
+                            new PointF(x + w, y),
+                            new PointF(x + w - pSkew, y + h),
+                            new PointF(x, y + h)
+                        });
+                    }
+                    break;
+
+                case "Chevron":
+                    {
+                        float notch = Math.Min(w * 0.22f, h * 0.45f);
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y),
+                            new PointF(x + w - notch, y),
+                            new PointF(x + w, y + h / 2f),
+                            new PointF(x + w - notch, y + h),
+                            new PointF(x, y + h),
+                            new PointF(x + notch, y + h / 2f)
+                        });
+                    }
                     break;
 
                 case "Trapezoid":
-                    float tSkew = w * 0.2f;
-                    path.AddPolygon(new PointF[]
                     {
-                        new PointF(x + tSkew, y),
-                        new PointF(x + w - tSkew, y),
-                        new PointF(x + w, y + h),
-                        new PointF(x, y + h)
-                    });
+                        float tSkew = w * 0.2f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + tSkew, y),
+                            new PointF(x + w - tSkew, y),
+                            new PointF(x + w, y + h),
+                            new PointF(x, y + h)
+                        });
+                    }
                     break;
 
                 case "Diamond":
@@ -131,51 +238,91 @@ namespace GenOffice.UI
                     break;
 
                 case "Octagon":
-                    float oCut = Math.Min(w, h) * 0.28f;
-                    path.AddPolygon(new PointF[]
                     {
-                        new PointF(x + oCut, y),
-                        new PointF(x + w - oCut, y),
-                        new PointF(x + w, y + oCut),
-                        new PointF(x + w, y + h - oCut),
-                        new PointF(x + w - oCut, y + h),
-                        new PointF(x + oCut, y + h),
-                        new PointF(x, y + h - oCut),
-                        new PointF(x, y + oCut)
-                    });
+                        float oCut = Math.Min(w, h) * 0.28f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + oCut, y),
+                            new PointF(x + w - oCut, y),
+                            new PointF(x + w, y + oCut),
+                            new PointF(x + w, y + h - oCut),
+                            new PointF(x + w - oCut, y + h),
+                            new PointF(x + oCut, y + h),
+                            new PointF(x, y + h - oCut),
+                            new PointF(x, y + oCut)
+                        });
+                    }
+                    break;
+
+                case "Decagon":
+                    {
+                        PointF[] decaPts = new PointF[10];
+                        float cx = x + w / 2f;
+                        float cy = y + h / 2f;
+                        float rx = w / 2f;
+                        float ry = h / 2f;
+                        for (int di = 0; di < 10; di++)
+                        {
+                            double ang = -Math.PI / 2.0 + di * (2.0 * Math.PI / 10.0);
+                            decaPts[di] = new PointF((float)(cx + rx * Math.Cos(ang)), (float)(cy + ry * Math.Sin(ang)));
+                        }
+                        path.AddPolygon(decaPts);
+                    }
                     break;
 
                 case "Cross":
                 case "Plus":
-                    float cW = w / 3f; float cH = h / 3f;
-                    path.AddPolygon(new PointF[]
                     {
-                        new PointF(x + cW, y), new PointF(x + 2 * cW, y),
-                        new PointF(x + 2 * cW, y + cH), new PointF(x + w, y + cH),
-                        new PointF(x + w, y + 2 * cH), new PointF(x + 2 * cW, y + 2 * cH),
-                        new PointF(x + 2 * cW, y + h), new PointF(x + cW, y + h),
-                        new PointF(x + cW, y + 2 * cH), new PointF(x, y + 2 * cH),
-                        new PointF(x, y + cH), new PointF(x + cW, y + cH)
-                    });
+                        float cW = w / 3f; float cH = h / 3f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + cW, y), new PointF(x + 2 * cW, y),
+                            new PointF(x + 2 * cW, y + cH), new PointF(x + w, y + cH),
+                            new PointF(x + w, y + 2 * cH), new PointF(x + 2 * cW, y + 2 * cH),
+                            new PointF(x + 2 * cW, y + h), new PointF(x + cW, y + h),
+                            new PointF(x + cW, y + 2 * cH), new PointF(x, y + 2 * cH),
+                            new PointF(x, y + cH), new PointF(x + cW, y + cH)
+                        });
+                    }
                     break;
 
                 case "Minus":
-                    path.AddRectangle(new RectangleF(x, y + h * 0.35f, w, h * 0.3f));
+                    path.AddRectangle(new RectangleF(x, y + h * 0.38f, w, h * 0.24f));
                     break;
 
                 case "Multiply":
-                    path.AddPolygon(new PointF[]
                     {
-                        new PointF(x + w * 0.2f, y), new PointF(x + w / 2f, y + h * 0.3f), new PointF(x + w * 0.8f, y),
-                        new PointF(x + w, y + h * 0.2f), new PointF(x + w * 0.7f, y + h / 2f), new PointF(x + w, y + h * 0.8f),
-                        new PointF(x + w * 0.8f, y + h), new PointF(x + w / 2f, y + h * 0.7f), new PointF(x + w * 0.2f, y + h),
-                        new PointF(x, y + h * 0.8f), new PointF(x + w * 0.3f, y + h / 2f), new PointF(x, y + h * 0.2f)
-                    });
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w * 0.2f, y), new PointF(x + w / 2f, y + h * 0.3f), new PointF(x + w * 0.8f, y),
+                            new PointF(x + w, y + h * 0.2f), new PointF(x + w * 0.7f, y + h / 2f), new PointF(x + w, y + h * 0.8f),
+                            new PointF(x + w * 0.8f, y + h), new PointF(x + w / 2f, y + h * 0.7f), new PointF(x + w * 0.2f, y + h),
+                            new PointF(x, y + h * 0.8f), new PointF(x + w * 0.3f, y + h / 2f), new PointF(x, y + h * 0.2f)
+                        });
+                    }
+                    break;
+
+                case "Divide":
+                    path.AddRectangle(new RectangleF(x, y + h * 0.42f, w, h * 0.16f));
+                    path.AddEllipse(x + w / 2f - h * 0.1f, y + h * 0.15f, h * 0.2f, h * 0.2f);
+                    path.AddEllipse(x + w / 2f - h * 0.1f, y + h * 0.65f, h * 0.2f, h * 0.2f);
                     break;
 
                 case "Equal":
-                    path.AddRectangle(new RectangleF(x, y + h * 0.2f, w, h * 0.22f));
-                    path.AddRectangle(new RectangleF(x, y + h * 0.58f, w, h * 0.22f));
+                    path.AddRectangle(new RectangleF(x, y + h * 0.22f, w, h * 0.2f));
+                    path.AddRectangle(new RectangleF(x, y + h * 0.58f, w, h * 0.2f));
+                    break;
+
+                case "NotEqual":
+                    path.AddRectangle(new RectangleF(x, y + h * 0.25f, w, h * 0.18f));
+                    path.AddRectangle(new RectangleF(x, y + h * 0.57f, w, h * 0.18f));
+                    path.AddPolygon(new PointF[]
+                    {
+                        new PointF(x + w * 0.65f, y),
+                        new PointF(x + w * 0.75f, y),
+                        new PointF(x + w * 0.35f, y + h),
+                        new PointF(x + w * 0.25f, y + h)
+                    });
                     break;
 
                 case "Heart":
@@ -204,7 +351,7 @@ namespace GenOffice.UI
                     break;
 
                 case "Sun":
-                    path.AddEllipse(x + w * 0.2f, y + h * 0.2f, w * 0.6f, h * 0.6f);
+                    path.AddEllipse(x + w * 0.22f, y + h * 0.22f, w * 0.56f, h * 0.56f);
                     break;
 
                 case "Moon":
@@ -220,139 +367,248 @@ namespace GenOffice.UI
                     path.AddRectangle(new RectangleF(x + w * 0.25f, y + h * 0.55f, w * 0.5f, h * 0.35f));
                     break;
 
-                case "RightArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x, y + h * 0.25f),
-                        new PointF(x + w * 0.6f, y + h * 0.25f),
-                        new PointF(x + w * 0.6f, y),
-                        new PointF(x + w, y + h / 2f),
-                        new PointF(x + w * 0.6f, y + h),
-                        new PointF(x + w * 0.6f, y + h * 0.75f),
-                        new PointF(x, y + h * 0.75f)
-                    });
-                    break;
-
-                case "LeftArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x + w * 0.4f, y),
-                        new PointF(x + w * 0.4f, y + h * 0.25f),
-                        new PointF(x + w, y + h * 0.25f),
-                        new PointF(x + w, y + h * 0.75f),
-                        new PointF(x + w * 0.4f, y + h * 0.75f),
-                        new PointF(x + w * 0.4f, y + h),
-                        new PointF(x, y + h / 2f)
-                    });
-                    break;
-
-                case "UpArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x + w / 2f, y),
-                        new PointF(x + w, y + h * 0.4f),
-                        new PointF(x + w * 0.75f, y + h * 0.4f),
-                        new PointF(x + w * 0.75f, y + h),
-                        new PointF(x + w * 0.25f, y + h),
-                        new PointF(x + w * 0.25f, y + h * 0.4f),
-                        new PointF(x, y + h * 0.4f)
-                    });
-                    break;
-
-                case "DownArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x + w * 0.25f, y),
-                        new PointF(x + w * 0.75f, y),
-                        new PointF(x + w * 0.75f, y + h * 0.6f),
-                        new PointF(x + w, y + h * 0.6f),
-                        new PointF(x + w / 2f, y + h),
-                        new PointF(x, y + h * 0.6f),
-                        new PointF(x + w * 0.25f, y + h * 0.6f)
-                    });
-                    break;
-
-                case "LeftRightArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x, y + h / 2f),
-                        new PointF(x + w * 0.25f, y),
-                        new PointF(x + w * 0.25f, y + h * 0.25f),
-                        new PointF(x + w * 0.75f, y + h * 0.25f),
-                        new PointF(x + w * 0.75f, y),
-                        new PointF(x + w, y + h / 2f),
-                        new PointF(x + w * 0.75f, y + h),
-                        new PointF(x + w * 0.75f, y + h * 0.75f),
-                        new PointF(x + w * 0.25f, y + h * 0.75f),
-                        new PointF(x + w * 0.25f, y + h)
-                    });
-                    break;
-
-                case "UpDownArrow":
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x + w / 2f, y),
-                        new PointF(x + w, y + h * 0.25f),
-                        new PointF(x + w * 0.75f, y + h * 0.25f),
-                        new PointF(x + w * 0.75f, y + h * 0.75f),
-                        new PointF(x + w, y + h * 0.75f),
-                        new PointF(x + w / 2f, y + h),
-                        new PointF(x, y + h * 0.75f),
-                        new PointF(x + w * 0.25f, y + h * 0.75f),
-                        new PointF(x + w * 0.25f, y + h * 0.25f),
-                        new PointF(x, y + h * 0.25f)
-                    });
-                    break;
-
-                case "Star4":
-                    path.AddPolygon(CreateStarPoints(x, y, w, h, 4, 0.4f));
-                    break;
-
-                case "Star5":
-                    path.AddPolygon(CreateStarPoints(x, y, w, h, 5, 0.42f));
-                    break;
-
-                case "Star6":
-                    path.AddPolygon(CreateStarPoints(x, y, w, h, 6, 0.45f));
-                    break;
-
-                case "Star8":
-                    path.AddPolygon(CreateStarPoints(x, y, w, h, 8, 0.5f));
-                    break;
-
-                case "Star12":
-                    path.AddPolygon(CreateStarPoints(x, y, w, h, 12, 0.65f));
-                    break;
-
-                case "Cylinder":
-                    path.AddEllipse(x, y, w, h * 0.3f);
-                    path.AddArc(x, y + h * 0.7f, w, h * 0.3f, 0, 180);
-                    path.AddLine(x, y + h * 0.85f, x, y + h * 0.15f);
-                    path.AddLine(x + w, y + h * 0.15f, x + w, y + h * 0.85f);
+                case "Teardrop":
+                    path.AddLine(x + w / 2f, y, x + w, y + h * 0.6f);
+                    path.AddArc(x, y + h * 0.2f, w, h * 0.8f, 0, 180);
+                    path.AddLine(x, y + h * 0.6f, x + w / 2f, y);
                     path.CloseFigure();
                     break;
 
-                case "Cube":
-                    float skew = Math.Min(w, h) * 0.22f;
-                    path.AddPolygon(new PointF[]
-                    {
-                        new PointF(x, y + skew),
-                        new PointF(x + skew, y),
-                        new PointF(x + w, y),
-                        new PointF(x + w, y + h - skew),
-                        new PointF(x + w - skew, y + h),
-                        new PointF(x, y + h),
-                    });
+                case "Arc":
+                    path.AddArc(x, y, w, h, 200, 200);
                     break;
 
-                case "CalloutRect":
-                    path.AddPolygon(new PointF[]
+                case "Donut":
+                    path.AddEllipse(x, y, w, h);
+                    path.AddEllipse(x + w * 0.25f, y + h * 0.25f, w * 0.5f, h * 0.5f);
+                    break;
+
+                case "Cylinder":
+                case "Can":
                     {
-                        new PointF(x, y), new PointF(x + w, y),
-                        new PointF(x + w, y + h * 0.75f), new PointF(x + w * 0.45f, y + h * 0.75f),
-                        new PointF(x + w * 0.2f, y + h), new PointF(x + w * 0.28f, y + h * 0.75f),
-                        new PointF(x, y + h * 0.75f)
-                    });
+                        float ch = h * 0.2f;
+                        path.AddEllipse(x, y, w, ch);
+                        path.AddLine(x, y + ch / 2f, x, y + h - ch / 2f);
+                        path.AddArc(x, y + h - ch, w, ch, 180, -180);
+                        path.AddLine(x + w, y + h - ch / 2f, x + w, y + ch / 2f);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "Cube":
+                    {
+                        float skew = Math.Min(w, h) * 0.25f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y + skew),
+                            new PointF(x + skew, y),
+                            new PointF(x + w, y),
+                            new PointF(x + w, y + h - skew),
+                            new PointF(x + w - skew, y + h),
+                            new PointF(x, y + h),
+                        });
+                    }
+                    break;
+
+                // Block Arrows
+                case "RightArrow":
+                    {
+                        float neckRatio = (adj1 > 0.05f && adj1 < 0.48f) ? adj1 : 0.25f;
+                        float headRatio = (adj2 > 0.1f && adj2 < 0.7f) ? adj2 : 0.4f;
+                        float headX = x + w * (1.0f - headRatio);
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y + h * neckRatio),
+                            new PointF(headX, y + h * neckRatio),
+                            new PointF(headX, y),
+                            new PointF(x + w, y + h / 2f),
+                            new PointF(headX, y + h),
+                            new PointF(headX, y + h * (1.0f - neckRatio)),
+                            new PointF(x, y + h * (1.0f - neckRatio))
+                        });
+                    }
+                    break;
+
+                case "LeftArrow":
+                    {
+                        float neckRatio = (adj1 > 0.05f && adj1 < 0.48f) ? adj1 : 0.25f;
+                        float headRatio = (adj2 > 0.1f && adj2 < 0.7f) ? adj2 : 0.4f;
+                        float headX = x + w * headRatio;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(headX, y),
+                            new PointF(headX, y + h * neckRatio),
+                            new PointF(x + w, y + h * neckRatio),
+                            new PointF(x + w, y + h * (1.0f - neckRatio)),
+                            new PointF(headX, y + h * (1.0f - neckRatio)),
+                            new PointF(headX, y + h),
+                            new PointF(x, y + h / 2f)
+                        });
+                    }
+                    break;
+
+                case "UpArrow":
+                    {
+                        float neckRatio = (adj1 > 0.05f && adj1 < 0.48f) ? adj1 : 0.25f;
+                        float headRatio = (adj2 > 0.1f && adj2 < 0.7f) ? adj2 : 0.4f;
+                        float headY = y + h * headRatio;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w / 2f, y),
+                            new PointF(x + w, headY),
+                            new PointF(x + w * (1.0f - neckRatio), headY),
+                            new PointF(x + w * (1.0f - neckRatio), y + h),
+                            new PointF(x + w * neckRatio, y + h),
+                            new PointF(x + w * neckRatio, headY),
+                            new PointF(x, headY)
+                        });
+                    }
+                    break;
+
+                case "DownArrow":
+                    {
+                        float neckRatio = (adj1 > 0.05f && adj1 < 0.48f) ? adj1 : 0.25f;
+                        float headRatio = (adj2 > 0.1f && adj2 < 0.7f) ? adj2 : 0.4f;
+                        float headY = y + h * (1.0f - headRatio);
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w * neckRatio, y),
+                            new PointF(x + w * (1.0f - neckRatio), y),
+                            new PointF(x + w * (1.0f - neckRatio), headY),
+                            new PointF(x + w, headY),
+                            new PointF(x + w / 2f, y + h),
+                            new PointF(x, headY),
+                            new PointF(x + w * neckRatio, headY)
+                        });
+                    }
+                    break;
+
+                case "LeftRightArrow":
+                    {
+                        float hW = w * 0.25f; float nH = h * 0.25f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y + h / 2f),
+                            new PointF(x + hW, y),
+                            new PointF(x + hW, y + nH),
+                            new PointF(x + w - hW, y + nH),
+                            new PointF(x + w - hW, y),
+                            new PointF(x + w, y + h / 2f),
+                            new PointF(x + w - hW, y + h),
+                            new PointF(x + w - hW, y + h - nH),
+                            new PointF(x + hW, y + h - nH),
+                            new PointF(x + hW, y + h)
+                        });
+                    }
+                    break;
+
+                case "UpDownArrow":
+                    {
+                        float hH = h * 0.25f; float nW = w * 0.25f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w / 2f, y),
+                            new PointF(x + w, y + hH),
+                            new PointF(x + w - nW, y + hH),
+                            new PointF(x + w - nW, y + h - hH),
+                            new PointF(x + w, y + h - hH),
+                            new PointF(x + w / 2f, y + h),
+                            new PointF(x, y + h - hH),
+                            new PointF(x + nW, y + h - hH),
+                            new PointF(x + nW, y + hH),
+                            new PointF(x, y + hH)
+                        });
+                    }
+                    break;
+
+                case "QuadArrow":
+                    {
+                        float aL = Math.Min(w, h) * 0.3f;
+                        float aW = Math.Min(w, h) * 0.15f;
+                        float cx = x + w / 2f;
+                        float cy = y + h / 2f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(cx, y), new PointF(cx + aW, y + aL), new PointF(cx + aW / 2f, y + aL),
+                            new PointF(cx + aW / 2f, cy - aW / 2f), new PointF(x + w - aL, cy - aW / 2f), new PointF(x + w - aL, cy - aW),
+                            new PointF(x + w, cy), new PointF(x + w - aL, cy + aW), new PointF(x + w - aL, cy + aW / 2f),
+                            new PointF(cx + aW / 2f, cy + aW / 2f), new PointF(cx + aW / 2f, y + h - aL), new PointF(cx + aW, y + h - aL),
+                            new PointF(cx, y + h), new PointF(cx - aW, y + h - aL), new PointF(cx - aW / 2f, y + h - aL),
+                            new PointF(cx - aW / 2f, cy + aW / 2f), new PointF(x + aL, cy + aW / 2f), new PointF(x + aL, cy + aW),
+                            new PointF(x, cy), new PointF(x + aL, cy - aW), new PointF(x + aL, cy - aW / 2f),
+                            new PointF(cx - aW / 2f, cy - aW / 2f), new PointF(cx - aW / 2f, y + aL), new PointF(cx - aW, y + aL)
+                        });
+                    }
+                    break;
+
+                case "BentArrow":
+                    {
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y + h * 0.4f),
+                            new PointF(x + w * 0.45f, y + h * 0.4f),
+                            new PointF(x + w * 0.45f, y + h * 0.25f),
+                            new PointF(x + w, y + h * 0.25f),
+                            new PointF(x + w * 0.75f, y),
+                            new PointF(x + w, y + h * 0.5f),
+                            new PointF(x + w * 0.75f, y + h * 0.5f),
+                            new PointF(x + w * 0.45f, y + h * 0.5f),
+                            new PointF(x + w * 0.45f, y + h),
+                            new PointF(x, y + h)
+                        });
+                    }
+                    break;
+
+                case "UTurnArrow":
+                    {
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w * 0.35f, y + h),
+                            new PointF(x + w * 0.35f, y + h * 0.4f),
+                            new PointF(x + w * 0.65f, y + h * 0.4f),
+                            new PointF(x + w * 0.65f, y + h * 0.7f),
+                            new PointF(x + w * 0.55f, y + h * 0.7f),
+                            new PointF(x + w * 0.75f, y + h),
+                            new PointF(x + w * 0.95f, y + h * 0.7f),
+                            new PointF(x + w * 0.85f, y + h * 0.7f),
+                            new PointF(x + w * 0.85f, y + h * 0.3f),
+                            new PointF(x + w * 0.15f, y + h * 0.3f),
+                            new PointF(x + w * 0.15f, y + h)
+                        });
+                    }
+                    break;
+
+                // Lines & Connectors
+                case "Line":
+                    path.AddLine(x, y + h, x + w, y);
+                    break;
+
+                case "ArrowLine":
+                case "DoubleArrowLine":
+                    path.AddLine(x, y + h, x + w, y);
+                    break;
+
+                case "ElbowConnector":
+                case "ElbowArrowConnector":
+                    path.AddLine(x, y + h, x + w / 2f, y + h);
+                    path.AddLine(x + w / 2f, y + h, x + w / 2f, y);
+                    path.AddLine(x + w / 2f, y, x + w, y);
+                    break;
+
+                case "CurvedConnector":
+                    path.AddBezier(x, y + h, x, y, x + w, y + h, x + w, y);
+                    break;
+
+                // Flowchart
+                case "FlowchartTerminator":
+                    {
+                        float r = Math.Min(w / 2f, h / 2f);
+                        path.AddArc(x, y, r * 2, h, 90, 180);
+                        path.AddLine(x + r, y, x + w - r, y);
+                        path.AddArc(x + w - r * 2, y, r * 2, h, 270, 180);
+                        path.AddLine(x + w - r, y + h, x + r, y + h);
+                        path.CloseFigure();
+                    }
                     break;
 
                 case "FlowchartDocument":
@@ -362,6 +618,173 @@ namespace GenOffice.UI
                     path.AddBezier(x + w * 0.25f, y + h * 0.85f, x + w * 0.1f, y + h * 0.7f, x, y + h * 0.9f, x, y + h * 0.85f);
                     path.AddLine(x, y + h * 0.85f, x, y);
                     path.CloseFigure();
+                    break;
+
+                // Stars and Banners
+                case "Star4":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 4, 0.38f));
+                    break;
+                case "Star5":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 5, 0.38f));
+                    break;
+                case "Star6":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 6, 0.5f));
+                    break;
+                case "Star8":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 8, 0.55f));
+                    break;
+                case "Star10":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 10, 0.65f));
+                    break;
+                case "Star12":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 12, 0.7f));
+                    break;
+                case "Star16":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 16, 0.75f));
+                    break;
+                case "Star24":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 24, 0.8f));
+                    break;
+                case "Star32":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 32, 0.82f));
+                    break;
+
+                case "Explosion1":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 8, 0.42f));
+                    break;
+                case "Explosion2":
+                    path.AddPolygon(CreateStarPoints(x, y, w, h, 14, 0.58f));
+                    break;
+
+                case "HorizontalScroll":
+                    {
+                        float curl = w * 0.12f;
+                        path.AddArc(x, y, curl * 2, h * 0.3f, 180, 180);
+                        path.AddLine(x + curl * 2, y + h * 0.15f, x + w - curl, y + h * 0.15f);
+                        path.AddArc(x + w - curl * 2, y + h * 0.15f, curl * 2, h * 0.3f, 0, 180);
+                        path.AddLine(x + w - curl * 2, y + h * 0.3f, x + w - curl * 2, y + h * 0.85f);
+                        path.AddArc(x + w - curl * 2, y + h * 0.7f, curl * 2, h * 0.3f, 0, 180);
+                        path.AddLine(x + w - curl, y + h * 0.85f, x + curl, y + h * 0.85f);
+                        path.AddArc(x, y + h * 0.55f, curl * 2, h * 0.3f, 180, 180);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "VerticalScroll":
+                    {
+                        float curl = h * 0.12f;
+                        path.AddArc(x, y, w * 0.3f, curl * 2, 90, 180);
+                        path.AddLine(x + w * 0.15f, y + curl * 2, x + w * 0.15f, y + h - curl);
+                        path.AddArc(x + w * 0.15f, y + h - curl * 2, w * 0.3f, curl * 2, 270, 180);
+                        path.AddLine(x + w * 0.3f, y + h - curl * 2, x + w * 0.85f, y + h - curl * 2);
+                        path.AddArc(x + w * 0.7f, y + h - curl * 2, w * 0.3f, curl * 2, 270, 180);
+                        path.AddLine(x + w * 0.85f, y + h - curl, x + w * 0.85f, y + curl);
+                        path.AddArc(x + w * 0.55f, y, w * 0.3f, curl * 2, 90, 180);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "RibbonUp":
+                    {
+                        float fold = w * 0.15f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y + h * 0.3f), new PointF(x + fold, y), new PointF(x + w - fold, y),
+                            new PointF(x + w, y + h * 0.3f), new PointF(x + w - fold * 0.6f, y + h * 0.6f),
+                            new PointF(x + w - fold, y + h * 0.45f), new PointF(x + w - fold, y + h),
+                            new PointF(x + fold, y + h), new PointF(x + fold, y + h * 0.45f),
+                            new PointF(x + fold * 0.6f, y + h * 0.6f)
+                        });
+                    }
+                    break;
+
+                case "RibbonDown":
+                    {
+                        float fold = w * 0.15f;
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + fold, y), new PointF(x + w - fold, y),
+                            new PointF(x + w - fold, y + h * 0.55f), new PointF(x + w - fold * 0.6f, y + h * 0.4f),
+                            new PointF(x + w, y + h * 0.7f), new PointF(x + w - fold, y + h),
+                            new PointF(x + fold, y + h), new PointF(x, y + h * 0.7f),
+                            new PointF(x + fold * 0.6f, y + h * 0.4f), new PointF(x + fold, y + h * 0.55f)
+                        });
+                    }
+                    break;
+
+                // Callouts
+                case "CalloutRect":
+                    {
+                        float tX = (adj2 > 0.05f && adj2 < 0.95f) ? (x + w * adj2) : (x + w * 0.25f);
+                        float tY = (adj3 > 0.8f && adj3 < 1.6f) ? (y + h * adj3) : (y + h * 1.25f);
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x, y),
+                            new PointF(x + w, y),
+                            new PointF(x + w, y + h * 0.78f),
+                            new PointF(x + w * 0.45f, y + h * 0.78f),
+                            new PointF(tX, tY),
+                            new PointF(x + w * 0.28f, y + h * 0.78f),
+                            new PointF(x, y + h * 0.78f)
+                        });
+                    }
+                    break;
+
+                case "CalloutRoundedRect":
+                    {
+                        float r = Math.Min(w, h) * 0.18f;
+                        float bH = h * 0.78f;
+                        float tX = (adj2 > 0.05f && adj2 < 0.95f) ? (x + w * adj2) : (x + w * 0.25f);
+                        float tY = (adj3 > 0.8f && adj3 < 1.6f) ? (y + h * adj3) : (y + h * 1.25f);
+                        path.AddArc(x, y, r * 2, r * 2, 180, 90);
+                        path.AddArc(x + w - r * 2, y, r * 2, r * 2, 270, 90);
+                        path.AddArc(x + w - r * 2, y + bH - r * 2, r * 2, r * 2, 0, 90);
+                        path.AddLine(x + w - r, y + bH, x + w * 0.45f, y + bH);
+                        path.AddLine(x + w * 0.45f, y + bH, tX, tY);
+                        path.AddLine(tX, tY, x + w * 0.28f, y + bH);
+                        path.AddLine(x + w * 0.28f, y + bH, x + r, y + bH);
+                        path.AddArc(x, y + bH - r * 2, r * 2, r * 2, 90, 90);
+                        path.CloseFigure();
+                    }
+                    break;
+
+                case "CalloutOval":
+                    {
+                        float bH = h * 0.78f;
+                        float tX = (adj2 > 0.05f && adj2 < 0.95f) ? (x + w * adj2) : (x + w * 0.25f);
+                        float tY = (adj3 > 0.8f && adj3 < 1.6f) ? (y + h * adj3) : (y + h * 1.25f);
+                        path.AddEllipse(x, y, w, bH);
+                        path.AddPolygon(new PointF[]
+                        {
+                            new PointF(x + w * 0.30f, y + bH * 0.9f),
+                            new PointF(tX, tY),
+                            new PointF(x + w * 0.45f, y + bH * 0.9f)
+                        });
+                    }
+                    break;
+
+                case "CalloutCloud":
+                    {
+                        float bH = h * 0.75f;
+                        path.AddEllipse(x + w * 0.15f, y + bH * 0.35f, w * 0.35f, bH * 0.55f);
+                        path.AddEllipse(x + w * 0.35f, y + bH * 0.15f, w * 0.4f, bH * 0.6f);
+                        path.AddEllipse(x + w * 0.55f, y + bH * 0.35f, w * 0.35f, bH * 0.55f);
+                        path.AddRectangle(new RectangleF(x + w * 0.25f, y + bH * 0.55f, w * 0.5f, bH * 0.35f));
+                        // Speech bubbles
+                        path.AddEllipse(x + w * 0.25f, y + h * 0.8f, w * 0.12f, h * 0.1f);
+                        path.AddEllipse(x + w * 0.18f, y + h * 0.92f, w * 0.08f, h * 0.07f);
+                    }
+                    break;
+
+                case "LineCallout1":
+                    path.AddRectangle(new RectangleF(x, y, w, h * 0.7f));
+                    path.AddLine(x + w * 0.2f, y + h * 0.7f, x, y + h);
+                    break;
+
+                case "LineCallout2":
+                    path.AddRectangle(new RectangleF(x, y, w, h * 0.7f));
+                    path.AddLine(x + w * 0.2f, y + h * 0.7f, x + w * 0.1f, y + h * 0.85f);
+                    path.AddLine(x + w * 0.1f, y + h * 0.85f, x, y + h);
                     break;
 
                 default:
@@ -394,6 +817,7 @@ namespace GenOffice.UI
         public static void DrawShape(Graphics g, DocShapeObject shape, Rectangle bounds, RibbonBar ribbon, float zoomLevel)
         {
             if (bounds.Width <= 0 || bounds.Height <= 0) return;
+            if (shape != null) shape.ApplyCachedTagMetadata();
 
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -401,7 +825,334 @@ namespace GenOffice.UI
             // SPECIAL: Render SmartArt Diagrams
             if (shape.ShapeType == "SmartArt" || !string.IsNullOrEmpty(shape.SmartArtType))
             {
-                SmartArtRenderer.DrawSmartArt(g, bounds, shape.SmartArtType, shape.SmartArtTitle, shape.StylePresetIndex, shape.TextContent, shape.IsSelected, zoomLevel);
+                if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                {
+                    shape.CachedImage = DocShapeObject.LoadOptimizedImage(shape.ImagePath, bounds.Width, bounds.Height);
+                }
+
+                if (shape.SubShapeRelativeBounds == null || shape.SubShapeRelativeBounds.Count == 0)
+                {
+                    string saType = shape.SmartArtType ?? "List_BasicBlock";
+                    string[] saNodes = SmartArtRenderer.GetSmartArtNodeList(saType, shape.TextContent);
+                    SmartArtRenderer.PopulateSubShapeBounds(bounds, saType, saNodes.Length, shape);
+                }
+
+                bool hasVectorNodes = (shape.SubShapeRelativeBounds != null && shape.SubShapeRelativeBounds.Count > 0);
+                if (shape.CachedImage != null && !hasVectorNodes)
+                {
+                    g.DrawImage(shape.CachedImage, bounds);
+
+                    if (shape.IsSelected)
+                    {
+                        using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f) { DashStyle = DashStyle.Dash })
+                        {
+                            g.DrawRectangle(selPen, bounds);
+                        }
+                        int hs = Math.Max(5, (int)(7 * zoomLevel));
+                        Point[] handles = new Point[]
+                        {
+                            new Point(bounds.Left, bounds.Top),
+                            new Point(bounds.Left + bounds.Width / 2, bounds.Top),
+                            new Point(bounds.Right, bounds.Top),
+                            new Point(bounds.Right, bounds.Top + bounds.Height / 2),
+                            new Point(bounds.Right, bounds.Bottom),
+                            new Point(bounds.Left + bounds.Width / 2, bounds.Bottom),
+                            new Point(bounds.Left, bounds.Bottom),
+                            new Point(bounds.Left, bounds.Top + bounds.Height / 2)
+                        };
+                        for (int hi = 0; hi < handles.Length; hi++)
+                        {
+                            Rectangle hR = new Rectangle(handles[hi].X - hs / 2, handles[hi].Y - hs / 2, hs, hs);
+                            g.FillRectangle(Brushes.White, hR);
+                            using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+                            {
+                                g.DrawRectangle(hPen, hR);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    SmartArtRenderer.SuppressNodeBodies = hasVectorNodes;
+                    try
+                    {
+                        SmartArtRenderer.DrawSmartArt(g, bounds, shape, zoomLevel);
+                    }
+                    finally
+                    {
+                        SmartArtRenderer.SuppressNodeBodies = false;
+                    }
+                }
+
+                // Draw customized or actively edited SmartArt nodes directly on canvas
+                if (shape.SubShapeRelativeBounds != null && shape.SubShapeRelativeBounds.Count > 0)
+                {
+                    for (int ni = 0; ni < shape.SubShapeRelativeBounds.Count; ni++)
+                    {
+                        bool isActivelyEditing = shape.IsSelected && shape.IsEditingText && shape.SelectedNodeIndex == ni;
+                        bool hasCustomColor = shape.NodeColors != null && shape.NodeColors.ContainsKey(ni);
+                        bool isModifiedText = shape.ModifiedNodes != null && shape.ModifiedNodes.Contains(ni);
+                        bool hasCustomShape = shape.NodeShapeTypes != null && shape.NodeShapeTypes.ContainsKey(ni);
+                        bool hasCustomOutline = shape.NodeOutlineColors != null && shape.NodeOutlineColors.ContainsKey(ni);
+                        bool hasCustomTextColor = shape.NodeTextColors != null && shape.NodeTextColors.ContainsKey(ni);
+                        bool hasCustomScale = shape.NodeScaleDeltas != null && shape.NodeScaleDeltas.ContainsKey(ni);
+                        bool hasVisualStyle = shape.VisualStylePreset > 0;
+                        bool shouldDrawNode = true;
+
+                        if (shouldDrawNode)
+                        {
+                            RectangleF rf = shape.SubShapeRelativeBounds[ni];
+                            float scaleDelta = hasCustomScale ? shape.NodeScaleDeltas[ni] : 0f;
+                            int baseW = (int)(rf.Width * bounds.Width);
+                            int baseH = (int)(rf.Height * bounds.Height);
+
+                            string sType = "RoundedRectangle";
+                            if (hasCustomShape && !string.IsNullOrEmpty(shape.NodeShapeTypes[ni]))
+                            {
+                                sType = shape.NodeShapeTypes[ni];
+                            }
+                            else if (shape.SmartArtType != null && shape.SmartArtType.Contains("Chevron"))
+                            {
+                                sType = "Chevron";
+                            }
+                            else if (shape.SmartArtType != null && shape.SmartArtType.Contains("Radial"))
+                            {
+                                sType = (ni == 0) ? "Circle" : "RoundedRectangle";
+                            }
+                            else if (shape.SmartArtType != null && (shape.SmartArtType.StartsWith("Cycle_") || shape.SmartArtType.Contains("Ring") || shape.SmartArtType.Contains("Nondirectional")))
+                            {
+                                sType = "RoundedRectangle";
+                            }
+
+                            if (shape.AspectRatioLock && (sType == "Oval" || sType == "Circle"))
+                            {
+                                sType = "Circle";
+                            }
+
+                            Rectangle nodeRect;
+                            if (sType == "Circle" || (shape.AspectRatioLock && sType == "Oval"))
+                            {
+                                int baseDim = Math.Min(baseW, baseH);
+                                int nw = Math.Max(6, (int)(baseDim * (1f + scaleDelta)));
+                                int nh = nw;
+                                int nx = bounds.X + (int)(rf.X * bounds.Width) + (baseW - nw) / 2;
+                                int ny = bounds.Y + (int)(rf.Y * bounds.Height) + (baseH - nh) / 2;
+                                nodeRect = new Rectangle(nx, ny, nw, nh);
+                            }
+                            else
+                            {
+                                int nw = Math.Max(6, (int)(baseW * (1f + scaleDelta)));
+                                int nh = Math.Max(6, (int)(baseH * (1f + scaleDelta)));
+                                int nx = bounds.X + (int)(rf.X * bounds.Width) + (baseW - nw) / 2;
+                                int ny = bounds.Y + (int)(rf.Y * bounds.Height) + (baseH - nh) / 2;
+                                nodeRect = new Rectangle(nx, ny, nw, nh);
+                            }
+
+                            Color bgCol;
+                            if (hasCustomColor)
+                            {
+                                bgCol = shape.NodeColors[ni];
+                            }
+                            else if (shape.DefaultNodeColors != null && shape.DefaultNodeColors.ContainsKey(ni))
+                            {
+                                bgCol = shape.DefaultNodeColors[ni];
+                            }
+                            else if (shape.ResolvedThemePalette != null && shape.ResolvedThemePalette.Length > 0)
+                            {
+                                if (shape.StylePresetIndex == 2)
+                                {
+                                    bgCol = shape.ResolvedThemePalette[ni % shape.ResolvedThemePalette.Length];
+                                }
+                                else
+                                {
+                                    bgCol = shape.ResolvedThemePalette[0];
+                                }
+                            }
+                            else
+                            {
+                                bgCol = Color.FromArgb(68, 114, 196);
+                            }
+
+                            Color outlineCol = hasCustomOutline ? shape.NodeOutlineColors[ni] : ControlPaint.Dark(bgCol, 0.15f);
+                            float outlineWidth = 1.2f;
+
+                            int vStyle = shape.VisualStylePreset;
+                            int radius = Math.Max(3, (int)(6 * zoomLevel));
+
+                            // 1. Draw 3D Shadow if vStyle == 2
+                            if (vStyle == 2)
+                            {
+                                Rectangle shRect = new Rectangle(nodeRect.X + 3, nodeRect.Y + 4, nodeRect.Width, nodeRect.Height);
+                                using (GraphicsPath shPath = (sType == "RoundedRectangle") ? CreateRoundedPath(shRect, radius) : CreateShapePath(sType, shRect))
+                                using (SolidBrush shB = new SolidBrush(Color.FromArgb(50, 0, 0, 0)))
+                                {
+                                    g.FillPath(shB, shPath);
+                                }
+                            }
+
+                            // 2. Main Node Path
+                            using (GraphicsPath nPath = (sType == "RoundedRectangle") ? CreateRoundedPath(nodeRect, radius) : CreateShapePath(sType, nodeRect))
+                            {
+                                if (vStyle == 4) // Outline mode: White/transparent body, colored border
+                                {
+                                    using (SolidBrush whiteB = new SolidBrush(Color.White))
+                                    {
+                                        g.FillPath(whiteB, nPath);
+                                    }
+                                    outlineWidth = 2.2f;
+                                    outlineCol = bgCol;
+                                }
+                                else if (vStyle == 1) // Gradient mode
+                                {
+                                    Color lightCol = ControlPaint.Light(bgCol, 0.35f);
+                                    using (LinearGradientBrush lgb = new LinearGradientBrush(nodeRect, lightCol, bgCol, 90f))
+                                    {
+                                        g.FillPath(lgb, nPath);
+                                    }
+                                    outlineCol = ControlPaint.Dark(bgCol, 0.2f);
+                                }
+                                else if (vStyle == 3) // Glass mode
+                                {
+                                    Color lightCol = ControlPaint.Light(bgCol, 0.2f);
+                                    Color darkCol = ControlPaint.Dark(bgCol, 0.1f);
+                                    using (LinearGradientBrush lgb = new LinearGradientBrush(nodeRect, lightCol, darkCol, 90f))
+                                    {
+                                        g.FillPath(lgb, nPath);
+                                    }
+                                    // Glossy reflection highlight on top half
+                                    Rectangle glassRect = new Rectangle(nodeRect.X + 2, nodeRect.Y + 2, Math.Max(2, nodeRect.Width - 4), Math.Max(2, nodeRect.Height / 2 - 1));
+                                    using (GraphicsPath glPath = (sType == "RoundedRectangle") ? CreateRoundedPath(glassRect, Math.Max(2, radius - 1)) : CreateShapePath(sType, glassRect))
+                                    using (LinearGradientBrush glB = new LinearGradientBrush(glassRect, Color.FromArgb(140, 255, 255, 255), Color.FromArgb(15, 255, 255, 255), 90f))
+                                    {
+                                        g.FillPath(glB, glPath);
+                                    }
+                                }
+                                else // Flat (vStyle == 0) or 3D Bevel (vStyle == 2)
+                                {
+                                    using (SolidBrush bgB = new SolidBrush(bgCol))
+                                    {
+                                        g.FillPath(bgB, nPath);
+                                    }
+                                    if (vStyle == 2)
+                                    {
+                                        // Draw 3D Bevel inner highlight
+                                        Rectangle bevelRect = new Rectangle(nodeRect.X + 1, nodeRect.Y + 1, Math.Max(2, nodeRect.Width - 2), Math.Max(2, nodeRect.Height - 2));
+                                        using (GraphicsPath bPath = (sType == "RoundedRectangle") ? CreateRoundedPath(bevelRect, radius) : CreateShapePath(sType, bevelRect))
+                                        using (Pen topPen = new Pen(Color.FromArgb(90, 255, 255, 255), 1.5f))
+                                        {
+                                            g.DrawPath(topPen, bPath);
+                                        }
+                                    }
+                                }
+
+                                // Border
+                                using (Pen borderPen = new Pen(outlineCol, outlineWidth))
+                                {
+                                    g.DrawPath(borderPen, nPath);
+                                }
+
+                                string nTxt = shape.GetNodeText(ni);
+                                if (string.IsNullOrEmpty(nTxt) || nTxt == "[Text]" || nTxt == "(Text)" || nTxt == "Text")
+                                {
+                                    nTxt = isActivelyEditing ? "" : "[Text]";
+                                }
+
+                                Color txtCol;
+                                if (hasCustomTextColor)
+                                {
+                                    txtCol = shape.NodeTextColors[ni];
+                                }
+                                else if (vStyle == 4)
+                                {
+                                    txtCol = bgCol;
+                                }
+                                else
+                                {
+                                    txtCol = (bgCol.R * 0.299 + bgCol.G * 0.587 + bgCol.B * 0.114) > 160 ? Color.FromArgb(35, 35, 35) : Color.White;
+                                }
+
+                                float fontSize = Math.Max(8.0f, Math.Min(14.0f, (nodeRect.Height / 3.2f) * zoomLevel));
+                                using (Font nFont = new Font("Segoe UI", fontSize, FontStyle.Bold))
+                                using (SolidBrush tb = new SolidBrush(txtCol))
+                                using (StringFormat sf = new StringFormat
+                                {
+                                    Alignment = StringAlignment.Center,
+                                    LineAlignment = StringAlignment.Center,
+                                    FormatFlags = StringFormatFlags.LineLimit,
+                                    Trimming = StringTrimming.EllipsisWord
+                                })
+                                {
+                                    Rectangle textR = new Rectangle(nodeRect.X + 4, nodeRect.Y + 4, Math.Max(4, nodeRect.Width - 8), Math.Max(4, nodeRect.Height - 8));
+                                    Region oldClip = g.Clip;
+                                    g.SetClip(nPath, CombineMode.Intersect);
+                                    g.DrawString(nTxt, nFont, tb, textR, sf);
+                                    g.Clip = oldClip;
+
+                                    // If actively editing this node, draw the text cursor caret!
+                                    if (isActivelyEditing)
+                                    {
+                                        int curIdx = Math.Max(0, Math.Min(shape.TextCursorIndex, nTxt.Length));
+                                        string beforeCursor = nTxt.Substring(0, curIdx);
+
+                                        SizeF fullSz = g.MeasureString(nTxt, nFont, textR.Width, sf);
+                                        SizeF subSz = g.MeasureString(beforeCursor, nFont, textR.Width, StringFormat.GenericTypographic);
+
+                                        float caretX = textR.X + (textR.Width - fullSz.Width) / 2f + subSz.Width;
+                                        if (caretX < textR.X + 2) caretX = textR.X + 2;
+                                        if (caretX > textR.Right - 4) caretX = textR.Right - 4;
+
+                                        float caretY = textR.Y + (textR.Height - fullSz.Height) / 2f;
+                                        float caretH = Math.Max(12f, fullSz.Height);
+
+                                        using (Pen caretPen = new Pen(txtCol, 1.0f) { StartCap = System.Drawing.Drawing2D.LineCap.Flat, EndCap = System.Drawing.Drawing2D.LineCap.Flat })
+                                        {
+                                            g.DrawLine(caretPen, (int)caretX, (int)caretY, (int)caretX, (int)(caretY + caretH));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-Selection: Highlight specific clicked node with dashed border and 4 corner handles!
+                if (shape.IsSelected && shape.SelectedNodeIndex >= 0 && shape.SubShapeRelativeBounds != null && shape.SelectedNodeIndex < shape.SubShapeRelativeBounds.Count)
+                {
+                    RectangleF rf = shape.SubShapeRelativeBounds[shape.SelectedNodeIndex];
+                    Rectangle nodeRect = new Rectangle(
+                        bounds.X + (int)(rf.X * bounds.Width),
+                        bounds.Y + (int)(rf.Y * bounds.Height),
+                        Math.Max(6, (int)(rf.Width * bounds.Width)),
+                        Math.Max(6, (int)(rf.Height * bounds.Height))
+                    );
+
+                    using (Pen nodePen = new Pen(Color.FromArgb(0, 120, 215), 2.0f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawRectangle(nodePen, nodeRect);
+                    }
+                    int nhs = Math.Max(4, (int)(6 * zoomLevel));
+                    Point[] nhandles = new Point[]
+                    {
+                        new Point(nodeRect.Left, nodeRect.Top),
+                        new Point(nodeRect.Left + nodeRect.Width / 2, nodeRect.Top),
+                        new Point(nodeRect.Right, nodeRect.Top),
+                        new Point(nodeRect.Right, nodeRect.Top + nodeRect.Height / 2),
+                        new Point(nodeRect.Right, nodeRect.Bottom),
+                        new Point(nodeRect.Left + nodeRect.Width / 2, nodeRect.Bottom),
+                        new Point(nodeRect.Left, nodeRect.Bottom),
+                        new Point(nodeRect.Left, nodeRect.Top + nodeRect.Height / 2)
+                    };
+                    for (int nhi = 0; nhi < nhandles.Length; nhi++)
+                    {
+                        Rectangle nhR = new Rectangle(nhandles[nhi].X - nhs / 2, nhandles[nhi].Y - nhs / 2, nhs, nhs);
+                        g.FillRectangle(Brushes.White, nhR);
+                        using (Pen nhPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+                        {
+                            g.DrawRectangle(nhPen, nhR);
+                        }
+                    }
+                }
+
                 return;
             }
 
@@ -547,7 +1298,7 @@ namespace GenOffice.UI
             // SPECIAL: Render ShapeType == "WordArt"
             if (shape.ShapeType == "WordArt")
             {
-                string text = !string.IsNullOrEmpty(shape.TextContent) ? shape.TextContent : "GenOffice WordArt";
+                string text = !string.IsNullOrEmpty(shape.TextContent) ? shape.TextContent : "ZENQ WORDART";
                 using (Font waFont = new Font("Impact", Math.Max(12, bounds.Height * 0.55f), FontStyle.Regular))
                 {
                     using (SolidBrush shB = new SolidBrush(Color.FromArgb(80, 30, 58, 138)))
@@ -569,19 +1320,31 @@ namespace GenOffice.UI
                 {
                     if (!string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
                     {
-                        try
+                        int reqW = bounds.Width > 0 ? bounds.Width : (shape.BaseWidth > 0 ? shape.BaseWidth : 48);
+                        int reqH = bounds.Height > 0 ? bounds.Height : (shape.BaseHeight > 0 ? shape.BaseHeight : 24);
+                        shape.CachedImage = DocShapeObject.LoadOptimizedImage(shape.ImagePath, reqW, reqH);
+                    }
+                }
+
+                if (shape.CachedImage == null)
+                {
+                    if (shape.WrapMode != 0 && bounds.Width > 30 && bounds.Height > 30)
+                    {
+                        using (SolidBrush emptyBg = new SolidBrush(Color.FromArgb(245, 246, 248)))
+                        using (Pen emptyPen = new Pen(Color.FromArgb(210, 215, 222), 1.0f) { DashStyle = DashStyle.Dash })
                         {
-                            using (var temp = Image.FromFile(shape.ImagePath))
+                            g.FillRectangle(emptyBg, bounds);
+                            g.DrawRectangle(emptyPen, bounds);
+                            using (Font f = new Font("Segoe UI", 8.5f))
+                            using (SolidBrush tb = new SolidBrush(Color.FromArgb(140, 145, 155)))
                             {
-                                shape.CachedImage = new Bitmap(temp);
+                                string msg = "[Hình ảnh]";
+                                SizeF sz = g.MeasureString(msg, f);
+                                g.DrawString(msg, f, tb, bounds.X + (bounds.Width - sz.Width) / 2, bounds.Y + (bounds.Height - sz.Height) / 2);
                             }
                         }
-                        catch { }
                     }
-                    if (shape.CachedImage == null)
-                    {
-                        shape.CachedImage = CreateDefaultSamplePhoto(bounds.Width, bounds.Height);
-                    }
+                    return;
                 }
 
                 // 1. Picture Style Presets Background & Frames
@@ -650,57 +1413,88 @@ namespace GenOffice.UI
                 // 2. Draw the Main Image with Effects
                 if (shape.CachedImage != null)
                 {
-                    using (ImageAttributes attr = new ImageAttributes())
+                    bool hasEffects = (shape.PictureTransparency > 0.01f || shape.PictureGrayscale || shape.PictureSepia || Math.Abs(shape.PictureBrightness) > 0.01f);
+                    if (hasEffects)
                     {
-                        if (shape.PictureTransparency > 0.01f)
+                        using (ImageAttributes attr = new ImageAttributes())
                         {
-                            float alpha = Math.Max(0.05f, 1.0f - shape.PictureTransparency);
-                            ColorMatrix cm = new ColorMatrix();
-                            cm.Matrix33 = alpha;
-                            attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-                        }
-                        else if (shape.PictureGrayscale)
-                        {
-                            ColorMatrix cm = new ColorMatrix(new float[][] {
-                                new float[] {0.3f, 0.3f, 0.3f, 0, 0},
-                                new float[] {0.59f, 0.59f, 0.59f, 0, 0},
-                                new float[] {0.11f, 0.11f, 0.11f, 0, 0},
-                                new float[] {0, 0, 0, 1, 0},
-                                new float[] {0, 0, 0, 0, 1}
-                            });
-                            attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-                        }
-                        else if (shape.PictureSepia)
-                        {
-                            ColorMatrix cm = new ColorMatrix(new float[][] {
-                                new float[] {0.393f, 0.349f, 0.272f, 0, 0},
-                                new float[] {0.769f, 0.686f, 0.534f, 0, 0},
-                                new float[] {0.189f, 0.168f, 0.131f, 0, 0},
-                                new float[] {0, 0, 0, 1, 0},
-                                new float[] {0, 0, 0, 0, 1}
-                            });
-                            attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-                        }
-                        else if (Math.Abs(shape.PictureBrightness) > 0.01f)
-                        {
-                            float b = shape.PictureBrightness;
-                            ColorMatrix cm = new ColorMatrix(new float[][] {
-                                new float[] {1, 0, 0, 0, 0},
-                                new float[] {0, 1, 0, 0, 0},
-                                new float[] {0, 0, 1, 0, 0},
-                                new float[] {0, 0, 0, 1, 0},
-                                new float[] {b, b, b, 0, 1}
-                            });
-                            attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-                        }
+                            if (shape.PictureTransparency > 0.01f)
+                            {
+                                float alpha = Math.Max(0.05f, 1.0f - shape.PictureTransparency);
+                                ColorMatrix cm = new ColorMatrix();
+                                cm.Matrix33 = alpha;
+                                attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                            }
+                            else if (shape.PictureGrayscale)
+                            {
+                                ColorMatrix cm = new ColorMatrix(new float[][] {
+                                    new float[] {0.3f, 0.3f, 0.3f, 0, 0},
+                                    new float[] {0.59f, 0.59f, 0.59f, 0, 0},
+                                    new float[] {0.11f, 0.11f, 0.11f, 0, 0},
+                                    new float[] {0, 0, 0, 1, 0},
+                                    new float[] {0, 0, 0, 0, 1}
+                                });
+                                attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                            }
+                            else if (shape.PictureSepia)
+                            {
+                                ColorMatrix cm = new ColorMatrix(new float[][] {
+                                    new float[] {0.393f, 0.349f, 0.272f, 0, 0},
+                                    new float[] {0.769f, 0.686f, 0.534f, 0, 0},
+                                    new float[] {0.189f, 0.168f, 0.131f, 0, 0},
+                                    new float[] {0, 0, 0, 1, 0},
+                                    new float[] {0, 0, 0, 0, 1}
+                                });
+                                attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                            }
+                            else if (Math.Abs(shape.PictureBrightness) > 0.01f)
+                            {
+                                float b = shape.PictureBrightness;
+                                ColorMatrix cm = new ColorMatrix(new float[][] {
+                                    new float[] {1, 0, 0, 0, 0},
+                                    new float[] {0, 1, 0, 0, 0},
+                                    new float[] {0, 0, 1, 0, 0},
+                                    new float[] {0, 0, 0, 1, 0},
+                                    new float[] {b, b, b, 0, 1}
+                                });
+                                attr.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                            }
 
+                            if (shape.PictureStylePreset == 4) // Rounded Corner
+                            {
+                                using (GraphicsPath rPath = CreateShapePath("RoundedRectangle", bounds))
+                                {
+                                    var prevClip = g.Clip;
+                                    g.SetClip(rPath, CombineMode.Intersect);
+                                    g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                                    g.Clip = prevClip;
+                                }
+                            }
+                            else if (shape.PictureStylePreset == 6) // Soft Edge Oval
+                            {
+                                using (GraphicsPath oPath = CreateShapePath("Oval", bounds))
+                                {
+                                    var prevClip = g.Clip;
+                                    g.SetClip(oPath, CombineMode.Intersect);
+                                    g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                                    g.Clip = prevClip;
+                                }
+                            }
+                            else
+                            {
+                                g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                            }
+                        }
+                    }
+                    else
+                    {
                         if (shape.PictureStylePreset == 4) // Rounded Corner
                         {
                             using (GraphicsPath rPath = CreateShapePath("RoundedRectangle", bounds))
                             {
                                 var prevClip = g.Clip;
                                 g.SetClip(rPath, CombineMode.Intersect);
-                                g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                                g.DrawImage(shape.CachedImage, bounds);
                                 g.Clip = prevClip;
                             }
                         }
@@ -710,13 +1504,13 @@ namespace GenOffice.UI
                             {
                                 var prevClip = g.Clip;
                                 g.SetClip(oPath, CombineMode.Intersect);
-                                g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                                g.DrawImage(shape.CachedImage, bounds);
                                 g.Clip = prevClip;
                             }
                         }
                         else
                         {
-                            g.DrawImage(shape.CachedImage, bounds, 0, 0, shape.CachedImage.Width, shape.CachedImage.Height, GraphicsUnit.Pixel, attr);
+                            g.DrawImage(shape.CachedImage, bounds);
                         }
                     }
                 }
@@ -731,9 +1525,9 @@ namespace GenOffice.UI
                         {
                             using (GraphicsPath rPath = CreateShapePath("RoundedRectangle", bounds)) g.DrawPath(outlinePen, rPath);
                         }
-                        else if (shape.PictureStylePreset == 6)
+                        else if (shape.PictureStylePreset == 6 || shape.ShapeType == "Circle" || (shape.AspectRatioLock && shape.ShapeType == "Oval"))
                         {
-                            using (GraphicsPath oPath = CreateShapePath("Oval", bounds)) g.DrawPath(outlinePen, oPath);
+                            using (GraphicsPath oPath = CreateShapePath("Circle", bounds)) g.DrawPath(outlinePen, oPath);
                         }
                         else
                         {
@@ -816,7 +1610,7 @@ namespace GenOffice.UI
             // 1. Draw Drop Shadow if enabled
             if (shape.HasShadow && shape.WrapMode != 5 && shape.FillColor != Color.Transparent)
             {
-                using (GraphicsPath sPath = CreateShapePath(shape.ShapeType, new Rectangle(bounds.X + 4, bounds.Y + 4, bounds.Width, bounds.Height)))
+                using (GraphicsPath sPath = CreateShapePath(shape, new Rectangle(bounds.X + 4, bounds.Y + 4, bounds.Width, bounds.Height)))
                 using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
                 {
                     g.FillPath(shadowB, sPath);
@@ -824,7 +1618,7 @@ namespace GenOffice.UI
             }
 
             // 2. Main Shape Path
-            using (GraphicsPath path = CreateShapePath(shape.ShapeType, bounds))
+            using (GraphicsPath path = CreateShapePath(shape, bounds))
             {
                 // Fill
                 if (shape.FillColor != Color.Transparent)
@@ -922,7 +1716,7 @@ namespace GenOffice.UI
                 }
             }
 
-            // 5. If Selected -> Draw 8 Resize Handles + Rotation Handle + Floating Layout Options Button
+            // 5. If Selected -> Draw 8 Resize Handles + Rotation Handle + Yellow Adjustment Handles + Floating Layout Options Button
             if (shape.IsSelected)
             {
                 // Bounding Selection Outline
@@ -960,6 +1754,30 @@ namespace GenOffice.UI
                 Rectangle rotRect = new Rectangle(rotX - hs/2, rotY, hs, hs);
                 g.FillEllipse(Brushes.LightGreen, rotRect);
                 g.DrawEllipse(new Pen(Color.FromArgb(0, 120, 215), 1.2f), rotRect);
+
+                // Yellow Adjustment Handles (Grip vàng điều chỉnh góc bo / mũi tên / chú thích)
+                Point[] adjHandles = GetAdjustmentHandles(shape, bounds, zoomLevel);
+                if (adjHandles != null && adjHandles.Length > 0)
+                {
+                    int adjSize = Math.Max(7, (int)(8 * zoomLevel));
+                    using (SolidBrush yb = new SolidBrush(Color.FromArgb(255, 215, 0))) // Gold Yellow
+                    using (Pen yp = new Pen(Color.FromArgb(50, 50, 50), 1.2f))
+                    {
+                        for (int ai = 0; ai < adjHandles.Length; ai++)
+                        {
+                            Point ap = adjHandles[ai];
+                            PointF[] diamond = new PointF[]
+                            {
+                                new PointF(ap.X, ap.Y - adjSize / 2f),
+                                new PointF(ap.X + adjSize / 2f, ap.Y),
+                                new PointF(ap.X, ap.Y + adjSize / 2f),
+                                new PointF(ap.X - adjSize / 2f, ap.Y)
+                            };
+                            g.FillPolygon(yb, diamond);
+                            g.DrawPolygon(yp, diamond);
+                        }
+                    }
+                }
 
                 // Floating Layout Options Button at Top-Right
                 Rectangle wrapBtn = new Rectangle(bounds.Right + 5, bounds.Top, 22, 22);
@@ -1208,61 +2026,113 @@ namespace GenOffice.UI
                     continue;
                 }
 
-                int pIndex = 0;
-                while (pIndex < para.Length)
+                if (!shape.WordWrap)
                 {
-                    int fitCount = 0;
-                    for (int len = 1; len <= para.Length - pIndex; len++)
-                    {
-                        string sub = para.Substring(pIndex, len);
-                        SizeF sz = g.MeasureString(sub, font, PointF.Empty, StringFormat.GenericTypographic);
-                        if (sz.Width <= maxW || len == 1)
-                        {
-                            fitCount = len;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-
-                    if (pIndex + fitCount < para.Length)
-                    {
-                        int lastSpace = para.LastIndexOf(' ', pIndex + fitCount - 1, fitCount);
-                        if (lastSpace >= pIndex)
-                        {
-                            fitCount = (lastSpace - pIndex) + 1;
-                        }
-                    }
-
-                    string lineStr = para.Substring(pIndex, fitCount);
-                    SizeF lineSz = g.MeasureString(lineStr, font, PointF.Empty, StringFormat.GenericTypographic);
+                    // WordWrap == false: Do not wrap across lines
+                    SizeF sz = g.MeasureString(para, font, PointF.Empty, StringFormat.GenericTypographic);
                     float lineX = textBounds.X;
                     if (shape.TextAlignment == StringAlignment.Center)
                     {
-                        lineX = textBounds.X + Math.Max(0, (textBounds.Width - lineSz.Width) / 2);
+                        lineX = textBounds.X + Math.Max(0, (textBounds.Width - sz.Width) / 2f);
                     }
                     else if (shape.TextAlignment == StringAlignment.Far)
                     {
-                        lineX = textBounds.Right - lineSz.Width;
+                        lineX = textBounds.Right - sz.Width;
                     }
 
                     lines.Add(new ShapeLineInfo
                     {
-                        Text = lineStr,
-                        StartIndex = charIndex + pIndex,
-                        Length = fitCount,
+                        Text = para,
+                        StartIndex = charIndex,
+                        Length = para.Length,
                         X = lineX,
                         Y = curY,
-                        Width = lineSz.Width,
+                        Width = sz.Width,
                         Height = lineH
                     });
-
                     curY += lineH;
-                    pIndex += fitCount;
+                }
+                else
+                {
+                    // WordWrap == true: Wrap lines on word boundaries
+                    int pIndex = 0;
+                    while (pIndex < para.Length)
+                    {
+                        int fitCount = 0;
+                        for (int len = 1; len <= para.Length - pIndex; len++)
+                        {
+                            string sub = para.Substring(pIndex, len);
+                            SizeF sz = g.MeasureString(sub, font, PointF.Empty, StringFormat.GenericTypographic);
+                            if (sz.Width <= maxW || len == 1)
+                            {
+                                fitCount = len;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+
+                        if (pIndex + fitCount < para.Length)
+                        {
+                            int lastSpace = para.LastIndexOf(' ', pIndex + fitCount - 1, fitCount);
+                            if (lastSpace >= pIndex)
+                            {
+                                fitCount = (lastSpace - pIndex) + 1;
+                            }
+                        }
+
+                        string lineStr = para.Substring(pIndex, fitCount);
+                        SizeF lineSz = g.MeasureString(lineStr, font, PointF.Empty, StringFormat.GenericTypographic);
+                        float lineX = textBounds.X;
+                        if (shape.TextAlignment == StringAlignment.Center)
+                        {
+                            lineX = textBounds.X + Math.Max(0, (textBounds.Width - lineSz.Width) / 2f);
+                        }
+                        else if (shape.TextAlignment == StringAlignment.Far)
+                        {
+                            lineX = textBounds.Right - lineSz.Width;
+                        }
+
+                        lines.Add(new ShapeLineInfo
+                        {
+                            Text = lineStr,
+                            StartIndex = charIndex + pIndex,
+                            Length = fitCount,
+                            X = lineX,
+                            Y = curY,
+                            Width = lineSz.Width,
+                            Height = lineH
+                        });
+
+                        curY += lineH;
+                        pIndex += fitCount;
+                    }
                 }
 
                 charIndex += para.Length + 1;
+            }
+
+            // Apply Vertical Alignment Offset (Top, Middle, Bottom)
+            float totalH = lines.Count * lineH;
+            float vOffset = 0;
+            if (shape.TextLineAlignment == StringAlignment.Center)
+            {
+                vOffset = Math.Max(0, (textBounds.Height - totalH) / 2f);
+            }
+            else if (shape.TextLineAlignment == StringAlignment.Far)
+            {
+                vOffset = Math.Max(0, textBounds.Height - totalH - 4);
+            }
+
+            if (vOffset > 0)
+            {
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    ShapeLineInfo info = lines[i];
+                    info.Y += vOffset;
+                    lines[i] = info;
+                }
             }
 
             return lines;
@@ -1274,7 +2144,15 @@ namespace GenOffice.UI
             {
                 float curX = textBounds.X;
                 if (shape.TextAlignment == StringAlignment.Center) curX = textBounds.X + textBounds.Width / 2f;
-                return new PointF(curX, textBounds.Y + 2);
+                else if (shape.TextAlignment == StringAlignment.Far) curX = textBounds.Right - 4;
+
+                float curY = textBounds.Y + 2;
+                float lineH = font.GetHeight(g);
+                if (lineH < 12) lineH = (shape.FontSize * 1.35f * zoomLevel);
+                if (shape.TextLineAlignment == StringAlignment.Center) curY = textBounds.Y + Math.Max(0, (textBounds.Height - lineH) / 2f);
+                else if (shape.TextLineAlignment == StringAlignment.Far) curY = textBounds.Bottom - lineH - 4;
+
+                return new PointF(curX, curY);
             }
 
             int targetIndex = Math.Max(0, Math.Min(shape.TextCursorIndex, shape.TextContent.Length));
@@ -1301,6 +2179,106 @@ namespace GenOffice.UI
             float curXPos = targetLine.X + subSz.Width;
 
             return new PointF(curXPos, targetLine.Y);
+        }
+
+        public static Point[] GetAdjustmentHandles(DocShapeObject shape, Rectangle bounds, float zoomLevel)
+        {
+            if (shape == null || bounds.Width <= 0 || bounds.Height <= 0) return new Point[0];
+
+            string sType = shape.ShapeType ?? "Rectangle";
+            if (sType == "RoundedRectangle" || sType == "RoundSingleCorner" || sType == "RoundSameSideCorner" || sType == "RoundDiagonalCorner" || sType == "SnippedAndRounded")
+            {
+                float rRatio = (shape.AdjustValue1 > 0.01f && shape.AdjustValue1 <= 0.5f) ? shape.AdjustValue1 : 0.2f;
+                int shapeW = shape.BaseWidth + shape.WidthDelta;
+                int shapeH = shape.BaseHeight + shape.HeightDelta;
+                int baseDim = (shapeH > 0 && shapeW > 0) ? (int)(Math.Min(shapeW, shapeH) * zoomLevel) : Math.Min(bounds.Width, bounds.Height);
+                int rPx = (int)(baseDim * rRatio);
+                return new Point[] { new Point(bounds.Left + rPx, bounds.Top) };
+            }
+            else if (sType == "RightArrow")
+            {
+                float neckRatio = (shape.AdjustValue1 > 0.05f && shape.AdjustValue1 < 0.48f) ? shape.AdjustValue1 : 0.25f;
+                float headRatio = (shape.AdjustValue2 > 0.1f && shape.AdjustValue2 < 0.7f) ? shape.AdjustValue2 : 0.4f;
+                int neckY = bounds.Top + (int)(bounds.Height * neckRatio);
+                int headX = bounds.Left + (int)(bounds.Width * (1.0f - headRatio));
+                return new Point[] { new Point(headX, neckY), new Point(headX, bounds.Top) };
+            }
+            else if (sType == "LeftArrow")
+            {
+                float neckRatio = (shape.AdjustValue1 > 0.05f && shape.AdjustValue1 < 0.48f) ? shape.AdjustValue1 : 0.25f;
+                float headRatio = (shape.AdjustValue2 > 0.1f && shape.AdjustValue2 < 0.7f) ? shape.AdjustValue2 : 0.4f;
+                int neckY = bounds.Top + (int)(bounds.Height * neckRatio);
+                int headX = bounds.Left + (int)(bounds.Width * headRatio);
+                return new Point[] { new Point(headX, neckY), new Point(headX, bounds.Top) };
+            }
+            else if (sType.StartsWith("Callout"))
+            {
+                float tXRatio = (shape.AdjustValue2 > 0.05f && shape.AdjustValue2 < 0.95f) ? shape.AdjustValue2 : 0.25f;
+                float tYRatio = (shape.AdjustValue3 > 0.8f && shape.AdjustValue3 < 1.6f) ? shape.AdjustValue3 : 1.25f;
+                return new Point[] { new Point(bounds.Left + (int)(bounds.Width * tXRatio), bounds.Top + (int)(bounds.Height * tYRatio)) };
+            }
+
+            return new Point[0];
+        }
+
+        public static int HitTestAdjustmentHandle(DocShapeObject shape, Rectangle bounds, Point mousePt, float zoomLevel)
+        {
+            Point[] handles = GetAdjustmentHandles(shape, bounds, zoomLevel);
+            int hitRad = Math.Max(6, (int)(8 * zoomLevel));
+            for (int i = 0; i < handles.Length; i++)
+            {
+                int dx = mousePt.X - handles[i].X;
+                int dy = mousePt.Y - handles[i].Y;
+                if (dx * dx + dy * dy <= hitRad * hitRad) return i;
+            }
+            return -1;
+        }
+
+        public static void ApplyAdjustmentDrag(DocShapeObject shape, int handleIndex, Point mousePt, Rectangle bounds, float zoomLevel)
+        {
+            if (shape == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+
+            string sType = shape.ShapeType ?? "Rectangle";
+            if (sType == "RoundedRectangle" || sType == "RoundSingleCorner" || sType == "RoundSameSideCorner" || sType == "RoundDiagonalCorner" || sType == "SnippedAndRounded")
+            {
+                int shapeW = shape.BaseWidth + shape.WidthDelta;
+                int shapeH = shape.BaseHeight + shape.HeightDelta;
+                float baseDim = (shapeH > 0 && shapeW > 0) ? (Math.Min(shapeW, shapeH) * zoomLevel) : Math.Min(bounds.Width, bounds.Height);
+                if (baseDim <= 0) baseDim = Math.Min(bounds.Width, bounds.Height);
+                float r = (mousePt.X - bounds.Left) / baseDim;
+                shape.AdjustValue1 = Math.Max(0.02f, Math.Min(0.5f, r));
+            }
+            else if (sType == "RightArrow")
+            {
+                if (handleIndex == 0)
+                {
+                    float neck = (mousePt.Y - bounds.Top) / (float)bounds.Height;
+                    shape.AdjustValue1 = Math.Max(0.05f, Math.Min(0.45f, neck));
+                }
+                else if (handleIndex == 1)
+                {
+                    float head = (bounds.Right - mousePt.X) / (float)bounds.Width;
+                    shape.AdjustValue2 = Math.Max(0.1f, Math.Min(0.7f, head));
+                }
+            }
+            else if (sType == "LeftArrow")
+            {
+                if (handleIndex == 0)
+                {
+                    float neck = (mousePt.Y - bounds.Top) / (float)bounds.Height;
+                    shape.AdjustValue1 = Math.Max(0.05f, Math.Min(0.45f, neck));
+                }
+                else if (handleIndex == 1)
+                {
+                    float head = (mousePt.X - bounds.Left) / (float)bounds.Width;
+                    shape.AdjustValue2 = Math.Max(0.1f, Math.Min(0.7f, head));
+                }
+            }
+            else if (sType.StartsWith("Callout"))
+            {
+                shape.AdjustValue2 = (mousePt.X - bounds.Left) / (float)bounds.Width;
+                shape.AdjustValue3 = (mousePt.Y - bounds.Top) / (float)bounds.Height;
+            }
         }
 
         public static int GetCharIndexFromPoint(Graphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel, int clickX, int clickY)

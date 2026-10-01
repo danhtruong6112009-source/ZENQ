@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_PPTX_HANDLER_HPP
-#ifndef GENOFFICE_PPTX_HANDLER_HPP
 #define GENOFFICE_PPTX_HANDLER_HPP
 
 #include "../core/SlideModel.hpp"

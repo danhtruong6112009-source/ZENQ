@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_WRITER_VIEW_HPP
-#ifndef GENOFFICE_WRITER_VIEW_HPP
 #define GENOFFICE_WRITER_VIEW_HPP
 
 #include <windows.h>

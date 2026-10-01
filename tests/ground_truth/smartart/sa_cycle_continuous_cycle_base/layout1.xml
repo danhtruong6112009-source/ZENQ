@@ -1,0 +1,352 @@
+<ns0:layoutDef xmlns:ns0="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns1="http://schemas.openxmlformats.org/officeDocument/2006/relationships" uniqueId="urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons">
+  <ns0:title val="" />
+  <ns0:desc val="" />
+  <ns0:catLst>
+    <ns0:cat type="list" pri="1500" />
+  </ns0:catLst>
+  <ns0:sampData>
+    <ns0:dataModel>
+      <ns0:ptLst>
+        <ns0:pt modelId="0" type="doc" />
+        <ns0:pt modelId="10">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="11">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="20">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="21">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="30">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="31">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+      </ns0:ptLst>
+      <ns0:cxnLst>
+        <ns0:cxn modelId="40" srcId="0" destId="10" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="12" srcId="10" destId="11" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="50" srcId="0" destId="20" srcOrd="1" destOrd="0" />
+        <ns0:cxn modelId="22" srcId="20" destId="21" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="60" srcId="0" destId="30" srcOrd="1" destOrd="0" />
+        <ns0:cxn modelId="32" srcId="30" destId="31" srcOrd="0" destOrd="0" />
+      </ns0:cxnLst>
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:sampData>
+  <ns0:styleData>
+    <ns0:dataModel>
+      <ns0:ptLst>
+        <ns0:pt modelId="0" type="doc" />
+        <ns0:pt modelId="10">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="20">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+      </ns0:ptLst>
+      <ns0:cxnLst>
+        <ns0:cxn modelId="60" srcId="0" destId="10" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="70" srcId="0" destId="20" srcOrd="1" destOrd="0" />
+      </ns0:cxnLst>
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:styleData>
+  <ns0:clrData>
+    <ns0:dataModel>
+      <ns0:ptLst>
+        <ns0:pt modelId="0" type="doc" />
+        <ns0:pt modelId="10">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="20">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="30">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="40">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+      </ns0:ptLst>
+      <ns0:cxnLst>
+        <ns0:cxn modelId="60" srcId="0" destId="10" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="70" srcId="0" destId="20" srcOrd="1" destOrd="0" />
+        <ns0:cxn modelId="80" srcId="0" destId="30" srcOrd="2" destOrd="0" />
+        <ns0:cxn modelId="90" srcId="0" destId="40" srcOrd="3" destOrd="0" />
+      </ns0:cxnLst>
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:clrData>
+  <ns0:layoutNode name="Name0">
+    <ns0:varLst>
+      <ns0:chMax />
+      <ns0:chPref />
+      <ns0:dir />
+      <ns0:animLvl val="lvl" />
+    </ns0:varLst>
+    <ns0:alg type="lin">
+      <ns0:param type="linDir" val="fromT" />
+    </ns0:alg>
+    <ns0:shape ns1:blip="">
+      <ns0:adjLst />
+    </ns0:shape>
+    <ns0:constrLst>
+      <ns0:constr type="primFontSz" for="des" forName="Parent1" val="65" />
+      <ns0:constr type="primFontSz" for="des" forName="Childtext1" refType="primFontSz" refFor="des" refForName="Parent1" op="lte" />
+      <ns0:constr type="w" for="ch" forName="composite" refType="w" />
+      <ns0:constr type="h" for="ch" forName="composite" refType="h" />
+      <ns0:constr type="h" for="ch" forName="spaceBetweenRectangles" refType="w" refFor="ch" refForName="composite" fact="-0.042" />
+      <ns0:constr type="sp" refType="h" refFor="ch" refForName="composite" op="equ" fact="0.1" />
+    </ns0:constrLst>
+    <ns0:forEach name="nodesForEach" axis="ch" ptType="node">
+      <ns0:layoutNode name="composite">
+        <ns0:alg type="composite">
+          <ns0:param type="ar" val="3.6" />
+        </ns0:alg>
+        <ns0:shape ns1:blip="">
+          <ns0:adjLst />
+        </ns0:shape>
+        <ns0:choose name="Name1">
+          <ns0:if name="Name2" func="var" arg="dir" op="equ" val="norm">
+            <ns0:choose name="Name3">
+              <ns0:if name="Name4" axis="self" ptType="node" func="posOdd" op="equ" val="1">
+                <ns0:constrLst>
+                  <ns0:constr type="l" for="ch" forName="Accent1" refType="w" fact="0.18" />
+                  <ns0:constr type="t" for="ch" forName="Accent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Accent1Text" refType="w" fact="0.18" />
+                  <ns0:constr type="t" for="ch" forName="Accent1Text" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1Text" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1Text" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Parent1" refType="w" fact="0.441" />
+                  <ns0:constr type="t" for="ch" forName="Parent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Parent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Parent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Childtext1" refType="w" fact="0.69" />
+                  <ns0:constr type="t" for="ch" forName="Childtext1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="Childtext1" refType="w" fact="0.31" />
+                  <ns0:constr type="h" for="ch" forName="Childtext1" refType="h" fact="0.6" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing" refType="w" fact="0" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing" refType="h" fact="0" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing" refType="w" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing" refType="h" fact="0.1" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing1" refType="w" fact="0.69" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing1" refType="w" fact="0.31" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing1" refType="h" fact="0.6" />
+                </ns0:constrLst>
+              </ns0:if>
+              <ns0:else name="Name5">
+                <ns0:constrLst>
+                  <ns0:constr type="l" for="ch" forName="Accent1" refType="w" fact="0.571" />
+                  <ns0:constr type="t" for="ch" forName="Accent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Accent1Text" refType="w" fact="0.571" />
+                  <ns0:constr type="t" for="ch" forName="Accent1Text" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1Text" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1Text" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Parent1" refType="w" fact="0.31" />
+                  <ns0:constr type="t" for="ch" forName="Parent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Parent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Parent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Childtext1" refType="w" fact="0" />
+                  <ns0:constr type="t" for="ch" forName="Childtext1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="Childtext1" refType="w" fact="0.3" />
+                  <ns0:constr type="h" for="ch" forName="Childtext1" refType="h" fact="0.6" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing" refType="w" fact="0.82" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing" refType="h" fact="0" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing" refType="w" fact="0.18" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing" refType="h" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing1" refType="w" fact="0" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing1" refType="w" fact="0.3" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing1" refType="h" fact="0.6" />
+                </ns0:constrLst>
+              </ns0:else>
+            </ns0:choose>
+          </ns0:if>
+          <ns0:else name="Name6">
+            <ns0:choose name="Name7">
+              <ns0:if name="Name8" axis="self" ptType="node" func="posOdd" op="equ" val="1">
+                <ns0:constrLst>
+                  <ns0:constr type="l" for="ch" forName="Accent1" refType="w" fact="0.571" />
+                  <ns0:constr type="t" for="ch" forName="Accent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Accent1Text" refType="w" fact="0.571" />
+                  <ns0:constr type="t" for="ch" forName="Accent1Text" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1Text" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1Text" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Parent1" refType="w" fact="0.31" />
+                  <ns0:constr type="t" for="ch" forName="Parent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Parent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Parent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Childtext1" refType="w" fact="0" />
+                  <ns0:constr type="t" for="ch" forName="Childtext1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="Childtext1" refType="w" fact="0.3" />
+                  <ns0:constr type="h" for="ch" forName="Childtext1" refType="h" fact="0.6" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing" refType="w" fact="0.82" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing" refType="h" fact="0" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing" refType="w" fact="0.18" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing" refType="h" />
+                </ns0:constrLst>
+              </ns0:if>
+              <ns0:else name="Name9">
+                <ns0:constrLst>
+                  <ns0:constr type="l" for="ch" forName="Accent1" refType="w" fact="0.18" />
+                  <ns0:constr type="t" for="ch" forName="Accent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Accent1Text" refType="w" fact="0.18" />
+                  <ns0:constr type="t" for="ch" forName="Accent1Text" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Accent1Text" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Accent1Text" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Parent1" refType="w" fact="0.441" />
+                  <ns0:constr type="t" for="ch" forName="Parent1" refType="h" fact="0" />
+                  <ns0:constr type="h" for="ch" forName="Parent1" refType="h" />
+                  <ns0:constr type="w" for="ch" forName="Parent1" refType="h" fact="0.87" />
+                  <ns0:constr type="l" for="ch" forName="Childtext1" refType="w" fact="0.69" />
+                  <ns0:constr type="t" for="ch" forName="Childtext1" refType="h" fact="0.2" />
+                  <ns0:constr type="w" for="ch" forName="Childtext1" refType="w" fact="0.31" />
+                  <ns0:constr type="h" for="ch" forName="Childtext1" refType="h" fact="0.6" />
+                  <ns0:constr type="l" for="ch" forName="BalanceSpacing" refType="w" fact="0" />
+                  <ns0:constr type="t" for="ch" forName="BalanceSpacing" refType="h" fact="0" />
+                  <ns0:constr type="w" for="ch" forName="BalanceSpacing" refType="w" fact="0.18" />
+                  <ns0:constr type="h" for="ch" forName="BalanceSpacing" refType="h" />
+                </ns0:constrLst>
+              </ns0:else>
+            </ns0:choose>
+          </ns0:else>
+        </ns0:choose>
+        <ns0:layoutNode name="Parent1" styleLbl="node1">
+          <ns0:varLst>
+            <ns0:chMax val="1" />
+            <ns0:chPref val="1" />
+            <ns0:bulletEnabled val="1" />
+          </ns0:varLst>
+          <ns0:alg type="tx" />
+          <ns0:shape rot="90" type="hexagon" ns1:blip="">
+            <ns0:adjLst>
+              <ns0:adj idx="1" val="0.25" />
+              <ns0:adj idx="2" val="1.1547" />
+            </ns0:adjLst>
+          </ns0:shape>
+          <ns0:presOf axis="self" ptType="node" />
+          <ns0:constrLst>
+            <ns0:constr type="lMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="rMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="tMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="bMarg" refType="primFontSz" fact="0.3" />
+          </ns0:constrLst>
+          <ns0:ruleLst>
+            <ns0:rule type="primFontSz" val="5" fact="NaN" max="NaN" />
+          </ns0:ruleLst>
+        </ns0:layoutNode>
+        <ns0:layoutNode name="Childtext1" styleLbl="revTx">
+          <ns0:varLst>
+            <ns0:chMax val="0" />
+            <ns0:chPref val="0" />
+            <ns0:bulletEnabled val="1" />
+          </ns0:varLst>
+          <ns0:choose name="Name10">
+            <ns0:if name="Name11" func="var" arg="dir" op="equ" val="norm">
+              <ns0:choose name="Name12">
+                <ns0:if name="Name13" axis="self" ptType="node" func="posOdd" op="equ" val="1">
+                  <ns0:alg type="tx">
+                    <ns0:param type="parTxLTRAlign" val="l" />
+                  </ns0:alg>
+                </ns0:if>
+                <ns0:else name="Name14">
+                  <ns0:alg type="tx">
+                    <ns0:param type="parTxLTRAlign" val="r" />
+                  </ns0:alg>
+                </ns0:else>
+              </ns0:choose>
+            </ns0:if>
+            <ns0:else name="Name15">
+              <ns0:choose name="Name16">
+                <ns0:if name="Name17" axis="self" ptType="node" func="posOdd" op="equ" val="1">
+                  <ns0:alg type="tx">
+                    <ns0:param type="parTxLTRAlign" val="r" />
+                  </ns0:alg>
+                </ns0:if>
+                <ns0:else name="Name18">
+                  <ns0:alg type="tx">
+                    <ns0:param type="parTxLTRAlign" val="l" />
+                  </ns0:alg>
+                </ns0:else>
+              </ns0:choose>
+            </ns0:else>
+          </ns0:choose>
+          <ns0:shape type="rect" ns1:blip="">
+            <ns0:adjLst />
+          </ns0:shape>
+          <ns0:presOf axis="des" ptType="node" />
+          <ns0:constrLst>
+            <ns0:constr type="lMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="rMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="tMarg" refType="primFontSz" fact="0.3" />
+            <ns0:constr type="bMarg" refType="primFontSz" fact="0.3" />
+          </ns0:constrLst>
+          <ns0:ruleLst>
+            <ns0:rule type="primFontSz" val="5" fact="NaN" max="NaN" />
+          </ns0:ruleLst>
+        </ns0:layoutNode>
+        <ns0:layoutNode name="BalanceSpacing">
+          <ns0:alg type="sp" />
+          <ns0:shape ns1:blip="">
+            <ns0:adjLst />
+          </ns0:shape>
+        </ns0:layoutNode>
+        <ns0:layoutNode name="BalanceSpacing1">
+          <ns0:alg type="sp" />
+          <ns0:shape ns1:blip="">
+            <ns0:adjLst />
+          </ns0:shape>
+        </ns0:layoutNode>
+        <ns0:forEach name="Name19" axis="followSib" ptType="sibTrans" hideLastTrans="0" cnt="1">
+          <ns0:layoutNode name="Accent1Text" styleLbl="node1">
+            <ns0:alg type="tx" />
+            <ns0:shape rot="90" type="hexagon" ns1:blip="">
+              <ns0:adjLst>
+                <ns0:adj idx="1" val="0.25" />
+                <ns0:adj idx="2" val="1.1547" />
+              </ns0:adjLst>
+            </ns0:shape>
+            <ns0:presOf axis="self" ptType="sibTrans" />
+            <ns0:constrLst>
+              <ns0:constr type="lMarg" />
+              <ns0:constr type="rMarg" />
+              <ns0:constr type="tMarg" />
+              <ns0:constr type="bMarg" />
+            </ns0:constrLst>
+            <ns0:ruleLst>
+              <ns0:rule type="primFontSz" val="5" fact="NaN" max="NaN" />
+            </ns0:ruleLst>
+          </ns0:layoutNode>
+        </ns0:forEach>
+      </ns0:layoutNode>
+      <ns0:forEach name="Name20" axis="followSib" ptType="sibTrans" cnt="1">
+        <ns0:layoutNode name="spaceBetweenRectangles">
+          <ns0:alg type="sp" />
+          <ns0:shape ns1:blip="">
+            <ns0:adjLst />
+          </ns0:shape>
+          <ns0:presOf />
+          <ns0:constrLst />
+          <ns0:ruleLst />
+        </ns0:layoutNode>
+      </ns0:forEach>
+    </ns0:forEach>
+  </ns0:layoutNode>
+</ns0:layoutDef>

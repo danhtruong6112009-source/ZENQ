@@ -1,0 +1,158 @@
+<ns0:layoutDef xmlns:ns0="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:ns1="http://schemas.openxmlformats.org/officeDocument/2006/relationships" uniqueId="urn:microsoft.com/office/officeart/2005/8/layout/pList1">
+  <ns0:title val="" />
+  <ns0:desc val="" />
+  <ns0:catLst>
+    <ns0:cat type="list" pri="2000" />
+    <ns0:cat type="picture" pri="2500" />
+    <ns0:cat type="pictureconvert" pri="2500" />
+  </ns0:catLst>
+  <ns0:sampData>
+    <ns0:dataModel>
+      <ns0:ptLst>
+        <ns0:pt modelId="0" type="doc" />
+        <ns0:pt modelId="1">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="2">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="3">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+        <ns0:pt modelId="4">
+          <ns0:prSet phldr="1" />
+        </ns0:pt>
+      </ns0:ptLst>
+      <ns0:cxnLst>
+        <ns0:cxn modelId="7" srcId="0" destId="1" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="8" srcId="0" destId="2" srcOrd="1" destOrd="0" />
+        <ns0:cxn modelId="9" srcId="0" destId="3" srcOrd="2" destOrd="0" />
+        <ns0:cxn modelId="10" srcId="0" destId="4" srcOrd="3" destOrd="0" />
+      </ns0:cxnLst>
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:sampData>
+  <ns0:styleData>
+    <ns0:dataModel>
+      <ns0:ptLst>
+        <ns0:pt modelId="0" type="doc" />
+        <ns0:pt modelId="1" />
+        <ns0:pt modelId="2" />
+      </ns0:ptLst>
+      <ns0:cxnLst>
+        <ns0:cxn modelId="3" srcId="0" destId="1" srcOrd="0" destOrd="0" />
+        <ns0:cxn modelId="4" srcId="0" destId="2" srcOrd="1" destOrd="0" />
+      </ns0:cxnLst>
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:styleData>
+  <ns0:clrData useDef="1">
+    <ns0:dataModel>
+      <ns0:ptLst />
+      <ns0:bg />
+      <ns0:whole />
+    </ns0:dataModel>
+  </ns0:clrData>
+  <ns0:layoutNode name="Name0">
+    <ns0:varLst>
+      <ns0:dir />
+      <ns0:resizeHandles val="exact" />
+    </ns0:varLst>
+    <ns0:choose name="Name1">
+      <ns0:if name="Name2" axis="self" func="var" arg="dir" op="equ" val="norm">
+        <ns0:alg type="snake">
+          <ns0:param type="grDir" val="tL" />
+          <ns0:param type="flowDir" val="row" />
+          <ns0:param type="contDir" val="sameDir" />
+          <ns0:param type="off" val="ctr" />
+          <ns0:param type="vertAlign" val="mid" />
+          <ns0:param type="horzAlign" val="ctr" />
+        </ns0:alg>
+      </ns0:if>
+      <ns0:else name="Name3">
+        <ns0:alg type="snake">
+          <ns0:param type="grDir" val="tR" />
+          <ns0:param type="flowDir" val="row" />
+          <ns0:param type="contDir" val="sameDir" />
+          <ns0:param type="off" val="ctr" />
+          <ns0:param type="vertAlign" val="mid" />
+          <ns0:param type="horzAlign" val="ctr" />
+        </ns0:alg>
+      </ns0:else>
+    </ns0:choose>
+    <ns0:shape ns1:blip="">
+      <ns0:adjLst />
+    </ns0:shape>
+    <ns0:presOf />
+    <ns0:constrLst>
+      <ns0:constr type="w" for="ch" forName="compNode" refType="w" />
+      <ns0:constr type="w" for="ch" ptType="sibTrans" refType="w" refFor="ch" refForName="compNode" op="equ" fact="0.1" />
+      <ns0:constr type="sp" refType="w" refFor="ch" refForName="compNode" op="equ" fact="0.1" />
+      <ns0:constr type="primFontSz" for="des" ptType="node" op="equ" val="65" />
+    </ns0:constrLst>
+    <ns0:ruleLst />
+    <ns0:forEach name="Name4" axis="ch" ptType="node">
+      <ns0:layoutNode name="compNode">
+        <ns0:alg type="composite">
+          <ns0:param type="ar" val="0.943" />
+        </ns0:alg>
+        <ns0:shape ns1:blip="">
+          <ns0:adjLst />
+        </ns0:shape>
+        <ns0:presOf axis="self" />
+        <ns0:constrLst>
+          <ns0:constr type="h" refType="w" fact="1.06" />
+          <ns0:constr type="h" for="ch" forName="pictRect" refType="h" fact="0.65" />
+          <ns0:constr type="w" for="ch" forName="pictRect" refType="w" />
+          <ns0:constr type="l" for="ch" forName="pictRect" />
+          <ns0:constr type="t" for="ch" forName="pictRect" />
+          <ns0:constr type="w" for="ch" forName="textRect" refType="w" />
+          <ns0:constr type="h" for="ch" forName="textRect" refType="h" fact="0.35" />
+          <ns0:constr type="l" for="ch" forName="textRect" />
+          <ns0:constr type="t" for="ch" forName="textRect" refType="b" refFor="ch" refForName="pictRect" />
+        </ns0:constrLst>
+        <ns0:ruleLst />
+        <ns0:layoutNode name="pictRect">
+          <ns0:alg type="sp" />
+          <ns0:shape type="roundRect" ns1:blip="" blipPhldr="1">
+            <ns0:adjLst />
+          </ns0:shape>
+          <ns0:presOf />
+          <ns0:constrLst />
+          <ns0:ruleLst />
+        </ns0:layoutNode>
+        <ns0:layoutNode name="textRect" styleLbl="revTx">
+          <ns0:varLst>
+            <ns0:bulletEnabled val="1" />
+          </ns0:varLst>
+          <ns0:alg type="tx">
+            <ns0:param type="txAnchorVert" val="t" />
+          </ns0:alg>
+          <ns0:shape type="rect" ns1:blip="">
+            <ns0:adjLst />
+          </ns0:shape>
+          <ns0:presOf axis="desOrSelf" ptType="node" />
+          <ns0:constrLst>
+            <ns0:constr type="bMarg" />
+          </ns0:constrLst>
+          <ns0:ruleLst>
+            <ns0:rule type="primFontSz" val="5" fact="NaN" max="NaN" />
+          </ns0:ruleLst>
+        </ns0:layoutNode>
+      </ns0:layoutNode>
+      <ns0:forEach name="Name5" axis="followSib" ptType="sibTrans" cnt="1">
+        <ns0:layoutNode name="sibTrans">
+          <ns0:alg type="sp" />
+          <ns0:shape type="rect" ns1:blip="" hideGeom="1">
+            <ns0:adjLst />
+          </ns0:shape>
+          <ns0:presOf axis="self" />
+          <ns0:constrLst />
+          <ns0:ruleLst />
+        </ns0:layoutNode>
+      </ns0:forEach>
+    </ns0:forEach>
+  </ns0:layoutNode>
+</ns0:layoutDef>

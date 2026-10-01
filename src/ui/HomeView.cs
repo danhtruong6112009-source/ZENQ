@@ -2,7 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Windows.Forms;
+using GenOffice.Core;
+using GenOffice.Format;
+using System.Text;
 
 namespace GenOffice.UI
 {
@@ -12,13 +16,15 @@ namespace GenOffice.UI
         public string FilePath { get; set; }
         public OfficeAppMode Mode { get; set; }
         public string LastModified { get; set; }
+        public bool IsStarred { get; set; }
 
-        public RecentDocItem(string title, string path, OfficeAppMode mode, string date)
+        public RecentDocItem(string title, string path, OfficeAppMode mode, string date, bool isStarred = false)
         {
             Title = title;
             FilePath = path;
             Mode = mode;
             LastModified = date;
+            IsStarred = isStarred;
         }
     }
 
@@ -26,15 +32,85 @@ namespace GenOffice.UI
     {
         public List<RecentDocItem> RecentDocs { get; set; }
         public List<RecentDocItem> TrashDocs { get; set; }
-        public int ActiveTab { get; set; } // 0: Tính năng, 1: Tài liệu gần đây, 2: Thùng rác
+        public int ActiveTab { get; set; } // 0: Trang chủ, 1: Thùng rác, 2: Cài đặt, 3: Tài liệu của tôi
+        public int SubFilter = 0; // 0: Tất cả, 1: Gần đây, 2: Đã gắn dấu sao, 10..14: Bộ lọc Tài liệu của tôi
         public float SmoothScrollY = 0f;
         public float TargetScrollY = 0f;
         public int HoverCardIndex = -1;
         public int HoverRowIndex = -1;
         public int HoverTabIndex = -1;
         public bool HoverHelpBtn = false;
+        public bool HoverUpdateBtn = false;
 
-        // Sliding Liquid Glass Pill Animation Properties
+        // Interaction Hover States for New UI Elements
+        public bool HoverSidebarDoc = false;
+        public bool HoverSidebarRecent = false;
+        public bool HoverSidebarStar = false;
+        public int HoverSidebarApp = -1;
+        public bool HoverPromoBtn = false;
+        public bool HoverStorageManage = false;
+        public int HoverTemplateIndex = -1;
+        public int HoverRowStar = -1;
+        public bool HoverMyDocsOpenFileBtn = false;
+        public int HoverPillIndex = -1;
+
+        public struct FilterPill
+        {
+            public string Label;
+            public int FilterId;
+            public RectangleF Bounds;
+        }
+        public List<FilterPill> MyDocsFilterPills = new List<FilterPill>();
+        public RectangleF MyDocsOpenFileBtnRect = RectangleF.Empty;
+
+        public RectangleF ScrollBarBounds = RectangleF.Empty;
+        public RectangleF ScrollBarThumbBounds = RectangleF.Empty;
+        public bool IsDraggingScrollBar = false;
+        public bool IsHoveringScrollBar = false;
+        private int _scrollBarDragStartMouseY = 0;
+        private float _scrollBarDragStartScrollY = 0;
+
+        public bool IsHoverHand
+        {
+            get
+            {
+                return HoverTabIndex >= 0 || HoverCardIndex >= 0 || HoverRowIndex >= 0 ||
+                       HoverHelpBtn || HoverUpdateBtn || HoverSidebarDoc || HoverSidebarRecent ||
+                       HoverSidebarStar || HoverSidebarApp >= 0 || HoverPromoBtn ||
+                       HoverStorageManage || HoverTemplateIndex >= 0 || HoverRowStar >= 0 ||
+                       HoverMyDocsOpenFileBtn || HoverPillIndex >= 0;
+            }
+        }
+
+        // Settings Bounds (Tab 2: Cài đặt - Full Width Classic Style)
+        public RectangleF SettingAiCopilotToggleRect = RectangleF.Empty;
+        public RectangleF SettingAiProviderGoogleRect = RectangleF.Empty;
+        public RectangleF SettingAiProviderOpenAiRect = RectangleF.Empty;
+        public RectangleF SettingAiProviderClaudeRect = RectangleF.Empty;
+        public RectangleF SettingAiProviderOllamaRect = RectangleF.Empty;
+        public RectangleF SettingAiConfigBtnRect = RectangleF.Empty;
+        public RectangleF SettingRibbonIslandRect = RectangleF.Empty;
+        public RectangleF SettingRibbonStandardRect = RectangleF.Empty;
+        public RectangleF SettingThemeLightRect = RectangleF.Empty;
+        public RectangleF SettingThemeDarkRect = RectangleF.Empty;
+        public RectangleF SettingAutoSaveToggleRect = RectangleF.Empty;
+        public RectangleF SettingAutoSave30Rect = RectangleF.Empty;
+        public RectangleF SettingAutoSave60Rect = RectangleF.Empty;
+        public RectangleF SettingAutoSave120Rect = RectangleF.Empty;
+        public RectangleF SettingSmoothScrollRect = RectangleF.Empty;
+        public RectangleF SettingRulerRect = RectangleF.Empty;
+        public RectangleF SettingAutoCorrectViRect = RectangleF.Empty;
+        public RectangleF SettingWordPredictionRect = RectangleF.Empty;
+        public RectangleF SettingLangViRect = RectangleF.Empty;
+        public RectangleF SettingLangEnRect = RectangleF.Empty;
+        public RectangleF SettingCheckUpdateBtnRect = RectangleF.Empty;
+        public RectangleF SettingHelpBtnRect = RectangleF.Empty;
+        public RectangleF SettingShortcutWriterRect = RectangleF.Empty;
+        public RectangleF SettingShortcutCalcRect = RectangleF.Empty;
+        public RectangleF SettingShortcutSlidesRect = RectangleF.Empty;
+        public RectangleF SettingShortcutPdfRect = RectangleF.Empty;
+
+        // Sliding Indicator Animation Properties
         public float IndicatorCurrentX = -1f;
         public float IndicatorTargetX = -1f;
         public float IndicatorCurrentW = -1f;
@@ -46,9 +122,11 @@ namespace GenOffice.UI
             set { SmoothScrollY = value; TargetScrollY = value; }
         }
 
-        public bool UpdateSmoothScroll(int windowHeight = 800)
+        public bool UpdateSmoothScroll(int windowHeight = 0, int windowWidth = 0)
         {
-            int maxScroll = GetMaxScroll(windowHeight);
+            int h = (windowHeight > 200) ? windowHeight : _lastHeight;
+            int w = (windowWidth > 200) ? windowWidth : _lastWidth;
+            int maxScroll = GetMaxScroll(h, w);
             TargetScrollY = Math.Max(0, Math.Min(maxScroll, TargetScrollY));
             bool isAnimating = false;
 
@@ -60,10 +138,9 @@ namespace GenOffice.UI
             else if (SmoothScrollY != TargetScrollY)
             {
                 SmoothScrollY = TargetScrollY;
-                isAnimating = true;
             }
 
-            // Animate Sliding Indicator Pill
+            // Animate Sliding Indicator Underline
             if (IndicatorCurrentX > 0 && IndicatorTargetX > 0)
             {
                 if (Math.Abs(IndicatorTargetX - IndicatorCurrentX) > 0.3f)
@@ -93,99 +170,300 @@ namespace GenOffice.UI
             return isAnimating;
         }
 
+        public string SearchKeyword = "";
+        public bool IsScanning = false;
+        public bool IsSearchFocused = false;
+        public bool CursorBlink = true;
+
+        public List<RecentDocItem> GetFilteredDocs(int tab)
+        {
+            List<RecentDocItem> baseList = (tab == 1) ? TrashDocs : RecentDocs;
+            if (baseList == null) return new List<RecentDocItem>();
+
+            List<RecentDocItem> res = new List<RecentDocItem>();
+            string kw = string.IsNullOrWhiteSpace(SearchKeyword) ? "" : SearchKeyword.Trim().ToLowerInvariant();
+
+            foreach (var item in baseList)
+            {
+                if (tab == 0 && SubFilter == 2 && !item.IsStarred)
+                {
+                    continue;
+                }
+                if (tab == 3)
+                {
+                    if ((SubFilter == 2 || SubFilter == 14) && !item.IsStarred) continue;
+                    if (SubFilter == 10 && item.Mode != OfficeAppMode.Writer) continue;
+                    if (SubFilter == 11 && item.Mode != OfficeAppMode.Calc) continue;
+                    if (SubFilter == 12 && item.Mode != OfficeAppMode.Slides) continue;
+                    if (SubFilter == 13 && item.Mode != OfficeAppMode.Pdf) continue;
+                }
+
+                if (!string.IsNullOrEmpty(kw))
+                {
+                    if ((item.Title != null && item.Title.ToLowerInvariant().Contains(kw)) ||
+                        (item.FilePath != null && item.FilePath.ToLowerInvariant().Contains(kw)))
+                    {
+                        res.Add(item);
+                    }
+                }
+                else
+                {
+                    res.Add(item);
+                }
+            }
+            return res;
+        }
+
         public int GetTotalContentHeight(int width, int windowHeight = 800)
         {
-            if (ActiveTab == 0)
+            if (ActiveTab == 2)
             {
-                return 160 + (118 + 20) * 2 + 20;
+                return 980;
             }
             else
             {
-                List<RecentDocItem> currentList = (ActiveTab == 1) ? RecentDocs : TrashDocs;
-                return currentList.Count * 64 + 20;
+                List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
+                int count = (currentList != null) ? currentList.Count : 0;
+                return count * 58 + 384 + 96;
             }
         }
 
-        public int GetMaxScroll(int windowHeight = 800, int width = 1200)
+        public int GetMaxScroll(int windowHeight = 0, int width = 0)
         {
-            if (ActiveTab == 0)
+            int h = (windowHeight > 200) ? windowHeight : _lastHeight;
+            int w = (width > 200) ? width : _lastWidth;
+            if (ActiveTab == 2)
             {
-                int totalH = 160 + (118 + 20) * 2 + 20;
-                return Math.Max(0, totalH - windowHeight);
+                int totalH = 1180;
+                int viewportH = Math.Max(100, h - 120);
+                return Math.Max(0, totalH - viewportH);
+            }
+            else
+            {
+                List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
+                if (currentList == null || currentList.Count == 0) return 0;
+                int totalListHeight = currentList.Count * 58 + 96;
+                float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+                GetCenterContentMetrics(w, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+                int viewportH = Math.Max(100, h - (int)listTopY - 4);
+                return Math.Max(0, totalListHeight - viewportH);
+            }
+        }
+
+        public bool HandleScrollBarMouseDown(int mouseX, int mouseY, int width, int height)
+        {
+            if (ScrollBarBounds.IsEmpty) return false;
+            if (ScrollBarBounds.Contains(mouseX, mouseY))
+            {
+                int maxScroll = GetMaxScroll(height, width);
+                if (maxScroll <= 0) return true;
+
+                if (ScrollBarThumbBounds.Contains(mouseX, mouseY))
+                {
+                    IsDraggingScrollBar = true;
+                    _scrollBarDragStartMouseY = mouseY;
+                    _scrollBarDragStartScrollY = TargetScrollY;
+                    return true;
+                }
+                else
+                {
+                    float barH = ScrollBarBounds.Height;
+                    float thumbH = Math.Max(20f, ScrollBarThumbBounds.Height);
+                    float trackScrollH = Math.Max(1f, barH - thumbH);
+                    float frac = (mouseY - ScrollBarBounds.Y - thumbH / 2f) / trackScrollH;
+                    frac = Math.Max(0f, Math.Min(1f, frac));
+                    TargetScrollY = (int)Math.Round(frac * maxScroll);
+                    SmoothScrollY = TargetScrollY;
+
+                    IsDraggingScrollBar = true;
+                    _scrollBarDragStartMouseY = mouseY;
+                    _scrollBarDragStartScrollY = TargetScrollY;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool HandleScrollBarMouseMove(int mouseX, int mouseY, int width, int height)
+        {
+            if (IsDraggingScrollBar)
+            {
+                float barH = ScrollBarBounds.Height;
+                float thumbH = Math.Max(20f, ScrollBarThumbBounds.Height);
+                float trackScrollH = Math.Max(1f, barH - thumbH);
+                int deltaMouseY = mouseY - _scrollBarDragStartMouseY;
+                int maxScroll = GetMaxScroll(height, width);
+                float deltaScroll = ((float)deltaMouseY / trackScrollH) * maxScroll;
+                TargetScrollY = (int)Math.Max(0, Math.Min(maxScroll, _scrollBarDragStartScrollY + deltaScroll));
+                SmoothScrollY = TargetScrollY;
+                return true;
             }
 
-            List<RecentDocItem> currentList = (ActiveTab == 1) ? RecentDocs : TrashDocs;
-            int totalListHeight = currentList.Count * 64 + 16;
-            int tableBodyHeight = Math.Max(120, windowHeight - 160 - 55 - 48);
-            return Math.Max(0, totalListHeight - tableBodyHeight);
+            bool isInside = !ScrollBarBounds.IsEmpty && ScrollBarBounds.Contains(mouseX, mouseY);
+            if (isInside != IsHoveringScrollBar)
+            {
+                IsHoveringScrollBar = isInside;
+                return true;
+            }
+            return false;
+        }
+
+        public void HandleScrollBarMouseUp()
+        {
+            IsDraggingScrollBar = false;
+        }
+
+        public const float SidebarWidth = 220f;
+        public const float RightPanelWidth = 280f;
+        private int _lastWidth = 1200;
+        private int _lastHeight = 800;
+
+        public RectangleF GetSidebarBounds(int width, int height)
+        {
+            return new RectangleF(0, 0, SidebarWidth, height > 0 ? height : _lastHeight);
         }
 
         public RectangleF GetDockCapsuleBounds(int width, int scrollY)
         {
-            int marginX = Math.Max(32, (width - 1200) / 2);
-            float logoSize = 64f;
-            float dockX = marginX + logoSize + 20;
-            float dockY = 85 + 11; // Cố định ở đầu trang
-            return new RectangleF(dockX, dockY, 586, 42);
+            return GetSidebarBounds(width, scrollY);
         }
 
-        public RectangleF GetHelpBtnBounds(int width, int scrollY)
+        public RectangleF GetSearchBoxBounds(int width)
         {
-            int marginX = Math.Max(32, (width - 1200) / 2);
-            int contentW = width - marginX * 2;
-            float btnSize = 42f;
-            float btnX = marginX + contentW - btnSize;
-            float btnY = 85 + 11; // Cố định thẳng hàng đối diện 3 tab
-            return new RectangleF(btnX, btnY, btnSize, btnSize);
+            float contentLeft = SidebarWidth + 24f;
+            float rightEdge = width - RightPanelWidth - 24f;
+            float searchW = Math.Min(480f, rightEdge - contentLeft - 180f);
+            if (searchW < 200f) searchW = 200f;
+            return new RectangleF(contentLeft, 16f, searchW, 38f);
         }
 
-        public RectangleF GetFeaturesTabBounds(int width, int scrollY)
+        public RectangleF GetHelpBtnBounds(int width, int scrollY = 0)
         {
-            RectangleF dock = GetDockCapsuleBounds(width, scrollY);
-            return new RectangleF(dock.X + 4, dock.Y + 4, 140, 34);
+            float btnSize = 36f;
+            return new RectangleF(width - RightPanelWidth - 24f - btnSize - 8f - btnSize, 17f, btnSize, btnSize);
         }
 
-        public RectangleF GetMyDocsTabBounds(int width, int scrollY)
+        public RectangleF GetUpdateBtnBounds(int width, int scrollY = 0)
         {
-            RectangleF dock = GetDockCapsuleBounds(width, scrollY);
-            return new RectangleF(dock.X + 4 + 140 + 4, dock.Y + 4, 195, 34);
+            float btnSize = 36f;
+            return new RectangleF(width - RightPanelWidth - 24f - btnSize, 17f, btnSize, btnSize);
         }
 
-        public RectangleF GetTrashTabBounds(int width, int scrollY)
+        public RectangleF GetFeaturesTabBounds(int width, int scrollY = 0)
         {
-            RectangleF dock = GetDockCapsuleBounds(width, scrollY);
-            return new RectangleF(dock.X + 4 + 140 + 4 + 195 + 4, dock.Y + 4, 235, 34);
+            return GetCardBounds(0, width, _lastHeight);
         }
 
-        public RectangleF GetCardBounds(int index, int width, int windowHeight)
+        public RectangleF GetMyDocsTabBounds(int width, int scrollY = 0)
         {
-            if (ActiveTab != 0) return new RectangleF(-1000, -1000, 0, 0);
-
-            int marginX = Math.Max(32, (width - 1200) / 2);
-            int contentW = width - marginX * 2;
-            int cardGap = 20;
-            int cardW = (contentW - cardGap * 2) / 3;
-            if (cardW < 280) cardW = 280;
-
-            int startY = 160; // Hạ xuống vừa chạm dưới mép Logo không bị đè
-            int cardH = 118;  // Kích thước chuẩn gọn gàng thanh thoát
-
-            int col = index % 3;
-            int row = index / 3;
-
-            return new RectangleF(marginX + (cardW + cardGap) * col, startY + (cardH + cardGap) * row, cardW, cardH);
+            return new RectangleF(12f, 70f, SidebarWidth - 24f, 38f);
         }
 
-        public RectangleF GetTableCardBounds(int width, int windowHeight)
+        public RectangleF GetOpenDocNavBounds(int width, int scrollY = 0)
         {
-            if (ActiveTab == 0) return new RectangleF(-1000, -1000, 0, 0);
+            return new RectangleF(12f, 114f, SidebarWidth - 24f, 38f);
+        }
 
-            int marginX = Math.Max(32, (width - 1200) / 2);
-            int contentW = width - marginX * 2;
-            int tableY = 160; // Hạ xuống dưới mép logo
-            int tableH = Math.Max(180, windowHeight - tableY - 55); // Thu ngắn lên 1cm so với đáy màn hình
+        public RectangleF GetRecentNavBounds(int width, int scrollY = 0)
+        {
+            return RectangleF.Empty;
+        }
 
-            return new RectangleF(marginX, tableY, contentW, tableH);
+        public RectangleF GetStarredNavBounds(int width, int scrollY = 0)
+        {
+            return RectangleF.Empty;
+        }
+
+        public RectangleF GetTrashTabBounds(int width, int scrollY = 0)
+        {
+            return new RectangleF(12f, 158f, SidebarWidth - 24f, 38f);
+        }
+
+        public RectangleF GetAppNavBounds(int appIndex, int width, int scrollY = 0)
+        {
+            float appNavY = 236f + appIndex * 36f;
+            return new RectangleF(12f, appNavY, SidebarWidth - 24f, 32f);
+        }
+
+        public RectangleF GetPromoBtnBounds(int width)
+        {
+            float panelX = width - RightPanelWidth;
+            float px = panelX + 20f;
+            return new RectangleF(px + 14f, 150f, 120f, 26f);
+        }
+
+        public RectangleF GetStorageManageBounds(int width)
+        {
+            float panelX = width - RightPanelWidth;
+            float px = panelX + 20f;
+            float pw = RightPanelWidth - 40f;
+            return new RectangleF(px + pw - 48f, 204f, 48f, 20f);
+        }
+
+        public RectangleF GetTemplateCardBounds(int index, int width)
+        {
+            float panelX = width - RightPanelWidth;
+            float px = panelX + 20f;
+            float pw = RightPanelWidth - 40f;
+            float curY = 294f + index * 44f;
+            return new RectangleF(px, curY, pw, 40f);
+        }
+
+        public RectangleF GetSettingsTabBounds(int width, int scrollY = 0)
+        {
+            float h = (scrollY > 200) ? scrollY : _lastHeight;
+            if (h < 200) h = 750f;
+            return new RectangleF(12f, h - 52f, SidebarWidth - 24f, 38f);
+        }
+
+        public RectangleF GetAiTabBounds(int width, int scrollY = 0)
+        {
+            return GetSettingsTabBounds(width, scrollY);
+        }
+
+        public void GetCenterContentMetrics(int width, out float startX, out float contentW, out float bannerH, out float cardY, out float fileListY, out float colHeaderY, out float listTopY)
+        {
+            startX = SidebarWidth + 24f;
+            contentW = Math.Max(400f, width - SidebarWidth - RightPanelWidth - 48f);
+            bannerH = (ActiveTab == 0) ? (float)Math.Round(contentW * 3456.0 / 8064.0) : 0f;
+            cardY = (ActiveTab == 0) ? (68f + bannerH + 16f) : 68f;
+            if (ActiveTab == 0)
+            {
+                fileListY = cardY + 84f + 20f;
+                colHeaderY = fileListY + 30f;
+                listTopY = colHeaderY + 22f;
+            }
+            else if (ActiveTab == 3)
+            {
+                fileListY = 70f;
+                colHeaderY = fileListY + 82f;
+                listTopY = colHeaderY + 24f;
+            }
+            else // ActiveTab == 1 (Thùng rác)
+            {
+                fileListY = 70f;
+                colHeaderY = fileListY + 36f;
+                listTopY = colHeaderY + 22f;
+            }
+        }
+
+        public RectangleF GetCardBounds(int index, int width, int windowHeight = 0)
+        {
+            if (index < 0 || index >= 4) return new RectangleF(-1000, -1000, 0, 0);
+            float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+            GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+            float cardGap = 14f;
+            float cardW = Math.Min(148f, (contentW - 3 * cardGap) / 4f);
+            if (cardW < 110f) cardW = 110f;
+            return new RectangleF(startX + index * (cardW + cardGap), cardY, cardW, 84f);
+        }
+
+        public RectangleF GetTableCardBounds(int width, int windowHeight = 0)
+        {
+            float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+            GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+            float h = (windowHeight > 200) ? windowHeight : _lastHeight;
+            return new RectangleF(startX, listTopY, contentW, Math.Max(180, h - listTopY - 16f));
         }
 
         public HomeView()
@@ -193,8 +471,403 @@ namespace GenOffice.UI
             ScrollY = 0;
             ActiveTab = 0;
 
+            LoadRecentDocs();
+
+            try
+            {
+                DesktopShortcutManager.DeleteShortcut("GenOffice");
+            }
+            catch { }
+        }
+
+        private static string GetRecentDocsFilePath()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string dir = Path.Combine(appData, "GenOffice");
+            if (!Directory.Exists(dir))
+            {
+                try { Directory.CreateDirectory(dir); } catch { }
+            }
+            return Path.Combine(dir, "recent_docs.xml");
+        }
+
+        private static readonly string[] DummyTitles = new string[]
+        {
+            "Kế hoạch Kinh doanh Quý 3.docx",
+            "Báo cáo Tài chính Q2.xlsx",
+            "Bài thuyết trình Sản phẩm 2026.pptx",
+            "Hợp đồng Dịch vụ Phần mềm.pdf",
+            "Dự thảo Bản nháp cũ.docx"
+        };
+
+        public void LoadRecentDocs()
+        {
             RecentDocs = new List<RecentDocItem>();
             TrashDocs = new List<RecentDocItem>();
+
+            string path = GetRecentDocsFilePath();
+            if (File.Exists(path))
+            {
+                try
+                {
+                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                    doc.Load(path);
+
+                    var rNodes = doc.SelectNodes("//RecentDocs/Doc");
+                    if (rNodes != null)
+                    {
+                        foreach (System.Xml.XmlNode n in rNodes)
+                        {
+                            if (n.Attributes == null) continue;
+                            string title = n.Attributes["title"] != null ? n.Attributes["title"].Value : "";
+                            string fpath = n.Attributes["path"] != null ? n.Attributes["path"].Value : "";
+                            int modeVal = 0;
+                            if (n.Attributes["mode"] != null) int.TryParse(n.Attributes["mode"].Value, out modeVal);
+                            string date = n.Attributes["date"] != null ? n.Attributes["date"].Value : "";
+                            bool isStarred = false;
+                            if (n.Attributes["starred"] != null) bool.TryParse(n.Attributes["starred"].Value, out isStarred);
+
+                            // Loại bỏ các tệp mẫu ảo cũ không tồn tại
+                            bool isDummy = false;
+                            for (int d = 0; d < DummyTitles.Length; d++)
+                            {
+                                if (string.Equals(title, DummyTitles[d], StringComparison.OrdinalIgnoreCase) && !File.Exists(fpath))
+                                {
+                                    isDummy = true;
+                                    break;
+                                }
+                            }
+                            if (!isDummy)
+                            {
+                                RecentDocs.Add(new RecentDocItem(title, fpath, (OfficeAppMode)modeVal, date, isStarred));
+                            }
+                        }
+                    }
+
+                    var tNodes = doc.SelectNodes("//TrashDocs/Doc");
+                    if (tNodes != null)
+                    {
+                        foreach (System.Xml.XmlNode n in tNodes)
+                        {
+                            if (n.Attributes == null) continue;
+                            string title = n.Attributes["title"] != null ? n.Attributes["title"].Value : "";
+                            string fpath = n.Attributes["path"] != null ? n.Attributes["path"].Value : "";
+                            int modeVal = 0;
+                            if (n.Attributes["mode"] != null) int.TryParse(n.Attributes["mode"].Value, out modeVal);
+                            string date = n.Attributes["date"] != null ? n.Attributes["date"].Value : "";
+
+                            bool isDummy = false;
+                            for (int d = 0; d < DummyTitles.Length; d++)
+                            {
+                                if (string.Equals(title, DummyTitles[d], StringComparison.OrdinalIgnoreCase) && !File.Exists(fpath))
+                                {
+                                    isDummy = true;
+                                    break;
+                                }
+                            }
+                            if (!isDummy)
+                            {
+                                TrashDocs.Add(new RecentDocItem(title, fpath, (OfficeAppMode)modeVal, date));
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Lưu lại phiên bản đã dọn sạch tệp ảo
+            SaveRecentDocs();
+        }
+
+        public static void AddRecentDocStatic(string filePath, OfficeAppMode mode, string title = null)
+        {
+            if (string.IsNullOrEmpty(filePath)) return;
+            try
+            {
+                string xmlPath = GetRecentDocsFilePath();
+                List<RecentDocItem> recent = new List<RecentDocItem>();
+                List<RecentDocItem> trash = new List<RecentDocItem>();
+
+                if (File.Exists(xmlPath))
+                {
+                    try
+                    {
+                        System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                        doc.Load(xmlPath);
+                        var rNodes = doc.SelectNodes("//RecentDocs/Doc");
+                        if (rNodes != null)
+                        {
+                            foreach (System.Xml.XmlNode n in rNodes)
+                            {
+                                if (n.Attributes == null) continue;
+                                string t = n.Attributes["title"] != null ? n.Attributes["title"].Value : "";
+                                string p = n.Attributes["path"] != null ? n.Attributes["path"].Value : "";
+                                int m = 0;
+                                if (n.Attributes["mode"] != null) int.TryParse(n.Attributes["mode"].Value, out m);
+                                string d = n.Attributes["date"] != null ? n.Attributes["date"].Value : "";
+                                recent.Add(new RecentDocItem(t, p, (OfficeAppMode)m, d));
+                            }
+                        }
+                        var tNodes = doc.SelectNodes("//TrashDocs/Doc");
+                        if (tNodes != null)
+                        {
+                            foreach (System.Xml.XmlNode n in tNodes)
+                            {
+                                if (n.Attributes == null) continue;
+                                string t = n.Attributes["title"] != null ? n.Attributes["title"].Value : "";
+                                string p = n.Attributes["path"] != null ? n.Attributes["path"].Value : "";
+                                int m = 0;
+                                if (n.Attributes["mode"] != null) int.TryParse(n.Attributes["mode"].Value, out m);
+                                string d = n.Attributes["date"] != null ? n.Attributes["date"].Value : "";
+                                trash.Add(new RecentDocItem(t, p, (OfficeAppMode)m, d));
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (string.IsNullOrEmpty(title))
+                {
+                    title = Path.GetFileName(filePath);
+                }
+
+                // Xóa mục trùng lặp trước đó
+                recent.RemoveAll(d => string.Equals(d.FilePath, filePath, StringComparison.OrdinalIgnoreCase) || d.Title == title);
+                trash.RemoveAll(d => string.Equals(d.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+                string dateStr = "Hôm nay, " + DateTime.Now.ToString("HH:mm");
+                recent.Insert(0, new RecentDocItem(title, filePath, mode, dateStr));
+                if (recent.Count > 40) recent.RemoveRange(40, recent.Count - 40);
+
+                // Ghi lại vào file XML
+                System.Xml.XmlDocument outDoc = new System.Xml.XmlDocument();
+                System.Xml.XmlElement root = outDoc.CreateElement("GenOfficeDocs");
+                outDoc.AppendChild(root);
+
+                System.Xml.XmlElement rRoot = outDoc.CreateElement("RecentDocs");
+                root.AppendChild(rRoot);
+                foreach (var item in recent)
+                {
+                    System.Xml.XmlElement d = outDoc.CreateElement("Doc");
+                    d.SetAttribute("title", item.Title ?? "");
+                    d.SetAttribute("path", item.FilePath ?? "");
+                    d.SetAttribute("mode", ((int)item.Mode).ToString());
+                    d.SetAttribute("date", item.LastModified ?? "");
+                    rRoot.AppendChild(d);
+                }
+
+                System.Xml.XmlElement tRoot = outDoc.CreateElement("TrashDocs");
+                root.AppendChild(tRoot);
+                foreach (var item in trash)
+                {
+                    System.Xml.XmlElement d = outDoc.CreateElement("Doc");
+                    d.SetAttribute("title", item.Title ?? "");
+                    d.SetAttribute("path", item.FilePath ?? "");
+                    d.SetAttribute("mode", ((int)item.Mode).ToString());
+                    d.SetAttribute("date", item.LastModified ?? "");
+                    tRoot.AppendChild(d);
+                }
+
+                outDoc.Save(xmlPath);
+            }
+            catch { }
+        }
+
+        public void AddRecentDocument(string filePath, OfficeAppMode mode, string title = null)
+        {
+            if (string.IsNullOrEmpty(filePath)) return;
+            try
+            {
+                if (RecentDocs == null) RecentDocs = new List<RecentDocItem>();
+                if (TrashDocs == null) TrashDocs = new List<RecentDocItem>();
+
+                if (string.IsNullOrEmpty(title))
+                {
+                    title = Path.GetFileName(filePath);
+                }
+
+                RecentDocs.RemoveAll(d => string.Equals(d.FilePath, filePath, StringComparison.OrdinalIgnoreCase) || d.Title == title);
+                TrashDocs.RemoveAll(d => string.Equals(d.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+
+                string dateStr = "Hôm nay, " + DateTime.Now.ToString("HH:mm");
+                RecentDocs.Insert(0, new RecentDocItem(title, filePath, mode, dateStr));
+
+                if (RecentDocs.Count > 40)
+                {
+                    RecentDocs.RemoveRange(40, RecentDocs.Count - 40);
+                }
+
+                SaveRecentDocs();
+            }
+            catch { }
+        }
+
+        public void ScanDeviceForDocuments(Action onComplete = null)
+        {
+            if (IsScanning) return;
+            IsScanning = true;
+
+            System.Threading.ThreadPool.QueueUserWorkItem(state =>
+            {
+                int foundCount = 0;
+                try
+                {
+                    List<string> targetFolders = new List<string>();
+                    string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string downloads = Path.Combine(userProfile, "Downloads");
+
+                    if (Directory.Exists(docs)) targetFolders.Add(docs);
+                    if (Directory.Exists(desktop)) targetFolders.Add(desktop);
+                    if (Directory.Exists(downloads)) targetFolders.Add(downloads);
+
+                    string[] validExtensions = new string[] { ".docx", ".doc", ".odt", ".xlsx", ".xls", ".csv", ".pptx", ".ppt", ".pdf" };
+
+                    List<FileInfo> allFiles = new List<FileInfo>();
+
+                    foreach (var rootDir in targetFolders)
+                    {
+                        ScanDirectoryRecursive(rootDir, validExtensions, allFiles, 0, 3);
+                    }
+
+                    // Sắp xếp theo ngày sửa đổi mới nhất
+                    allFiles.Sort((a, b) => b.LastWriteTime.CompareTo(a.LastWriteTime));
+
+                    int maxToAdd = Math.Min(60, allFiles.Count);
+                    for (int i = 0; i < maxToAdd; i++)
+                    {
+                        var fi = allFiles[i];
+                        string ext = fi.Extension.ToLowerInvariant();
+                        OfficeAppMode mode = OfficeAppMode.Writer;
+                        if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") mode = OfficeAppMode.Calc;
+                        else if (ext == ".pptx" || ext == ".ppt") mode = OfficeAppMode.Slides;
+                        else if (ext == ".pdf") mode = OfficeAppMode.Pdf;
+
+                        string dateStr = (fi.LastWriteTime.Date == DateTime.Today)
+                            ? "Hôm nay, " + fi.LastWriteTime.ToString("HH:mm")
+                            : fi.LastWriteTime.ToString("dd/MM/yyyy HH:mm");
+
+                        if (RecentDocs == null) RecentDocs = new List<RecentDocItem>();
+                        RecentDocs.RemoveAll(d => string.Equals(d.FilePath, fi.FullName, StringComparison.OrdinalIgnoreCase));
+                        RecentDocs.Add(new RecentDocItem(fi.Name, fi.FullName, mode, dateStr));
+                        foundCount++;
+                    }
+
+                    if (RecentDocs != null && RecentDocs.Count > 60)
+                    {
+                        RecentDocs.RemoveRange(60, RecentDocs.Count - 60);
+                    }
+
+                    SaveRecentDocs();
+                }
+                catch { }
+                finally
+                {
+                    IsScanning = false;
+                    if (onComplete != null) onComplete();
+                }
+            });
+        }
+
+        private void ScanDirectoryRecursive(string dir, string[] extensions, List<FileInfo> result, int currentDepth, int maxDepth)
+        {
+            if (currentDepth > maxDepth) return;
+            try
+            {
+                DirectoryInfo di = new DirectoryInfo(dir);
+                if ((di.Attributes & FileAttributes.Hidden) != 0 || (di.Attributes & FileAttributes.System) != 0) return;
+                string dirName = di.Name.ToLowerInvariant();
+                if (dirName.StartsWith(".") || dirName == "node_modules" || dirName == "appdata" || dirName == "temp" || dirName == "tmp" || dirName == "$recycle.bin") return;
+
+                var files = di.GetFiles();
+                foreach (var f in files)
+                {
+                    if ((f.Attributes & FileAttributes.Hidden) != 0) continue;
+                    string ext = f.Extension.ToLowerInvariant();
+                    for (int e = 0; e < extensions.Length; e++)
+                    {
+                        if (ext == extensions[e])
+                        {
+                            result.Add(f);
+                            break;
+                        }
+                    }
+                }
+
+                if (currentDepth < maxDepth)
+                {
+                    var subDirs = di.GetDirectories();
+                    foreach (var sd in subDirs)
+                    {
+                        ScanDirectoryRecursive(sd.FullName, extensions, result, currentDepth + 1, maxDepth);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public void EmptyTrash()
+        {
+            if (TrashDocs != null)
+            {
+                TrashDocs.Clear();
+                SaveRecentDocs();
+            }
+        }
+
+        public void ClearRecentDocs()
+        {
+            if (RecentDocs != null)
+            {
+                RecentDocs.Clear();
+                SaveRecentDocs();
+            }
+        }
+
+        public void SaveRecentDocs()
+        {
+            try
+            {
+                string path = GetRecentDocsFilePath();
+                System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                System.Xml.XmlElement root = doc.CreateElement("GenOfficeDocs");
+                doc.AppendChild(root);
+
+                System.Xml.XmlElement rRoot = doc.CreateElement("RecentDocs");
+                root.AppendChild(rRoot);
+                if (RecentDocs != null)
+                {
+                    foreach (var item in RecentDocs)
+                    {
+                        System.Xml.XmlElement d = doc.CreateElement("Doc");
+                        d.SetAttribute("title", item.Title ?? "");
+                        d.SetAttribute("path", item.FilePath ?? "");
+                        d.SetAttribute("mode", ((int)item.Mode).ToString());
+                        d.SetAttribute("date", item.LastModified ?? "");
+                        d.SetAttribute("starred", item.IsStarred ? "true" : "false");
+                        rRoot.AppendChild(d);
+                    }
+                }
+
+                System.Xml.XmlElement tRoot = doc.CreateElement("TrashDocs");
+                root.AppendChild(tRoot);
+                if (TrashDocs != null)
+                {
+                    foreach (var item in TrashDocs)
+                    {
+                        System.Xml.XmlElement d = doc.CreateElement("Doc");
+                        d.SetAttribute("title", item.Title ?? "");
+                        d.SetAttribute("path", item.FilePath ?? "");
+                        d.SetAttribute("mode", ((int)item.Mode).ToString());
+                        d.SetAttribute("date", item.LastModified ?? "");
+                        tRoot.AppendChild(d);
+                    }
+                }
+
+                doc.Save(path);
+            }
+            catch { }
         }
 
         #region Vector Graphics Drawing Primitives
@@ -218,6 +891,11 @@ namespace GenOffice.UI
 
         private void DrawVectorAppEmblem(Graphics g, float x, float y, float size, OfficeAppMode mode)
         {
+            if (AppIconRenderer.DrawAppIcon(g, x, y, size, mode))
+            {
+                return;
+            }
+
             RectangleF box = new RectangleF(x, y, size, size);
             Color baseCol, darkCol;
 
@@ -382,6 +1060,155 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawSidebarNavItem(Graphics g, RectangleF rect, string text, Action<Graphics, float, float, float, Color> drawIcon, bool isActive, bool isHover)
+        {
+            if (isActive)
+            {
+                using (GraphicsPath ip = CreateRoundedRectanglePath(rect, 6f))
+                using (SolidBrush ib = new SolidBrush(Color.White))
+                using (Pen iPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                {
+                    g.FillPath(ib, ip);
+                    g.DrawPath(iPen, ip);
+                }
+                using (SolidBrush barB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.FillRectangle(barB, rect.X, rect.Y + 7f, 3.5f, rect.Height - 14f);
+                }
+            }
+            else if (isHover)
+            {
+                using (GraphicsPath hp = CreateRoundedRectanglePath(rect, 6f))
+                using (SolidBrush hb = new SolidBrush(Color.FromArgb(235, 238, 243)))
+                {
+                    g.FillPath(hb, hp);
+                }
+            }
+
+            Color iconCol = isActive ? Color.FromArgb(37, 99, 235) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(100, 116, 139));
+            if (drawIcon != null)
+            {
+                drawIcon(g, rect.X + 14f, rect.Y + (rect.Height - 18f) / 2f, 18f, iconCol);
+            }
+
+            using (Font f = new Font("Segoe UI", 9.8f, isActive ? FontStyle.Bold : FontStyle.Regular))
+            using (SolidBrush tb = new SolidBrush(isActive ? Color.FromArgb(15, 23, 42) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
+            {
+                g.DrawString(text, f, tb, rect.X + 40f, rect.Y + (rect.Height - f.Height) / 2f);
+            }
+        }
+
+        private void DrawTabItem(Graphics g, RectangleF tabRect, string text, Action<Graphics, float, float, float, Color> drawIcon, float iconSize, Color color, bool isActive, Font boldFont, Font regFont)
+        {
+            Font f = isActive ? boldFont : regFont;
+            SizeF sz = g.MeasureString(text, f);
+            float gap = 6f;
+            float totalW = iconSize + gap + sz.Width;
+            float startX = tabRect.X + (tabRect.Width - totalW) / 2f;
+            float iconY = tabRect.Y + (tabRect.Height - iconSize) / 2f;
+            float textY = tabRect.Y + (tabRect.Height - sz.Height) / 2f;
+
+            if (drawIcon != null)
+            {
+                drawIcon(g, startX, iconY, iconSize, color);
+            }
+            using (SolidBrush tb = new SolidBrush(color))
+            {
+                g.DrawString(text, f, tb, startX + iconSize + gap, textY);
+            }
+        }
+
+        private void DrawAiTabItem(Graphics g, RectangleF tabRect, string text, Action<Graphics, float, float, float, Color> drawIcon, float iconSize, Color color, bool isActive, Font boldFont, Font regFont)
+        {
+            Font f = isActive ? boldFont : regFont;
+            string supText = "Thử nghiệm";
+
+            using (Font supFont = new Font("Segoe UI", 7.0f, FontStyle.Bold))
+            {
+                SizeF mainSz = g.MeasureString(text, f);
+                SizeF supSz = g.MeasureString(supText, supFont);
+
+                float iconGap = 6f;
+                float totalW = iconSize + iconGap + mainSz.Width - 1.5f + supSz.Width;
+
+                float startX = tabRect.X + (tabRect.Width - totalW) / 2f;
+                float iconY = tabRect.Y + (tabRect.Height - iconSize) / 2f;
+                float textY = tabRect.Y + (tabRect.Height - mainSz.Height) / 2f;
+
+                if (drawIcon != null)
+                {
+                    drawIcon(g, startX, iconY, iconSize, color);
+                }
+
+                float textX = startX + iconSize + iconGap;
+
+                // 1. Chữ chính "Thiết lập AI" (căn giữa theo chiều dọc chuẩn của Tab)
+                using (SolidBrush tb = new SolidBrush(color))
+                {
+                    g.DrawString(text, f, tb, textX, textY);
+                }
+
+                // 2. Chữ "Thử nghiệm" rõ nét, cân đối dạng số mũ ở góc trên bên phải (không nhô cao hơn đỉnh chữ)
+                float supX = textX + mainSz.Width - 1.5f;
+                float supY = textY + 0.5f;
+                Color supCol = isActive ? Color.FromArgb(99, 102, 241) : Color.FromArgb(120, 135, 155);
+                using (SolidBrush sb = new SolidBrush(supCol))
+                {
+                    g.DrawString(supText, supFont, sb, supX, supY);
+                }
+            }
+        }
+
+        public static void DrawFloatingCardBorderBadge(Graphics g, float x, float borderY)
+        {
+            float badgeW = 118f;
+            float badgeH = 22f;
+            float badgeY = borderY - badgeH / 2f;
+            RectangleF badgeRect = new RectangleF(x, badgeY, badgeW, badgeH);
+
+            // 1. Bóng đổ mềm mại (Soft drop shadow)
+            RectangleF shadowRect = new RectangleF(badgeRect.X, badgeRect.Y + 1.5f, badgeRect.Width, badgeRect.Height);
+            using (GraphicsPath sp = LiquidGlassHelper.CreateRoundedRectanglePath(shadowRect, 11f))
+            using (SolidBrush sb = new SolidBrush(Color.FromArgb(32, 15, 23, 42)))
+            {
+                g.FillPath(sb, sp);
+            }
+
+            // 2. Thân viên thuốc kính phát sáng Liquid Glass
+            using (GraphicsPath bp = LiquidGlassHelper.CreateRoundedRectanglePath(badgeRect, 11f))
+            using (LinearGradientBrush bg = new LinearGradientBrush(badgeRect, Color.FromArgb(255, 255, 255, 255), Color.FromArgb(235, 243, 255, 255), 90f))
+            using (Pen bPen = new Pen(Color.FromArgb(165, 180, 252), 1.3f))
+            {
+                g.FillPath(bg, bp);
+                g.DrawPath(bPen, bp);
+
+                // Ánh gương bóng (Top gloss sheen)
+                RectangleF glossR = new RectangleF(badgeRect.X + 2, badgeRect.Y + 1, badgeRect.Width - 4, (badgeH - 2) / 2f);
+                using (GraphicsPath gp = LiquidGlassHelper.CreateRoundedRectanglePath(glossR, (badgeH - 2) / 4f))
+                using (LinearGradientBrush gb = new LinearGradientBrush(glossR, Color.FromArgb(180, 255, 255, 255), Color.FromArgb(15, 255, 255, 255), 90f))
+                {
+                    g.FillPath(gb, gp);
+                }
+            }
+
+            // 3. Chấm phát sáng Indigo & Chữ THỬ NGHIỆM
+            float dotSize = 6f;
+            float dotX = badgeRect.X + 10f;
+            float dotY = badgeRect.Y + (badgeH - dotSize) / 2f;
+            using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(99, 102, 241)))
+            {
+                g.FillEllipse(dotBrush, dotX, dotY, dotSize, dotSize);
+            }
+
+            using (Font bf = new Font("Segoe UI", 7.6f, FontStyle.Bold))
+            using (SolidBrush txtBrush = new SolidBrush(Color.FromArgb(67, 56, 202)))
+            {
+                string bText = "THỬ NGHIỆM";
+                SizeF bSz = g.MeasureString(bText, bf);
+                g.DrawString(bText, bf, txtBrush, dotX + dotSize + 6f, badgeRect.Y + (badgeH - bSz.Height) / 2f);
+            }
+        }
+
         private void DrawVectorSparkleIcon(Graphics g, float x, float y, float size, Color color)
         {
             float s = size / 16f;
@@ -479,6 +1306,17 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawVectorSearchIcon(Graphics g, float cx, float cy, float size, Color col)
+        {
+            using (Pen p = new Pen(col, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                float r = size * 0.35f;
+                g.DrawEllipse(p, cx, cy, r * 2f, r * 2f);
+                float handleStart = r * 1.6f;
+                g.DrawLine(p, cx + handleStart, cy + handleStart, cx + size - 1, cy + size - 1);
+            }
+        }
+
         private void DrawVectorArrowRight(Graphics g, float x, float y, float size, Color color)
         {
             float s = size / 16f;
@@ -487,6 +1325,31 @@ namespace GenOffice.UI
                 g.DrawLine(p, x + 3 * s, y + 8 * s, x + 12 * s, y + 8 * s);
                 g.DrawLine(p, x + 8 * s, y + 4 * s, x + 12 * s, y + 8 * s);
                 g.DrawLine(p, x + 8 * s, y + 12 * s, x + 12 * s, y + 8 * s);
+            }
+        }
+
+        private void DrawVectorStarIcon(Graphics g, float cx, float cy, float radius, Color color, bool isFilled)
+        {
+            PointF[] points = new PointF[10];
+            double rx = radius;
+            double ry = radius * 0.42;
+            for (int i = 0; i < 10; i++)
+            {
+                double angle = i * Math.PI / 5.0 - Math.PI / 2.0;
+                double r = (i % 2 == 0) ? rx : ry;
+                points[i] = new PointF((float)(cx + r * Math.Cos(angle)), (float)(cy + r * Math.Sin(angle)));
+            }
+
+            if (isFilled)
+            {
+                using (SolidBrush b = new SolidBrush(color))
+                {
+                    g.FillPolygon(b, points);
+                }
+            }
+            using (Pen p = new Pen(color, 1.4f) { LineJoin = LineJoin.Round })
+            {
+                g.DrawPolygon(p, points);
             }
         }
 
@@ -514,11 +1377,32 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawVectorGearIcon(Graphics g, float cx, float cy, float size, Color color)
+        {
+            float s = size / 18f;
+            float rOuter = 7.5f * s;
+            float rInner = 5.0f * s;
+            float rHole = 2.4f * s;
+            using (Pen p = new Pen(color, 1.6f * s) { LineJoin = LineJoin.Round })
+            {
+                g.DrawEllipse(p, cx - rInner, cy - rInner, rInner * 2, rInner * 2);
+                g.DrawEllipse(p, cx - rHole, cy - rHole, rHole * 2, rHole * 2);
+
+                for (int i = 0; i < 6; i++)
+                {
+                    double angle = i * Math.PI / 3.0;
+                    float cos = (float)Math.Cos(angle);
+                    float sin = (float)Math.Sin(angle);
+                    g.DrawLine(p, cx + cos * rInner, cy + sin * rInner, cx + cos * rOuter, cy + sin * rOuter);
+                }
+            }
+        }
+
         private void ShowHelpDialog()
         {
             using (Form dlg = new Form())
             {
-                dlg.Text = "Giới thiệu & Hướng dẫn - GENOFFICE";
+                dlg.Text = "Giới thiệu & Hướng dẫn - ZENQ OFFICE";
                 dlg.Size = new Size(620, 520);
                 dlg.StartPosition = FormStartPosition.CenterScreen;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -532,7 +1416,7 @@ namespace GenOffice.UI
 
                 Label lblTitle = new Label
                 {
-                    Text = "GENOFFICE v3.5",
+                    Text = "ZENQ OFFICE 1",
                     Font = new Font("Segoe UI", 16f, FontStyle.Bold),
                     ForeColor = Color.FromArgb(15, 23, 42),
                     AutoSize = true,
@@ -607,7 +1491,7 @@ namespace GenOffice.UI
 
                 Label lblNoteContent = new Label
                 {
-                    Text = "GENOFFICE luôn nỗ lực tối đa để hiển thị và xử lý tài liệu chuẩn xác nhất. Tuy nhiên, do sự khác biệt về đặc tả kỹ thuật và tiêu chuẩn phần mềm giữa các nền tảng, chúng tôi không thể cam kết rằng mọi định dạng nâng cao sẽ hiển thị giống hệt 100% như trên các bộ ứng dụng Office khác.",
+                    Text = "ZENQ OFFICE luôn nỗ lực tối đa để hiển thị và xử lý tài liệu chuẩn xác nhất. Tuy nhiên, do sự khác biệt về đặc tả kỹ thuật và tiêu chuẩn phần mềm giữa các nền tảng, chúng tôi không thể cam kết rằng mọi định dạng nâng cao sẽ hiển thị giống hệt 100% như trên các bộ ứng dụng Office khác.",
                     Font = new Font("Segoe UI", 9f),
                     ForeColor = Color.FromArgb(71, 85, 105),
                     Location = new Point(14, 34),
@@ -617,6 +1501,28 @@ namespace GenOffice.UI
                 pnlNote.Controls.Add(lblNoteContent);
 
                 pnl.Controls.Add(pnlNote);
+
+                Button btnUpdate = new Button
+                {
+                    Text = "🔄 Kiểm tra cập nhật",
+                    Size = new Size(160, 34),
+                    Location = new Point(310, 418),
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = Color.FromArgb(241, 245, 249),
+                    ForeColor = Color.FromArgb(15, 23, 42),
+                    Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                    Cursor = Cursors.Hand
+                };
+                btnUpdate.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+                btnUpdate.Click += (s, e) =>
+                {
+                    dlg.Close();
+                    using (UpdateDialogForm updDlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
+                    {
+                        updDlg.ShowDialog();
+                    }
+                };
+                pnl.Controls.Add(btnUpdate);
 
                 Button btnClose = new Button
                 {
@@ -639,9 +1545,680 @@ namespace GenOffice.UI
         }
         #endregion
 
-        #region Main Dashboard Drawing (iOS 26 / VisionOS Liquid Glassmorphism)
+        #region Main Dashboard Drawing (OfficeHub Modern Style)
+        
+        // New helper methods needed for the redesign:
+        private void DrawSidebarNavSmall(Graphics g, RectangleF rect, string text, Color textColor, bool isActive, bool isHover)
+        {
+            if (isActive)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(rect, 6f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                {
+                    g.FillPath(b, p);
+                }
+                textColor = Color.FromArgb(37, 99, 235);
+            }
+            else if (isHover)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(rect, 6f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                {
+                    g.FillPath(b, p);
+                }
+                textColor = Color.FromArgb(15, 23, 42);
+            }
+
+            using (Font f = new Font("Segoe UI", 9f, isActive ? FontStyle.Bold : FontStyle.Regular))
+            using (SolidBrush tb = new SolidBrush(textColor))
+            {
+                g.DrawString(text, f, tb, rect.X + 40f, rect.Y + (rect.Height - f.Height) / 2f);
+            }
+            // Small dot/dash icon
+            using (SolidBrush dotB = new SolidBrush(isActive ? Color.FromArgb(37, 99, 235) : Color.FromArgb(160, textColor)))
+            {
+                float iconY = rect.Y + rect.Height / 2f - 2f;
+                g.FillEllipse(dotB, rect.X + 22f, iconY, 4f, 4f);
+            }
+        }
+
+        private void DrawSidebarAppNavItem(Graphics g, RectangleF rect, string text, OfficeAppMode mode, bool isHover)
+        {
+            if (isHover)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(rect, 6f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                {
+                    g.FillPath(b, p);
+                }
+            }
+
+            // 3D App Icon
+            float iconSize = 24f;
+            float iconX = rect.X + 12f;
+            float iconY = rect.Y + (rect.Height - iconSize) / 2f;
+            if (!AppIconRenderer.DrawAppIcon(g, iconX, iconY, iconSize, mode))
+            {
+                DrawVectorAppEmblem(g, iconX, iconY, iconSize, mode);
+            }
+
+            // Text
+            using (Font tf = new Font("Segoe UI", 9f, isHover ? FontStyle.Bold : FontStyle.Regular))
+            using (SolidBrush tb = new SolidBrush(isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105)))
+            {
+                g.DrawString(text, tf, tb, rect.X + 44f, rect.Y + (rect.Height - tf.Height) / 2f);
+            }
+        }
+
+        private void DrawVectorHomeIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            float s = size / 20f;
+            using (Pen p = new Pen(color, 1.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round, LineJoin = System.Drawing.Drawing2D.LineJoin.Round })
+            {
+                // House shape
+                PointF[] roof = new PointF[] {
+                    new PointF(x + 2 * s, y + 10 * s),
+                    new PointF(x + 10 * s, y + 3 * s),
+                    new PointF(x + 18 * s, y + 10 * s)
+                };
+                g.DrawLines(p, roof);
+                // Walls
+                g.DrawLine(p, x + 4 * s, y + 9 * s, x + 4 * s, y + 17 * s);
+                g.DrawLine(p, x + 16 * s, y + 9 * s, x + 16 * s, y + 17 * s);
+                g.DrawLine(p, x + 4 * s, y + 17 * s, x + 16 * s, y + 17 * s);
+                // Door
+                g.DrawLine(p, x + 8 * s, y + 17 * s, x + 8 * s, y + 12 * s);
+                g.DrawLine(p, x + 12 * s, y + 17 * s, x + 12 * s, y + 12 * s);
+                g.DrawLine(p, x + 8 * s, y + 12 * s, x + 12 * s, y + 12 * s);
+            }
+        }
+
+        private void DrawVectorBellIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            float s = size / 18f;
+            using (Pen p = new Pen(color, 1.4f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+            {
+                // Bell body
+                g.DrawArc(p, x + 3 * s, y + 2 * s, 12 * s, 10 * s, 180, 180);
+                g.DrawLine(p, x + 3 * s, y + 7 * s, x + 3 * s, y + 13 * s);
+                g.DrawLine(p, x + 15 * s, y + 7 * s, x + 15 * s, y + 13 * s);
+                g.DrawLine(p, x + 1 * s, y + 13 * s, x + 17 * s, y + 13 * s);
+                // Clapper
+                g.DrawLine(p, x + 7 * s, y + 15 * s, x + 11 * s, y + 15 * s);
+            }
+        }
+
+        private void DrawBannerFloatingIcon(Graphics g, float x, float y, float size, Color bgColor, string letter)
+        {
+            RectangleF iconRect = new RectangleF(x, y, size, size);
+            using (GraphicsPath ip = CreateRoundedRectanglePath(iconRect, size * 0.25f))
+            using (SolidBrush ib = new SolidBrush(Color.FromArgb(220, bgColor)))
+            {
+                g.FillPath(ib, ip);
+            }
+            using (Font lf = new Font("Segoe UI", size * 0.4f, FontStyle.Bold))
+            using (SolidBrush lt = new SolidBrush(Color.White))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(letter, lf, lt, iconRect, sf);
+            }
+        }
+
+        private void DrawCreationCard(Graphics g, RectangleF rect, string name, string subtitle, OfficeAppMode mode, bool isHover)
+        {
+            Color accentColor;
+            if (mode == OfficeAppMode.Writer)
+                accentColor = Color.FromArgb(37, 99, 235);
+            else if (mode == OfficeAppMode.Calc)
+                accentColor = Color.FromArgb(16, 185, 129);
+            else if (mode == OfficeAppMode.Slides)
+                accentColor = Color.FromArgb(249, 115, 22);
+            else
+                accentColor = Color.FromArgb(220, 38, 38);
+
+            // Card background
+            using (GraphicsPath cp = CreateRoundedRectanglePath(rect, 12f))
+            using (SolidBrush cb = new SolidBrush(Color.White))
+            using (Pen cPen = new Pen(isHover ? accentColor : Color.FromArgb(234, 236, 240), isHover ? 1.5f : 1f))
+            {
+                if (isHover)
+                {
+                    RectangleF shadow = new RectangleF(rect.X, rect.Y + 2f, rect.Width, rect.Height);
+                    using (GraphicsPath sp = CreateRoundedRectanglePath(shadow, 12f))
+                    using (SolidBrush sb = new SolidBrush(Color.FromArgb(15, 0, 0, 0)))
+                    {
+                        g.FillPath(sb, sp);
+                    }
+                }
+                g.FillPath(cb, cp);
+                g.DrawPath(cPen, cp);
+            }
+
+            // Centered 3D icon
+            float iconSize = 46f;
+            float iconX = rect.X + (rect.Width - iconSize) / 2f;
+            float iconY = isHover ? (rect.Y + 4f) : (rect.Y + 5f);
+            if (!AppIconRenderer.DrawAppIcon(g, iconX, iconY, iconSize, mode))
+            {
+                DrawVectorAppEmblem(g, iconX, iconY, iconSize, mode);
+            }
+
+            // Name centered below icon
+            using (Font nameFont = new Font("Segoe UI", 8.8f, FontStyle.Bold))
+            using (SolidBrush nameB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            {
+                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center };
+                g.DrawString(name, nameFont, nameB, rect.X + rect.Width / 2f, rect.Y + 53f, csf);
+            }
+
+            // Subtitle centered
+            using (Font subFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (SolidBrush subB = new SolidBrush(Color.FromArgb(148, 163, 184)))
+            {
+                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center };
+                g.DrawString(subtitle, subFont, subB, rect.X + rect.Width / 2f, rect.Y + 68f, csf);
+            }
+        }
+
+        private struct TemplateLineInfo
+        {
+            public string Text;
+            public int Alignment; // 0=Left, 1=Center, 2=Right, 3=Justify
+            public bool Bold;
+            public bool Italic;
+            public float FontSize;
+
+            public TemplateLineInfo(string text, int alignment, bool bold, bool italic, float fontSize)
+            {
+                Text = text;
+                Alignment = alignment;
+                Bold = bold;
+                Italic = italic;
+                FontSize = fontSize;
+            }
+        }
+
+        private static void SaveFormattedTemplateDocx(string fPath, List<TemplateLineInfo> lines, string fontName = "Times New Roman")
+        {
+            StringBuilder sb = new StringBuilder();
+            List<FormattedRun> runs = new List<FormattedRun>();
+            Dictionary<int, int> paraAlignments = new Dictionary<int, int>();
+            Dictionary<int, float> paraSpacingsAfter = new Dictionary<int, float>();
+            Dictionary<int, float> paraLineSpacings = new Dictionary<int, float>();
+            int charOffset = 0;
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                paraAlignments[charOffset] = line.Alignment;
+                paraLineSpacings[charOffset] = 1.15f;
+                if (line.Alignment == 1 && line.FontSize >= 14f)
+                {
+                    paraSpacingsAfter[charOffset] = 6f;
+                }
+
+                if (!string.IsNullOrEmpty(line.Text))
+                {
+                    runs.Add(new FormattedRun(
+                        charOffset,
+                        line.Text.Length,
+                        fontName,
+                        line.FontSize,
+                        line.Bold,
+                        line.Italic,
+                        false,
+                        false,
+                        Color.FromArgb(15, 23, 42),
+                        Color.Empty
+                    ));
+                    sb.Append(line.Text);
+                }
+
+                if (i < lines.Count - 1)
+                {
+                    sb.Append("\r\n");
+                    charOffset += (line.Text != null ? line.Text.Length : 0) + 1;
+                }
+            }
+
+            DocxHandler.SaveDocxFile(
+                fPath,
+                sb.ToString(),
+                runs,
+                false,
+                0,
+                "",
+                "",
+                false,
+                null,
+                null,
+                paraAlignments,
+                paraLineSpacings,
+                null,
+                paraSpacingsAfter
+            );
+        }
+
+        private string EnsureTemplateLeaveRequest()
+        {
+            try
+            {
+                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
+                string fPath = Path.Combine(tDir, "Don_Xin_Nghi_Phep.docx");
+
+                // Chuẩn hóa văn bản hành chính theo Nghị định 30/2020/NĐ-CP:
+                // - Quốc hiệu, Tiêu ngữ, Tiêu đề: Căn giữa (Center), in đậm
+                // - Nội dung: Giãn cách chuẩn, văn phong hành chính trang trọng
+                // - Địa danh, ngày tháng & Chữ ký: Căn phải (Right) ở góc dưới cùng bên phải
+                List<TemplateLineInfo> lines = new List<TemplateLineInfo>
+                {
+                    new TemplateLineInfo("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", 1, true, false, 13f),
+                    new TemplateLineInfo("Độc lập - Tự do - Hạnh phúc", 1, true, false, 14f),
+                    new TemplateLineInfo("--------------------------------", 1, true, false, 12f),
+                    new TemplateLineInfo("", 1, false, false, 13f),
+                    new TemplateLineInfo("ĐƠN XIN NGHỈ PHÉP", 1, true, false, 16f),
+                    new TemplateLineInfo("", 1, false, false, 13f),
+                    new TemplateLineInfo("Kính gửi: Ban Giám đốc cùng Phòng Hành chính - Nhân sự", 0, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("Tôi tên là: [Họ và tên nhân viên]", 0, false, false, 13f),
+                    new TemplateLineInfo("Chức vụ: [Chức danh / Vị trí công tác]", 0, false, false, 13f),
+                    new TemplateLineInfo("Bộ phận / Phòng ban: [Phòng ban làm việc]", 0, false, false, 13f),
+                    new TemplateLineInfo("Mã số nhân viên: [Mã NV]", 0, false, false, 13f),
+                    new TemplateLineInfo("Số điện thoại liên hệ: [Số điện thoại]", 0, false, false, 13f),
+                    new TemplateLineInfo("Email liên hệ: [Địa chỉ email cá nhân / công ty]", 0, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("Nay tôi làm đơn này kính xin Ban Giám đốc và Phòng Hành chính - Nhân sự cho phép tôi được nghỉ phép:", 0, false, false, 13f),
+                    new TemplateLineInfo("- Thời gian nghỉ phép: Từ ngày .../.../2026 đến hết ngày .../.../2026", 0, false, false, 13f),
+                    new TemplateLineInfo("- Tổng số ngày xin nghỉ: ... ngày làm việc (bằng chữ: ... ngày).", 0, false, false, 13f),
+                    new TemplateLineInfo("- Lý do xin nghỉ phép: [Giải quyết việc cá nhân gia đình / Nghỉ phép năm theo quy định].", 0, false, false, 13f),
+                    new TemplateLineInfo("- Địa chỉ và số điện thoại liên hệ khi cần: [Địa chỉ cư trú / Số điện thoại khẩn cấp].", 0, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("Trong thời gian nghỉ phép, tôi đã bàn giao đầy đủ công việc tồn đọng và hồ sơ tài liệu liên quan cho đồng nghiệp: [Họ và tên người nhận bàn giao] - Bộ phận: [Bộ phận]. Người nhận bàn giao cam kết sẽ hỗ trợ xử lý kịp thời các công việc phát sinh liên quan.", 3, false, false, 13f),
+                    new TemplateLineInfo("Tôi cam kết sẽ có mặt làm việc đúng thời hạn quy định và hoàn thành đầy đủ nhiệm vụ được giao sau kỳ nghỉ.", 3, false, false, 13f),
+                    new TemplateLineInfo("Kính mong Ban Giám đốc và Phòng Hành chính - Nhân sự xem xét và tạo điều kiện phê duyệt!", 3, false, false, 13f),
+                    new TemplateLineInfo("Tôi xin chân thành cảm ơn!", 0, false, true, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("..., ngày ... tháng ... năm 2026", 2, false, true, 13f),
+                    new TemplateLineInfo("Người làm đơn", 2, true, false, 13f),
+                    new TemplateLineInfo("(Ký và ghi rõ họ tên)", 2, false, true, 12f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("[Họ và tên nhân viên]", 2, true, false, 13f)
+                };
+
+                SaveFormattedTemplateDocx(fPath, lines);
+                return fPath;
+            }
+            catch { return null; }
+        }
+
+        private string EnsureTemplateProjectReport()
+        {
+            try
+            {
+                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
+                string fPath = Path.Combine(tDir, "Bao_Cao_Tien_Do_Du_An.docx");
+
+                List<TemplateLineInfo> lines = new List<TemplateLineInfo>
+                {
+                    new TemplateLineInfo("BÁO CÁO TIẾN ĐỘ DỰ ÁN", 1, true, false, 16f),
+                    new TemplateLineInfo("Tháng 09/2026 • Ban Quản lý Dự án ZENQ OFFICE", 1, false, true, 12f),
+                    new TemplateLineInfo("----------------------------------------------------------------", 1, false, false, 12f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("1. THÔNG TIN CHUNG DỰ ÁN", 0, true, false, 13.5f),
+                    new TemplateLineInfo("• Tên dự án: Triển khai Hệ thống Văn phòng Thông minh ZENQ OFFICE", 0, false, false, 13f),
+                    new TemplateLineInfo("• Quản trị dự án (PM): [Họ và tên PM]", 0, false, false, 13f),
+                    new TemplateLineInfo("• Giai đoạn: Thử nghiệm diện rộng (Pilot Phase)", 0, false, false, 13f),
+                    new TemplateLineInfo("• Tình trạng hiện tại: ĐÚNG TIẾN ĐỘ (On Track)", 0, true, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("2. MỤC TIÊU & KẾT QUẢ ĐÃ ĐẠT ĐƯỢC", 0, true, false, 13.5f),
+                    new TemplateLineInfo("- Hoàn tất tích hợp bộ công cụ Soạn thảo (Writer), Bảng tính (Calc), Trình chiếu (Slides) và PDF.", 3, false, false, 13f),
+                    new TemplateLineInfo("- Tích hợp thành công Trợ lý AI Copilot hỗ trợ người dùng phân tích văn bản.", 3, false, false, 13f),
+                    new TemplateLineInfo("- Tối ưu hóa hiệu năng render mượt mà 60 FPS trên máy tính cấu hình tiêu chuẩn.", 3, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("3. RỦI RO & GIẢI PHÁP ĐỀ XUẤT", 0, true, false, 13.5f),
+                    new TemplateLineInfo("- Rủi ro về dung lượng bộ nhớ khi xử lý file lớn -> Đã áp dụng phân trang ảo (Virtual Rendering).", 3, false, false, 13f),
+                    new TemplateLineInfo("- Đề xuất tăng cường thử nghiệm bảo mật cho các tệp văn bản mã hóa.", 3, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("4. KẾ HOẠCH HÀNH ĐỘNG TUẦN TIẾP THEO", 0, true, false, 13.5f),
+                    new TemplateLineInfo("- Kiểm thử lần cuối và phát hành phiên bản chính thức đến người dùng.", 3, false, false, 13f),
+                    new TemplateLineInfo("- Tổ chức buổi đào tạo hướng dẫn sử dụng các phím tắt và tính năng AI.", 3, false, false, 13f),
+                    new TemplateLineInfo("", 0, false, false, 13f),
+                    new TemplateLineInfo("..., ngày ... tháng ... năm 2026", 2, false, true, 13f),
+                    new TemplateLineInfo("Người lập báo cáo", 2, true, false, 13f),
+                    new TemplateLineInfo("(Ký và ghi rõ họ tên)", 2, false, true, 12f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("", 2, false, false, 13f),
+                    new TemplateLineInfo("[Họ và tên người lập]", 2, true, false, 13f)
+                };
+
+                SaveFormattedTemplateDocx(fPath, lines);
+                return fPath;
+            }
+            catch { return null; }
+        }
+
+        private string EnsureTemplateBusinessPlan()
+        {
+            try
+            {
+                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
+                string fPath = Path.Combine(tDir, "Ke_Hoach_Kinh_Doanh.pptx");
+                if (!File.Exists(fPath))
+                {
+                    PresentationRoot pres = new PresentationRoot();
+                    pres.Title = "Kế hoạch Kinh doanh Chiến lược";
+
+                    float cw = pres.CanvasWidth;
+                    float ch = pres.CanvasHeight;
+
+                    SlideNode s1 = new SlideNode { Layout = SlideLayoutType.TitleSlide, Title = "KẾ HOẠCH KINH DOANH CHIẾN LƯỢC" };
+                    s1.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề Chính",
+                        Transform = new Transform2D(cw * 0.1f, ch * 0.28f, cw * 0.8f, 100f),
+                        Text = "KẾ HOẠCH KINH DOANH CHIẾN LƯỢC",
+                        FontSize = 36f,
+                        Bold = true,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    s1.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề Phụ",
+                        Transform = new Transform2D(cw * 0.15f, ch * 0.52f, cw * 0.7f, 60f),
+                        Text = "Định hướng Phát triển Doanh nghiệp 2026 - 2030",
+                        FontSize = 20f,
+                        Alignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x64748B,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    pres.Slides.Add(s1);
+
+                    SlideNode s2 = new SlideNode { Layout = SlideLayoutType.TitleAndContent, Title = "TỔNG QUAN THỊ TRƯỜNG & MỤC TIÊU" };
+                    s2.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Tiêu đề",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
+                        Text = "TỔNG QUAN THỊ TRƯỜNG & MỤC TIÊU",
+                        FontSize = 30f,
+                        Bold = true,
+                        Alignment = TextAlignment.Left,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = 0x0F172A,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    s2.Shapes.Add(new ShapeNode
+                    {
+                        Type = ShapeType.TextBox,
+                        Name = "Nội dung",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.88f, ch * 0.62f),
+                        Text = "• Nhu cầu chuyển đổi số trong văn phòng tăng trưởng 35%/năm.\n• Mục tiêu đạt 100.000 người dùng hoạt động hàng tháng (MAU).\n• Doanh thu kỳ vọng năm đầu tiên: 10 tỷ VNĐ.\n• Mở rộng hợp tác chiến lược cùng các đối tác công nghệ.",
+                        FontSize = 18f,
+                        Alignment = TextAlignment.Left,
+                        TextColor = 0x334155,
+                        FillColor = 0x00FFFFFF,
+                        StrokeWidth = 0f
+                    });
+                    pres.Slides.Add(s2);
+
+                    Format.PptxHandler.SavePptx(fPath, pres);
+                }
+                return fPath;
+            }
+            catch { return null; }
+        }
+
+        private string EnsureTemplateTimesheet()
+        {
+            try
+            {
+                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
+                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
+                string fPath = Path.Combine(tDir, "Bang_Cham_Cong_Thang.csv");
+                if (!File.Exists(fPath))
+                {
+                    string csv = "STT,Mã NV,Họ và Tên,Chức vụ,Số ngày công,Nghỉ phép,Nghỉ ốm,Tổng công,Ghi chú\r\n1,NV001,Nguyễn Văn An,Trưởng phòng,22,0,0,22,Đủ công\r\n2,NV002,Trần Thị Bình,Chuyên viên,21,1,0,22,Phép năm\r\n3,NV003,Lê Hoàng Cường,Kỹ sư phần mềm,22,0,0,22,Đủ công\r\n4,NV004,Phạm Thị Dung,Kế toán trưởng,20,2,0,22,Nghỉ việc riêng\r\n5,NV005,Võ Quốc Em,Nhân viên thiết kế,22,0,0,22,Đủ công\r\n";
+                    File.WriteAllText(fPath, csv, System.Text.Encoding.UTF8);
+                }
+                return fPath;
+            }
+            catch { return null; }
+        }
+
+        private void DrawRightSidebarPanel(Graphics g, int width, int height)
+        {
+            float panelX = width - RightPanelWidth;
+            float panelW = RightPanelWidth;
+
+            // Panel background
+            using (SolidBrush panelBg = new SolidBrush(Color.White))
+            using (Pen panelBorder = new Pen(Color.FromArgb(234, 236, 240), 1f))
+            {
+                g.FillRectangle(panelBg, panelX, 0, panelW, height);
+                g.DrawLine(panelBorder, panelX, 0, panelX, height);
+            }
+
+            float px = panelX + 20f;
+            float pw = panelW - 40f;
+
+            // ── 1. "Làm việc hiệu quả hơn" promo card ──
+            RectangleF promoRect = new RectangleF(px, 70f, pw, 118f);
+            using (GraphicsPath pp = CreateRoundedRectanglePath(promoRect, 12f))
+            using (LinearGradientBrush promoBg = new LinearGradientBrush(promoRect, Color.FromArgb(238, 242, 255), Color.FromArgb(224, 231, 255), 135f))
+            {
+                g.FillPath(promoBg, pp);
+            }
+            using (Font promoTitleFont = new Font("Segoe UI", 10f, FontStyle.Bold))
+            using (Font promoSubFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+            using (SolidBrush promoTitleB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush promoSubB = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                g.DrawString("Làm việc hiệu quả hơn", promoTitleFont, promoTitleB, px + 14f, 82f);
+                g.DrawString("Tận dụng các mẫu tài liệu có sẵn\nđể tiết kiệm thời gian và nâng cao\nhiệu suất công việc.", promoSubFont, promoSubB, px + 14f, 104f);
+            }
+            // CTA button
+            RectangleF ctaBtn = GetPromoBtnBounds(width);
+            using (GraphicsPath ctap = CreateRoundedRectanglePath(ctaBtn, 6f))
+            using (SolidBrush ctaBg = new SolidBrush(HoverPromoBtn ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235)))
+            {
+                g.FillPath(ctaBg, ctap);
+            }
+            using (Font ctaFont = new Font("Segoe UI", 8f, FontStyle.Bold))
+            using (SolidBrush ctaTxt = new SolidBrush(Color.White))
+            {
+                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString("Khám phá mẫu", ctaFont, ctaTxt, ctaBtn, csf);
+            }
+
+            // ── 2. "Dung lượng lưu trữ" section (DỮ LIỆU THỰC TẾ TỪ Ổ ĐĨA MÁY TÍNH) ──
+            string driveLetter = "C:";
+            long totalBytes = 0;
+            long freeBytes = 0;
+            try
+            {
+                string sysPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string root = Path.GetPathRoot(sysPath);
+                if (!string.IsNullOrEmpty(root))
+                {
+                    DriveInfo drive = new DriveInfo(root);
+                    driveLetter = drive.Name.TrimEnd('\\');
+                    totalBytes = drive.TotalSize;
+                    freeBytes = drive.AvailableFreeSpace;
+                }
+            }
+            catch
+            {
+                try
+                {
+                    DriveInfo d = new DriveInfo("C");
+                    driveLetter = "C:";
+                    totalBytes = d.TotalSize;
+                    freeBytes = d.AvailableFreeSpace;
+                }
+                catch { }
+            }
+
+            long usedBytes = Math.Max(0, totalBytes - freeBytes);
+            double usedGb = Math.Round(usedBytes / (1024.0 * 1024 * 1024), 1);
+            double totalGb = (totalBytes > 0) ? Math.Round(totalBytes / (1024.0 * 1024 * 1024), 1) : 100.0;
+            int usedPct = (totalBytes > 0) ? (int)Math.Max(1, Math.Min(99, Math.Round((double)usedBytes / (double)totalBytes * 100.0))) : 35;
+
+            float storeY = 204f;
+            using (Font storeTitleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (Font storeSubFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+            using (SolidBrush storeTitleB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            {
+                g.DrawString(string.Format("Dung lượng ổ đĩa ({0})", driveLetter), storeTitleFont, storeTitleB, px, storeY);
+                using (SolidBrush linkB = new SolidBrush(HoverStorageManage ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235)))
+                {
+                    g.DrawString("Quản lý", storeSubFont, linkB, px + pw - 48f, storeY + 2f);
+                }
+            }
+
+            // Progress bar
+            RectangleF trackRect = new RectangleF(px, 226f, pw, 7f);
+            using (GraphicsPath trp = CreateRoundedRectanglePath(trackRect, 3.5f))
+            using (SolidBrush trBg = new SolidBrush(Color.FromArgb(226, 232, 240)))
+            {
+                g.FillPath(trBg, trp);
+            }
+            float fillW = Math.Max(7f, pw * (usedPct / 100f));
+            RectangleF fillRect = new RectangleF(px, 226f, fillW, 7f);
+            using (GraphicsPath flp = CreateRoundedRectanglePath(fillRect, 3.5f))
+            using (SolidBrush flBg = new SolidBrush(usedPct > 90 ? Color.FromArgb(239, 68, 68) : Color.FromArgb(37, 99, 235)))
+            {
+                g.FillPath(flBg, flp);
+            }
+
+            using (Font storeInfoFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+            using (SolidBrush storeInfoB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            {
+                g.DrawString(string.Format("{0} GB / {1} GB", usedGb, totalGb), storeInfoFont, storeInfoB, px, 238f);
+                g.DrawString(string.Format("{0}%", usedPct), storeInfoFont, storeInfoB, px + pw - 28f, 238f);
+            }
+
+            // ── 3. "Mẫu nổi bật" section (CLICKABLE & FUNCTIONAL) ──
+            float tmplHeaderY = 266f;
+            using (Font secFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (SolidBrush secB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            {
+                g.DrawString("Mẫu nổi bật", secFont, secB, px, tmplHeaderY);
+            }
+            using (Font linkFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+            using (SolidBrush linkB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                g.DrawString("Xem tất cả", linkFont, linkB, px + pw - 50f, tmplHeaderY + 2f);
+            }
+
+            // Template cards (Starts at Y=294f, each height 40f with 44f step)
+            string[] templateNames = new string[] { "Đơn xin nghỉ phép", "Kế hoạch kinh doanh", "Báo cáo dự án", "Bảng chấm công" };
+            string[] templateTypes = new string[] { "Mẫu văn bản", "Mẫu thuyết trình", "Mẫu văn bản", "Mẫu bảng tính" };
+            Color[] templateColors = new Color[] { Color.FromArgb(99, 102, 241), Color.FromArgb(249, 115, 22), Color.FromArgb(37, 99, 235), Color.FromArgb(16, 185, 129) };
+            string[] templateLetters = new string[] { "W", "P", "W", "X" };
+            OfficeAppMode[] templateModes = new OfficeAppMode[] { OfficeAppMode.Writer, OfficeAppMode.Slides, OfficeAppMode.Writer, OfficeAppMode.Calc };
+
+            for (int i = 0; i < templateNames.Length; i++)
+            {
+                RectangleF tmplRect = GetTemplateCardBounds(i, width);
+                bool isTmplHover = (HoverTemplateIndex == i);
+
+                if (isTmplHover)
+                {
+                    using (GraphicsPath hovP = CreateRoundedRectanglePath(tmplRect, 6f))
+                    using (SolidBrush hovB = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    {
+                        g.FillPath(hovB, hovP);
+                    }
+                }
+
+                // Template icon
+                RectangleF tmplIcon = new RectangleF(tmplRect.X + 4f, tmplRect.Y + 6f, 28f, 28f);
+                if (!AppIconRenderer.DrawAppIcon(g, tmplIcon.X, tmplIcon.Y, tmplIcon.Width, templateModes[i]))
+                {
+                    using (GraphicsPath tip = CreateRoundedRectanglePath(tmplIcon, 6f))
+                    using (SolidBrush tib = new SolidBrush(Color.FromArgb(30, templateColors[i].R, templateColors[i].G, templateColors[i].B)))
+                    {
+                        g.FillPath(tib, tip);
+                    }
+                    using (Font tlf = new Font("Segoe UI", 9f, FontStyle.Bold))
+                    using (SolidBrush tlt = new SolidBrush(templateColors[i]))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                        g.DrawString(templateLetters[i], tlf, tlt, tmplIcon, sf);
+                    }
+                }
+                // Template text
+                using (Font tnf = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (Font ttf = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+                using (SolidBrush tnb = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                using (SolidBrush ttb = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                {
+                    g.DrawString(templateNames[i], tnf, tnb, tmplRect.X + 38f, tmplRect.Y + 6f);
+                    g.DrawString(templateTypes[i], ttf, ttb, tmplRect.X + 38f, tmplRect.Y + 23f);
+                }
+                // Arrow >
+                using (SolidBrush arB = new SolidBrush(isTmplHover ? Color.FromArgb(37, 99, 235) : Color.FromArgb(148, 163, 184)))
+                using (Font arf = new Font("Segoe UI", 10f, FontStyle.Regular))
+                {
+                    g.DrawString("›", arf, arB, tmplRect.Right - 14f, tmplRect.Y + 10f);
+                }
+
+                // Separator line
+                if (i < templateNames.Length - 1)
+                {
+                    using (Pen sepPen = new Pen(Color.FromArgb(241, 245, 249), 1f))
+                    {
+                        g.DrawLine(sepPen, tmplRect.X, tmplRect.Bottom + 1f, tmplRect.Right, tmplRect.Bottom + 1f);
+                    }
+                }
+            }
+
+            // ── 4. "Tính năng nổi bật" section (TÍNH NĂNG THẬT 100% CỦA GENOFFICE) ──
+            float featY = 482f;
+            using (Font secFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (SolidBrush secB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            {
+                g.DrawString("Tính năng nổi bật", secFont, secB, px, featY);
+            }
+
+            string[] features = new string[] {
+                "Trợ lý AI Copilot thông minh",
+                "Hỗ trợ DOCX, XLSX, PPTX, PDF",
+                "Ngoại tuyến 100% & Bảo mật cao",
+                "Tự động lưu bản thảo an toàn"
+            };
+            using (Font featFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (SolidBrush featB = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            using (SolidBrush checkB = new SolidBrush(Color.FromArgb(16, 185, 129)))
+            {
+                for (int i = 0; i < features.Length; i++)
+                {
+                    float fy = featY + 22f + i * 22f;
+                    g.DrawString("✓", featFont, checkB, px + 2f, fy);
+                    g.DrawString(features[i], featFont, featB, px + 18f, fy);
+                }
+            }
+        }
+
         public void Draw(Graphics g, int width, int height)
         {
+            _lastWidth = width;
+            _lastHeight = height;
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -653,425 +2230,1048 @@ namespace GenOffice.UI
 
             int currentScroll = ScrollY;
 
-            // 1. Toàn bộ nền Dashboard: Liquid Glass Backdrop đa sắc
-            LiquidGlassHelper.DrawLiquidGlassBackdrop(g, width, height);
-
-            int marginX = Math.Max(32, (width - 1200) / 2);
-            int contentW = width - marginX * 2;
-            int currentY = 85;
-
-            // 2. Header: Logo chính thức GENOFFICE
-            float logoSize = 64f;
-            float logoX = marginX;
-            float logoY = currentY;
-
-            GenOfficeLogoRenderer.DrawLogo(g, logoX, logoY, logoSize, true, true);
-
-            // Tab Capsule đặt ngay cạnh Icon với hiệu ứng LIQUID GLASS LƯỚT MƯỢT MÀ
-            RectangleF dockRect = GetDockCapsuleBounds(width, 0);
-            RectangleF featTab = GetFeaturesTabBounds(width, 0);
-            RectangleF myDocsTab = GetMyDocsTabBounds(width, 0);
-            RectangleF trashTab = GetTrashTabBounds(width, 0);
-
-            RectangleF currentActiveBounds = (ActiveTab == 0) ? featTab : ((ActiveTab == 1) ? myDocsTab : trashTab);
-            IndicatorTargetX = currentActiveBounds.X;
-            IndicatorTargetW = currentActiveBounds.Width;
-
-            if (IndicatorCurrentX <= 0)
+            // 1. Background
+            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(248, 250, 252)))
             {
-                IndicatorCurrentX = currentActiveBounds.X;
-                IndicatorCurrentW = currentActiveBounds.Width;
+                g.FillRectangle(bgBrush, 0, 0, width, height);
             }
 
-            // A. Khung Dock chứa (Outer Liquid Glass Chamber)
-            using (GraphicsPath dp = CreateRoundedRectanglePath(dockRect, 21f))
-            using (LinearGradientBrush db = new LinearGradientBrush(dockRect, Color.FromArgb(145, 255, 255, 255), Color.FromArgb(95, 240, 245, 255), 90f))
-            using (Pen dpPen = new Pen(Color.FromArgb(160, 255, 255, 255), 1.2f))
+            // 2. LEFT SIDEBAR (White)
+            RectangleF sidebarRect = new RectangleF(0, 0, SidebarWidth, height);
+            using (SolidBrush sbBg = new SolidBrush(Color.White))
+            using (Pen sbBorder = new Pen(Color.FromArgb(234, 236, 240), 1f))
             {
-                g.FillPath(db, dp);
-                g.DrawPath(dpPen, dp);
+                g.FillRectangle(sbBg, sidebarRect);
+                g.DrawLine(sbBorder, SidebarWidth, 0, SidebarWidth, height);
             }
 
-            // B. Nền Hover cho các Tab chưa chọn
-            if (HoverTabIndex == 0 && ActiveTab != 0)
+            // 2.1 Logo
+            GenOfficeLogoRenderer.DrawLogo(g, 20f, 14f, 30f, false);
+            using (Font brandFont = new Font("Segoe UI", 11f, FontStyle.Bold))
+            using (SolidBrush brandBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                using (GraphicsPath hp = CreateRoundedRectanglePath(featTab, 17f))
-                using (SolidBrush hb = new SolidBrush(Color.FromArgb(60, 255, 255, 255)))
-                    g.FillPath(hb, hp);
-            }
-            else if (HoverTabIndex == 1 && ActiveTab != 1)
-            {
-                using (GraphicsPath hp = CreateRoundedRectanglePath(myDocsTab, 17f))
-                using (SolidBrush hb = new SolidBrush(Color.FromArgb(60, 255, 255, 255)))
-                    g.FillPath(hb, hp);
-            }
-            else if (HoverTabIndex == 2 && ActiveTab != 2)
-            {
-                using (GraphicsPath hp = CreateRoundedRectanglePath(trashTab, 17f))
-                using (SolidBrush hb = new SolidBrush(Color.FromArgb(60, 255, 255, 255)))
-                    g.FillPath(hb, hp);
+                g.DrawString("ZENQ OFFICE", brandFont, brandBrush, 56f, 18f);
             }
 
-            // C. VIÊN THUỐC KÍNH LỎNG LƯỚT MƯỢT MÀ (Sliding Liquid Glass Active Indicator)
-            float indX = (IndicatorCurrentX > 0) ? IndicatorCurrentX : currentActiveBounds.X;
-            float indW = (IndicatorCurrentW > 0) ? IndicatorCurrentW : currentActiveBounds.Width;
-            RectangleF indicatorRect = new RectangleF(indX, dockRect.Y + 4, indW, 34);
+            // 2.2 Nav items (Trang chủ, Tài liệu của tôi, Thùng rác)
+            RectangleF tab0Rect = GetMyDocsTabBounds(width, height);
+            DrawSidebarNavItem(g, tab0Rect, "Trang chủ", (gr, ix, iy, isz, icol) => DrawVectorHomeIcon(gr, ix, iy, isz, icol), ActiveTab == 0, HoverTabIndex == 0);
 
-            RectangleF indShadow = new RectangleF(indicatorRect.X, indicatorRect.Y + 2f, indicatorRect.Width, indicatorRect.Height);
-            using (GraphicsPath sp = CreateRoundedRectanglePath(indShadow, 17f))
-            using (SolidBrush sb = new SolidBrush(Color.FromArgb(28, 0, 0, 0)))
+            RectangleF navDocRect = GetOpenDocNavBounds(width, height);
+            DrawSidebarNavItem(g, navDocRect, "Tài liệu của tôi", (gr, ix, iy, isz, icol) => DrawVectorFolderIcon(gr, ix, iy, isz, icol), ActiveTab == 3, HoverTabIndex == 3 || HoverSidebarDoc);
+
+            RectangleF tab1Rect = GetTrashTabBounds(width, height);
+            DrawSidebarNavItem(g, tab1Rect, "Thùng rác", (gr, ix, iy, isz, icol) => DrawVectorTrashIcon(gr, ix, iy, isz, icol), ActiveTab == 1, HoverTabIndex == 1);
+
+            // 2.3 "Ứng dụng" section (CLICKABLE SHORTCUTS TO CREATE DOCUMENTS)
+            float appSectionY = 212f;
+            using (Font secLabelFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+            using (SolidBrush secLabelBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
             {
-                g.FillPath(sb, sp);
+                g.DrawString("ỨNG DỤNG", secLabelFont, secLabelBrush, 20f, appSectionY);
             }
+            DrawSidebarAppNavItem(g, GetAppNavBounds(0, width, height), "Tài liệu", OfficeAppMode.Writer, HoverSidebarApp == 0);
+            DrawSidebarAppNavItem(g, GetAppNavBounds(1, width, height), "Bảng tính", OfficeAppMode.Calc, HoverSidebarApp == 1);
+            DrawSidebarAppNavItem(g, GetAppNavBounds(2, width, height), "Thuyết trình", OfficeAppMode.Slides, HoverSidebarApp == 2);
+            DrawSidebarAppNavItem(g, GetAppNavBounds(3, width, height), "PDF", OfficeAppMode.Pdf, HoverSidebarApp == 3);
 
-            using (GraphicsPath ip = CreateRoundedRectanglePath(indicatorRect, 17f))
-            using (LinearGradientBrush ib = new LinearGradientBrush(indicatorRect, Color.FromArgb(238, 255, 255, 255), Color.FromArgb(185, 240, 250, 255), 90f))
-            using (Pen ipPen = new Pen(Color.FromArgb(245, 255, 255, 255), 1.4f))
+            // 2.4 Settings at bottom
+            float sepY = height - 56f;
+            using (Pen sepPen = new Pen(Color.FromArgb(234, 236, 240), 1f))
             {
-                g.FillPath(ib, ip);
-                g.DrawPath(ipPen, ip);
+                g.DrawLine(sepPen, 16f, sepY, SidebarWidth - 16f, sepY);
+            }
+            RectangleF tab2Rect = GetSettingsTabBounds(width, height);
+            DrawSidebarNavItem(g, tab2Rect, "Cài đặt", (gr, ix, iy, isz, icol) => DrawVectorGearIcon(gr, ix + isz / 2f, iy + isz / 2f, isz, icol), ActiveTab == 2, HoverTabIndex == 2);
 
-                RectangleF glossRect = new RectangleF(indicatorRect.X + 8, indicatorRect.Y + 2, indicatorRect.Width - 16, 12);
-                using (GraphicsPath gp = CreateRoundedRectanglePath(glossRect, 6f))
-                using (LinearGradientBrush gb = new LinearGradientBrush(glossRect, Color.FromArgb(160, 255, 255, 255), Color.FromArgb(10, 255, 255, 255), 90f))
+            // 3. CENTER CONTENT
+            float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+            GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+
+            // 3.1 Top bar: Search
+            RectangleF searchBoxRect = GetSearchBoxBounds(width);
+            using (GraphicsPath sbp = CreateRoundedRectanglePath(searchBoxRect, 19f))
+            using (SolidBrush sbb = new SolidBrush(Color.FromArgb(245, 247, 250)))
+            using (Pen sbpPen = new Pen(IsSearchFocused ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240), IsSearchFocused ? 1.5f : 1f))
+            {
+                g.FillPath(sbb, sbp);
+                g.DrawPath(sbpPen, sbp);
+            }
+            DrawVectorSearchIcon(g, searchBoxRect.X + 14f, searchBoxRect.Y + 12f, 14f, Color.FromArgb(148, 163, 184));
+
+            float textX = searchBoxRect.X + 36f;
+            float textY = searchBoxRect.Y + 10f;
+            using (Font searchFont = new Font("Segoe UI", 9.2f, FontStyle.Regular))
+            {
+                if (string.IsNullOrEmpty(SearchKeyword))
                 {
-                    g.FillPath(gb, gp);
-                }
-            }
-
-            // D. Nhãn chữ và Icon của 3 Tab
-            using (Font tabBoldFont = new Font("Segoe UI", 10f, FontStyle.Bold))
-            using (Font tabRegFont = new Font("Segoe UI", 10f, FontStyle.Regular))
-            {
-                // Tab 0: Tính năng
-                bool isTab0 = (ActiveTab == 0);
-                Color c0 = isTab0 ? Color.FromArgb(67, 56, 202) : Color.FromArgb(90, 105, 130);
-                DrawVectorSparkleIcon(g, featTab.X + 14, featTab.Y + 9, 16, c0);
-                using (SolidBrush tb0 = new SolidBrush(c0))
-                {
-                    g.DrawString("Tính năng", isTab0 ? tabBoldFont : tabRegFont, tb0, featTab.X + 38, featTab.Y + 7);
-                }
-
-                // Tab 1: Tài liệu gần đây
-                bool isTab1 = (ActiveTab == 1);
-                Color c1 = isTab1 ? Color.FromArgb(29, 78, 216) : Color.FromArgb(90, 105, 130);
-                DrawVectorFolderIcon(g, myDocsTab.X + 14, myDocsTab.Y + 8, 18, c1);
-                using (SolidBrush tb1 = new SolidBrush(c1))
-                {
-                    g.DrawString("Tài liệu gần đây (" + RecentDocs.Count + ")", isTab1 ? tabBoldFont : tabRegFont, tb1, myDocsTab.X + 38, myDocsTab.Y + 7);
-                }
-
-                // Tab 2: Thùng rác
-                bool isTab2 = (ActiveTab == 2);
-                Color c2 = isTab2 ? Color.FromArgb(185, 28, 28) : Color.FromArgb(90, 105, 130);
-                DrawVectorTrashIcon(g, trashTab.X + 14, trashTab.Y + 8, 18, c2);
-                using (SolidBrush tb2 = new SolidBrush(c2))
-                {
-                    g.DrawString("Thùng rác (" + TrashDocs.Count + ") [Tối đa 30 ngày]", isTab2 ? tabBoldFont : tabRegFont, tb2, trashTab.X + 38, trashTab.Y + 7);
-                }
-            }
-
-            // D. NÚT VECTOR DẤU ? (Help / Trợ giúp & Hướng dẫn) ĐỐI DIỆN 3 TAB
-            RectangleF helpRect = GetHelpBtnBounds(width, 0);
-            using (GraphicsPath hp = CreateRoundedRectanglePath(helpRect, 21f))
-            {
-                if (HoverHelpBtn)
-                {
-                    RectangleF hShadow = new RectangleF(helpRect.X, helpRect.Y + 2f, helpRect.Width, helpRect.Height);
-                    using (GraphicsPath hsp = CreateRoundedRectanglePath(hShadow, 21f))
-                    using (SolidBrush hsb = new SolidBrush(Color.FromArgb(40, 37, 99, 235)))
+                    using (SolidBrush phBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                     {
-                        g.FillPath(hsb, hsp);
+                        g.DrawString("Tìm kiếm tệp, thư mục, mẫu...", searchFont, phBrush, textX, textY);
                     }
-
-                    using (LinearGradientBrush hbg = new LinearGradientBrush(helpRect, Color.FromArgb(59, 130, 246), Color.FromArgb(37, 99, 235), 90f))
-                    using (Pen hBorder = new Pen(Color.FromArgb(147, 197, 253), 1.5f))
+                    if (IsSearchFocused && CursorBlink)
                     {
-                        g.FillPath(hbg, hp);
-                        g.DrawPath(hBorder, hp);
+                        using (Pen cp = new Pen(Color.FromArgb(37, 99, 235), 1.8f))
+                        {
+                            g.DrawLine(cp, textX, textY + 2, textX, textY + 16);
+                        }
                     }
-                    DrawVectorQuestionIcon(g, helpRect.X + helpRect.Width / 2f, helpRect.Y + helpRect.Height / 2f, 19f, Color.White);
                 }
                 else
                 {
-                    using (LinearGradientBrush db = new LinearGradientBrush(helpRect, Color.FromArgb(145, 255, 255, 255), Color.FromArgb(95, 240, 245, 255), 90f))
-                    using (Pen dpPen = new Pen(Color.FromArgb(160, 255, 255, 255), 1.2f))
+                    using (SolidBrush kwBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                     {
-                        g.FillPath(db, hp);
-                        g.DrawPath(dpPen, hp);
+                        g.DrawString(SearchKeyword, searchFont, kwBrush, textX, textY);
                     }
-                    DrawVectorQuestionIcon(g, helpRect.X + helpRect.Width / 2f, helpRect.Y + helpRect.Height / 2f, 19f, Color.FromArgb(37, 99, 235));
+                    if (IsSearchFocused && CursorBlink)
+                    {
+                        SizeF sz = g.MeasureString(SearchKeyword, searchFont);
+                        float curX = textX + sz.Width - 3;
+                        using (Pen cp = new Pen(Color.FromArgb(37, 99, 235), 1.8f))
+                        {
+                            g.DrawLine(cp, curX, textY + 2, curX, textY + 16);
+                        }
+                    }
+                    DrawVectorCrossIcon(g, searchBoxRect.Right - 22f, searchBoxRect.Y + 13f, 12f, Color.FromArgb(148, 163, 184));
                 }
             }
 
-            // 3. Nội dung theo Tab đang chọn
+            // Top bar icons: bell, help, user avatar
+            float topBarRightX = width - RightPanelWidth - 24f;
+            DrawVectorBellIcon(g, topBarRightX - 120f, 24f, 18f, Color.FromArgb(100, 116, 139));
+
+            RectangleF helpRect = GetHelpBtnBounds(width, height);
+            if (HoverHelpBtn)
+            {
+                using (SolidBrush hb = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                {
+                    g.FillEllipse(hb, helpRect);
+                }
+            }
+            DrawVectorQuestionIcon(g, helpRect.X + helpRect.Width / 2f, helpRect.Y + helpRect.Height / 2f, 16f, Color.FromArgb(100, 116, 139));
+
+            RectangleF updateRect = GetUpdateBtnBounds(width, height);
+            using (SolidBrush avatarBg = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                g.FillEllipse(avatarBg, updateRect.X + 4f, updateRect.Y + 4f, 28f, 28f);
+            }
+            using (Font avatarFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            using (SolidBrush avatarTxt = new SolidBrush(Color.White))
+            {
+                StringFormat asf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                RectangleF avatarTextRect = new RectangleF(updateRect.X + 4f, updateRect.Y + 4f, 28f, 28f);
+                g.DrawString("UH", avatarFont, avatarTxt, avatarTextRect, asf);
+            }
+
+            // 4. WELCOME BANNER (Tab 0 only)
             if (ActiveTab == 0)
             {
-                // Tab 0: 4 Thẻ Ứng Dụng Lớn (Writer, Calc, Slides, PDF Editor) vừa vặn màn hình
+                RectangleF bannerRect = new RectangleF(startX, 68f, contentW, bannerH);
+                if (!AppIconRenderer.DrawBanner(g, bannerRect))
+                {
+                    using (GraphicsPath bp = CreateRoundedRectanglePath(bannerRect, 16f))
+                    using (LinearGradientBrush bannerBg = new LinearGradientBrush(bannerRect, Color.FromArgb(79, 102, 207), Color.FromArgb(105, 126, 218), 135f))
+                    {
+                        g.FillPath(bannerBg, bp);
+                    }
+                    using (Font bannerTitleFont = new Font("Segoe UI", 16f, FontStyle.Bold))
+                    using (Font bannerSubFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                    using (SolidBrush bannerTxtBrush = new SolidBrush(Color.White))
+                    {
+                        g.DrawString("Chào mừng bạn quay trở lại!", bannerTitleFont, bannerTxtBrush, startX + 28f, 96f);
+                        using (SolidBrush bannerSubBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
+                        {
+                            g.DrawString("Bắt đầu công việc của bạn với các công cụ văn phòng mạnh mẽ và linh hoạt.", bannerSubFont, bannerSubBrush, startX + 28f, 128f);
+                        }
+                    }
+                    // Floating icons (All 4 formats)
+                    float iconBlockX = bannerRect.Right - 204f;
+                    float iconBlockY = bannerRect.Y + 28f;
+                    AppIconRenderer.DrawAppIcon(g, iconBlockX, iconBlockY, 50f, OfficeAppMode.Writer);
+                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 44f, iconBlockY + 14f, 50f, OfficeAppMode.Calc);
+                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 88f, iconBlockY - 6f, 50f, OfficeAppMode.Slides);
+                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 132f, iconBlockY + 16f, 46f, OfficeAppMode.Pdf);
+                }
+            }
+
+            // 5. CREATION CARDS (Chỉ hiển thị tại Trang chủ)
+            if (ActiveTab == 0)
+            {
                 RectangleF c0 = GetCardBounds(0, width, height);
                 RectangleF c1 = GetCardBounds(1, width, height);
                 RectangleF c2 = GetCardBounds(2, width, height);
                 RectangleF c3 = GetCardBounds(3, width, height);
-
-                DrawAppCreationCard(g, (int)c0.X, (int)c0.Y, (int)c0.Width, (int)c0.Height,
-                    "Writer", "Soạn thảo văn bản",
-                    OfficeAppMode.Writer, HoverCardIndex == 0);
-
-                DrawAppCreationCard(g, (int)c1.X, (int)c1.Y, (int)c1.Width, (int)c1.Height,
-                    "Calc", "Bảng tính số liệu",
-                    OfficeAppMode.Calc, HoverCardIndex == 1);
-
-                DrawAppCreationCard(g, (int)c2.X, (int)c2.Y, (int)c2.Width, (int)c2.Height,
-                    "Slides", "Trình chiếu thuyết trình",
-                    OfficeAppMode.Slides, HoverCardIndex == 2);
-
-                DrawAppCreationCard(g, (int)c3.X, (int)c3.Y, (int)c3.Width, (int)c3.Height,
-                    "PDF Editor", "Chỉnh sửa & Ký PDF",
-                    OfficeAppMode.Pdf, HoverCardIndex == 3);
+                DrawCreationCard(g, c0, "Tạo tài liệu", "Soạn thảo văn bản", OfficeAppMode.Writer, HoverCardIndex == 0);
+                DrawCreationCard(g, c1, "Tạo bảng tính", "Xử lý dữ liệu", OfficeAppMode.Calc, HoverCardIndex == 1);
+                DrawCreationCard(g, c2, "Tạo thuyết trình", "Trình bày ý tưởng", OfficeAppMode.Slides, HoverCardIndex == 2);
+                DrawCreationCard(g, c3, "Tạo từ PDF", "Chỉnh sửa, chuyển đổi", OfficeAppMode.Pdf, HoverCardIndex == 3);
             }
-            else
+
+            // 6. MAIN CONTENT AREA
+            if (ActiveTab == 2)
             {
-                // Tab 1 hoặc Tab 2: BẢNG CỐ ĐỊNH MỞ RỘNG VỪA VẶN MÀN HÌNH + MỖI FILE LÀ 1 THẺ LIQUID GLASS ĐỘC LẬP
-                List<RecentDocItem> currentList = (ActiveTab == 1) ? RecentDocs : TrashDocs;
-                RectangleF tableCardRect = GetTableCardBounds(width, height);
-
-                // Khung bảng lớn cố định mở vừa màn hình
-                LiquidGlassHelper.DrawLiquidGlassCard(g, tableCardRect, 18f, false, Color.FromArgb(59, 130, 246));
-
-                // Table Header Bar (Cố định ở đỉnh bảng)
-                RectangleF thRect = new RectangleF(tableCardRect.X + 2, tableCardRect.Y + 2, tableCardRect.Width - 4, 44);
-                using (GraphicsPath thPath = LiquidGlassHelper.CreateRoundedRectanglePath(thRect, 16f))
-                using (SolidBrush thBg = new SolidBrush(Color.FromArgb(135, 255, 255, 255)))
-                using (Pen thBorder = new Pen(Color.FromArgb(90, 255, 255, 255), 1f))
+                using (Font secHeaderFont = new Font("Segoe UI", 13f, FontStyle.Bold))
+                using (SolidBrush secHeaderBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    GraphicsState gs = g.Save();
-                    g.SetClip(new RectangleF(tableCardRect.X, tableCardRect.Y, tableCardRect.Width, 44));
-                    g.FillPath(thBg, thPath);
-                    g.Restore(gs);
-                    g.DrawLine(thBorder, tableCardRect.X + 16, tableCardRect.Y + 44, tableCardRect.Right - 16, tableCardRect.Y + 44);
+                    g.DrawString("Cài đặt", secHeaderFont, secHeaderBrush, startX, 76f);
                 }
-
-                using (Font thFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-                using (SolidBrush thBrush = new SolidBrush(Color.FromArgb(90, 105, 130)))
+                using (Pen sepPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 {
-                    g.DrawString("TÊN TÀI LIỆU", thFont, thBrush, tableCardRect.X + 28, tableCardRect.Y + 14);
-                    g.DrawString("PHÂN HỆ", thFont, thBrush, tableCardRect.Right - 460, tableCardRect.Y + 14);
-                    g.DrawString("LẦN SỬA CUỐI", thFont, thBrush, tableCardRect.Right - 330, tableCardRect.Y + 14);
-                    g.DrawString("THAO TÁC", thFont, thBrush, tableCardRect.Right - 175, tableCardRect.Y + 14);
+                    g.DrawLine(sepPen, startX, 110f, startX + contentW, 110f);
                 }
-
-                // Vùng Viewport cuộn nội dung danh sách file bên trong bảng
-                RectangleF rowsViewport = new RectangleF(tableCardRect.X + 4, tableCardRect.Y + 46, tableCardRect.Width - 8, tableCardRect.Height - 52);
-
-                GraphicsState clipState = g.Save();
-                g.SetClip(rowsViewport);
-
-                int rowHeight = 56;
-                int rowGap = 8;
-                int rowTotalH = rowHeight + rowGap;
-                float startY = tableCardRect.Y + 52 - currentScroll;
-
-                if (currentList.Count == 0)
+                RectangleF setViewport = new RectangleF(startX, 114f, contentW, Math.Max(100, height - 118));
+                GraphicsState gs = g.Save();
+                g.SetClip(setViewport);
+                DrawSettingsDashboard(g, startX, contentW, 120f - currentScroll);
+                g.Restore(gs);
+                if (maxScroll > 0)
                 {
-                    using (Font emptyFont = new Font("Segoe UI", 11.5f, FontStyle.Regular))
-                    using (SolidBrush emptyBrush = new SolidBrush(Color.FromArgb(120, 135, 160)))
+                    float trackH = setViewport.Height - 16f;
+                    float thumbH = Math.Max(30f, Math.Min(trackH - 10f, trackH * (setViewport.Height / 980f)));
+                    float thumbY = setViewport.Top + 8f + (currentScroll / (float)maxScroll) * (trackH - thumbH);
+                    ScrollBarBounds = new RectangleF(startX + contentW - 10f, setViewport.Top + 4f, 10f, setViewport.Height - 8f);
+                    ScrollBarThumbBounds = new RectangleF(startX + contentW - 7f, thumbY, 5f, thumbH);
+
+                    if (IsHoveringScrollBar || IsDraggingScrollBar)
                     {
-                        string emptyMsg = (ActiveTab == 1) ? "Chưa có tài liệu nào gần đây. Hãy chọn tab 'Tính năng' để tạo tài liệu mới!" : "Thùng rác đang trống.";
-                        g.DrawString(emptyMsg, emptyFont, emptyBrush, tableCardRect.X + 32, tableCardRect.Y + 80);
+                        using (GraphicsPath trackPath = CreateRoundedRectanglePath(ScrollBarBounds, 4f))
+                        using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        {
+                            g.FillPath(trackBg, trackPath);
+                        }
+                    }
+
+                    Color thumbColor = IsDraggingScrollBar ? Color.FromArgb(71, 85, 105) :
+                                       (IsHoveringScrollBar ? Color.FromArgb(100, 116, 139) : Color.FromArgb(148, 163, 184));
+                    using (GraphicsPath tp = CreateRoundedRectanglePath(ScrollBarThumbBounds, 2.5f))
+                    using (SolidBrush tb = new SolidBrush(thumbColor))
+                    {
+                        g.FillPath(tb, tp);
                     }
                 }
                 else
                 {
-                    using (Font rTitleFont = new Font("Segoe UI", 10.5f, FontStyle.Bold))
-                    using (Font rFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
-                    using (Font badgeFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+                    ScrollBarBounds = RectangleF.Empty;
+                    ScrollBarThumbBounds = RectangleF.Empty;
+                }
+            }
+            else
+            {
+                // File list (fileListY, colHeaderY, listTopY from GetCenterContentMetrics)
+                if (ActiveTab == 3)
+                {
+                    using (Font secHeaderFont = new Font("Segoe UI", 13f, FontStyle.Bold))
+                    using (SolidBrush secHeaderBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                     {
-                        for (int i = 0; i < currentList.Count; i++)
+                        g.DrawString("Tài liệu của tôi", secHeaderFont, secHeaderBrush, startX, fileListY - 2f);
+                    }
+                    using (Font subFont = new Font("Segoe UI", 8.8f, FontStyle.Regular))
+                    using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                    {
+                        g.DrawString("Quản lý và mở nhanh tất cả các tệp tài liệu trong máy của bạn", subFont, subBrush, startX, fileListY + 22f);
+                    }
+
+                    // Button "Mở tệp từ máy..."
+                    float btnW = 160f;
+                    float btnH = 32f;
+                    MyDocsOpenFileBtnRect = new RectangleF(startX + contentW - btnW, fileListY - 2f, btnW, btnH);
+                    using (GraphicsPath bp = CreateRoundedRectanglePath(MyDocsOpenFileBtnRect, 6f))
+                    using (SolidBrush bb = new SolidBrush(HoverMyDocsOpenFileBtn ? Color.FromArgb(239, 246, 255) : Color.FromArgb(248, 250, 252)))
+                    using (Pen bpPen = new Pen(HoverMyDocsOpenFileBtn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225), 1.2f))
+                    {
+                        g.FillPath(bb, bp);
+                        g.DrawPath(bpPen, bp);
+                    }
+                    DrawVectorFolderIcon(g, MyDocsOpenFileBtnRect.X + 12f, MyDocsOpenFileBtnRect.Y + 8f, 16f, Color.FromArgb(37, 99, 235));
+                    using (Font btnF = new Font("Segoe UI", 8.8f, FontStyle.Bold))
+                    using (SolidBrush btnB = new SolidBrush(Color.FromArgb(30, 64, 175)))
+                    {
+                        g.DrawString("Mở tệp từ máy...", btnF, btnB, MyDocsOpenFileBtnRect.X + 34f, MyDocsOpenFileBtnRect.Y + 7f);
+                    }
+
+                    // Filter pills
+                    MyDocsFilterPills.Clear();
+                    string[] labels = new string[] { "Tất cả", "Gần đây", "Đã gắn sao ⭐", "Văn bản (.docx)", "Bảng tính (.xlsx)", "Thuyết trình (.pptx)", "PDF (.pdf)" };
+                    int[] ids = new int[] { 0, 1, 2, 10, 11, 12, 13 };
+                    float curPillX = startX;
+                    float pillY = fileListY + 48f;
+                    using (Font pillFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                    {
+                        for (int p = 0; p < labels.Length; p++)
                         {
-                            RecentDocItem doc = currentList[i];
-                            float rowY = startY + i * rowTotalH;
+                            SizeF sz = g.MeasureString(labels[p], pillFont);
+                            float pw = sz.Width + 18f;
+                            RectangleF pRect = new RectangleF(curPillX, pillY, pw, 26f);
+                            bool isPillActive = (SubFilter == ids[p]);
+                            bool isPillHover = (HoverPillIndex == p);
 
-                            // Chỉ vẽ các dòng nằm trong hoặc gần khung nhìn
-                            if (rowY + rowHeight < rowsViewport.Top - 50 || rowY > rowsViewport.Bottom + 50) continue;
-
-                            RectangleF rowCard = new RectangleF(tableCardRect.X + 12, rowY, tableCardRect.Width - 24, rowHeight);
-                            bool isRowHover = (HoverRowIndex == i);
-
-                            // MỖI FILE LÀ 1 THẺ LIQUID GLASS ĐỘC LẬP
-                            Color rowAccent = (doc.Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
-                                              ((doc.Mode == OfficeAppMode.Calc) ? Color.FromArgb(16, 185, 129) :
-                                              ((doc.Mode == OfficeAppMode.Slides) ? Color.FromArgb(249, 115, 22) : Color.FromArgb(220, 38, 38)));
-
-                            // Đổ bóng 3D cho thẻ file
-                            RectangleF cardShadow = new RectangleF(rowCard.X, rowCard.Y + (isRowHover ? 3f : 1.5f), rowCard.Width, rowCard.Height);
-                            using (GraphicsPath csp = CreateRoundedRectanglePath(cardShadow, 13f))
-                            using (SolidBrush csb = new SolidBrush(Color.FromArgb(isRowHover ? 26 : 14, 0, 0, 0)))
+                            using (GraphicsPath pp = CreateRoundedRectanglePath(pRect, 13f))
+                            using (SolidBrush pb = new SolidBrush(isPillActive ? Color.FromArgb(37, 99, 235) : (isPillHover ? Color.FromArgb(241, 245, 249) : Color.White)))
+                            using (Pen pPen = new Pen(isPillActive ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240), 1f))
+                            using (SolidBrush txtB = new SolidBrush(isPillActive ? Color.White : (isPillHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(100, 116, 139))))
                             {
-                                g.FillPath(csb, csp);
+                                g.FillPath(pb, pp);
+                                g.DrawPath(pPen, pp);
+                                g.DrawString(labels[p], pillFont, txtB, pRect.X + 9f, pRect.Y + 5f);
                             }
-
-                            // Thân Kính lỏng Liquid Glass riêng biệt cho từng File
-                            using (GraphicsPath crp = CreateRoundedRectanglePath(rowCard, 13f))
-                            using (LinearGradientBrush crb = new LinearGradientBrush(rowCard,
-                                isRowHover ? Color.FromArgb(235, 255, 255, 255) : Color.FromArgb(170, 255, 255, 255),
-                                isRowHover ? Color.FromArgb(195, 245, 255, 255) : Color.FromArgb(120, 245, 250, 255), 90f))
-                            using (Pen crPen = new Pen(isRowHover ? Color.FromArgb(245, 255, 255, 255) : Color.FromArgb(180, 255, 255, 255), isRowHover ? 1.4f : 1.0f))
+                            MyDocsFilterPills.Add(new FilterPill { Label = labels[p], FilterId = ids[p], Bounds = pRect });
+                            curPillX += pw + 8f;
+                        }
+                    }
+                }
+                else
+                {
+                    using (Font secHeaderFont = new Font("Segoe UI", 12f, FontStyle.Bold))
+                    using (SolidBrush secHeaderBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                    {
+                        string headerText = (ActiveTab == 1) ? "Thùng rác" :
+                                            ((SubFilter == 2) ? "Tài liệu đã gắn dấu sao ⭐" :
+                                            ((SubFilter == 1) ? "Tệp gần đây" : "Tất cả tệp gần đây"));
+                        g.DrawString(headerText, secHeaderFont, secHeaderBrush, startX, fileListY);
+                    }
+                    if (ActiveTab == 0)
+                    {
+                        using (Font linkFont = new Font("Segoe UI", 9f, FontStyle.Regular))
+                        using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                        {
+                            string linkText = "Xem tất cả →";
+                            SizeF linkSz = g.MeasureString(linkText, linkFont);
+                            g.DrawString(linkText, linkFont, linkBrush, startX + contentW - linkSz.Width, fileListY + 4f);
+                        }
+                    }
+                    else if (ActiveTab == 1)
+                    {
+                        if (TrashDocs != null && TrashDocs.Count > 0)
+                        {
+                            RectangleF empBtn = new RectangleF(startX + contentW - 155f, fileListY - 2f, 155f, 30f);
+                            using (GraphicsPath ep = CreateRoundedRectanglePath(empBtn, 4f))
+                            using (SolidBrush eb = new SolidBrush(Color.FromArgb(254, 242, 242)))
+                            using (Pen epPen = new Pen(Color.FromArgb(254, 202, 202), 1f))
                             {
-                                g.FillPath(crb, crp);
-                                g.DrawPath(crPen, crp);
+                                g.FillPath(eb, ep);
+                                g.DrawPath(epPen, ep);
                             }
-
-                            // Vạch màu phân hệ phát sáng ở cạnh trái thẻ file
-                            RectangleF leftPill = new RectangleF(rowCard.X + 5, rowCard.Y + 12, 3.5f, rowCard.Height - 24);
-                            using (GraphicsPath lpp = CreateRoundedRectanglePath(leftPill, 1.75f))
-                            using (SolidBrush lpb = new SolidBrush(rowAccent))
+                            DrawVectorTrashIcon(g, empBtn.X + 10f, empBtn.Y + 6f, 16f, Color.FromArgb(220, 38, 38));
+                            using (Font btnF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                            using (SolidBrush btnB = new SolidBrush(Color.FromArgb(220, 38, 38)))
                             {
-                                g.FillPath(lpb, lpp);
-                            }
-
-                            // Biểu tượng loại tệp Vector
-                            DrawVectorDocumentRowIcon(g, rowCard.X + 18, rowCard.Y + 17, 18, 22, doc.Mode);
-
-                            // Tên tài liệu
-                            using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
-                            {
-                                g.DrawString(doc.Title, rTitleFont, titleBrush, rowCard.X + 46, rowCard.Y + 16);
-                            }
-
-                            // Badge Phân hệ (Writer, Calc, Slides, PDF)
-                            string modeName = (doc.Mode == OfficeAppMode.Writer) ? "Writer" :
-                                              ((doc.Mode == OfficeAppMode.Calc) ? "Calc" :
-                                              ((doc.Mode == OfficeAppMode.Slides) ? "Slides" : "PDF"));
-                            RectangleF badgeRect = new RectangleF(tableCardRect.Right - 460, rowCard.Y + 15, 68, 26);
-                            LiquidGlassHelper.DrawLiquidGlassPill(g, badgeRect, 13f, false, false, rowAccent);
-                            using (SolidBrush btxt = new SolidBrush(rowAccent))
-                            {
-                                g.DrawString(modeName, badgeFont, btxt, badgeRect.X + 13, badgeRect.Y + 4);
-                            }
-
-                            // Thời gian sửa đổi
-                            using (SolidBrush timeBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
-                            {
-                                g.DrawString(doc.LastModified, rFont, timeBrush, tableCardRect.Right - 330, rowCard.Y + 18);
-                            }
-
-                            // Các nút thao tác dạng viên thuốc Kính lỏng nằm gọn gàng bên trong thẻ
-                            if (ActiveTab == 1)
-                            {
-                                RectangleF delBox = new RectangleF(rowCard.Right - 132, rowCard.Y + 13, 116, 30);
-                                LiquidGlassHelper.DrawLiquidGlassPill(g, delBox, 15f, false, false, Color.FromArgb(220, 38, 38));
-                                DrawVectorTrashIcon(g, delBox.X + 8, delBox.Y + 7, 16, Color.FromArgb(185, 28, 28));
-                                using (SolidBrush dbTxt = new SolidBrush(Color.FromArgb(185, 28, 28)))
-                                {
-                                    g.DrawString("Bỏ thùng rác", rFont, dbTxt, delBox.X + 28, delBox.Y + 6);
-                                }
-                            }
-                            else
-                            {
-                                RectangleF resBox = new RectangleF(rowCard.Right - 170, rowCard.Y + 13, 86, 30);
-                                LiquidGlassHelper.DrawLiquidGlassPill(g, resBox, 15f, false, false, Color.FromArgb(4, 120, 87));
-                                DrawVectorRestoreIcon(g, resBox.X + 8, resBox.Y + 7, 16, Color.FromArgb(4, 120, 87));
-                                using (SolidBrush rbTxt = new SolidBrush(Color.FromArgb(4, 120, 87)))
-                                {
-                                    g.DrawString("Phục hồi", rFont, rbTxt, resBox.X + 28, resBox.Y + 6);
-                                }
-
-                                RectangleF purgeBox = new RectangleF(rowCard.Right - 76, rowCard.Y + 13, 60, 30);
-                                LiquidGlassHelper.DrawLiquidGlassPill(g, purgeBox, 15f, false, false, Color.FromArgb(220, 38, 38));
-                                DrawVectorCrossIcon(g, purgeBox.X + 8, purgeBox.Y + 8, 14, Color.FromArgb(220, 38, 38));
-                                using (SolidBrush pbTxt = new SolidBrush(Color.FromArgb(220, 38, 38)))
-                                {
-                                    g.DrawString("Xóa", rFont, pbTxt, purgeBox.X + 24, purgeBox.Y + 6);
-                                }
+                                g.DrawString("Dọn sạch thùng rác", btnF, btnB, empBtn.X + 30f, empBtn.Y + 7f);
                             }
                         }
                     }
                 }
 
-                g.Restore(clipState);
+                // Column headers (colHeaderY and listTopY already computed from GetCenterContentMetrics)
+                using (Font thFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (SolidBrush thBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                {
+                    g.DrawString("Tên tệp", thFont, thBrush, startX + 16f, colHeaderY);
+                    g.DrawString("Loại", thFont, thBrush, startX + contentW * 0.50f, colHeaderY);
+                    g.DrawString("Thời gian sửa đổi", thFont, thBrush, startX + contentW * 0.62f, colHeaderY);
+                    g.DrawString("Kích thước", thFont, thBrush, startX + contentW * 0.80f, colHeaderY);
+                }
+                using (Pen hLine = new Pen(Color.FromArgb(234, 236, 240), 1f))
+                {
+                    g.DrawLine(hLine, startX, colHeaderY + 20f, startX + contentW, colHeaderY + 20f);
+                }
 
-                // Vẽ thanh cuộn kính lỏng mờ (Scrollbar) nếu số file tràn màn hình
+                RectangleF listViewport = new RectangleF(startX, listTopY, contentW, Math.Max(100, height - listTopY - 4f));
+                GraphicsState gs = g.Save();
+                g.SetClip(listViewport);
+
+                List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
+                float startFileY = listTopY - currentScroll;
+                int rowHeight = 56;
+                int rowGap = 2;
+                int rowTotalH = rowHeight + rowGap;
+
+                if (currentList.Count == 0)
+                {
+                    using (Font emptyFont = new Font("Segoe UI", 10.5f, FontStyle.Regular))
+                    using (SolidBrush emptyBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                    {
+                        string emptyMsg;
+                        if (!string.IsNullOrEmpty(SearchKeyword))
+                        {
+                            emptyMsg = string.Format("Không tìm thấy tài liệu nào khớp với từ khóa '{0}'.", SearchKeyword);
+                        }
+                        else
+                        {
+                            if (ActiveTab == 3)
+                            {
+                                if (SubFilter == 2 || SubFilter == 14)
+                                    emptyMsg = "Chưa có tài liệu nào được gắn dấu sao ⭐. Hãy nhấp vào biểu tượng ngôi sao ở danh sách tệp để đánh dấu tài liệu quan trọng!";
+                                else
+                                    emptyMsg = "Chưa có tài liệu nào trong mục này. Nhấn 'Mở tệp từ máy...' để thêm tài liệu hoặc tạo tệp mới từ Trang chủ!";
+                            }
+                            else if (ActiveTab == 0)
+                            {
+                                emptyMsg = "Chưa có tệp nào gần đây. Hãy tạo tệp mới từ các chức năng ở trên!";
+                            }
+                            else
+                            {
+                                emptyMsg = "Thùng rác đang trống.";
+                            }
+                        }
+                        g.DrawString(emptyMsg, emptyFont, emptyBrush, startX + 16f, startFileY + 24f);
+                    }
+                }
+                else
+                {
+                    using (Font rTitleFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                    using (Font rPathFont = new Font("Segoe UI", 8f, FontStyle.Regular))
+                    using (Font rFont = new Font("Segoe UI", 8.8f, FontStyle.Regular))
+                    using (Font badgeFont = new Font("Segoe UI", 8f, FontStyle.Bold))
+                    {
+                        for (int i = 0; i < currentList.Count; i++)
+                        {
+                            RecentDocItem doc = currentList[i];
+                            float rowY = startFileY + i * rowTotalH;
+                            if (rowY + rowHeight < listViewport.Top - 30 || rowY > listViewport.Bottom + 30) continue;
+
+                            RectangleF rowRect = new RectangleF(startX, rowY, contentW, rowHeight);
+                            bool isRowHover = (HoverRowIndex == i);
+
+                            Color accentColor = (doc.Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
+                                                ((doc.Mode == OfficeAppMode.Calc) ? Color.FromArgb(16, 185, 129) :
+                                                ((doc.Mode == OfficeAppMode.Slides) ? Color.FromArgb(249, 115, 22) : Color.FromArgb(220, 38, 38)));
+
+                            if (isRowHover)
+                            {
+                                using (SolidBrush rb = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                                {
+                                    g.FillRectangle(rb, rowRect);
+                                }
+                            }
+                            using (Pen rLine = new Pen(Color.FromArgb(241, 245, 249), 1f))
+                            {
+                                g.DrawLine(rLine, rowRect.X, rowRect.Bottom, rowRect.Right, rowRect.Bottom);
+                            }
+
+                            // Doc icon
+                            DrawVectorAppEmblem(g, rowRect.X + 14f, rowRect.Y + 12f, 32f, doc.Mode);
+
+                            // Title (Bound to column 1 with ellipsis to avoid overlapping column 2)
+                            float colLoaiX = startX + contentW * 0.50f;
+                            float titleMaxW = Math.Max(80f, colLoaiX - (rowRect.X + 56f) - 16f);
+                            RectangleF titleRect = new RectangleF(rowRect.X + 56f, rowRect.Y + 9f, titleMaxW, 20f);
+                            using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                            using (StringFormat sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
+                            {
+                                g.DrawString(doc.Title, rTitleFont, titleB, titleRect, sf);
+                            }
+                            // Path
+                            string displayPath = !string.IsNullOrEmpty(doc.FilePath) ? doc.FilePath : "(Bản nháp tự động lưu)";
+                            RectangleF pathRect = new RectangleF(rowRect.X + 56f, rowRect.Y + 31f, titleMaxW, 16f);
+                            using (SolidBrush pathB = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                            using (StringFormat sf = new StringFormat { Trimming = StringTrimming.EllipsisPath, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
+                            {
+                                g.DrawString(displayPath, rPathFont, pathB, pathRect, sf);
+                            }
+
+                            // Type badge pill
+                            string modeName = (doc.Mode == OfficeAppMode.Writer) ? "Tài liệu" :
+                                              ((doc.Mode == OfficeAppMode.Calc) ? "Bảng tính" :
+                                              ((doc.Mode == OfficeAppMode.Slides) ? "Thuyết trình" : "PDF"));
+                            SizeF badgeSz = g.MeasureString(modeName, badgeFont);
+                            float badgeW = badgeSz.Width + 16f;
+                            RectangleF badgeRect = new RectangleF(startX + contentW * 0.50f - 4f, rowRect.Y + 17f, badgeW, 22f);
+                            using (GraphicsPath bp = CreateRoundedRectanglePath(badgeRect, 4f))
+                            using (SolidBrush bb = new SolidBrush(Color.FromArgb(25, accentColor.R, accentColor.G, accentColor.B)))
+                            {
+                                g.FillPath(bb, bp);
+                            }
+                            using (SolidBrush bt = new SolidBrush(accentColor))
+                            {
+                                StringFormat bsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                                g.DrawString(modeName, badgeFont, bt, badgeRect, bsf);
+                            }
+
+                            // Last modified
+                            float dateW = contentW * 0.16f;
+                            RectangleF dateRect = new RectangleF(startX + contentW * 0.62f, rowRect.Y + 17f, dateW, 22f);
+                            using (SolidBrush timeB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                            using (StringFormat sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
+                            {
+                                g.DrawString(doc.LastModified, rFont, timeB, dateRect, sf);
+                            }
+                            // Size placeholder
+                            using (SolidBrush sizeB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                            {
+                                g.DrawString("—", rFont, sizeB, startX + contentW * 0.80f, rowRect.Y + 18f);
+                            }
+
+                            // Action
+                            if (ActiveTab == 0 || ActiveTab == 3)
+                            {
+                                float dotX = startX + contentW - 24f;
+                                float dotCY = rowRect.Y + rowHeight / 2f;
+
+                                // Star Icon
+                                float starX = dotX - 32f;
+                                bool isRowStarHov = (HoverRowStar == i);
+                                Color starColor = doc.IsStarred ? Color.FromArgb(245, 158, 11) :
+                                                  (isRowStarHov ? Color.FromArgb(245, 158, 11) : Color.FromArgb(203, 213, 225));
+                                DrawVectorStarIcon(g, starX, dotCY, 7.5f, starColor, doc.IsStarred);
+
+                                // 3 dots
+                                using (SolidBrush dotB = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                                {
+                                    g.FillEllipse(dotB, dotX, dotCY - 6f, 3f, 3f);
+                                    g.FillEllipse(dotB, dotX, dotCY - 0.5f, 3f, 3f);
+                                    g.FillEllipse(dotB, dotX, dotCY + 5f, 3f, 3f);
+                                }
+                            }
+                            else
+                            {
+                                RectangleF resBtn = new RectangleF(startX + contentW - 135f, rowRect.Y + 14f, 65f, 28f);
+                                using (GraphicsPath rbp = CreateRoundedRectanglePath(resBtn, 4f))
+                                using (SolidBrush rbb = new SolidBrush(Color.FromArgb(236, 253, 245)))
+                                using (Pen rbPen = new Pen(Color.FromArgb(167, 243, 208), 1f))
+                                {
+                                    g.FillPath(rbb, rbp);
+                                    g.DrawPath(rbPen, rbp);
+                                }
+                                using (SolidBrush rtBrush = new SolidBrush(Color.FromArgb(5, 150, 105)))
+                                {
+                                    StringFormat rsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                                    g.DrawString("Phục hồi", rFont, rtBrush, resBtn, rsf);
+                                }
+                                RectangleF purgeBtn = new RectangleF(startX + contentW - 60f, rowRect.Y + 14f, 50f, 28f);
+                                using (GraphicsPath pbp = CreateRoundedRectanglePath(purgeBtn, 4f))
+                                using (SolidBrush pbb = new SolidBrush(Color.FromArgb(254, 242, 242)))
+                                using (Pen pbPen = new Pen(Color.FromArgb(254, 202, 202), 1f))
+                                {
+                                    g.FillPath(pbb, pbp);
+                                    g.DrawPath(pbPen, pbp);
+                                }
+                                using (SolidBrush ptBrush = new SolidBrush(Color.FromArgb(220, 38, 38)))
+                                {
+                                    StringFormat psf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                                    g.DrawString("Xóa", rFont, ptBrush, purgeBtn, psf);
+                                }
+                            }
+                        }
+                    }
+                }
+                g.Restore(gs);
+
                 if (maxScroll > 0)
                 {
-                    float trackH = rowsViewport.Height - 16;
-                    float thumbH = Math.Max(30, trackH * (rowsViewport.Height / (float)(currentList.Count * rowTotalH + 16)));
-                    float thumbY = rowsViewport.Top + 8 + (currentScroll / (float)maxScroll) * (trackH - thumbH);
-                    RectangleF thumbRect = new RectangleF(tableCardRect.Right - 10, thumbY, 5, thumbH);
+                    float trackH = listViewport.Height - 16f;
+                    float totalListH = currentList.Count * rowTotalH + 96f;
+                    float thumbH = Math.Max(30f, Math.Min(trackH - 10f, trackH * (listViewport.Height / totalListH)));
+                    float thumbY = listViewport.Top + 8f + (currentScroll / (float)maxScroll) * (trackH - thumbH);
+                    ScrollBarBounds = new RectangleF(startX + contentW - 10f, listViewport.Top + 4f, 10f, listViewport.Height - 8f);
+                    ScrollBarThumbBounds = new RectangleF(startX + contentW - 7f, thumbY, 5f, thumbH);
 
-                    using (GraphicsPath sbp = CreateRoundedRectanglePath(thumbRect, 2.5f))
-                    using (SolidBrush sbb = new SolidBrush(Color.FromArgb(80, 100, 120, 150)))
+                    if (IsHoveringScrollBar || IsDraggingScrollBar)
                     {
-                        g.FillPath(sbb, sbp);
+                        using (GraphicsPath trackPath = CreateRoundedRectanglePath(ScrollBarBounds, 4f))
+                        using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        {
+                            g.FillPath(trackBg, trackPath);
+                        }
+                    }
+
+                    Color thumbColor = IsDraggingScrollBar ? Color.FromArgb(71, 85, 105) :
+                                       (IsHoveringScrollBar ? Color.FromArgb(100, 116, 139) : Color.FromArgb(148, 163, 184));
+                    using (GraphicsPath tp = CreateRoundedRectanglePath(ScrollBarThumbBounds, 2.5f))
+                    using (SolidBrush tb = new SolidBrush(thumbColor))
+                    {
+                        g.FillPath(tb, tp);
+                    }
+                }
+                else
+                {
+                    ScrollBarBounds = RectangleF.Empty;
+                    ScrollBarThumbBounds = RectangleF.Empty;
+                }
+            }
+
+            // 7. RIGHT SIDEBAR PANEL
+            if (ActiveTab != 2)
+            {
+                DrawRightSidebarPanel(g, width, height);
+            }
+        }
+
+        private void DrawWpsAppCard(Graphics g, RectangleF rect, string name, string subtitle, OfficeAppMode mode, bool isHover)
+        {
+            Color accentColor;
+            if (mode == OfficeAppMode.Writer)
+            {
+                accentColor = Color.FromArgb(37, 99, 235);
+            }
+            else if (mode == OfficeAppMode.Calc)
+            {
+                accentColor = Color.FromArgb(16, 185, 129);
+            }
+            else if (mode == OfficeAppMode.Slides)
+            {
+                accentColor = Color.FromArgb(249, 115, 22);
+            }
+            else
+            {
+                accentColor = Color.FromArgb(220, 38, 38);
+            }
+
+            // Nền thẻ trắng phẳng chuẩn WPS (#FFFFFF)
+            using (GraphicsPath cp = CreateRoundedRectanglePath(rect, 8f))
+            using (SolidBrush cb = new SolidBrush(Color.White))
+            using (Pen cPen = new Pen(isHover ? accentColor : Color.FromArgb(226, 232, 240), isHover ? 1.5f : 1f))
+            {
+                if (isHover)
+                {
+                    RectangleF shadow = new RectangleF(rect.X, rect.Y + 2f, rect.Width, rect.Height);
+                    using (GraphicsPath sp = CreateRoundedRectanglePath(shadow, 8f))
+                    using (SolidBrush sb = new SolidBrush(Color.FromArgb(18, 0, 0, 0)))
+                    {
+                        g.FillPath(sb, sp);
+                    }
+                }
+
+                g.FillPath(cb, cp);
+                g.DrawPath(cPen, cp);
+            }
+
+            // Biểu tượng ứng dụng Vector nguyên bản, sắc nét & chuẩn thương hiệu
+            DrawVectorAppEmblem(g, rect.X + 14f, rect.Y + 12f, 36f, mode);
+
+            // Tên ứng dụng
+            using (Font nameFont = new Font("Segoe UI", 10.5f, FontStyle.Bold))
+            using (SolidBrush nameB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            {
+                g.DrawString(name, nameFont, nameB, rect.X + 14f, rect.Y + 54f);
+            }
+
+            // Phụ đề mô tả
+            using (Font subFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (SolidBrush subB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            {
+                g.DrawString(subtitle, subFont, subB, rect.X + 14f, rect.Y + 73f);
+            }
+        }
+
+        private void DrawSettingsDashboard(Graphics g, float startX, float contentW, float curY)
+        {
+            using (Font secFont = new Font("Segoe UI", 11f, FontStyle.Bold))
+            using (Font rTitleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (Font ctrlFont = new Font("Segoe UI", 8.8f, FontStyle.Regular))
+            using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            using (SolidBrush rTitleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            using (Pen sepPen = new Pen(Color.FromArgb(241, 245, 249), 1f))
+            {
+                // ================= SECTION 1: TRÍ TUỆ NHÂN TẠO =================
+                DrawVectorSparkleIcon(g, startX, curY + 2f, 16, Color.FromArgb(99, 102, 241));
+                g.DrawString("Trí tuệ nhân tạo", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float card1H = 150f;
+                RectangleF card1 = new RectangleF(startX, curY, contentW, card1H);
+                DrawWpsCardContainer(g, card1);
+
+                // Row 1: AI Copilot Toggle
+                float r1Y = card1.Y;
+                g.DrawString("Trợ lý AI Copilot", rTitleFont, rTitleBrush, card1.X + 16f, r1Y + 15f);
+                SettingAiCopilotToggleRect = new RectangleF(card1.Right - 95f, r1Y + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingAiCopilotToggleRect, AppSettings.Instance.AiCopilotEnabled);
+
+                g.DrawLine(sepPen, card1.X + 16f, r1Y + 50f, card1.Right - 16f, r1Y + 50f);
+
+                // Row 2: AI Provider
+                float r2Y = card1.Y + 50f;
+                g.DrawString("Mô hình AI", rTitleFont, rTitleBrush, card1.X + 16f, r2Y + 15f);
+                int prov = AppSettings.Instance.SelectedAiProvider;
+                SettingAiProviderGoogleRect = new RectangleF(card1.Right - 465f, r2Y + 10f, 115f, 30f);
+                SettingAiProviderOpenAiRect = new RectangleF(card1.Right - 340f, r2Y + 10f, 110f, 30f);
+                SettingAiProviderClaudeRect = new RectangleF(card1.Right - 220f, r2Y + 10f, 105f, 30f);
+                SettingAiProviderOllamaRect = new RectangleF(card1.Right - 105f, r2Y + 10f, 90f, 30f);
+
+                DrawWpsSegmentedButton(g, SettingAiProviderGoogleRect, "Google Gemini", prov == 0, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingAiProviderOpenAiRect, "OpenAI GPT", prov == 1, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingAiProviderClaudeRect, "Claude 3.5", prov == 2, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingAiProviderOllamaRect, "Ollama Local", prov == 3, ctrlFont);
+
+                g.DrawLine(sepPen, card1.X + 16f, r2Y + 50f, card1.Right - 16f, r2Y + 50f);
+
+                // Row 3: API Key & Dialog Button
+                float r3Y = card1.Y + 100f;
+                g.DrawString("Cấu hình API Key", rTitleFont, rTitleBrush, card1.X + 16f, r3Y + 15f);
+                SettingAiConfigBtnRect = new RectangleF(card1.Right - 165f, r3Y + 9f, 150f, 32f);
+                DrawWpsActionButton(g, SettingAiConfigBtnRect, "Thiết lập API Key...", Color.FromArgb(79, 70, 229), ctrlFont);
+
+                curY += card1H + 20f;
+
+                // ================= SECTION 2: GIAO DIỆN =================
+                DrawFluentPaletteIcon(g, startX, curY + 2f, 16f, Color.FromArgb(37, 99, 235));
+                g.DrawString("Giao diện", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float card2H = 100f;
+                RectangleF card2 = new RectangleF(startX, curY, contentW, card2H);
+                DrawWpsCardContainer(g, card2);
+
+                // Row 1: Ribbon Style
+                float c2r1Y = card2.Y;
+                g.DrawString("Kiểu thanh công cụ", rTitleFont, rTitleBrush, card2.X + 16f, c2r1Y + 15f);
+                bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                SettingRibbonIslandRect = new RectangleF(card2.Right - 280f, c2r1Y + 10f, 130f, 30f);
+                SettingRibbonStandardRect = new RectangleF(card2.Right - 140f, c2r1Y + 10f, 125f, 30f);
+                DrawWpsSegmentedButton(g, SettingRibbonIslandRect, "Dạng Đảo (Island)", isIsland, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingRibbonStandardRect, "Tiêu chuẩn (Classic)", !isIsland, ctrlFont);
+
+                g.DrawLine(sepPen, card2.X + 16f, c2r1Y + 50f, card2.Right - 16f, c2r1Y + 50f);
+
+                // Row 2: Theme
+                float c2r2Y = card2.Y + 50f;
+                g.DrawString("Chủ đề giao diện", rTitleFont, rTitleBrush, card2.X + 16f, c2r2Y + 15f);
+                bool isLight = (AppSettings.Instance.Theme == AppTheme.Light);
+                SettingThemeLightRect = new RectangleF(card2.Right - 230f, c2r2Y + 10f, 105f, 30f);
+                SettingThemeDarkRect = new RectangleF(card2.Right - 115f, c2r2Y + 10f, 100f, 30f);
+                DrawWpsSegmentedButton(g, SettingThemeLightRect, "Sáng (Light)", isLight, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingThemeDarkRect, "Tối (Dark)", !isLight, ctrlFont);
+
+                curY += card2H + 20f;
+
+                // ================= SECTION: LỐI TẮT MÀN HÌNH CHÍNH =================
+                DrawVectorDesktopIcon(g, startX, curY + 2f, 16f, Color.FromArgb(14, 165, 233));
+                g.DrawString("Lối tắt màn hình", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float cardShortcutsH = 200f;
+                RectangleF cardSc = new RectangleF(startX, curY, contentW, cardShortcutsH);
+                DrawWpsCardContainer(g, cardSc);
+
+                float scRowH = 50f;
+                float scRowY = cardSc.Y;
+
+                // Row 1: Writer Shortcut
+                AppIconRenderer.DrawAppIcon(g, cardSc.X + 16f, scRowY + 9f, 32f, OfficeAppMode.Writer);
+                g.DrawString("ZenQ Writer", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 15f);
+                SettingShortcutWriterRect = new RectangleF(cardSc.Right - 95f, scRowY + 11f, 80f, 28f);
+                bool hasWriterSc = DesktopShortcutManager.IsShortcutExists("ZenQ Writer") || DesktopShortcutManager.IsShortcutExists("GenOffice Writer");
+                DrawWpsToggleSwitch(g, SettingShortcutWriterRect, hasWriterSc);
+                g.DrawLine(sepPen, cardSc.X + 16f, scRowY + scRowH, cardSc.Right - 16f, scRowY + scRowH);
+                scRowY += scRowH;
+
+                // Row 2: Calc Shortcut
+                AppIconRenderer.DrawAppIcon(g, cardSc.X + 16f, scRowY + 9f, 32f, OfficeAppMode.Calc);
+                g.DrawString("ZenQ Calc", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 15f);
+                SettingShortcutCalcRect = new RectangleF(cardSc.Right - 95f, scRowY + 11f, 80f, 28f);
+                bool hasCalcSc = DesktopShortcutManager.IsShortcutExists("ZenQ Calc") || DesktopShortcutManager.IsShortcutExists("GenOffice Calc");
+                DrawWpsToggleSwitch(g, SettingShortcutCalcRect, hasCalcSc);
+                g.DrawLine(sepPen, cardSc.X + 16f, scRowY + scRowH, cardSc.Right - 16f, scRowY + scRowH);
+                scRowY += scRowH;
+
+                // Row 3: Slides Shortcut
+                AppIconRenderer.DrawAppIcon(g, cardSc.X + 16f, scRowY + 9f, 32f, OfficeAppMode.Slides);
+                g.DrawString("ZenQ Slides", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 15f);
+                SettingShortcutSlidesRect = new RectangleF(cardSc.Right - 95f, scRowY + 11f, 80f, 28f);
+                bool hasSlidesSc = DesktopShortcutManager.IsShortcutExists("ZenQ Slides") || DesktopShortcutManager.IsShortcutExists("GenOffice Slides");
+                DrawWpsToggleSwitch(g, SettingShortcutSlidesRect, hasSlidesSc);
+                g.DrawLine(sepPen, cardSc.X + 16f, scRowY + scRowH, cardSc.Right - 16f, scRowY + scRowH);
+                scRowY += scRowH;
+
+                // Row 4: PDF Shortcut
+                AppIconRenderer.DrawAppIcon(g, cardSc.X + 16f, scRowY + 9f, 32f, OfficeAppMode.Pdf);
+                g.DrawString("ZenQ PDF", rTitleFont, rTitleBrush, cardSc.X + 58f, scRowY + 15f);
+                SettingShortcutPdfRect = new RectangleF(cardSc.Right - 95f, scRowY + 11f, 80f, 28f);
+                bool hasPdfSc = DesktopShortcutManager.IsShortcutExists("ZenQ PDF") || DesktopShortcutManager.IsShortcutExists("GenOffice PDF");
+                DrawWpsToggleSwitch(g, SettingShortcutPdfRect, hasPdfSc);
+
+                curY += cardShortcutsH + 20f;
+
+                // ================= SECTION 3: HỆ THỐNG & SOẠN THẢO =================
+                DrawFluentSlidersIcon(g, startX, curY + 2f, 16f, Color.FromArgb(5, 150, 105));
+                g.DrawString("Hệ thống & Soạn thảo", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float card3H = 300f;
+                RectangleF card3 = new RectangleF(startX, curY, contentW, card3H);
+                DrawWpsCardContainer(g, card3);
+
+                float r3RowH = 50f;
+                float r3YCur = card3.Y;
+
+                // Row 1: Auto-Save
+                g.DrawString("Tự động lưu", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                SettingAutoSaveToggleRect = new RectangleF(card3.Right - 95f, r3YCur + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingAutoSaveToggleRect, AppSettings.Instance.AutoSaveEnabled);
+                g.DrawLine(sepPen, card3.X + 16f, r3YCur + r3RowH, card3.Right - 16f, r3YCur + r3RowH);
+                r3YCur += r3RowH;
+
+                // Row 2: Auto-Save Interval
+                g.DrawString("Tần suất lưu", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                int interval = AppSettings.Instance.AutoSaveIntervalSeconds;
+                SettingAutoSave30Rect = new RectangleF(card3.Right - 275f, r3YCur + 10f, 80f, 30f);
+                SettingAutoSave60Rect = new RectangleF(card3.Right - 185f, r3YCur + 10f, 100f, 30f);
+                SettingAutoSave120Rect = new RectangleF(card3.Right - 75f, r3YCur + 10f, 65f, 30f);
+                DrawWpsSegmentedButton(g, SettingAutoSave30Rect, "30 giây", interval == 30, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingAutoSave60Rect, "60s (Chuẩn)", interval == 60, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingAutoSave120Rect, "120s", interval == 120, ctrlFont);
+                g.DrawLine(sepPen, card3.X + 16f, r3YCur + r3RowH, card3.Right - 16f, r3YCur + r3RowH);
+                r3YCur += r3RowH;
+
+                // Row 3: Smooth Scroll
+                g.DrawString("Cuộn trang mượt mà", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                SettingSmoothScrollRect = new RectangleF(card3.Right - 95f, r3YCur + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingSmoothScrollRect, AppSettings.Instance.EnableSmoothScroll);
+                g.DrawLine(sepPen, card3.X + 16f, r3YCur + r3RowH, card3.Right - 16f, r3YCur + r3RowH);
+                r3YCur += r3RowH;
+
+                // Row 4: Ruler
+                g.DrawString("Thanh thước đo", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                SettingRulerRect = new RectangleF(card3.Right - 95f, r3YCur + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingRulerRect, AppSettings.Instance.ShowRuler);
+                g.DrawLine(sepPen, card3.X + 16f, r3YCur + r3RowH, card3.Right - 16f, r3YCur + r3RowH);
+                r3YCur += r3RowH;
+
+                // Row 5: Auto-Correct Vietnamese
+                g.DrawString("Tự động sửa lỗi gõ", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                SettingAutoCorrectViRect = new RectangleF(card3.Right - 95f, r3YCur + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingAutoCorrectViRect, AppSettings.Instance.AutoCorrectVietnamese);
+                g.DrawLine(sepPen, card3.X + 16f, r3YCur + r3RowH, card3.Right - 16f, r3YCur + r3RowH);
+                r3YCur += r3RowH;
+
+                // Row 6: Word Prediction
+                g.DrawString("Gợi ý từ thông minh", rTitleFont, rTitleBrush, card3.X + 16f, r3YCur + 15f);
+                SettingWordPredictionRect = new RectangleF(card3.Right - 95f, r3YCur + 11f, 80f, 28f);
+                DrawWpsToggleSwitch(g, SettingWordPredictionRect, AppSettings.Instance.WordPredictionEnabled);
+
+                curY += card3H + 20f;
+
+                // ================= SECTION 4: THỜI GIAN & NGÔN NGỮ =================
+                DrawFluentGlobeIcon(g, startX, curY + 2f, 16f, Color.FromArgb(220, 38, 38));
+                g.DrawString("Ngôn ngữ", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float card4H = 50f;
+                RectangleF card4 = new RectangleF(startX, curY, contentW, card4H);
+                DrawWpsCardContainer(g, card4);
+
+                g.DrawString("Ngôn ngữ giao diện", rTitleFont, rTitleBrush, card4.X + 16f, card4.Y + 15f);
+                bool isVi = (AppSettings.Instance.Language == AppLanguage.Vietnamese);
+                SettingLangViRect = new RectangleF(card4.Right - 265f, card4.Y + 10f, 125f, 30f);
+                SettingLangEnRect = new RectangleF(card4.Right - 130f, card4.Y + 10f, 115f, 30f);
+                DrawWpsSegmentedButton(g, SettingLangViRect, "Tiếng Việt (VN)", isVi, ctrlFont);
+                DrawWpsSegmentedButton(g, SettingLangEnRect, "English (US)", !isVi, ctrlFont);
+
+                curY += card4H + 20f;
+
+                // ================= SECTION 5: THÔNG TIN ỨNG DỤNG =================
+                DrawFluentUpdateIcon(g, startX, curY + 2f, 16f, Color.FromArgb(100, 116, 139));
+                g.DrawString("Thông tin ứng dụng", secFont, secBrush, startX + 22f, curY);
+                curY += 26f;
+
+                float card5H = 52f;
+                RectangleF card5 = new RectangleF(startX, curY, contentW, card5H);
+                DrawWpsCardContainer(g, card5);
+
+                g.DrawString("ZENQ OFFICE Professional", rTitleFont, rTitleBrush, card5.X + 16f, card5.Y + 16f);
+
+                SettingCheckUpdateBtnRect = new RectangleF(card5.Right - 295f, card5.Y + 10f, 145f, 32f);
+                SettingHelpBtnRect = new RectangleF(card5.Right - 140f, card5.Y + 10f, 125f, 32f);
+                DrawWpsActionButton(g, SettingCheckUpdateBtnRect, "Kiểm tra cập nhật", Color.FromArgb(37, 99, 235), ctrlFont);
+                DrawWpsActionButton(g, SettingHelpBtnRect, "Xem tài liệu", Color.FromArgb(71, 85, 105), ctrlFont);
+                curY += card5H + 40f;
+            }
+        }
+
+        private void DrawWpsCardContainer(Graphics g, RectangleF rect)
+        {
+            using (GraphicsPath p = CreateRoundedRectanglePath(rect, 6f))
+            using (SolidBrush bg = new SolidBrush(Color.White))
+            using (Pen border = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.FillPath(bg, p);
+                g.DrawPath(border, p);
+            }
+        }
+
+        private void DrawWpsToggleSwitch(Graphics g, RectangleF rect, bool isOn)
+        {
+            // Pill capsule dimensions
+            float pillW = 44f;
+            float pillH = 24f;
+            float pillX = rect.Right - pillW;
+            float pillY = rect.Y + (rect.Height - pillH) / 2f;
+            RectangleF pillRect = new RectangleF(pillX, pillY, pillW, pillH);
+
+            Color pillColor = isOn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225);
+            using (GraphicsPath p = CreateRoundedRectanglePath(pillRect, pillH / 2f))
+            using (SolidBrush bg = new SolidBrush(pillColor))
+            {
+                g.FillPath(bg, p);
+            }
+
+            // Circle Thumb knob
+            float thumbDia = 18f;
+            float thumbY = pillY + (pillH - thumbDia) / 2f;
+            float thumbX = isOn ? (pillRect.Right - thumbDia - 3f) : (pillRect.X + 3f);
+            RectangleF thumbRect = new RectangleF(thumbX, thumbY, thumbDia, thumbDia);
+
+            // Subtle drop shadow for knob
+            using (SolidBrush shadow = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+            {
+                g.FillEllipse(shadow, thumbX + 0.5f, thumbY + 1f, thumbDia, thumbDia);
+            }
+            using (SolidBrush whiteThumb = new SolidBrush(Color.White))
+            {
+                g.FillEllipse(whiteThumb, thumbRect);
+            }
+
+            // Status label to the left of the pill (Single line, NoWrap to prevent vertical splitting)
+            string statusText = isOn ? "Bật" : "Tắt";
+            using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (SolidBrush txtB = new SolidBrush(isOn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(100, 116, 139)))
+            {
+                StringFormat sf = new StringFormat { 
+                    Alignment = StringAlignment.Far, 
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
+                RectangleF labelRect = new RectangleF(rect.X, rect.Y, Math.Max(28f, rect.Width - pillW - 6f), rect.Height);
+                g.DrawString(statusText, f, txtB, labelRect, sf);
+            }
+        }
+
+        private void DrawVectorDesktopIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen p = new Pen(color, 1.4f))
+            {
+                // Screen
+                g.DrawRectangle(p, x + 1f, y + 1f, size - 2f, size - 6f);
+                // Stand neck
+                g.DrawLine(p, x + size / 2f, y + size - 5f, x + size / 2f, y + size - 1f);
+                // Stand base
+                g.DrawLine(p, x + 3f, y + size - 1f, x + size - 3f, y + size - 1f);
+            }
+        }
+
+        private void DrawVectorAppLogoIcon(Graphics g, float x, float y, float size)
+        {
+            RectangleF r = new RectangleF(x, y, size, size);
+            using (GraphicsPath path = CreateRoundedRectanglePath(r, 6f))
+            using (LinearGradientBrush lgb = new LinearGradientBrush(r, Color.FromArgb(79, 70, 229), Color.FromArgb(147, 51, 234), 135f))
+            {
+                g.FillPath(lgb, path);
+            }
+            using (Font f = new Font("Segoe UI", 12f, FontStyle.Bold))
+            using (SolidBrush wb = new SolidBrush(Color.White))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString("G", f, wb, r, sf);
+            }
+        }
+
+        private void DrawWpsSegmentedButton(Graphics g, RectangleF rect, string label, bool isSelected, Font font)
+        {
+            using (GraphicsPath p = CreateRoundedRectanglePath(rect, 4f))
+            {
+                if (isSelected)
+                {
+                    using (SolidBrush bg = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                    using (Pen pen = new Pen(Color.FromArgb(37, 99, 235), 1.2f))
+                    {
+                        g.FillPath(bg, p);
+                        g.DrawPath(pen, p);
+                    }
+                    using (SolidBrush txt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                        g.DrawString(label, font, txt, rect, sf);
+                    }
+                }
+                else
+                {
+                    using (SolidBrush bg = new SolidBrush(Color.White))
+                    using (Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                    {
+                        g.FillPath(bg, p);
+                        g.DrawPath(pen, p);
+                    }
+                    using (SolidBrush txt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                    {
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                        g.DrawString(label, font, txt, rect, sf);
                     }
                 }
             }
         }
 
-        private void DrawAppCreationCard(Graphics g, int x, int y, int w, int h, string name, string subtitle, OfficeAppMode mode, bool isHovered)
+        private void DrawWpsActionButton(Graphics g, RectangleF rect, string label, Color textColor, Font font)
         {
-            RectangleF cardRect = new RectangleF(x, y, w, h);
+            using (GraphicsPath p = CreateRoundedRectanglePath(rect, 4f))
+            using (SolidBrush bg = new SolidBrush(Color.White))
+            using (Pen pen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            {
+                g.FillPath(bg, p);
+                g.DrawPath(pen, p);
+            }
+            using (SolidBrush txt = new SolidBrush(textColor))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(label, font, txt, rect, sf);
+            }
+        }
 
-            Color accentColor, lightColor;
-            if (mode == OfficeAppMode.Writer)
+        private void DrawFluentPaletteIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.4f))
             {
-                accentColor = Color.FromArgb(37, 99, 235);
-                lightColor = Color.FromArgb(96, 165, 250);
+                g.DrawEllipse(pen, x + 1, y + 1, size - 2, size - 2);
+                using (SolidBrush b = new SolidBrush(color))
+                {
+                    g.FillEllipse(b, x + size * 0.28f, y + size * 0.25f, 2.5f, 2.5f);
+                    g.FillEllipse(b, x + size * 0.60f, y + size * 0.28f, 2.5f, 2.5f);
+                    g.FillEllipse(b, x + size * 0.35f, y + size * 0.58f, 2.5f, 2.5f);
+                }
             }
-            else if (mode == OfficeAppMode.Calc)
-            {
-                accentColor = Color.FromArgb(5, 150, 105);
-                lightColor = Color.FromArgb(52, 211, 153);
-            }
-            else if (mode == OfficeAppMode.Slides)
-            {
-                accentColor = Color.FromArgb(234, 88, 12);
-                lightColor = Color.FromArgb(251, 146, 60);
-            }
-            else // PDF
-            {
-                accentColor = Color.FromArgb(220, 38, 38);
-                lightColor = Color.FromArgb(248, 113, 113);
-            }
+        }
 
-            LiquidGlassHelper.DrawLiquidGlassCard(g, cardRect, 16f, isHovered, accentColor);
-
-            // Dải ruy băng phát sáng ở đỉnh thẻ
-            RectangleF topStrip = new RectangleF(x + 18, y + 6, 42, 4);
-            using (GraphicsPath tp = LiquidGlassHelper.CreateRoundedRectanglePath(topStrip, 2f))
-            using (LinearGradientBrush tgb = new LinearGradientBrush(topStrip, accentColor, lightColor, 0f))
+        private void DrawFluentSlidersIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.4f))
             {
-                g.FillPath(tgb, tp);
+                g.DrawLine(pen, x + 2, y + 5, x + size - 2, y + 5);
+                g.DrawLine(pen, x + 2, y + size / 2f, x + size - 2, y + size / 2f);
+                g.DrawLine(pen, x + 2, y + size - 5, x + size - 2, y + size - 5);
+
+                using (SolidBrush b = new SolidBrush(color))
+                {
+                    g.FillEllipse(b, x + size * 0.3f, y + 3, 4, 4);
+                    g.FillEllipse(b, x + size * 0.65f, y + size / 2f - 2, 4, 4);
+                    g.FillEllipse(b, x + size * 0.4f, y + size - 7, 4, 4);
+                }
             }
+        }
 
-            // Khung biểu tượng
-            RectangleF emblemBg = new RectangleF(x + 20, y + (h - 50) / 2, 50, 50);
-            using (GraphicsPath ep = LiquidGlassHelper.CreateRoundedRectanglePath(emblemBg, 13f))
-            using (SolidBrush eb = new SolidBrush(Color.FromArgb(isHovered ? 45 : 25, accentColor.R, accentColor.G, accentColor.B)))
-            using (Pen epen = new Pen(Color.FromArgb(isHovered ? 140 : 80, accentColor.R, accentColor.G, accentColor.B), 1.2f))
+        private void DrawFluentGlobeIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.4f))
             {
-                g.FillPath(eb, ep);
-                g.DrawPath(epen, ep);
+                g.DrawEllipse(pen, x + 1, y + 1, size - 2, size - 2);
+                g.DrawLine(pen, x + 1, y + size / 2f, x + size - 1, y + size / 2f);
+                g.DrawEllipse(pen, x + size * 0.25f, y + 1, size * 0.5f, size - 2);
             }
-            DrawVectorAppEmblem(g, emblemBg.X + 2, emblemBg.Y + 2, 46, mode);
+        }
 
-            // Tiêu đề & phụ đề
-            using (Font titleFont = new Font("Segoe UI", 15f, FontStyle.Bold))
-            using (Font subFont = new Font("Segoe UI", 9.8f, FontStyle.Bold))
-            using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
-            using (SolidBrush subBrush = new SolidBrush(accentColor))
+        private void DrawFluentUpdateIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.4f))
             {
-                g.DrawString(name, titleFont, titleBrush, x + 82, y + (h - 48) / 2 + 1);
-                g.DrawString(subtitle, subFont, subBrush, x + 82, y + (h - 48) / 2 + 26);
-            }
-
-            // Nút bấm "Tạo mới →"
-            RectangleF actionBtn = new RectangleF(x + w - 108, y + (h - 32) / 2, 94, 32);
-            LiquidGlassHelper.DrawLiquidGlassPill(g, actionBtn, 16f, isHovered, isHovered, accentColor);
-            using (Font btnFont = new Font("Segoe UI", 9f, FontStyle.Bold))
-            using (SolidBrush abTxt = new SolidBrush(isHovered ? Color.White : accentColor))
-            {
-                g.DrawString("Tạo mới", btnFont, abTxt, actionBtn.X + 11, actionBtn.Y + 6);
-                DrawVectorArrowRight(g, actionBtn.X + 68, actionBtn.Y + 8, 14, isHovered ? Color.White : accentColor);
+                g.DrawArc(pen, x + 2, y + 2, size - 4, size - 4, 45, 230);
+                g.DrawArc(pen, x + 2, y + 2, size - 4, size - 4, 225, 50);
+                using (SolidBrush b = new SolidBrush(color))
+                {
+                    PointF[] arrow = new PointF[] {
+                        new PointF(x + size - 3, y + 4),
+                        new PointF(x + size + 1, y + 9),
+                        new PointF(x + size - 5, y + 10)
+                    };
+                    g.FillPolygon(b, arrow);
+                }
             }
         }
         #endregion
@@ -1083,21 +3283,79 @@ namespace GenOffice.UI
             int prevCard = HoverCardIndex;
             int prevRow = HoverRowIndex;
             bool prevHelp = HoverHelpBtn;
+            bool prevUpdate = HoverUpdateBtn;
+            bool prevSideDoc = HoverSidebarDoc;
+            bool prevSideRec = HoverSidebarRecent;
+            bool prevSideStar = HoverSidebarStar;
+            int prevSideApp = HoverSidebarApp;
+            bool prevPromo = HoverPromoBtn;
+            bool prevStorage = HoverStorageManage;
+            int prevTmpl = HoverTemplateIndex;
+            int prevRowStar = HoverRowStar;
 
-            // 1. Check Hover Tabs (Tính năng vs Tài liệu gần đây vs Thùng rác vs Nút ?)
             HoverTabIndex = -1;
-            RectangleF featTab = GetFeaturesTabBounds(width, 0);
-            RectangleF myDocsTab = GetMyDocsTabBounds(width, 0);
-            RectangleF trashTab = GetTrashTabBounds(width, 0);
-            RectangleF helpRect = GetHelpBtnBounds(width, 0);
+            HoverSidebarDoc = false;
+            HoverSidebarRecent = false;
+            HoverSidebarStar = false;
+            HoverSidebarApp = -1;
+            HoverPromoBtn = false;
+            HoverStorageManage = false;
+            HoverTemplateIndex = -1;
+            HoverRowStar = -1;
 
-            if (featTab.Contains(x, y)) HoverTabIndex = 0;
-            else if (myDocsTab.Contains(x, y)) HoverTabIndex = 1;
-            else if (trashTab.Contains(x, y)) HoverTabIndex = 2;
+            RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
+            RectangleF openDocNav = GetOpenDocNavBounds(width, height);
+            RectangleF trashTab = GetTrashTabBounds(width, height);
+            RectangleF settingsTab = GetSettingsTabBounds(width, height);
+            RectangleF helpRect = GetHelpBtnBounds(width, height);
+            RectangleF updateRect = GetUpdateBtnBounds(width, height);
+
+            if (myDocsTab.Contains(x, y)) HoverTabIndex = 0;
+            else if (openDocNav.Contains(x, y)) { HoverTabIndex = 3; HoverSidebarDoc = true; }
+            else if (trashTab.Contains(x, y)) HoverTabIndex = 1;
+            else if (settingsTab.Contains(x, y)) HoverTabIndex = 2;
+
+            for (int a = 0; a < 4; a++)
+            {
+                if (GetAppNavBounds(a, width, height).Contains(x, y))
+                {
+                    HoverSidebarApp = a;
+                    break;
+                }
+            }
 
             HoverHelpBtn = helpRect.Contains(x, y);
+            HoverUpdateBtn = updateRect.Contains(x, y);
 
-            // 2. Check Hover Cards (Tab 0)
+            HoverMyDocsOpenFileBtn = (ActiveTab == 3 && MyDocsOpenFileBtnRect.Contains(x, y));
+            HoverPillIndex = -1;
+            if (ActiveTab == 3)
+            {
+                for (int p = 0; p < MyDocsFilterPills.Count; p++)
+                {
+                    if (MyDocsFilterPills[p].Bounds.Contains(x, y))
+                    {
+                        HoverPillIndex = p;
+                        break;
+                    }
+                }
+            }
+
+            // Right Panel Hover
+            if (ActiveTab != 2)
+            {
+                HoverPromoBtn = GetPromoBtnBounds(width).Contains(x, y);
+                HoverStorageManage = GetStorageManageBounds(width).Contains(x, y);
+                for (int t = 0; t < 4; t++)
+                {
+                    if (GetTemplateCardBounds(t, width).Contains(x, y))
+                    {
+                        HoverTemplateIndex = t;
+                        break;
+                    }
+                }
+            }
+
             HoverCardIndex = -1;
             if (ActiveTab == 0)
             {
@@ -1112,77 +3370,126 @@ namespace GenOffice.UI
                 }
             }
 
-            // 3. Check Hover Rows (Tab 1 & 2)
             HoverRowIndex = -1;
-            if (ActiveTab != 0)
+            if (ActiveTab == 0 || ActiveTab == 1 || ActiveTab == 3)
             {
-                List<RecentDocItem> currentList = (ActiveTab == 1) ? RecentDocs : TrashDocs;
-                RectangleF tb = GetTableCardBounds(width, height);
-                float rowStartY = tb.Y + 52 - ScrollY;
-                int rowTotalH = 56 + 8;
-
-                if (x >= tb.X + 12 && x <= tb.Right - 12 && y >= tb.Y + 46 && y <= tb.Bottom - 6)
+                List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
+                if (currentList != null && currentList.Count > 0)
                 {
-                    float relY = y - (tb.Y + 52) + ScrollY;
-                    if (relY >= 0)
+                    float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+                    GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+                    float startY = listTopY - ScrollY;
+                    int rowHeight = 56;
+                    int rowTotalH = rowHeight + 2;
+
+                    int maxScroll = GetMaxScroll(height, width);
+                    if (x >= startX && x <= startX + contentW - (maxScroll > 0 ? 14f : 0f) && y >= listTopY && y <= height - 4f)
                     {
-                        int r = (int)(relY / rowTotalH);
-                        float withinRowY = relY % rowTotalH;
-                        if (r >= 0 && r < currentList.Count && withinRowY <= 56)
+                        float relY = y - startY;
+                        if (relY >= 0)
                         {
-                            HoverRowIndex = r;
+                            int r = (int)(relY / rowTotalH);
+                            float withinRowY = relY % rowTotalH;
+                            if (r >= 0 && r < currentList.Count && withinRowY <= rowHeight)
+                            {
+                                HoverRowIndex = r;
+                                if ((ActiveTab == 0 || ActiveTab == 3) && x >= startX + contentW - 54f && x <= startX + contentW - 30f)
+                                {
+                                    HoverRowStar = r;
+                                }
+                            }
                         }
                     }
                 }
             }
+            else if (ActiveTab == 2)
+            {
+                bool hovSetting = (SettingAiCopilotToggleRect.Contains(x, y) ||
+                                   SettingAiProviderGoogleRect.Contains(x, y) ||
+                                   SettingAiProviderOpenAiRect.Contains(x, y) ||
+                                   SettingAiProviderClaudeRect.Contains(x, y) ||
+                                   SettingAiProviderOllamaRect.Contains(x, y) ||
+                                   SettingAiConfigBtnRect.Contains(x, y) ||
+                                   SettingRibbonIslandRect.Contains(x, y) ||
+                                   SettingRibbonStandardRect.Contains(x, y) ||
+                                   SettingThemeLightRect.Contains(x, y) ||
+                                   SettingThemeDarkRect.Contains(x, y) ||
+                                   SettingAutoSaveToggleRect.Contains(x, y) ||
+                                   SettingAutoSave30Rect.Contains(x, y) ||
+                                   SettingAutoSave60Rect.Contains(x, y) ||
+                                   SettingAutoSave120Rect.Contains(x, y) ||
+                                   SettingSmoothScrollRect.Contains(x, y) ||
+                                   SettingRulerRect.Contains(x, y) ||
+                                   SettingAutoCorrectViRect.Contains(x, y) ||
+                                   SettingWordPredictionRect.Contains(x, y) ||
+                                   SettingLangViRect.Contains(x, y) ||
+                                   SettingLangEnRect.Contains(x, y) ||
+                                   SettingCheckUpdateBtnRect.Contains(x, y) ||
+                                   SettingHelpBtnRect.Contains(x, y) ||
+                                   SettingShortcutWriterRect.Contains(x, y) ||
+                                   SettingShortcutCalcRect.Contains(x, y) ||
+                                   SettingShortcutSlidesRect.Contains(x, y) ||
+                                   SettingShortcutPdfRect.Contains(x, y));
+                HoverRowIndex = hovSetting ? 200 : -1;
+            }
 
-            return (prevCard != HoverCardIndex || prevRow != HoverRowIndex || prevTab != HoverTabIndex || prevHelp != HoverHelpBtn);
+            return (prevCard != HoverCardIndex || prevRow != HoverRowIndex || prevTab != HoverTabIndex ||
+                    prevHelp != HoverHelpBtn || prevUpdate != HoverUpdateBtn || prevSideDoc != HoverSidebarDoc ||
+                    prevSideRec != HoverSidebarRecent || prevSideStar != HoverSidebarStar ||
+                    prevSideApp != HoverSidebarApp || prevPromo != HoverPromoBtn ||
+                    prevStorage != HoverStorageManage || prevTmpl != HoverTemplateIndex || prevRowStar != HoverRowStar);
         }
 
         public OfficeAppMode? HandleClick(int x, int y, int width, int height, out string docTitle)
         {
+            string openFilePath;
+            return HandleClick(x, y, width, height, out docTitle, out openFilePath);
+        }
+
+        public OfficeAppMode? HandleClick(int x, int y, int width, int height, out string docTitle, out string openFilePath)
+        {
             docTitle = "";
+            openFilePath = null;
             int currentScroll = ScrollY;
 
-            // Check Click Nút ? (Trợ giúp)
-            RectangleF helpRect = GetHelpBtnBounds(width, 0);
+            // Search Box
+            RectangleF searchBoxRect = GetSearchBoxBounds(width);
+            if (searchBoxRect.Contains(x, y))
+            {
+                if (!string.IsNullOrEmpty(SearchKeyword) && x >= searchBoxRect.Right - 28f)
+                {
+                    SearchKeyword = "";
+                    IsSearchFocused = true;
+                    return null;
+                }
+                IsSearchFocused = true;
+                return null;
+            }
+            else
+            {
+                IsSearchFocused = false;
+            }
+
+            // Help button
+            RectangleF helpRect = GetHelpBtnBounds(width, height);
             if (helpRect.Contains(x, y))
             {
                 ShowHelpDialog();
                 return null;
             }
 
-            // 1. Click Tabs (Tính năng vs Tài liệu gần đây vs Thùng rác)
-            RectangleF featTab = GetFeaturesTabBounds(width, 0);
-            RectangleF myDocsTab = GetMyDocsTabBounds(width, 0);
-            RectangleF trashTab = GetTrashTabBounds(width, 0);
-
-            if (featTab.Contains(x, y))
+            // User avatar / Update button area
+            RectangleF updateRect = GetUpdateBtnBounds(width, height);
+            if (updateRect.Contains(x, y))
             {
-                ActiveTab = 0;
-                IndicatorTargetX = featTab.X;
-                IndicatorTargetW = featTab.Width;
-                ScrollY = 0;
-                return null;
-            }
-            if (myDocsTab.Contains(x, y))
-            {
-                ActiveTab = 1;
-                IndicatorTargetX = myDocsTab.X;
-                IndicatorTargetW = myDocsTab.Width;
-                ScrollY = 0;
-                return null;
-            }
-            if (trashTab.Contains(x, y))
-            {
-                ActiveTab = 2;
-                IndicatorTargetX = trashTab.X;
-                IndicatorTargetW = trashTab.Width;
-                ScrollY = 0;
+                using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
+                {
+                    dlg.ShowDialog();
+                }
                 return null;
             }
 
-            // 2. Click Cards (Khi đang ở Tab 0 - Tính năng)
+            // Creation cards (Chỉ có ở Trang chủ)
             if (ActiveTab == 0)
             {
                 for (int i = 0; i < 4; i++)
@@ -1190,6 +3497,7 @@ namespace GenOffice.UI
                     RectangleF cb = GetCardBounds(i, width, height);
                     if (cb.Contains(x, y))
                     {
+                        openFilePath = null;
                         if (i == 0) { docTitle = "Văn bản Mới.docx"; return OfficeAppMode.Writer; }
                         if (i == 1) { docTitle = "Bảng tính Mới.xlsx"; return OfficeAppMode.Calc; }
                         if (i == 2) { docTitle = "Trình chiếu Mới.pptx"; return OfficeAppMode.Slides; }
@@ -1197,55 +3505,303 @@ namespace GenOffice.UI
                     }
                 }
             }
-            else
-            {
-                // 3. Click Document Card or Action Buttons (Khi ở Tab 1 hoặc Tab 2)
-                List<RecentDocItem> currentList = (ActiveTab == 1) ? RecentDocs : TrashDocs;
-                RectangleF tb = GetTableCardBounds(width, height);
-                int rowTotalH = 56 + 8;
 
-                if (x >= tb.X + 12 && x <= tb.Right - 12 && y >= tb.Y + 46 && y <= tb.Bottom - 6)
+            // Sidebar Tabs & Navigation Links (Trang chủ, Tài liệu của tôi, Thùng rác, Cài đặt)
+            RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
+            RectangleF openDocNav = GetOpenDocNavBounds(width, height);
+            RectangleF trashTab = GetTrashTabBounds(width, height);
+            RectangleF settingsTab = GetSettingsTabBounds(width, height);
+
+            if (myDocsTab.Contains(x, y))
+            {
+                ActiveTab = 0;
+                SubFilter = 0;
+                IndicatorTargetX = myDocsTab.X;
+                IndicatorTargetW = myDocsTab.Width;
+                ScrollY = 0;
+                TargetScrollY = 0;
+                return null;
+            }
+            if (openDocNav.Contains(x, y))
+            {
+                ActiveTab = 3;
+                SubFilter = 0;
+                IndicatorTargetX = openDocNav.X;
+                IndicatorTargetW = openDocNav.Width;
+                ScrollY = 0;
+                TargetScrollY = 0;
+                return null;
+            }
+            if (trashTab.Contains(x, y))
+            {
+                ActiveTab = 1;
+                IndicatorTargetX = trashTab.X;
+                IndicatorTargetW = trashTab.Width;
+                ScrollY = 0;
+                return null;
+            }
+            if (settingsTab.Contains(x, y))
+            {
+                ActiveTab = 2;
+                IndicatorTargetX = settingsTab.X;
+                IndicatorTargetW = settingsTab.Width;
+                ScrollY = 0;
+                return null;
+            }
+
+            // Sidebar App Shortcut Buttons (W / X / P / PDF) - 100% BLANK NEW DOCUMENTS
+            if (GetAppNavBounds(0, width, height).Contains(x, y))
+            {
+                docTitle = "Văn bản Mới.docx";
+                openFilePath = null;
+                return OfficeAppMode.Writer;
+            }
+            if (GetAppNavBounds(1, width, height).Contains(x, y))
+            {
+                docTitle = "Bảng tính Mới.xlsx";
+                openFilePath = null;
+                return OfficeAppMode.Calc;
+            }
+            if (GetAppNavBounds(2, width, height).Contains(x, y))
+            {
+                docTitle = "Trình chiếu Mới.pptx";
+                openFilePath = null;
+                return OfficeAppMode.Slides;
+            }
+            if (GetAppNavBounds(3, width, height).Contains(x, y))
+            {
+                docTitle = "Tài liệu PDF Mới.pdf";
+                openFilePath = null;
+                return OfficeAppMode.Pdf;
+            }
+
+            // Right Panel Clicks
+            if (ActiveTab != 2)
+            {
+                // Promo Button -> Mở mẫu đơn xin nghỉ phép
+                if (GetPromoBtnBounds(width).Contains(x, y))
                 {
-                    float relY = y - (tb.Y + 52) + currentScroll;
+                    string tPath = EnsureTemplateLeaveRequest();
+                    if (!string.IsNullOrEmpty(tPath))
+                    {
+                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Đơn xin nghỉ phép.docx");
+                        docTitle = "Mẫu - Đơn xin nghỉ phép.docx";
+                        openFilePath = tPath;
+                        return OfficeAppMode.Writer;
+                    }
+                }
+
+                // Quản lý ổ đĩa -> Mở Explorer
+                if (GetStorageManageBounds(width).Contains(x, y))
+                {
+                    try
+                    {
+                        string sysPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        string root = Path.GetPathRoot(sysPath);
+                        System.Diagnostics.Process.Start("explorer.exe", !string.IsNullOrEmpty(root) ? root : "C:\\");
+                    }
+                    catch { }
+                    return null;
+                }
+
+                // "Xem tất cả" bên cạnh "Mẫu nổi bật" -> Mở Tài liệu của tôi
+                float pxAll = (width - RightPanelWidth) + 20f;
+                float pwAll = RightPanelWidth - 40f;
+                float tmplHeaderY = 266f;
+                RectangleF viewAllTemplatesRect = new RectangleF(pxAll + pwAll - 65f, tmplHeaderY - 4f, 65f, 24f);
+                if (viewAllTemplatesRect.Contains(x, y))
+                {
+                    ActiveTab = 3;
+                    SubFilter = 0;
+                    ScrollY = 0;
+                    TargetScrollY = 0;
+                    return null;
+                }
+
+                // 4 Mẫu nổi bật (Templates)
+                if (GetTemplateCardBounds(0, width).Contains(x, y))
+                {
+                    string tPath = EnsureTemplateLeaveRequest();
+                    if (!string.IsNullOrEmpty(tPath))
+                    {
+                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Đơn xin nghỉ phép.docx");
+                        docTitle = "Mẫu - Đơn xin nghỉ phép.docx";
+                        openFilePath = tPath;
+                        return OfficeAppMode.Writer;
+                    }
+                }
+                if (GetTemplateCardBounds(1, width).Contains(x, y))
+                {
+                    string tPath = EnsureTemplateBusinessPlan();
+                    if (!string.IsNullOrEmpty(tPath))
+                    {
+                        AddRecentDocument(tPath, OfficeAppMode.Slides, "Mẫu - Kế hoạch kinh doanh.pptx");
+                        docTitle = "Mẫu - Kế hoạch kinh doanh.pptx";
+                        openFilePath = tPath;
+                        return OfficeAppMode.Slides;
+                    }
+                }
+                if (GetTemplateCardBounds(2, width).Contains(x, y))
+                {
+                    string tPath = EnsureTemplateProjectReport();
+                    if (!string.IsNullOrEmpty(tPath))
+                    {
+                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Báo cáo tiến độ dự án.docx");
+                        docTitle = "Mẫu - Báo cáo tiến độ dự án.docx";
+                        openFilePath = tPath;
+                        return OfficeAppMode.Writer;
+                    }
+                }
+                if (GetTemplateCardBounds(3, width).Contains(x, y))
+                {
+                    string tPath = EnsureTemplateTimesheet();
+                    if (!string.IsNullOrEmpty(tPath))
+                    {
+                        AddRecentDocument(tPath, OfficeAppMode.Calc, "Mẫu - Bảng chấm công.csv");
+                        docTitle = "Mẫu - Bảng chấm công.csv";
+                        openFilePath = tPath;
+                        return OfficeAppMode.Calc;
+                    }
+                }
+            }
+
+            // Tab-specific actions
+            if (ActiveTab == 3)
+            {
+                if (MyDocsOpenFileBtnRect.Contains(x, y))
+                {
+                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    {
+                        ofd.Title = "Mở tài liệu văn phòng - ZENQ OFFICE";
+                        ofd.Filter = "Tất cả tài liệu văn phòng (*.docx;*.xlsx;*.pptx;*.pdf)|*.docx;*.xlsx;*.pptx;*.pdf|Word (*.docx)|*.docx|Excel (*.xlsx)|*.xlsx|PowerPoint (*.pptx)|*.pptx|PDF (*.pdf)|*.pdf|Tất cả tệp (*.*)|*.*";
+                        ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        if (ofd.ShowDialog() == DialogResult.OK)
+                        {
+                            string chosenPath = ofd.FileName;
+                            string ext = Path.GetExtension(chosenPath).ToLowerInvariant();
+                            OfficeAppMode chosenMode = OfficeAppMode.Writer;
+                            if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") chosenMode = OfficeAppMode.Calc;
+                            else if (ext == ".pptx" || ext == ".ppt") chosenMode = OfficeAppMode.Slides;
+                            else if (ext == ".pdf") chosenMode = OfficeAppMode.Pdf;
+
+                            AddRecentDocument(chosenPath, chosenMode);
+                            docTitle = Path.GetFileName(chosenPath);
+                            openFilePath = chosenPath;
+                            return chosenMode;
+                        }
+                    }
+                    return null;
+                }
+
+                for (int p = 0; p < MyDocsFilterPills.Count; p++)
+                {
+                    if (MyDocsFilterPills[p].Bounds.Contains(x, y))
+                    {
+                        SubFilter = MyDocsFilterPills[p].FilterId;
+                        ScrollY = 0;
+                        TargetScrollY = 0;
+                        return null;
+                    }
+                }
+            }
+            else if (ActiveTab == 0)
+            {
+                float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+                GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+                RectangleF viewAllRect = new RectangleF(startX + contentW - 120f, fileListY, 120f, 26f);
+                if (viewAllRect.Contains(x, y))
+                {
+                    ActiveTab = 3;
+                    SubFilter = 0;
+                    ScrollY = 0;
+                    TargetScrollY = 0;
+                    return null;
+                }
+            }
+            else if (ActiveTab == 1)
+            {
+                if (TrashDocs != null && TrashDocs.Count > 0)
+                {
+                    float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+                    GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+                    RectangleF empBtn = new RectangleF(startX + contentW - 155f, fileListY - 2f, 155f, 30f);
+                    if (empBtn.Contains(x, y))
+                    {
+                        var dr = MessageBox.Show("Bạn có chắc chắn muốn dọn sạch tất cả tệp trong Thùng rác không?", "Dọn sạch thùng rác", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                        if (dr == DialogResult.Yes)
+                        {
+                            EmptyTrash();
+                        }
+                        return null;
+                    }
+                }
+            }
+
+            // File list clicks
+            if (ActiveTab == 0 || ActiveTab == 1 || ActiveTab == 3)
+            {
+                List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
+                float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
+                GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
+                float startY = listTopY - currentScroll;
+                int rowHeight = 56;
+                int rowTotalH = rowHeight + 2;
+
+                int maxScroll = GetMaxScroll(height, width);
+                if (x >= startX && x <= startX + contentW - (maxScroll > 0 ? 14f : 0f) && y >= listTopY && y <= height - 4f)
+                {
+                    float relY = y - startY;
                     if (relY >= 0)
                     {
                         int r = (int)(relY / rowTotalH);
                         float withinRowY = relY % rowTotalH;
-                        if (r >= 0 && r < currentList.Count && withinRowY <= 56)
+                        if (r >= 0 && r < currentList.Count && withinRowY <= rowHeight)
                         {
-                            float rowY = tb.Y + 52 + r * rowTotalH - currentScroll;
+                            float rowY = startY + r * rowTotalH;
+                            RecentDocItem item = currentList[r];
 
-                            float rowRight = tb.Right - 12;
-
-                            if (ActiveTab == 1)
+                            if (ActiveTab == 0 || ActiveTab == 3)
                             {
-                                // Click 🗑 Bỏ thùng rác button (rowRight - 132..rowRight - 16)
-                                if (x >= rowRight - 132 && x <= rowRight - 16 && y >= rowY + 13 && y <= rowY + 43)
+                                // Click on Star icon -> toggle star
+                                float dotX = startX + contentW - 24f;
+                                if (x >= dotX - 44f && x <= dotX - 18f)
                                 {
-                                    RecentDocItem item = RecentDocs[r];
-                                    RecentDocs.RemoveAt(r);
-                                    TrashDocs.Add(item);
+                                    item.IsStarred = !item.IsStarred;
+                                    SaveRecentDocs();
                                     return null;
                                 }
 
-                                RecentDocItem doc = RecentDocs[r];
-                                docTitle = doc.Title;
-                                return doc.Mode;
+                                // Click on dots area -> move to trash
+                                if (x >= dotX - 16f)
+                                {
+                                    RecentDocs.Remove(item);
+                                    if (TrashDocs == null) TrashDocs = new List<RecentDocItem>();
+                                    TrashDocs.Add(item);
+                                    SaveRecentDocs();
+                                    return null;
+                                }
+
+                                // Open document
+                                docTitle = item.Title;
+                                openFilePath = item.FilePath;
+                                return item.Mode;
                             }
                             else
                             {
-                                // Click ↺ Phục hồi button (rowRight - 170..rowRight - 84)
-                                if (x >= rowRight - 170 && x <= rowRight - 84 && y >= rowY + 13 && y <= rowY + 43)
+                                RectangleF resBtn = new RectangleF(startX + contentW - 135f, rowY + 14f, 65f, 28f);
+                                if (resBtn.Contains(x, y))
                                 {
-                                    RecentDocItem item = TrashDocs[r];
-                                    TrashDocs.RemoveAt(r);
-                                    RecentDocs.Add(item);
+                                    TrashDocs.Remove(item);
+                                    if (RecentDocs == null) RecentDocs = new List<RecentDocItem>();
+                                    RecentDocs.Insert(0, item);
+                                    SaveRecentDocs();
                                     return null;
                                 }
-                                // Click ❌ Xóa hẳn button (rowRight - 76..rowRight - 16)
-                                if (x >= rowRight - 76 && x <= rowRight - 16 && y >= rowY + 13 && y <= rowY + 43)
+                                RectangleF purgeBtn = new RectangleF(startX + contentW - 60f, rowY + 14f, 50f, 28f);
+                                if (purgeBtn.Contains(x, y))
                                 {
-                                    TrashDocs.RemoveAt(r);
+                                    TrashDocs.Remove(item);
+                                    SaveRecentDocs();
                                     return null;
                                 }
                             }
@@ -1253,9 +3809,41 @@ namespace GenOffice.UI
                     }
                 }
             }
+            else if (ActiveTab == 2)
+            {
+                // Settings clicks
+                if (SettingAiCopilotToggleRect.Contains(x, y)) { AppSettings.Instance.AiCopilotEnabled = !AppSettings.Instance.AiCopilotEnabled; AppSettings.Instance.Save(); return null; }
+                if (SettingAiProviderGoogleRect.Contains(x, y)) { AppSettings.Instance.SelectedAiProvider = 0; AppSettings.Instance.Save(); return null; }
+                if (SettingAiProviderOpenAiRect.Contains(x, y)) { AppSettings.Instance.SelectedAiProvider = 1; AppSettings.Instance.Save(); return null; }
+                if (SettingAiProviderClaudeRect.Contains(x, y)) { AppSettings.Instance.SelectedAiProvider = 2; AppSettings.Instance.Save(); return null; }
+                if (SettingAiProviderOllamaRect.Contains(x, y)) { AppSettings.Instance.SelectedAiProvider = 3; AppSettings.Instance.Save(); return null; }
+                if (SettingAiConfigBtnRect.Contains(x, y)) { using (AiConfigDialog dlg = new AiConfigDialog()) { dlg.ShowDialog(); } return null; }
+                if (SettingRibbonIslandRect.Contains(x, y)) { AppSettings.Instance.RibbonStyle = RibbonStyle.Island; AppSettings.Instance.Save(); return null; }
+                if (SettingRibbonStandardRect.Contains(x, y)) { AppSettings.Instance.RibbonStyle = RibbonStyle.Standard; AppSettings.Instance.Save(); return null; }
+                if (SettingThemeLightRect.Contains(x, y)) { AppSettings.Instance.Theme = AppTheme.Light; AppSettings.Instance.Save(); return null; }
+                if (SettingThemeDarkRect.Contains(x, y)) { AppSettings.Instance.Theme = AppTheme.Dark; AppSettings.Instance.Save(); return null; }
+                if (SettingAutoSaveToggleRect.Contains(x, y)) { AppSettings.Instance.AutoSaveEnabled = !AppSettings.Instance.AutoSaveEnabled; AppSettings.Instance.Save(); return null; }
+                if (SettingAutoSave30Rect.Contains(x, y)) { AppSettings.Instance.AutoSaveIntervalSeconds = 30; AppSettings.Instance.Save(); return null; }
+                if (SettingAutoSave60Rect.Contains(x, y)) { AppSettings.Instance.AutoSaveIntervalSeconds = 60; AppSettings.Instance.Save(); return null; }
+                if (SettingAutoSave120Rect.Contains(x, y)) { AppSettings.Instance.AutoSaveIntervalSeconds = 120; AppSettings.Instance.Save(); return null; }
+                if (SettingSmoothScrollRect.Contains(x, y)) { AppSettings.Instance.EnableSmoothScroll = !AppSettings.Instance.EnableSmoothScroll; AppSettings.Instance.Save(); return null; }
+                if (SettingRulerRect.Contains(x, y)) { AppSettings.Instance.ShowRuler = !AppSettings.Instance.ShowRuler; AppSettings.Instance.Save(); return null; }
+                if (SettingAutoCorrectViRect.Contains(x, y)) { AppSettings.Instance.AutoCorrectVietnamese = !AppSettings.Instance.AutoCorrectVietnamese; AppSettings.Instance.Save(); return null; }
+                if (SettingWordPredictionRect.Contains(x, y)) { AppSettings.Instance.WordPredictionEnabled = !AppSettings.Instance.WordPredictionEnabled; AppSettings.Instance.Save(); return null; }
+                if (SettingLangViRect.Contains(x, y)) { AppSettings.Instance.Language = AppLanguage.Vietnamese; AppSettings.Instance.Save(); return null; }
+                if (SettingLangEnRect.Contains(x, y)) { AppSettings.Instance.Language = AppLanguage.English; AppSettings.Instance.Save(); return null; }
+                if (SettingCheckUpdateBtnRect.Contains(x, y)) { using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo)) { dlg.ShowDialog(); } return null; }
+                if (SettingHelpBtnRect.Contains(x, y)) { ShowHelpDialog(); return null; }
+                if (SettingShortcutWriterRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Writer", "-writer", "icon\\writer.ico", "Soạn thảo văn bản ZenQ Writer"); DesktopShortcutManager.DeleteShortcut("GenOffice Writer"); return null; }
+                if (SettingShortcutCalcRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Calc", "-calc", "icon\\calc.ico", "Bảng tính ZenQ Calc"); DesktopShortcutManager.DeleteShortcut("GenOffice Calc"); return null; }
+                if (SettingShortcutSlidesRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Slides", "-slides", "icon\\present.ico", "Trình chiếu ZenQ Slides"); DesktopShortcutManager.DeleteShortcut("GenOffice Slides"); return null; }
+                if (SettingShortcutPdfRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ PDF", "-pdf", "icon\\pdf.ico", "Đọc và chỉnh sửa ZenQ PDF"); DesktopShortcutManager.DeleteShortcut("GenOffice PDF"); return null; }
+            }
 
             return null;
         }
         #endregion
+
+
     }
 }

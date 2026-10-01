@@ -1,10 +1,39 @@
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Forms.Integration;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using GenOffice.Core;
+
+// Explicit aliases to completely prevent WinForms vs WPF name collisions
+using WinForms = System.Windows.Forms;
+using WinFormsControl = System.Windows.Forms.Control;
+using WinFormsPanel = System.Windows.Forms.Panel;
+using GdiBitmap = System.Drawing.Bitmap;
+using GdiImage = System.Drawing.Image;
+using GdiColor = System.Drawing.Color;
+using GdiRectangle = System.Drawing.Rectangle;
+using WpfColor = System.Windows.Media.Color;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfBrushes = System.Windows.Media.Brushes;
+using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
+using WpfPoint = System.Windows.Point;
+using WpfSize = System.Windows.Size;
+using WpfThickness = System.Windows.Thickness;
+using WpfCornerRadius = System.Windows.CornerRadius;
+using WpfGridLength = System.Windows.GridLength;
+using WpfGridUnitType = System.Windows.GridUnitType;
+using WpfAlignment = System.Windows.VerticalAlignment;
+using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
+using WpfStretch = System.Windows.Media.Stretch;
+using WpfPath = System.Windows.Shapes.Path;
+using WpfGeometry = System.Windows.Media.Geometry;
 
 namespace GenOffice.UI
 {
@@ -53,9 +82,11 @@ namespace GenOffice.UI
         [DllImport("gdi32.dll")]
         private static extern bool DeleteObject(IntPtr hObject);
 
-        public static Bitmap GetVideoPosterFrame(string filePath, int width = 960, int height = 540)
+        public static GdiBitmap GetVideoPosterFrame(string filePath, int width = 1280, int height = 720)
         {
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return null;
+
+            // 1. Try Windows Shell Item Image Factory (fast, native thumbnail extraction)
             try
             {
                 Guid guid = new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b");
@@ -65,256 +96,563 @@ namespace GenOffice.UI
                 {
                     IntPtr hBitmap;
                     int hr = factory.GetImage(new SIZE(width, height), SIIGBF.SIIGBF_BIGGERSIZEOK, out hBitmap);
+                    if (hr != 0 || hBitmap == IntPtr.Zero)
+                    {
+                        hr = factory.GetImage(new SIZE(width, height), SIIGBF.SIIGBF_THUMBNAILONLY, out hBitmap);
+                    }
+                    if (hr != 0 || hBitmap == IntPtr.Zero)
+                    {
+                        hr = factory.GetImage(new SIZE(width, height), SIIGBF.SIIGBF_RESIZETOFIT, out hBitmap);
+                    }
+
                     if (hr == 0 && hBitmap != IntPtr.Zero)
                     {
-                        Bitmap bmp = Image.FromHbitmap(hBitmap);
+                        GdiBitmap bmp = GdiImage.FromHbitmap(hBitmap);
                         DeleteObject(hBitmap);
                         return bmp;
                     }
                 }
             }
             catch { }
+
+            // 2. Fallback: Extract first frame via Windows Media Foundation MediaPlayer
+            try
+            {
+                GdiBitmap frame = ExtractFrameViaMediaPlayer(filePath, width, height);
+                if (frame != null) return frame;
+            }
+            catch { }
+
             return null;
         }
-    }
 
-    /// <summary>
-    /// ActiveX Control wrapper for Windows Media Player with zero chrome (Pure Video Surface)
-    /// </summary>
-    public class WmpAxControl : AxHost
-    {
-        public WmpAxControl() : base("6bf52a52-394a-11d3-b153-00c04f79faa6") { }
-
-        public dynamic PlayerOcx
+        private static GdiBitmap ExtractFrameViaMediaPlayer(string filePath, int width, int height)
         {
-            get
+            try
             {
-                try
+                MediaPlayer player = new MediaPlayer();
+                player.Volume = 0;
+                player.ScrubbingEnabled = true;
+                player.Open(new Uri(filePath));
+                player.Position = TimeSpan.FromMilliseconds(200);
+
+                int w = width > 0 ? width : 640;
+                int h = height > 0 ? height : 360;
+
+                DrawingVisual visual = new DrawingVisual();
+                using (DrawingContext dc = visual.RenderOpen())
                 {
-                    return GetOcx();
+                    dc.DrawVideo(player, new Rect(0, 0, w, h));
                 }
-                catch
+
+                RenderTargetBitmap rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                rtb.Render(visual);
+
+                using (MemoryStream ms = new MemoryStream())
                 {
-                    return null;
+                    PngBitmapEncoder encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(rtb));
+                    encoder.Save(ms);
+                    ms.Seek(0, SeekOrigin.Begin);
+                    return new GdiBitmap(ms);
                 }
+            }
+            catch
+            {
+                return null;
             }
         }
     }
 
     /// <summary>
-    /// Sleek PowerPoint Native Video Playback Bar Control
+    /// Legacy ActiveX compatibility stub (preserved for API compatibility)
     /// </summary>
-    public class VideoPlaybackBarControl : Control
+    public class WmpAxControl : WinForms.AxHost
     {
-        private ShapeNode _shape;
-        private Action _onTogglePlay;
-        private Action<float> _onSeek;
-        private Action _onToggleVolume;
-        private bool _isDraggingScrubber = false;
+        public WmpAxControl() : base("6bf52a52-394a-11d3-b153-00c04f79faa6") { }
+        public dynamic PlayerOcx { get { return null; } }
+    }
 
-        public VideoPlaybackBarControl(ShapeNode shape, Action onTogglePlay, Action<float> onSeek, Action onToggleVolume)
+    /// <summary>
+    /// PowerPoint-Grade Native In-Slide Video Player View (WPF with Direct3D hardware-accelerated Media Foundation)
+    /// </summary>
+    public class WpfSlideVideoPlayerView : Grid
+    {
+        private MediaElement _media;
+        private Border _barBorder;
+        private Button _btnPlayPause;
+        private Slider _slider;
+        private TextBlock _txtTime;
+        private Button _btnVolume;
+        private Canvas _bookmarksCanvas;
+        private DispatcherTimer _trackerTimer;
+        private DispatcherTimer _autoHideTimer;
+        private bool _isUserSeeking = false;
+        private bool _isMuted = false;
+        private double _previousVolume = 0.8;
+        private ShapeNode _shape;
+        private bool _isPresentation;
+        private Action _onStateChanged;
+
+        public MediaElement Media { get { return _media; } }
+        public bool IsPlaying { get; private set; }
+
+        public WpfSlideVideoPlayerView(ShapeNode shape, string videoPath, bool isPresentation, Action onStateChanged)
         {
             _shape = shape;
-            _onTogglePlay = onTogglePlay;
-            _onSeek = onSeek;
-            _onToggleVolume = onToggleVolume;
+            _isPresentation = isPresentation;
+            _onStateChanged = onStateChanged;
 
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            Height = 32;
-            Dock = DockStyle.Bottom;
-            Cursor = Cursors.Default;
+            Background = WpfBrushes.Black;
+            ClipToBounds = true;
+
+            // 1. Direct3D Media Foundation Video Surface
+            _media = new MediaElement
+            {
+                LoadedBehavior = MediaState.Manual,
+                UnloadedBehavior = MediaState.Manual,
+                Stretch = WpfStretch.Uniform,
+                Source = new Uri(videoPath)
+            };
+            Children.Add(_media);
+
+            // Click anywhere on video surface -> Toggle Play / Pause!
+            _media.MouseDown += (s, e) =>
+            {
+                if (e.ChangedButton == MouseButton.Left)
+                {
+                    TogglePlay();
+                    e.Handled = true;
+                }
+            };
+
+            // 2. PowerPoint Floating Media Control Bar Overlay (Docked to bottom)
+            BuildPlaybackBar();
+
+            // 3. Event Handlers for MediaElement
+            _media.MediaOpened += Media_MediaOpened;
+            _media.MediaEnded += Media_MediaEnded;
+            _media.MediaFailed += Media_MediaFailed;
+
+            // 4. Position & Duration Tracker Timer (100ms)
+            _trackerTimer = new DispatcherTimer(DispatcherPriority.Normal)
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            _trackerTimer.Tick += TrackerTimer_Tick;
+
+            // 5. Auto-Hide Timer for Control Bar (2.5s)
+            _autoHideTimer = new DispatcherTimer(DispatcherPriority.Normal)
+            {
+                Interval = TimeSpan.FromMilliseconds(2500)
+            };
+            _autoHideTimer.Tick += (s, e) =>
+            {
+                _autoHideTimer.Stop();
+                if (IsPlaying && _barBorder != null)
+                {
+                    _barBorder.Opacity = 0.0;
+                }
+            };
+
+            // Mouse hover interactions for control bar visibility
+            MouseMove += (s, e) =>
+            {
+                if (_barBorder != null)
+                {
+                    _barBorder.Opacity = 1.0;
+                }
+                _autoHideTimer.Stop();
+                if (IsPlaying)
+                {
+                    _autoHideTimer.Start();
+                }
+            };
+
+            MouseLeave += (s, e) =>
+            {
+                if (IsPlaying && _barBorder != null)
+                {
+                    _barBorder.Opacity = 0.0;
+                }
+            };
+        }
+
+        private void BuildPlaybackBar()
+        {
+            _barBorder = new Border
+            {
+                Height = 36,
+                VerticalAlignment = WpfAlignment.Bottom,
+                Margin = new WpfThickness(10, 0, 10, 10),
+                CornerRadius = new WpfCornerRadius(6),
+                Background = new WpfSolidColorBrush(WpfColor.FromArgb(225, 15, 23, 42)),
+                BorderBrush = new WpfSolidColorBrush(WpfColor.FromArgb(120, 71, 85, 105)),
+                BorderThickness = new WpfThickness(1),
+                Opacity = 1.0
+            };
+
+            Grid barGrid = new Grid();
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new WpfGridLength(40) });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new WpfGridLength(1, WpfGridUnitType.Star) });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = WpfGridLength.Auto });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new WpfGridLength(40) });
+
+            // 1. Play/Pause Button
+            _btnPlayPause = new Button
+            {
+                Background = WpfBrushes.Transparent,
+                BorderThickness = new WpfThickness(0),
+                Cursor = Cursors.Hand,
+                Padding = new WpfThickness(0)
+            };
+            UpdatePlayButtonIcon(false);
+            _btnPlayPause.Click += (s, e) => TogglePlay();
+            Grid.SetColumn(_btnPlayPause, 0);
+            barGrid.Children.Add(_btnPlayPause);
+
+            // 2. Timeline Track with Bookmarks Canvas
+            Grid trackGrid = new Grid
+            {
+                VerticalAlignment = WpfAlignment.Center,
+                Margin = new WpfThickness(6, 0, 6, 0)
+            };
+
+            _slider = new Slider
+            {
+                Minimum = 0,
+                Maximum = 100,
+                VerticalAlignment = WpfAlignment.Center,
+                Cursor = Cursors.Hand
+            };
+            _slider.PreviewMouseDown += (s, e) => _isUserSeeking = true;
+            _slider.PreviewMouseUp += (s, e) =>
+            {
+                _isUserSeeking = false;
+                Seek((float)_slider.Value);
+            };
+            _slider.ValueChanged += (s, e) =>
+            {
+                if (_isUserSeeking)
+                {
+                    Seek((float)e.NewValue);
+                }
+            };
+            trackGrid.Children.Add(_slider);
+
+            _bookmarksCanvas = new Canvas
+            {
+                IsHitTestVisible = false,
+                VerticalAlignment = WpfAlignment.Center,
+                Height = 16
+            };
+            trackGrid.Children.Add(_bookmarksCanvas);
+
+            Grid.SetColumn(trackGrid, 1);
+            barGrid.Children.Add(trackGrid);
+
+            // 3. Time Display Text
+            _txtTime = new TextBlock
+            {
+                Text = "00:00 / 00:00",
+                Foreground = new WpfSolidColorBrush(WpfColor.FromRgb(226, 232, 240)),
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
+                FontSize = 11,
+                VerticalAlignment = WpfAlignment.Center,
+                Margin = new WpfThickness(8, 0, 8, 0)
+            };
+            Grid.SetColumn(_txtTime, 2);
+            barGrid.Children.Add(_txtTime);
+
+            // 4. Volume Button
+            _btnVolume = new Button
+            {
+                Background = WpfBrushes.Transparent,
+                BorderThickness = new WpfThickness(0),
+                Cursor = Cursors.Hand,
+                Padding = new WpfThickness(0)
+            };
+            UpdateVolumeButtonIcon(false);
+            _btnVolume.Click += (s, e) => ToggleVolume();
+            Grid.SetColumn(_btnVolume, 3);
+            barGrid.Children.Add(_btnVolume);
+
+            _barBorder.Child = barGrid;
+            Children.Add(_barBorder);
+        }
+
+        private void UpdatePlayButtonIcon(bool isPlaying)
+        {
+            WpfPath icon = new WpfPath
+            {
+                HorizontalAlignment = WpfHorizontalAlignment.Center,
+                VerticalAlignment = WpfAlignment.Center
+            };
+
+            if (isPlaying)
+            {
+                // Crisp Pause Icon (Two vertical bars)
+                icon.Fill = new WpfSolidColorBrush(WpfColor.FromRgb(56, 189, 248));
+                icon.Data = WpfGeometry.Parse("M 0 0 H 3.5 V 12 H 0 Z M 6.5 0 H 10 V 12 H 6.5 Z");
+            }
+            else
+            {
+                // Crisp Play Icon (Right triangle)
+                icon.Fill = WpfBrushes.White;
+                icon.Data = WpfGeometry.Parse("M 1 0 L 11 6 L 1 12 Z");
+            }
+
+            _btnPlayPause.Content = icon;
+        }
+
+        private void UpdateVolumeButtonIcon(bool isMuted)
+        {
+            WpfPath icon = new WpfPath
+            {
+                HorizontalAlignment = WpfHorizontalAlignment.Center,
+                VerticalAlignment = WpfAlignment.Center
+            };
+
+            if (isMuted)
+            {
+                icon.Fill = new WpfSolidColorBrush(WpfColor.FromRgb(239, 68, 68));
+                icon.Data = WpfGeometry.Parse("M 1 4 H 3.5 L 7 1 V 13 L 3.5 10 H 1 Z M 9.5 4 L 13.5 8 M 13.5 4 L 9.5 8");
+            }
+            else
+            {
+                icon.Fill = new WpfSolidColorBrush(WpfColor.FromRgb(203, 213, 225));
+                icon.Data = WpfGeometry.Parse("M 1 4 H 3.5 L 7 1 V 13 L 3.5 10 H 1 Z M 9 4.5 C 10.5 5.8 10.5 8.2 9 9.5 M 10.5 2.5 C 12.8 4.8 12.8 9.2 10.5 11.5");
+            }
+
+            _btnVolume.Content = icon;
+        }
+
+        private void RenderBookmarks()
+        {
+            if (_bookmarksCanvas == null || _slider == null || _slider.ActualWidth <= 0 || _shape == null || _shape.VideoBookmarks == null) return;
+            _bookmarksCanvas.Children.Clear();
+
+            double maxT = _slider.Maximum > 0 ? _slider.Maximum : 150.0;
+            double trackW = _slider.ActualWidth;
+
+            foreach (float bSec in _shape.VideoBookmarks)
+            {
+                double frac = Math.Max(0.0, Math.Min(1.0, bSec / maxT));
+                double bx = frac * trackW;
+
+                WpfPath mark = new WpfPath
+                {
+                    Fill = new WpfSolidColorBrush(WpfColor.FromRgb(250, 204, 21)),
+                    Stroke = new WpfSolidColorBrush(WpfColor.FromRgb(161, 98, 7)),
+                    StrokeThickness = 0.5,
+                    Data = WpfGeometry.Parse("M 0 0 L 3 3 L 0 6 L -3 3 Z")
+                };
+                Canvas.SetLeft(mark, bx);
+                Canvas.SetTop(mark, 5);
+                _bookmarksCanvas.Children.Add(mark);
+            }
+        }
+
+        private void Media_MediaOpened(object sender, RoutedEventArgs e)
+        {
+            if (_media.NaturalDuration.HasTimeSpan)
+            {
+                double totalSec = _media.NaturalDuration.TimeSpan.TotalSeconds;
+                _slider.Maximum = totalSec;
+                if (_shape != null)
+                {
+                    _shape.VideoTotalTime = (float)totalSec;
+                }
+            }
+
+            // Apply Trim Start
+            if (_shape != null && _shape.VideoTrimStart > 0)
+            {
+                _media.Position = TimeSpan.FromSeconds(_shape.VideoTrimStart);
+            }
+
+            // Apply Volume
+            SetVolumeLevel(_shape != null ? _shape.VideoVolume : VideoVolumeLevel.High, _shape != null ? _shape.VideoVolumeLevel : "High");
+
+            UpdateTimes();
+            RenderBookmarks();
+
+            // Auto-start playback
+            Play();
+        }
+
+        private void Media_MediaEnded(object sender, RoutedEventArgs e)
+        {
+            if (_shape != null && _shape.VideoLoopUntilStopped)
+            {
+                double startSec = (_shape.VideoTrimStart > 0) ? _shape.VideoTrimStart : 0.0;
+                _media.Position = TimeSpan.FromSeconds(startSec);
+                _media.Play();
+            }
+            else
+            {
+                Pause();
+                if (_shape != null && _shape.VideoRewindAfterPlaying)
+                {
+                    double startSec = (_shape.VideoTrimStart > 0) ? _shape.VideoTrimStart : 0.0;
+                    _media.Position = TimeSpan.FromSeconds(startSec);
+                    UpdateTimes();
+                }
+            }
+        }
+
+        private void Media_MediaFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            Console.WriteLine("MediaElement error: " + (e.ErrorException != null ? e.ErrorException.Message : "Unknown error"));
+        }
+
+        private void TrackerTimer_Tick(object sender, EventArgs e)
+        {
+            if (!_isUserSeeking && _media.NaturalDuration.HasTimeSpan)
+            {
+                double pos = _media.Position.TotalSeconds;
+                _slider.Value = pos;
+                if (_shape != null)
+                {
+                    _shape.VideoCurrentTime = (float)pos;
+                }
+
+                // Check Trim End
+                if (_shape != null && _shape.VideoTrimEnd > 0 && pos >= _shape.VideoTrimEnd)
+                {
+                    if (_shape.VideoLoopUntilStopped)
+                    {
+                        double startSec = (_shape.VideoTrimStart > 0) ? _shape.VideoTrimStart : 0.0;
+                        _media.Position = TimeSpan.FromSeconds(startSec);
+                    }
+                    else
+                    {
+                        Pause();
+                    }
+                }
+
+                UpdateTimes();
+            }
+        }
+
+        private void UpdateTimes()
+        {
+            TimeSpan cur = _media.Position;
+            TimeSpan tot = _media.NaturalDuration.HasTimeSpan ? _media.NaturalDuration.TimeSpan : TimeSpan.FromSeconds(_shape != null && _shape.VideoTotalTime > 0 ? _shape.VideoTotalTime : 0);
+
+            string curStr = cur.TotalHours >= 1 ? string.Format("{0:D2}:{1:D2}:{2:D2}", (int)cur.TotalHours, cur.Minutes, cur.Seconds) : string.Format("{0:D2}:{1:D2}", cur.Minutes, cur.Seconds);
+            string totStr = tot.TotalHours >= 1 ? string.Format("{0:D2}:{1:D2}:{2:D2}", (int)tot.TotalHours, tot.Minutes, tot.Seconds) : string.Format("{0:D2}:{1:D2}", tot.Minutes, tot.Seconds);
+
+            _txtTime.Text = curStr + " / " + totStr;
+        }
+
+        public void Play()
+        {
+            _media.Play();
+            IsPlaying = true;
+            if (_shape != null) _shape.IsVideoPlaying = true;
+            UpdatePlayButtonIcon(true);
+            _trackerTimer.Start();
+            _autoHideTimer.Start();
+            if (_onStateChanged != null) _onStateChanged();
+        }
+
+        public void Pause()
+        {
+            _media.Pause();
+            IsPlaying = false;
+            if (_shape != null) _shape.IsVideoPlaying = false;
+            UpdatePlayButtonIcon(false);
+            _trackerTimer.Stop();
+            _autoHideTimer.Stop();
+            if (_barBorder != null) _barBorder.Opacity = 1.0;
+            if (_onStateChanged != null) _onStateChanged();
+        }
+
+        public void TogglePlay()
+        {
+            if (IsPlaying) Pause();
+            else Play();
+        }
+
+        public void Seek(float seconds)
+        {
+            _media.Position = TimeSpan.FromSeconds(Math.Max(0, seconds));
+            if (_shape != null) _shape.VideoCurrentTime = seconds;
+            UpdateTimes();
+            if (_onStateChanged != null) _onStateChanged();
+        }
+
+        public void ToggleVolume()
+        {
+            if (_isMuted)
+            {
+                _isMuted = false;
+                _media.Volume = _previousVolume > 0 ? _previousVolume : 0.8;
+                UpdateVolumeButtonIcon(false);
+                if (_shape != null) _shape.VideoVolume = VideoVolumeLevel.High;
+            }
+            else
+            {
+                _previousVolume = _media.Volume;
+                _isMuted = true;
+                _media.Volume = 0.0;
+                UpdateVolumeButtonIcon(true);
+                if (_shape != null) _shape.VideoVolume = VideoVolumeLevel.Mute;
+            }
+        }
+
+        public void SetVolumeLevel(VideoVolumeLevel level, string levelStr)
+        {
+            double vol = 0.8;
+            if (!string.IsNullOrEmpty(levelStr))
+            {
+                if (levelStr.Equals("Mute", StringComparison.OrdinalIgnoreCase)) vol = 0.0;
+                else if (levelStr.Equals("Low", StringComparison.OrdinalIgnoreCase)) vol = 0.25;
+                else if (levelStr.Equals("Medium", StringComparison.OrdinalIgnoreCase)) vol = 0.60;
+                else if (levelStr.Equals("High", StringComparison.OrdinalIgnoreCase)) vol = 1.0;
+            }
+            else
+            {
+                switch (level)
+                {
+                    case VideoVolumeLevel.Mute: vol = 0.0; break;
+                    case VideoVolumeLevel.Low: vol = 0.25; break;
+                    case VideoVolumeLevel.Medium: vol = 0.60; break;
+                    case VideoVolumeLevel.High: vol = 1.0; break;
+                }
+            }
+
+            _isMuted = (vol <= 0.001);
+            _media.Volume = vol;
+            if (!_isMuted) _previousVolume = vol;
+            UpdateVolumeButtonIcon(_isMuted);
         }
 
         public void UpdateShape(ShapeNode shape)
         {
             _shape = shape;
-            Invalidate();
+            RenderBookmarks();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        public void DisposePlayer()
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-            int w = Width;
-            int h = Height;
-
-            // Sleek Dark Background
-            using (SolidBrush bg = new SolidBrush(Color.FromArgb(240, 15, 23, 42)))
+            _trackerTimer.Stop();
+            _autoHideTimer.Stop();
+            try
             {
-                g.FillRectangle(bg, 0, 0, w, h);
+                _media.Stop();
+                _media.Close();
             }
-
-            using (Pen topPen = new Pen(Color.FromArgb(51, 65, 85), 1f))
-            {
-                g.DrawLine(topPen, 0, 0, w, 0);
-            }
-
-            // 1. Play / Pause Icon Button
-            float btnSz = h * 0.55f;
-            float btnX = 10;
-            float btnY = (h - btnSz) / 2f;
-            bool isPlaying = (_shape != null && _shape.IsVideoPlaying);
-
-            using (SolidBrush pb = new SolidBrush(Color.FromArgb(56, 189, 248)))
-            {
-                if (isPlaying)
-                {
-                    float barW = btnSz * 0.3f;
-                    g.FillRectangle(pb, btnX + btnSz * 0.1f, btnY, barW, btnSz);
-                    g.FillRectangle(pb, btnX + btnSz * 0.6f, btnY, barW, btnSz);
-                }
-                else
-                {
-                    PointF[] tri = new PointF[] {
-                        new PointF(btnX + 2, btnY),
-                        new PointF(btnX + btnSz, btnY + btnSz / 2f),
-                        new PointF(btnX + 2, btnY + btnSz)
-                    };
-                    g.FillPolygon(pb, tri);
-                }
-            }
-
-            // 2. Timeline Track
-            float timeX = btnX + btnSz + 12;
-            float timeW = Math.Max(40, w - timeX - (w > 240 ? 115 : 45));
-            float timeY = h / 2f - 2.5f;
-            float trackH = 5f;
-
-            using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(71, 85, 105)))
-            {
-                g.FillRectangle(trackBg, timeX, timeY, timeW, trackH);
-            }
-
-            float curT = _shape != null ? _shape.VideoCurrentTime : 0f;
-            float totT = _shape != null && _shape.VideoTotalTime > 0 ? _shape.VideoTotalTime : 150f;
-            float playedFrac = Math.Max(0f, Math.Min(1f, curT / totT));
-
-            // Played red progress
-            using (SolidBrush progB = new SolidBrush(Color.FromArgb(239, 68, 68)))
-            {
-                g.FillRectangle(progB, timeX, timeY, timeW * playedFrac, trackH);
-            }
-
-            // Scrubber knob
-            float scrubX = timeX + timeW * playedFrac;
-            float scrubR = 6f;
-            using (SolidBrush scrubB = new SolidBrush(Color.White))
-            using (Pen scrubPen = new Pen(Color.FromArgb(239, 68, 68), 1.5f))
-            {
-                g.FillEllipse(scrubB, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
-                g.DrawEllipse(scrubPen, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
-            }
-
-            // Yellow Bookmarks
-            if (_shape != null && _shape.VideoBookmarks != null && _shape.VideoBookmarks.Count > 0)
-            {
-                using (SolidBrush bmB = new SolidBrush(Color.FromArgb(250, 204, 21)))
-                using (Pen bmP = new Pen(Color.FromArgb(161, 98, 7), 1f))
-                {
-                    foreach (float bSec in _shape.VideoBookmarks)
-                    {
-                        float bFrac = Math.Max(0.05f, Math.Min(0.95f, bSec / totT));
-                        float bx = timeX + timeW * bFrac;
-                        g.FillRectangle(bmB, bx - 2f, timeY - 3f, 4f, trackH + 6f);
-                        g.DrawRectangle(bmP, bx - 2f, timeY - 3f, 4f, trackH + 6f);
-                    }
-                }
-            }
-
-            // 3. Time Text & Speaker on Right
-            if (w > 240)
-            {
-                float rightX = timeX + timeW + 8;
-                using (Font timeFont = new Font("Segoe UI", 9f, FontStyle.Regular))
-                using (SolidBrush tb = new SolidBrush(Color.FromArgb(226, 232, 240)))
-                {
-                    int curM = (int)(curT / 60);
-                    int curS = (int)(curT % 60);
-                    int totM = (int)(totT / 60);
-                    int totS = (int)(totT % 60);
-                    string timeStr = string.Format("{0:D2}:{1:D2} / {2:D2}:{3:D2}", curM, curS, totM, totS);
-                    g.DrawString(timeStr, timeFont, tb, rightX, (h - 14) / 2f);
-                }
-
-                // Volume icon
-                float spkX = w - 24;
-                float spkY = h / 2f;
-                using (Pen spkPen = new Pen(Color.FromArgb(148, 163, 184), 1.5f))
-                {
-                    g.DrawLine(spkPen, spkX, spkY - 4, spkX + 4, spkY - 4);
-                    g.DrawLine(spkPen, spkX + 4, spkY - 4, spkX + 8, spkY - 8);
-                    g.DrawLine(spkPen, spkX + 8, spkY - 8, spkX + 8, spkY + 8);
-                    g.DrawLine(spkPen, spkX + 8, spkY + 8, spkX + 4, spkY + 4);
-                    g.DrawLine(spkPen, spkX + 4, spkY + 4, spkX, spkY + 4);
-                    g.DrawLine(spkPen, spkX, spkY + 4, spkX, spkY - 4);
-                }
-            }
-        }
-
-        protected override void OnMouseDown(MouseEventArgs e)
-        {
-            base.OnMouseDown(e);
-            int w = Width;
-            int h = Height;
-            float btnSz = h * 0.55f;
-            float btnX = 10;
-            float timeX = btnX + btnSz + 12;
-            float timeW = Math.Max(40, w - timeX - (w > 240 ? 115 : 45));
-
-            if (e.X < timeX)
-            {
-                if (_onTogglePlay != null) _onTogglePlay();
-            }
-            else if (e.X >= timeX && e.X <= timeX + timeW)
-            {
-                _isDraggingScrubber = true;
-                SeekToMouseX(e.X, timeX, timeW);
-            }
-            else if (e.X > timeX + timeW)
-            {
-                if (e.X >= w - 30)
-                {
-                    if (_onToggleVolume != null) _onToggleVolume();
-                }
-            }
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            if (_isDraggingScrubber && (e.Button & MouseButtons.Left) != 0)
-            {
-                int w = Width;
-                int h = Height;
-                float btnSz = h * 0.55f;
-                float btnX = 10;
-                float timeX = btnX + btnSz + 12;
-                float timeW = Math.Max(40, w - timeX - (w > 240 ? 115 : 45));
-                SeekToMouseX(e.X, timeX, timeW);
-            }
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            base.OnMouseUp(e);
-            _isDraggingScrubber = false;
-        }
-
-        private void SeekToMouseX(int mouseX, float timeX, float timeW)
-        {
-            float frac = Math.Max(0f, Math.Min(1f, (mouseX - timeX) / timeW));
-            float totT = _shape != null && _shape.VideoTotalTime > 0 ? _shape.VideoTotalTime : 150f;
-            if (_onSeek != null) _onSeek(frac * totT);
-            Invalidate();
+            catch { }
         }
     }
 
     /// <summary>
-    /// PowerPoint-grade Seamless Video Playback Engine (100% borderless, real-time interactive click-to-pause/play)
+    /// PowerPoint-Grade Seamless Native In-Slide Video Playback Engine
+    /// Hosts Direct3D hardware-accelerated Media Foundation player directly in slide bounds
     /// </summary>
-    public class SlideVideoPlayerManager : IMessageFilter
+    public class SlideVideoPlayerManager
     {
         private static SlideVideoPlayerManager _instance;
         public static SlideVideoPlayerManager Instance
@@ -326,29 +664,18 @@ namespace GenOffice.UI
             }
         }
 
-        private Panel _playerContainer;
-        private WmpAxControl _wmpControl;
-        private VideoPlaybackBarControl _playbackBar;
+        private WinFormsPanel _playerContainer;
+        private ElementHost _elementHost;
+        private WpfSlideVideoPlayerView _wpfPlayer;
         private ShapeNode _activeShape;
-        private Control _parentControl;
+        private WinFormsControl _parentControl;
         private bool _isPresentation;
-        private Timer _playbackTracker;
 
         public bool IsPlaying
         {
             get
             {
-                if (_wmpControl == null) return false;
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null && ocx.playState == 3) // 3 = Playing
-                    {
-                        return true;
-                    }
-                }
-                catch { }
-                return false;
+                return _wpfPlayer != null && _wpfPlayer.IsPlaying;
             }
         }
 
@@ -357,100 +684,20 @@ namespace GenOffice.UI
             get { return _activeShape; }
         }
 
-        public SlideVideoPlayerManager()
-        {
-            _playbackTracker = new Timer();
-            _playbackTracker.Interval = 100;
-            _playbackTracker.Tick += PlaybackTracker_Tick;
-            Application.AddMessageFilter(this);
-        }
+        public SlideVideoPlayerManager() { }
 
-        public bool PreFilterMessage(ref Message m)
-        {
-            // Intercept mouse clicks on video: 0x0201 = WM_LBUTTONDOWN, 0x0203 = WM_LBUTTONDBLCLK
-            if (m.Msg == 0x0201 || m.Msg == 0x0203)
-            {
-                if (_playerContainer != null && _playerContainer.Visible && !_playerContainer.IsDisposed && _activeShape != null)
-                {
-                    Point screenPt = Cursor.Position;
-                    Rectangle panelScreen = _playerContainer.RectangleToScreen(_playerContainer.ClientRectangle);
-                    if (panelScreen.Contains(screenPt))
-                    {
-                        Point localPt = _playerContainer.PointToClient(screenPt);
-                        float barH = (_playbackBar != null && _playbackBar.Visible) ? _playbackBar.Height : 0;
-
-                        // If clicked on playback bar, let the playback bar handle its mouse event directly
-                        if (localPt.Y >= _playerContainer.Height - barH)
-                        {
-                            return false;
-                        }
-
-                        // If clicked anywhere on the main video screen -> IMMEDIATELY TOGGLE PLAY/PAUSE!
-                        TogglePlay();
-                        return true; // Eat message so WMP does not capture
-                    }
-                }
-            }
-            return false;
-        }
-
-        private void PlaybackTracker_Tick(object sender, EventArgs e)
-        {
-            if (_wmpControl == null || _activeShape == null) return;
-            try
-            {
-                dynamic ocx = _wmpControl.PlayerOcx;
-                if (ocx != null)
-                {
-                    double pos = (double)ocx.controls.currentPosition;
-                    _activeShape.VideoCurrentTime = (float)pos;
-
-                    if (ocx.currentMedia != null)
-                    {
-                        double dur = (double)ocx.currentMedia.duration;
-                        if (dur > 0) _activeShape.VideoTotalTime = (float)dur;
-                    }
-
-                    // Check Trim End
-                    if (_activeShape.VideoTrimEnd > 0 && pos >= _activeShape.VideoTrimEnd)
-                    {
-                        if (_activeShape.VideoLoopUntilStopped)
-                        {
-                            ocx.controls.currentPosition = (double)_activeShape.VideoTrimStart;
-                        }
-                        else
-                        {
-                            ocx.controls.pause();
-                            _activeShape.IsVideoPlaying = false;
-                        }
-                    }
-
-                    if (_playbackBar != null && !_playbackBar.IsDisposed)
-                    {
-                        _playbackBar.Invalidate();
-                    }
-
-                    if (_parentControl != null)
-                    {
-                        _parentControl.Invalidate();
-                    }
-                }
-            }
-            catch { }
-        }
-
-        public void Play(ShapeNode shape, Control container, Rectangle bounds, bool isPresentation = false)
+        public void Play(ShapeNode shape, WinFormsControl container, GdiRectangle bounds, bool isPresentation = false)
         {
             if (shape == null || container == null) return;
 
             string videoPath = ResolveVideoPath(shape.VideoPath, container);
             if (string.IsNullOrEmpty(videoPath) || (!videoPath.StartsWith("http", StringComparison.OrdinalIgnoreCase) && !File.Exists(videoPath)))
             {
-                using (OpenFileDialog ofd = new OpenFileDialog())
+                using (WinForms.OpenFileDialog ofd = new WinForms.OpenFileDialog())
                 {
                     ofd.Title = "Chọn tệp video để phát (" + (!string.IsNullOrEmpty(shape.VideoPath) ? Path.GetFileName(shape.VideoPath) : "Video") + ")...";
                     ofd.Filter = "Tệp Video (*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm)|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm|Tất cả tệp (*.*)|*.*";
-                    if (ofd.ShowDialog(container) == DialogResult.OK)
+                    if (ofd.ShowDialog(container) == WinForms.DialogResult.OK)
                     {
                         shape.VideoPath = ofd.FileName;
                         videoPath = ofd.FileName;
@@ -471,25 +718,14 @@ namespace GenOffice.UI
                 shape.CachedImage = VideoThumbnailHelper.GetVideoPosterFrame(videoPath);
             }
 
-            Rectangle adjustedBounds = isPresentation ? bounds : new Rectangle(bounds.X + 4, bounds.Y + 4, Math.Max(40, bounds.Width - 8), Math.Max(40, bounds.Height - 8));
-
             // If already playing this shape, just update bounds and ensure playing
-            if (_activeShape == shape && _playerContainer != null && _wmpControl != null)
+            if (_activeShape == shape && _playerContainer != null && _wpfPlayer != null)
             {
-                _playerContainer.Bounds = adjustedBounds;
+                _playerContainer.Bounds = bounds;
                 _isPresentation = isPresentation;
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null)
-                    {
-                        ocx.controls.play();
-                    }
-                }
-                catch { }
+                _wpfPlayer.Play();
                 shape.IsVideoPlaying = true;
-                if (_playbackBar != null) _playbackBar.UpdateShape(shape);
-                _playbackTracker.Start();
+                _wpfPlayer.UpdateShape(shape);
                 return;
             }
 
@@ -499,78 +735,51 @@ namespace GenOffice.UI
             _parentControl = container;
             _isPresentation = isPresentation;
 
-            // Pure Seamless Container
-            _playerContainer = new Panel();
-            _playerContainer.Bounds = adjustedBounds;
-            _playerContainer.BackColor = Color.Black;
+            // Pure Seamless WinForms Container & ElementHost
+            _playerContainer = new WinFormsPanel
+            {
+                Bounds = bounds,
+                BackColor = GdiColor.Black,
+                Margin = WinForms.Padding.Empty,
+                Padding = WinForms.Padding.Empty
+            };
 
-            // 1. Playback Bar Control at the bottom
-            _playbackBar = new VideoPlaybackBarControl(shape, () => TogglePlay(), s => Seek(s), () => ToggleVolume());
-            _playerContainer.Controls.Add(_playbackBar);
+            _elementHost = new ElementHost
+            {
+                Dock = WinForms.DockStyle.Fill,
+                BackColor = GdiColor.Black,
+                Margin = WinForms.Padding.Empty,
+                Padding = WinForms.Padding.Empty
+            };
 
-            // 2. Video Player on top
-            _wmpControl = new WmpAxControl();
-            _wmpControl.Dock = DockStyle.Fill;
-            _playerContainer.Controls.Add(_wmpControl);
+            // PowerPoint Native WPF Direct3D Media Foundation Player
+            _wpfPlayer = new WpfSlideVideoPlayerView(shape, videoPath, isPresentation, () =>
+            {
+                if (_parentControl != null && !_parentControl.IsDisposed)
+                {
+                    _parentControl.Invalidate();
+                }
+            });
+
+            _elementHost.Child = _wpfPlayer;
+            _playerContainer.Controls.Add(_elementHost);
 
             container.Controls.Add(_playerContainer);
             _playerContainer.BringToFront();
 
-            // Set uiMode = "none" (PURE VIDEO FRAMES, 0% WINDOWS/WMP CHROME)
-            try
-            {
-                dynamic ocx = _wmpControl.PlayerOcx;
-                if (ocx != null)
-                {
-                    ocx.uiMode = "none";
-                    ocx.settings.autoStart = true;
-                    ocx.settings.volume = GetVolumeValue(shape.VideoVolume, shape.VideoVolumeLevel);
-                    ocx.settings.setMode("loop", shape.VideoLoopUntilStopped);
-                    ocx.URL = videoPath;
-
-                    if (shape.VideoTrimStart > 0)
-                    {
-                        ocx.controls.currentPosition = (double)shape.VideoTrimStart;
-                    }
-                    ocx.controls.play();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("WMP play error: " + ex.Message);
-            }
-
+            _wpfPlayer.Play();
             shape.IsVideoPlaying = true;
-            _playbackTracker.Start();
             container.Invalidate();
         }
 
-        public void TogglePlay(ShapeNode shape = null, Control container = null, Rectangle bounds = default(Rectangle), bool isPresentation = false)
+        public void TogglePlay(ShapeNode shape = null, WinFormsControl container = null, GdiRectangle bounds = default(GdiRectangle), bool isPresentation = false)
         {
             if (shape == null) shape = _activeShape;
-            if (_activeShape == shape && _playerContainer != null && _wmpControl != null)
+            if (_activeShape == shape && _wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null)
-                    {
-                        if (shape.IsVideoPlaying || (ocx.playState == 3)) // If currently playing -> PAUSE!
-                        {
-                            ocx.controls.pause();
-                            shape.IsVideoPlaying = false;
-                        }
-                        else // If paused -> PLAY!
-                        {
-                            ocx.controls.play();
-                            shape.IsVideoPlaying = true;
-                        }
-                        if (_playbackBar != null) _playbackBar.UpdateShape(shape);
-                        if (_parentControl != null) _parentControl.Invalidate();
-                        return;
-                    }
-                }
-                catch { }
+                _wpfPlayer.TogglePlay();
+                if (_parentControl != null && !_parentControl.IsDisposed) _parentControl.Invalidate();
+                return;
             }
 
             if (shape != null && container != null)
@@ -581,93 +790,63 @@ namespace GenOffice.UI
 
         public void ToggleVolume()
         {
-            if (_activeShape != null && _wmpControl != null)
+            if (_wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null)
-                    {
-                        _activeShape.VideoVolume = (_activeShape.VideoVolume == VideoVolumeLevel.Mute) ? VideoVolumeLevel.High : VideoVolumeLevel.Mute;
-                        ocx.settings.volume = GetVolumeValue(_activeShape.VideoVolume, _activeShape.VideoVolumeLevel);
-                    }
-                }
-                catch { }
-                if (_playbackBar != null) _playbackBar.Invalidate();
+                _wpfPlayer.ToggleVolume();
             }
         }
 
         public void Pause()
         {
-            if (_wmpControl != null)
+            if (_wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null) ocx.controls.pause();
-                }
-                catch { }
+                _wpfPlayer.Pause();
             }
             if (_activeShape != null)
             {
                 _activeShape.IsVideoPlaying = false;
-                if (_playbackBar != null) _playbackBar.UpdateShape(_activeShape);
             }
-            if (_parentControl != null) _parentControl.Invalidate();
+            if (_parentControl != null && !_parentControl.IsDisposed) _parentControl.Invalidate();
         }
 
         public void Resume()
         {
-            if (_wmpControl != null)
+            if (_wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null) ocx.controls.play();
-                }
-                catch { }
+                _wpfPlayer.Play();
             }
             if (_activeShape != null)
             {
                 _activeShape.IsVideoPlaying = true;
-                if (_playbackBar != null) _playbackBar.UpdateShape(_activeShape);
             }
-            if (_parentControl != null) _parentControl.Invalidate();
+            if (_parentControl != null && !_parentControl.IsDisposed) _parentControl.Invalidate();
         }
 
         public void Seek(float seconds)
         {
-            if (_wmpControl != null)
+            if (_wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null)
-                    {
-                        ocx.controls.currentPosition = (double)seconds;
-                    }
-                }
-                catch { }
+                _wpfPlayer.Seek(seconds);
             }
             if (_activeShape != null)
             {
                 _activeShape.VideoCurrentTime = seconds;
-                if (_playbackBar != null) _playbackBar.Invalidate();
             }
-            if (_parentControl != null) _parentControl.Invalidate();
+            if (_parentControl != null && !_parentControl.IsDisposed) _parentControl.Invalidate();
         }
 
         public void Stop()
         {
-            _playbackTracker.Stop();
-            if (_wmpControl != null)
+            if (_wpfPlayer != null)
             {
-                try
-                {
-                    dynamic ocx = _wmpControl.PlayerOcx;
-                    if (ocx != null) ocx.controls.stop();
-                }
-                catch { }
+                _wpfPlayer.DisposePlayer();
+                _wpfPlayer = null;
+            }
+
+            if (_elementHost != null)
+            {
+                try { _elementHost.Dispose(); } catch { }
+                _elementHost = null;
             }
 
             if (_playerContainer != null && _parentControl != null)
@@ -679,8 +858,6 @@ namespace GenOffice.UI
                 }
                 catch { }
                 _playerContainer = null;
-                _wmpControl = null;
-                _playbackBar = null;
             }
 
             if (_activeShape != null)
@@ -691,40 +868,20 @@ namespace GenOffice.UI
 
             if (_parentControl != null)
             {
-                _parentControl.Invalidate();
+                if (!_parentControl.IsDisposed) _parentControl.Invalidate();
                 _parentControl = null;
             }
         }
 
-        public void UpdateBounds(Rectangle newBounds)
+        public void UpdateBounds(GdiRectangle newBounds)
         {
-            Rectangle adjusted = _isPresentation ? newBounds : new Rectangle(newBounds.X + 4, newBounds.Y + 4, Math.Max(40, newBounds.Width - 8), Math.Max(40, newBounds.Height - 8));
-            if (_playerContainer != null && (_playerContainer.Bounds != adjusted))
+            if (_playerContainer != null && (_playerContainer.Bounds != newBounds))
             {
-                _playerContainer.Bounds = adjusted;
+                _playerContainer.Bounds = newBounds;
             }
         }
 
-        private int GetVolumeValue(VideoVolumeLevel level, string levelStr)
-        {
-            if (!string.IsNullOrEmpty(levelStr))
-            {
-                if (levelStr.Equals("Mute", StringComparison.OrdinalIgnoreCase)) return 0;
-                if (levelStr.Equals("Low", StringComparison.OrdinalIgnoreCase)) return 25;
-                if (levelStr.Equals("Medium", StringComparison.OrdinalIgnoreCase)) return 60;
-                if (levelStr.Equals("High", StringComparison.OrdinalIgnoreCase)) return 100;
-            }
-            switch (level)
-            {
-                case VideoVolumeLevel.Mute: return 0;
-                case VideoVolumeLevel.Low: return 25;
-                case VideoVolumeLevel.Medium: return 60;
-                case VideoVolumeLevel.High: return 100;
-                default: return 80;
-            }
-        }
-
-        private string ResolveVideoPath(string rawPath, Control parent)
+        private string ResolveVideoPath(string rawPath, WinFormsControl parent)
         {
             if (string.IsNullOrEmpty(rawPath)) return null;
 
@@ -736,14 +893,26 @@ namespace GenOffice.UI
 
             if (File.Exists(rawPath)) return rawPath;
 
-            string full = Path.GetFullPath(rawPath);
-            if (File.Exists(full)) return full;
+            try
+            {
+                string full = Path.GetFullPath(rawPath);
+                if (File.Exists(full)) return full;
+            }
+            catch { }
 
-            string desktopPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), Path.GetFileName(rawPath));
-            if (File.Exists(desktopPath)) return desktopPath;
+            try
+            {
+                string desktopPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), Path.GetFileName(rawPath));
+                if (File.Exists(desktopPath)) return desktopPath;
+            }
+            catch { }
 
-            string myVideos = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), Path.GetFileName(rawPath));
-            if (File.Exists(myVideos)) return myVideos;
+            try
+            {
+                string myVideos = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), Path.GetFileName(rawPath));
+                if (File.Exists(myVideos)) return myVideos;
+            }
+            catch { }
 
             return null;
         }

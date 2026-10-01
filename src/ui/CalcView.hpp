@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_CALC_VIEW_HPP
-#ifndef GENOFFICE_CALC_VIEW_HPP
 #define GENOFFICE_CALC_VIEW_HPP
 
 #include <windows.h>

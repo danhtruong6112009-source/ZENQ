@@ -122,7 +122,7 @@ namespace GenOffice
             {
                 if (string.IsNullOrWhiteSpace(_txtComment.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập nội dung bình luận!", "GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Vui lòng nhập nội dung bình luận!", "ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 CommentText = _txtComment.Text.Trim();

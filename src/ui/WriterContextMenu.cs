@@ -46,10 +46,12 @@ namespace GenOffice.UI
             _styles = new StyleItem[]
             {
                 new StyleItem { Name = "Normal", Subtext = "Văn bản chuẩn", PreviewFont = new Font("Segoe UI", 10f, FontStyle.Regular), TextColor = Color.Black, Level = 0 },
+                new StyleItem { Name = "No Spacing", Subtext = "Không dãn cách dòng", PreviewFont = new Font("Segoe UI", 10f, FontStyle.Regular), TextColor = Color.Black, Level = 6 },
                 new StyleItem { Name = "Heading 1", Subtext = "Tiêu đề cấp 1", PreviewFont = new Font("Segoe UI Semibold", 13f, FontStyle.Bold), TextColor = Color.FromArgb(43, 87, 154), Level = 1 },
                 new StyleItem { Name = "Heading 2", Subtext = "Tiêu đề cấp 2", PreviewFont = new Font("Segoe UI Semibold", 11.5f, FontStyle.Bold), TextColor = Color.FromArgb(43, 87, 154), Level = 2 },
-                new StyleItem { Name = "Title", Subtext = "Tiêu đề trang trọng", PreviewFont = new Font("Segoe UI", 14f, FontStyle.Bold), TextColor = Color.FromArgb(31, 41, 55), Level = 3 },
-                new StyleItem { Name = "Subtitle", Subtext = "Tiêu đề phụ", PreviewFont = new Font("Segoe UI", 10.5f, FontStyle.Italic), TextColor = Color.FromArgb(107, 114, 128), Level = 4 }
+                new StyleItem { Name = "Heading 3", Subtext = "Tiêu đề cấp 3", PreviewFont = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold), TextColor = Color.FromArgb(31, 78, 121), Level = 3 },
+                new StyleItem { Name = "Title", Subtext = "Tiêu đề tài liệu lớn", PreviewFont = new Font("Segoe UI", 14f, FontStyle.Bold), TextColor = Color.FromArgb(43, 87, 154), Level = 4 },
+                new StyleItem { Name = "Subtitle", Subtext = "Tiêu đề phụ / Diễn giải", PreviewFont = new Font("Segoe UI", 10.5f, FontStyle.Italic), TextColor = Color.FromArgb(107, 114, 128), Level = 5 }
             };
 
             Rectangle wa = Screen.GetWorkingArea(screenLocation);
@@ -105,10 +107,10 @@ namespace GenOffice.UI
             base.OnMouseDown(e);
             if (e.Button == MouseButtons.Left && _hoverIndex >= 0 && _hoverIndex < _styles.Length)
             {
-                int lvl = _styles[_hoverIndex].Level;
+                string sName = _styles[_hoverIndex].Name;
                 if (_writerView != null)
                 {
-                    _writerView.ApplyHeadingStyle(lvl);
+                    _writerView.ApplyQuickStyle(sName, _ribbon);
                     if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon);
                     if (_parentForm != null) _parentForm.Invalidate();
                 }
@@ -792,7 +794,7 @@ namespace GenOffice.UI
                 case 0: // Font
                     Point fontPt = this.PointToScreen(new Point(_btnRects[0].Left, _btnRects[0].Bottom));
                     string curF = _ribbon != null ? _ribbon.SelectedFont : "Times New Roman";
-                    FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(curF) ? curF : "Times New Roman", fontPt, _ribbon != null ? _ribbon.AvailableSystemFonts : null);
+                    FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(curF) ? curF : "Times New Roman", fontPt, _ribbon != null ? _ribbon.AvailableSystemFonts : null, Color.FromArgb(16, 110, 190));
                     fDlg.FormClosed += (s, e) => { if (_floatingParentPopup != null) _floatingParentPopup.IsSubMenuOpen = false; };
                     fDlg.OnFontSelected += (font) =>
                     {
@@ -808,7 +810,7 @@ namespace GenOffice.UI
                 case 1: // Font Size
                     Point szPt = this.PointToScreen(new Point(_btnRects[1].Left, _btnRects[1].Bottom));
                     float curS = _ribbon != null && _ribbon.FontSize > 0 ? _ribbon.FontSize : 12f;
-                    SizeDropDownForm szDlg = new SizeDropDownForm(curS, szPt);
+                    SizeDropDownForm szDlg = new SizeDropDownForm(curS, szPt, Color.FromArgb(16, 110, 190));
                     szDlg.FormClosed += (s, e) => { if (_floatingParentPopup != null) _floatingParentPopup.IsSubMenuOpen = false; };
                     szDlg.OnSizeSelected += (sz) =>
                     {
@@ -986,25 +988,9 @@ namespace GenOffice.UI
 
         public static void ShowMiniToolbar(int screenX, int screenY, WriterView writerView, RibbonBar ribbon, Control parentControl)
         {
-            if (writerView == null || writerView.SelectionStart == writerView.SelectionEnd) return;
-
+            // Floating toolbar on left click is permanently disabled per user request.
+            // Mini-toolbar is now exclusively embedded inside the right-click ContextMenu.
             CloseCurrent();
-
-            _currentInstance = new WriterFloatingMiniToolbarPopup(writerView, ribbon, parentControl);
-
-            Rectangle wa = Screen.GetWorkingArea(new Point(screenX, screenY));
-            int targetX = screenX - 40;
-            int targetY = screenY - 65;
-
-            if (targetY < wa.Top + 10) targetY = screenY + 25;
-            if (targetY + 65 > wa.Bottom) targetY = wa.Bottom - 70;
-            if (targetX + 348 > wa.Right) targetX = wa.Right - 355;
-            if (targetX < wa.Left + 10) targetX = wa.Left + 10;
-
-            _screenBounds = new Rectangle(targetX, targetY, 348, 60);
-            _openedTime = DateTime.Now;
-
-            _currentInstance.Show(targetX, targetY);
         }
 
         public static void CloseCurrent()
@@ -1051,6 +1037,13 @@ namespace GenOffice.UI
         {
             if (_currentInstance != null && !_currentInstance.IsDisposed && _currentInstance.Visible)
             {
+                Form mainForm = Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null;
+                if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
+                {
+                    Point clientPt = mainForm.PointToClient(screenPt);
+                    if (clientPt.Y <= 158 || clientPt.Y >= mainForm.ClientSize.Height - 26) return false;
+                }
+
                 Rectangle expanded = new Rectangle(_screenBounds.X - thresholdPx, _screenBounds.Y - thresholdPx, _screenBounds.Width + thresholdPx * 2, _screenBounds.Height + thresholdPx * 2);
                 return expanded.Contains(screenPt);
             }
@@ -1064,11 +1057,29 @@ namespace GenOffice.UI
 
         public WriterFloatingMiniToolbarPopup(WriterView writerView, RibbonBar ribbon, Control parentControl)
         {
-            this.AutoClose = false;
+            this.AutoClose = true;
             this.Margin = Padding.Empty;
             this.Padding = Padding.Empty;
             this.DropShadowEnabled = true;
             this.BackColor = Color.FromArgb(249, 250, 251);
+
+            this.Closed += (s, e) =>
+            {
+                if (_currentInstance == this)
+                {
+                    _currentInstance = null;
+                    _screenBounds = Rectangle.Empty;
+                }
+            };
+
+            this.Closing += (s, e) =>
+            {
+                if (IsSubMenuOpen)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            };
 
             _toolbarControl = new WriterMiniToolbarControl(writerView, ribbon, parentControl as Form, this);
             ToolStripControlHost host = new ToolStripControlHost(_toolbarControl);
@@ -1159,7 +1170,7 @@ namespace GenOffice.UI
             {
                 Point fontPt = parentForm != null ? parentForm.PointToScreen(new Point(screenX, screenY)) : new Point(screenX, screenY);
                 string curF = ribbon != null ? ribbon.SelectedFont : "Times New Roman";
-                FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(curF) ? curF : "Times New Roman", fontPt, ribbon != null ? ribbon.AvailableSystemFonts : null);
+                FontDropDownForm fDlg = new FontDropDownForm(!string.IsNullOrEmpty(curF) ? curF : "Times New Roman", fontPt, ribbon != null ? ribbon.AvailableSystemFonts : null, Color.FromArgb(16, 110, 190));
                 fDlg.OnFontSelected += (font) =>
                 {
                     if (ribbon != null) ribbon.SelectedFont = font;

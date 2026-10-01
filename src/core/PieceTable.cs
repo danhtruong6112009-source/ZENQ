@@ -4,7 +4,11 @@ using System.Text;
 
 namespace GenOffice.Core
 {
-    public enum BufferType { Original, Add }
+    public enum BufferType
+    {
+        Original,
+        Add
+    }
 
     public class Piece
     {
@@ -25,6 +29,10 @@ namespace GenOffice.Core
         private StringBuilder originalBuffer = new StringBuilder();
         private StringBuilder addBuffer = new StringBuilder();
         private List<Piece> pieces = new List<Piece>();
+        private string _cachedText = null;
+        private int _cachedTextVersion = -1;
+
+        public int Version { get; private set; }
 
         public PieceTable()
         {
@@ -41,6 +49,8 @@ namespace GenOffice.Core
             originalBuffer.Clear();
             addBuffer.Clear();
             pieces.Clear();
+            _cachedText = null;
+            Version++;
         }
 
         public void SetInitialText(string text)
@@ -53,6 +63,8 @@ namespace GenOffice.Core
             {
                 pieces.Add(new Piece(BufferType.Original, 0, originalBuffer.Length));
             }
+            _cachedText = null;
+            Version++;
         }
 
         public int Length
@@ -95,6 +107,8 @@ namespace GenOffice.Core
             if (pieces.Count == 0)
             {
                 pieces.Add(new Piece(BufferType.Add, addOffset, textLen));
+                _cachedText = null;
+                Version++;
                 return;
             }
 
@@ -106,6 +120,8 @@ namespace GenOffice.Core
             if (pieceIdx >= pieces.Count)
             {
                 pieces.Add(new Piece(BufferType.Add, addOffset, textLen));
+                _cachedText = null;
+                Version++;
                 return;
             }
 
@@ -128,6 +144,9 @@ namespace GenOffice.Core
                 pieces.Insert(pieceIdx + 1, new Piece(BufferType.Add, addOffset, textLen));
                 pieces.Insert(pieceIdx + 2, rightPiece);
             }
+
+            _cachedText = null;
+            Version++;
         }
 
         public void Remove(int index, int length)
@@ -173,17 +192,26 @@ namespace GenOffice.Core
 
                 remainingToRemove -= toRemoveHere;
             }
+
+            _cachedText = null;
+            Version++;
         }
 
         public string GetText()
         {
+            if (_cachedText != null && _cachedTextVersion == Version)
+            {
+                return _cachedText;
+            }
             StringBuilder sb = new StringBuilder(Length);
             foreach (var piece in pieces)
             {
                 StringBuilder src = (piece.BufferType == BufferType.Original) ? originalBuffer : addBuffer;
                 sb.Append(src.ToString(piece.Start, piece.Length));
             }
-            return sb.ToString();
+            _cachedText = sb.ToString();
+            _cachedTextVersion = Version;
+            return _cachedText;
         }
     }
 }

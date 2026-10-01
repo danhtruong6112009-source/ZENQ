@@ -39,7 +39,7 @@ namespace GenOffice.UI
 
             InitializeData();
 
-            Text = "Thêm hiệu ứng hoạt họa - GenOffice Slides";
+            Text = "Thêm hiệu ứng hoạt họa - ZenQ Slides";
             Size = new Size(800, 580);
             MinimumSize = new Size(740, 500);
             StartPosition = FormStartPosition.CenterParent;
@@ -143,7 +143,7 @@ namespace GenOffice.UI
             };
             Label lblSub = new Label
             {
-                Text = "Khám phá & áp dụng các hiệu ứng hoạt họa tiêu chuẩn và hiệu ứng độc quyền GenOffice",
+                Text = "Khám phá & áp dụng các hiệu ứng hoạt họa tiêu chuẩn và hiệu ứng độc quyền ZenQ",
                 Font = new Font("Segoe UI", 8.25f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(233, 213, 255),
                 AutoSize = true,

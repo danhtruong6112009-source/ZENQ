@@ -1,5 +1,4 @@
 #ifndef GENOFFICE_PIECE_TABLE_HPP
-#ifndef GENOFFICE_PIECE_TABLE_HPP
 #define GENOFFICE_PIECE_TABLE_HPP
 
 #include <string>

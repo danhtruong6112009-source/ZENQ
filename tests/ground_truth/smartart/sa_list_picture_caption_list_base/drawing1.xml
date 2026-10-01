@@ -1,0 +1,449 @@
+<ns0:drawing xmlns:ns0="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:ns1="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <ns0:spTree>
+    <ns0:nvGrpSpPr>
+      <ns0:cNvPr id="0" name="" />
+      <ns0:cNvGrpSpPr />
+    </ns0:nvGrpSpPr>
+    <ns0:grpSpPr />
+    <ns0:sp modelId="{092D35C3-F934-488A-ADC7-B36B667D8195}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="120215" y="903" />
+          <ns1:ext cx="1829817" cy="1260743" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="roundRect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent1">
+            <ns1:hueOff val="0" />
+            <ns1:satOff val="0" />
+            <ns1:lumOff val="0" />
+            <ns1:alphaOff val="0" />
+          </ns1:schemeClr>
+        </ns1:solidFill>
+        <ns1:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
+          <ns1:solidFill>
+            <ns1:schemeClr val="lt1">
+              <ns1:hueOff val="0" />
+              <ns1:satOff val="0" />
+              <ns1:lumOff val="0" />
+              <ns1:alphaOff val="0" />
+            </ns1:schemeClr>
+          </ns1:solidFill>
+          <ns1:prstDash val="solid" />
+          <ns1:miter lim="800000" />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="2">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="1">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor">
+          <ns1:schemeClr val="lt1" />
+        </ns1:fontRef>
+      </ns0:style>
+    </ns0:sp>
+    <ns0:sp modelId="{86FDD37E-08DD-44D8-B7F9-EDFC76299A57}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="120215" y="1261647" />
+          <ns1:ext cx="1829817" cy="678862" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="rect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:noFill />
+        <ns1:ln>
+          <ns1:noFill />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor" />
+      </ns0:style>
+      <ns0:txBody>
+        <ns1:bodyPr spcFirstLastPara="0" vert="horz" wrap="square" lIns="135128" tIns="135128" rIns="135128" bIns="0" numCol="1" spcCol="1270" anchor="t" anchorCtr="0">
+          <ns1:noAutofit />
+        </ns1:bodyPr>
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:pPr marL="0" lvl="0" indent="0" algn="ctr" defTabSz="844550">
+            <ns1:lnSpc>
+              <ns1:spcPct val="90000" />
+            </ns1:lnSpc>
+            <ns1:spcBef>
+              <ns1:spcPct val="0" />
+            </ns1:spcBef>
+            <ns1:spcAft>
+              <ns1:spcPct val="35000" />
+            </ns1:spcAft>
+            <ns1:buNone />
+          </ns1:pPr>
+          <ns1:r>
+            <ns1:rPr lang="en-US" sz="1900" kern="1200" />
+            <ns1:t>Step 1: Picture Caption List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+      <ns0:txXfrm>
+        <ns1:off x="120215" y="1261647" />
+        <ns1:ext cx="1829817" cy="678862" />
+      </ns0:txXfrm>
+    </ns0:sp>
+    <ns0:sp modelId="{3C88AD60-E7B9-4A5F-BF05-3ADC5B2CE751}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2133091" y="903" />
+          <ns1:ext cx="1829817" cy="1260743" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="roundRect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent1">
+            <ns1:hueOff val="0" />
+            <ns1:satOff val="0" />
+            <ns1:lumOff val="0" />
+            <ns1:alphaOff val="0" />
+          </ns1:schemeClr>
+        </ns1:solidFill>
+        <ns1:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
+          <ns1:solidFill>
+            <ns1:schemeClr val="lt1">
+              <ns1:hueOff val="0" />
+              <ns1:satOff val="0" />
+              <ns1:lumOff val="0" />
+              <ns1:alphaOff val="0" />
+            </ns1:schemeClr>
+          </ns1:solidFill>
+          <ns1:prstDash val="solid" />
+          <ns1:miter lim="800000" />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="2">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="1">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor">
+          <ns1:schemeClr val="lt1" />
+        </ns1:fontRef>
+      </ns0:style>
+    </ns0:sp>
+    <ns0:sp modelId="{42F2F7E9-5B97-4F3C-80AC-C3EE3EAFF5DE}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2133091" y="1261647" />
+          <ns1:ext cx="1829817" cy="678862" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="rect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:noFill />
+        <ns1:ln>
+          <ns1:noFill />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor" />
+      </ns0:style>
+      <ns0:txBody>
+        <ns1:bodyPr spcFirstLastPara="0" vert="horz" wrap="square" lIns="135128" tIns="135128" rIns="135128" bIns="0" numCol="1" spcCol="1270" anchor="t" anchorCtr="0">
+          <ns1:noAutofit />
+        </ns1:bodyPr>
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:pPr marL="0" lvl="0" indent="0" algn="ctr" defTabSz="844550">
+            <ns1:lnSpc>
+              <ns1:spcPct val="90000" />
+            </ns1:lnSpc>
+            <ns1:spcBef>
+              <ns1:spcPct val="0" />
+            </ns1:spcBef>
+            <ns1:spcAft>
+              <ns1:spcPct val="35000" />
+            </ns1:spcAft>
+            <ns1:buNone />
+          </ns1:pPr>
+          <ns1:r>
+            <ns1:rPr lang="en-US" sz="1900" kern="1200" />
+            <ns1:t>Step 2: Picture Caption List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+      <ns0:txXfrm>
+        <ns1:off x="2133091" y="1261647" />
+        <ns1:ext cx="1829817" cy="678862" />
+      </ns0:txXfrm>
+    </ns0:sp>
+    <ns0:sp modelId="{56BA3A7E-7C40-40D8-A0B3-0343F75E7C0D}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="4145967" y="903" />
+          <ns1:ext cx="1829817" cy="1260743" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="roundRect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent1">
+            <ns1:hueOff val="0" />
+            <ns1:satOff val="0" />
+            <ns1:lumOff val="0" />
+            <ns1:alphaOff val="0" />
+          </ns1:schemeClr>
+        </ns1:solidFill>
+        <ns1:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
+          <ns1:solidFill>
+            <ns1:schemeClr val="lt1">
+              <ns1:hueOff val="0" />
+              <ns1:satOff val="0" />
+              <ns1:lumOff val="0" />
+              <ns1:alphaOff val="0" />
+            </ns1:schemeClr>
+          </ns1:solidFill>
+          <ns1:prstDash val="solid" />
+          <ns1:miter lim="800000" />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="2">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="1">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor">
+          <ns1:schemeClr val="lt1" />
+        </ns1:fontRef>
+      </ns0:style>
+    </ns0:sp>
+    <ns0:sp modelId="{35BA0DCE-66E9-4799-8300-105FB01F6780}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="4145967" y="1261647" />
+          <ns1:ext cx="1829817" cy="678862" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="rect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:noFill />
+        <ns1:ln>
+          <ns1:noFill />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor" />
+      </ns0:style>
+      <ns0:txBody>
+        <ns1:bodyPr spcFirstLastPara="0" vert="horz" wrap="square" lIns="135128" tIns="135128" rIns="135128" bIns="0" numCol="1" spcCol="1270" anchor="t" anchorCtr="0">
+          <ns1:noAutofit />
+        </ns1:bodyPr>
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:pPr marL="0" lvl="0" indent="0" algn="ctr" defTabSz="844550">
+            <ns1:lnSpc>
+              <ns1:spcPct val="90000" />
+            </ns1:lnSpc>
+            <ns1:spcBef>
+              <ns1:spcPct val="0" />
+            </ns1:spcBef>
+            <ns1:spcAft>
+              <ns1:spcPct val="35000" />
+            </ns1:spcAft>
+            <ns1:buNone />
+          </ns1:pPr>
+          <ns1:r>
+            <ns1:rPr lang="en-US" sz="1900" kern="1200" />
+            <ns1:t>Step 3: Picture Caption List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+      <ns0:txXfrm>
+        <ns1:off x="4145967" y="1261647" />
+        <ns1:ext cx="1829817" cy="678862" />
+      </ns0:txXfrm>
+    </ns0:sp>
+    <ns0:sp modelId="{5AC77274-86E9-42F3-B189-9292C9E1C0AE}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2133091" y="2123490" />
+          <ns1:ext cx="1829817" cy="1260743" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="roundRect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:solidFill>
+          <ns1:schemeClr val="accent1">
+            <ns1:hueOff val="0" />
+            <ns1:satOff val="0" />
+            <ns1:lumOff val="0" />
+            <ns1:alphaOff val="0" />
+          </ns1:schemeClr>
+        </ns1:solidFill>
+        <ns1:ln w="12700" cap="flat" cmpd="sng" algn="ctr">
+          <ns1:solidFill>
+            <ns1:schemeClr val="lt1">
+              <ns1:hueOff val="0" />
+              <ns1:satOff val="0" />
+              <ns1:lumOff val="0" />
+              <ns1:alphaOff val="0" />
+            </ns1:schemeClr>
+          </ns1:solidFill>
+          <ns1:prstDash val="solid" />
+          <ns1:miter lim="800000" />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="2">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="1">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor">
+          <ns1:schemeClr val="lt1" />
+        </ns1:fontRef>
+      </ns0:style>
+    </ns0:sp>
+    <ns0:sp modelId="{75FF8097-3B58-4FA5-980A-63D87563E1CE}">
+      <ns0:nvSpPr>
+        <ns0:cNvPr id="0" name="" />
+        <ns0:cNvSpPr />
+      </ns0:nvSpPr>
+      <ns0:spPr>
+        <ns1:xfrm>
+          <ns1:off x="2133091" y="3384234" />
+          <ns1:ext cx="1829817" cy="678862" />
+        </ns1:xfrm>
+        <ns1:prstGeom prst="rect">
+          <ns1:avLst />
+        </ns1:prstGeom>
+        <ns1:noFill />
+        <ns1:ln>
+          <ns1:noFill />
+        </ns1:ln>
+        <ns1:effectLst />
+      </ns0:spPr>
+      <ns0:style>
+        <ns1:lnRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:lnRef>
+        <ns1:fillRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:fillRef>
+        <ns1:effectRef idx="0">
+          <ns1:scrgbClr r="0" g="0" b="0" />
+        </ns1:effectRef>
+        <ns1:fontRef idx="minor" />
+      </ns0:style>
+      <ns0:txBody>
+        <ns1:bodyPr spcFirstLastPara="0" vert="horz" wrap="square" lIns="135128" tIns="135128" rIns="135128" bIns="0" numCol="1" spcCol="1270" anchor="t" anchorCtr="0">
+          <ns1:noAutofit />
+        </ns1:bodyPr>
+        <ns1:lstStyle />
+        <ns1:p>
+          <ns1:pPr marL="0" lvl="0" indent="0" algn="ctr" defTabSz="844550">
+            <ns1:lnSpc>
+              <ns1:spcPct val="90000" />
+            </ns1:lnSpc>
+            <ns1:spcBef>
+              <ns1:spcPct val="0" />
+            </ns1:spcBef>
+            <ns1:spcAft>
+              <ns1:spcPct val="35000" />
+            </ns1:spcAft>
+            <ns1:buNone />
+          </ns1:pPr>
+          <ns1:r>
+            <ns1:rPr lang="en-US" sz="1900" kern="1200" />
+            <ns1:t>Step 4: Picture Caption List</ns1:t>
+          </ns1:r>
+        </ns1:p>
+      </ns0:txBody>
+      <ns0:txXfrm>
+        <ns1:off x="2133091" y="3384234" />
+        <ns1:ext cx="1829817" cy="678862" />
+      </ns0:txXfrm>
+    </ns0:sp>
+  </ns0:spTree>
+</ns0:drawing>

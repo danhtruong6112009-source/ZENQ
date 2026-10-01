@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ZenQOffice</AssemblyName>
+    <ApplicationIcon>ZenQOffice.ico</ApplicationIcon>
+    <StartupObject>GenOffice.Program</StartupObject>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);CA1416;CS1685;CS0168;CS0219;CS0414;CS0649;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;WFO1000;WFO5001;WFO5002</NoWarn>
+    <WarningsNotAsErrors>WFO1000;WFO5001;WFO5002</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ZENQOFFICE.png">
+      <LogicalName>app_logo.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ZenQOffice.ico">
+      <LogicalName>app.ico</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\writer.png">
+      <LogicalName>icon_writer.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\calc.png">
+      <LogicalName>icon_calc.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\present.png">
+      <LogicalName>icon_present.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\pdf.png">
+      <LogicalName>icon_pdf.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\banner.png">
+      <LogicalName>banner.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="DocumentFormat.OpenXml">
+      <HintPath>DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml.Framework">
+      <HintPath>DocumentFormat.OpenXml.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml.Features">
+      <HintPath>DocumentFormat.OpenXml.Features.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml.Linq">
+      <HintPath>DocumentFormat.OpenXml.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfiumViewer">
+      <HintPath>PdfiumViewer.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp">
+      <HintPath>PdfSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

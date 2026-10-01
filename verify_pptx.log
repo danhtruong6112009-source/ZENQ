@@ -1,0 +1,20 @@
+=== VERIFY PPTX ===
+File: C:\Users\Danh\Downloads\Lesson 1 - GETTING STARTED.pptx
+Total slides: 26
+Canvas: 1920 x 1080
+Slide 1 shapes count: 1
+Slide 1 Shape 0: Type=Image, Name='Picture 1', X=0, Y=0, W=1920, H=1080
+Slide 3 shapes count: 16
+  Connector 1: Name='Curved Connector 27', Type=Arrow, X=543.756, Y=233.85428, W=102.60787, H=117.68672
+  Connector 2: Name='Curved Connector 28', Type=Arrow, X=380.95245, Y=403.1473, W=101.92945, H=135.98006
+  Connector 3: Name='Curved Connector 32', Type=Arrow, X=387.40158, Y=797.49335, W=56.549713, H=111.84357
+  Connector 4: Name='Curved Connector 34', Type=Arrow, X=544.4342, Y=595.04926, W=82.46446, H=149.99161
+Slide 6 animations count: 1
+  Anim: Type=Appear, Trigger=OnClick, TargetId='3', TargetName='TextBox 2', Text='Barack Obama'
+Slide 18 shapes count: 1
+  Table: Name='Table 5', Rows=6, Cols=4, W=1919.9998, H=1059.006
+  Row 0: Form | Pronunciation | Meaning | Vietnamese equivalent  
+  Row 1: 1. surgeon (n)  | /ˈsɜːdʒən/ | a doctor who is trained to perform surgery  | bác sĩ phẫu thuật
+Slide 21 shapes count: 10
+  Table: Name='Table 8', Rows=4, Cols=1
+  Row 0: descriptions of things that have happened 

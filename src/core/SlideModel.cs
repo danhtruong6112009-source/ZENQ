@@ -2,6 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.IO;
+using System.IO.Compression;
+using System.Xml;
+using System.Text;
+using System.Runtime.InteropServices;
 using GenOffice.UI;
 
 namespace GenOffice.Core
@@ -180,7 +186,7 @@ namespace GenOffice.Core
         GenOffice_Kaleidoscope,
         GenOffice_Starlight,
         GenOffice_GoldenRibbon,
-        GenOffice_CanvaFlow
+        GenOffice_SmoothFlow
     }
 
     public enum MorphType
@@ -287,12 +293,12 @@ namespace GenOffice.Core
 
     public enum ImpressViewMode
     {
-        Normal,
-        Outline,
-        Notes,
-        SlideSorter,
-        SlideMaster,
-        ReadingView
+        Normal = 0,
+        Outline = 1,
+        SlideSorter = 2,
+        Notes = 3,
+        SlideMaster = 4,
+        ReadingView = 5
     }
 
     public enum VideoStartMode
@@ -357,6 +363,67 @@ namespace GenOffice.Core
         }
     }
 
+    public class SlideTextRun
+    {
+        public string Text { get; set; }
+        public string FontName { get; set; }
+        public float FontSize { get; set; }
+        public bool Bold { get; set; }
+        public bool Italic { get; set; }
+        public bool Underline { get; set; }
+        public bool Strikethrough { get; set; }
+        public int TextColor { get; set; }
+        public bool HasGradient { get; set; }
+        public int GradientColor2 { get; set; }
+        public float GradientAngle { get; set; }
+        public int HighlightColor { get; set; }
+        public bool HasHighlight { get; set; }
+        public List<GradientStop> GradientStops { get; set; }
+        public float? ParaLineSpacing { get; set; }
+        public float? ParaSpaceBefore { get; set; }
+        public float? ParaSpaceAfter { get; set; }
+        public TextAlignment? ParaAlignment { get; set; }
+
+        public SlideTextRun()
+        {
+            Text = "";
+            TextColor = 0x000000;
+            FontSize = 14f;
+            FontName = "Segoe UI";
+            GradientStops = new List<GradientStop>();
+        }
+
+        public SlideTextRun(string text, int textColor = 0x000000, float fontSize = 14f, bool bold = false, string fontName = "Segoe UI")
+        {
+            Text = text ?? "";
+            TextColor = textColor;
+            FontSize = fontSize;
+            Bold = bold;
+            FontName = fontName ?? "Segoe UI";
+            GradientStops = new List<GradientStop>();
+        }
+    }
+
+    public class ShapeTextToken
+    {
+        public string Text { get; set; }
+        public Color Color { get; set; }
+        public Font Font { get; set; }
+        public float Width { get; set; }
+        public bool IsSpace { get; set; }
+        public bool IsNewline { get; set; }
+        public bool HasHighlight { get; set; }
+        public Color HighlightColor { get; set; }
+        public bool HasGradient { get; set; }
+        public Color GradientColor2 { get; set; }
+        public float GradientAngle { get; set; }
+        public List<GradientStop> GradientStops { get; set; }
+        public float? ParaLineSpacing { get; set; }
+        public float? ParaSpaceBefore { get; set; }
+        public float? ParaSpaceAfter { get; set; }
+        public TextAlignment? ParaAlignment { get; set; }
+    }
+
     public class ShapeNode
     {
         public string Id { get; set; }
@@ -368,8 +435,15 @@ namespace GenOffice.Core
         public string SmartArtTitle { get; set; }
         public Transform2D Transform { get; set; }
 
+        // Padding / Margins
+        public float? MarginLeft { get; set; }
+        public float? MarginTop { get; set; }
+        public float? MarginRight { get; set; }
+        public float? MarginBottom { get; set; }
+
         // Text Properties
         public string Text { get; set; }
+        public List<SlideTextRun> TextRuns { get; set; }
         public string FontName { get; set; }
         public float FontSize { get; set; }
         public bool Bold { get; set; }
@@ -381,16 +455,39 @@ namespace GenOffice.Core
         public VerticalTextAlignment VerticalAlignment { get; set; }
         public int TextColor { get; set; }
         public float LineSpacing { get; set; }
+        public bool HasHighlight { get; set; }
+        public int HighlightColor { get; set; }
+        public float CharacterSpacing { get; set; }
 
         // Fill & Line Properties
         public int FillColor { get; set; }
         public bool HasGradientFill { get; set; }
         public int GradientColor2 { get; set; }
         public float GradientAngle { get; set; }
+        public List<GradientStop> GradientStops { get; set; }
         public float FillOpacity { get; set; }
         public int StrokeColor { get; set; }
         public float StrokeWidth { get; set; }
         public DashStyle DashStyle { get; set; }
+
+        // Corner Radius (for Rectangle & RoundedRectangle)
+        public float CornerRadius { get; set; } = -1f;
+
+        public float GetEffectiveCornerRadius()
+        {
+            if (Transform == null) return 0f;
+            float maxR = Math.Min(Transform.Width, Transform.Height) / 2f;
+            if (maxR <= 0f) return 0f;
+            if (CornerRadius >= 0f)
+            {
+                return Math.Max(0f, Math.Min(maxR, CornerRadius));
+            }
+            if (Type == ShapeType.RoundedRectangle)
+            {
+                return Math.Min(20f, maxR);
+            }
+            return 0f;
+        }
 
         // Effect Properties
         public bool HasShadow { get; set; }
@@ -419,6 +516,51 @@ namespace GenOffice.Core
         public float CropTop { get; set; }
         public float CropRight { get; set; }
         public float CropBottom { get; set; }
+        public float FillRectLeft { get; set; }
+        public float FillRectTop { get; set; }
+        public float FillRectRight { get; set; }
+        public float FillRectBottom { get; set; }
+        public float SoftEdgeRadius { get; set; }
+        public float BlurRadius { get; set; }
+        public Bitmap CachedFeatheredBmp { get; set; }
+        public int CachedFeatherW { get; set; }
+        public int CachedFeatherH { get; set; }
+        public float CachedSoftPx { get; set; }
+        public float CachedBlurPx { get; set; }
+
+        public Bitmap DisplayCachedImage { get; set; }
+        public int DisplayCachedW { get; set; }
+        public int DisplayCachedH { get; set; }
+        public float DisplayCachedCropL { get; set; }
+        public float DisplayCachedCropT { get; set; }
+        public float DisplayCachedCropR { get; set; }
+        public float DisplayCachedCropB { get; set; }
+
+        public void InvalidateDisplayCache()
+        {
+            if (DisplayCachedImage != null)
+            {
+                try { DisplayCachedImage.Dispose(); } catch { }
+                DisplayCachedImage = null;
+            }
+            DisplayCachedW = 0;
+            DisplayCachedH = 0;
+            DisplayCachedCropL = 0f;
+            DisplayCachedCropT = 0f;
+            DisplayCachedCropR = 0f;
+            DisplayCachedCropB = 0f;
+        }
+
+        public void InvalidateFeatherCache()
+        {
+            InvalidateDisplayCache();
+            if (CachedFeatheredBmp != null)
+            {
+                try { CachedFeatheredBmp.Dispose(); } catch { }
+                CachedFeatheredBmp = null;
+            }
+        }
+
         public string CropShapeType { get; set; } // "Rectangle", "RoundedRectangle", "Oval", "Triangle", "Diamond", "Hexagon", "Heart", "Star5", "Cloud", "ArrowRight", etc.
         public string AltText { get; set; }
         public float OriginalWidth { get; set; }
@@ -437,6 +579,73 @@ namespace GenOffice.Core
         public Dictionary<string, int> TableCellFillColors { get; set; }
         public Dictionary<string, int> TableCellTextColors { get; set; }
         public Dictionary<string, bool> TableCellBolds { get; set; }
+        public Dictionary<string, TextAlignment> TableCellAlignments { get; set; }
+        public bool TableHasHeaderFill { get; set; }
+        public bool TableHasBandedFill { get; set; }
+        public List<float> TableColumnWidths { get; set; }
+        public List<float> TableRowHeights { get; set; }
+
+        public float[] GetComputedColumnWidths(float totalWidth)
+        {
+            int cols = Math.Max(1, TableColumns);
+            float[] res = new float[cols];
+            if (TableColumnWidths != null && TableColumnWidths.Count == cols)
+            {
+                float totalCw = 0f;
+                for (int i = 0; i < cols; i++) totalCw += TableColumnWidths[i];
+                float ratio = (totalCw > 0) ? (totalWidth / totalCw) : 1f;
+                for (int i = 0; i < cols; i++) res[i] = TableColumnWidths[i] * ratio;
+            }
+            else
+            {
+                float defW = totalWidth / cols;
+                for (int i = 0; i < cols; i++) res[i] = defW;
+            }
+            return res;
+        }
+
+        public float[] GetComputedRowHeights(float totalHeight)
+        {
+            int rows = Math.Max(1, TableRows);
+            float[] res = new float[rows];
+            if (TableRowHeights != null && TableRowHeights.Count == rows)
+            {
+                float totalRh = 0f;
+                for (int i = 0; i < rows; i++) totalRh += TableRowHeights[i];
+                float ratio = (totalRh > 0) ? (totalHeight / totalRh) : 1f;
+                for (int i = 0; i < rows; i++) res[i] = TableRowHeights[i] * ratio;
+            }
+            else
+            {
+                float defH = totalHeight / rows;
+                for (int i = 0; i < rows; i++) res[i] = defH;
+            }
+            return res;
+        }
+
+        public int HitTestColumn(float relX, float totalWidth)
+        {
+            float[] widths = GetComputedColumnWidths(totalWidth);
+            float cur = 0f;
+            for (int i = 0; i < widths.Length; i++)
+            {
+                cur += widths[i];
+                if (relX < cur || i == widths.Length - 1) return i;
+            }
+            return Math.Max(0, widths.Length - 1);
+        }
+
+        public int HitTestRow(float relY, float totalHeight)
+        {
+            float[] heights = GetComputedRowHeights(totalHeight);
+            float cur = 0f;
+            for (int i = 0; i < heights.Length; i++)
+            {
+                cur += heights[i];
+                if (relY < cur || i == heights.Length - 1) return i;
+            }
+            return Math.Max(0, heights.Length - 1);
+        }
 
         // Video Properties
         public string VideoPath { get; set; }
@@ -511,6 +720,7 @@ namespace GenOffice.Core
             IsVisible = true;
             Transform = new Transform2D(100f, 100f, 300f, 200f);
             Text = "";
+            TextRuns = new List<SlideTextRun>();
             FontName = "Segoe UI";
             FontSize = 18.0f;
             Bold = false;
@@ -518,18 +728,22 @@ namespace GenOffice.Core
             Underline = false;
             Strikethrough = false;
             HasTextShadow = false;
-            Alignment = TextAlignment.Left;
+            Alignment = (Type == ShapeType.TextBox) ? TextAlignment.Left : TextAlignment.Center;
             VerticalAlignment = VerticalTextAlignment.Middle;
-            TextColor = 0x222222;
+            TextColor = (Type == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF;
             LineSpacing = 1.2f;
+            HasHighlight = false;
+            HighlightColor = 0;
+            CharacterSpacing = 0f;
 
-            FillColor = 0xF3F4F6;
+            FillColor = 0x2563EB;
             HasGradientFill = false;
-            GradientColor2 = 0xE5E7EB;
+            GradientColor2 = 0x1D4ED8;
             GradientAngle = 90.0f;
+            GradientStops = new List<GradientStop>();
             FillOpacity = 1.0f;
-            StrokeColor = 0xD24726;
-            StrokeWidth = 2.0f;
+            StrokeColor = 0x00FFFFFF;
+            StrokeWidth = 0.0f;
             DashStyle = DashStyle.Solid;
 
             HasShadow = false;
@@ -548,8 +762,10 @@ namespace GenOffice.Core
             TableColumns = 0;
             TableRows = 0;
             TableData = null;
-            TableHeaderRow = true;
-            TableBandedRows = true;
+            TableHeaderRow = false;
+            TableBandedRows = false;
+            TableHasHeaderFill = false;
+            TableHasBandedFill = false;
             TableSelectedCellRow = -1;
             TableSelectedCellCol = -1;
             TableSelectedEndRow = -1;
@@ -557,6 +773,9 @@ namespace GenOffice.Core
             TableCellFillColors = new Dictionary<string, int>();
             TableCellTextColors = new Dictionary<string, int>();
             TableCellBolds = new Dictionary<string, bool>();
+            TableCellAlignments = new Dictionary<string, TextAlignment>();
+            TableColumnWidths = new List<float>();
+            TableRowHeights = new List<float>();
             ImageBrightness = 0.0f;
             ImageContrast = 1.0f;
             ImageSaturation = 1.0f;
@@ -566,6 +785,12 @@ namespace GenOffice.Core
             CropTop = 0f;
             CropRight = 0f;
             CropBottom = 0f;
+            FillRectLeft = 0f;
+            FillRectTop = 0f;
+            FillRectRight = 0f;
+            FillRectBottom = 0f;
+            SoftEdgeRadius = 0f;
+            BlurRadius = 0f;
             CropShapeType = "Rectangle";
             AltText = "";
             OriginalWidth = 0f;
@@ -608,6 +833,54 @@ namespace GenOffice.Core
                 foreach (var kvp in TableCellBolds) clonedBolds[kvp.Key] = kvp.Value;
             }
 
+            Dictionary<string, TextAlignment> clonedAligns = new Dictionary<string, TextAlignment>();
+            if (TableCellAlignments != null)
+            {
+                foreach (var kvp in TableCellAlignments) clonedAligns[kvp.Key] = kvp.Value;
+            }
+
+            List<SlideTextRun> clonedRuns = null;
+            if (TextRuns != null)
+            {
+                clonedRuns = new List<SlideTextRun>();
+                foreach (var r in TextRuns)
+                {
+                    List<GradientStop> clonedRunStops = null;
+                    if (r.GradientStops != null)
+                    {
+                        clonedRunStops = new List<GradientStop>();
+                        foreach (var gs in r.GradientStops) clonedRunStops.Add(gs.Clone());
+                    }
+                    clonedRuns.Add(new SlideTextRun
+                    {
+                        Text = r.Text,
+                        FontName = r.FontName,
+                        FontSize = r.FontSize,
+                        Bold = r.Bold,
+                        Italic = r.Italic,
+                        Underline = r.Underline,
+                        TextColor = r.TextColor,
+                        HasGradient = r.HasGradient,
+                        GradientColor2 = r.GradientColor2,
+                        GradientAngle = r.GradientAngle,
+                        GradientStops = clonedRunStops,
+                        HighlightColor = r.HighlightColor,
+                        HasHighlight = r.HasHighlight,
+                        ParaLineSpacing = r.ParaLineSpacing,
+                        ParaSpaceBefore = r.ParaSpaceBefore,
+                        ParaSpaceAfter = r.ParaSpaceAfter,
+                        ParaAlignment = r.ParaAlignment
+                    });
+                }
+            }
+
+            List<GradientStop> clonedStops = null;
+            if (GradientStops != null)
+            {
+                clonedStops = new List<GradientStop>();
+                foreach (var gs in GradientStops) clonedStops.Add(gs.Clone());
+            }
+
             return new ShapeNode
             {
                 Id = Id,
@@ -616,7 +889,12 @@ namespace GenOffice.Core
                 Type = Type,
                 IsVisible = IsVisible,
                 Transform = Transform.Clone(),
+                MarginLeft = MarginLeft,
+                MarginTop = MarginTop,
+                MarginRight = MarginRight,
+                MarginBottom = MarginBottom,
                 Text = Text,
+                TextRuns = clonedRuns,
                 FontName = FontName,
                 FontSize = FontSize,
                 Bold = Bold,
@@ -628,10 +906,14 @@ namespace GenOffice.Core
                 VerticalAlignment = VerticalAlignment,
                 TextColor = TextColor,
                 LineSpacing = LineSpacing,
+                HasHighlight = HasHighlight,
+                HighlightColor = HighlightColor,
+                CharacterSpacing = CharacterSpacing,
                 FillColor = FillColor,
                 HasGradientFill = HasGradientFill,
                 GradientColor2 = GradientColor2,
                 GradientAngle = GradientAngle,
+                GradientStops = clonedStops,
                 FillOpacity = FillOpacity,
                 StrokeColor = StrokeColor,
                 StrokeWidth = StrokeWidth,
@@ -658,7 +940,14 @@ namespace GenOffice.Core
                 CropTop = CropTop,
                 CropRight = CropRight,
                 CropBottom = CropBottom,
+                FillRectLeft = FillRectLeft,
+                FillRectTop = FillRectTop,
+                FillRectRight = FillRectRight,
+                FillRectBottom = FillRectBottom,
+                SoftEdgeRadius = SoftEdgeRadius,
+                BlurRadius = BlurRadius,
                 CropShapeType = CropShapeType ?? "Rectangle",
+                CornerRadius = CornerRadius,
                 AltText = AltText,
                 OriginalWidth = OriginalWidth,
                 OriginalHeight = OriginalHeight,
@@ -692,6 +981,11 @@ namespace GenOffice.Core
                 TableCellFillColors = clonedFills,
                 TableCellTextColors = clonedTexts,
                 TableCellBolds = clonedBolds,
+                TableCellAlignments = clonedAligns,
+                TableHasHeaderFill = TableHasHeaderFill,
+                TableHasBandedFill = TableHasBandedFill,
+                TableColumnWidths = TableColumnWidths != null ? new List<float>(TableColumnWidths) : new List<float>(),
+                TableRowHeights = TableRowHeights != null ? new List<float>(TableRowHeights) : new List<float>(),
                 Selected = false,
                 IsEditingText = false
             };
@@ -1003,10 +1297,36 @@ namespace GenOffice.Core
         public List<ShapeNode> Shapes { get; set; }
         public List<ShapeAnimation> Animations { get; set; }
 
+        private Bitmap _thumbnailCache;
+        public Bitmap ThumbnailCache
+        {
+            get { return _thumbnailCache; }
+            set
+            {
+                if (_thumbnailCache != null && _thumbnailCache != value)
+                {
+                    _thumbnailCache.Dispose();
+                }
+                _thumbnailCache = value;
+            }
+        }
+        public bool IsThumbnailDirty { get; set; }
+
+        public void InvalidateThumbnail()
+        {
+            IsThumbnailDirty = true;
+            if (_thumbnailCache != null)
+            {
+                _thumbnailCache.Dispose();
+                _thumbnailCache = null;
+            }
+        }
+
         public SlideNode()
         {
             Id = Guid.NewGuid().ToString("N");
             Title = "Slide không tên";
+            IsThumbnailDirty = true;
             BgColor = 0xFFFFFF;
             IsGradientBg = false;
             BgColor2 = 0xF3F4F6;
@@ -1193,6 +1513,13 @@ namespace GenOffice.Core
         public bool IsWidescreen { get; set; }
 
         public List<PresentationTheme> Themes { get; set; }
+        public Dictionary<string, int> ThemeColors { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        public int GetThemeColor(string key, int defaultColor = 0x000000)
+        {
+            if (ThemeColors != null && ThemeColors.TryGetValue(key, out int c)) return c;
+            return defaultColor;
+        }
 
         public PresentationRoot()
         {
@@ -1271,8 +1598,8 @@ namespace GenOffice.Core
                 Title = "Slide 1",
                 Layout = SlideLayoutType.TitleSlide,
                 BgColor = 0xFFFFFF,
-                Transition = TransitionType.Fade,
-                TransitionDuration = 0.5f
+                Transition = TransitionType.None,
+                TransitionDuration = 0f
             };
 
             ShapeNode mainTitle = new ShapeNode
@@ -1321,8 +1648,9 @@ namespace GenOffice.Core
             {
                 Title = "Slide " + (Slides.Count + 1),
                 Layout = layout,
-                Transition = TransitionType.Fade,
-                TransitionDuration = 1.0f
+                BgColor = 0xFFFFFF,
+                Transition = TransitionType.None,
+                TransitionDuration = 0f
             };
 
             ShapeNode titleShape = new ShapeNode
@@ -1433,6 +1761,435 @@ namespace GenOffice.Core
             Points = new List<PointF>();
             BrushRadius = 14f;
             IsKeep = true;
+        }
+    }
+
+    public static class SlideFontManager
+    {
+        [DllImport("gdi32.dll", EntryPoint = "AddFontResourceExW", SetLastError = true, ExactSpelling = true)]
+        private static extern int AddFontResourceEx([MarshalAs(UnmanagedType.LPWStr)] string lpszFilename, uint fl, IntPtr pdv);
+
+        private const uint FR_PRIVATE = 0x10;
+
+        private static readonly PrivateFontCollection _pfc = new PrivateFontCollection();
+        private static readonly Dictionary<string, FontFamily> _fontMap = new Dictionary<string, FontFamily>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _loadedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<string> _customFontNames = new List<string>();
+        private static readonly object _lock = new object();
+
+        static SlideFontManager()
+        {
+            RegisterFallback("Anton", "Impact");
+            RegisterFallback("Muli", "Segoe UI");
+            RegisterFallback("Muli Heavy", "Segoe UI");
+            RegisterFallback("Proxima Nova", "Segoe UI");
+            RegisterFallback("Proxima Nova Bold", "Segoe UI");
+            RegisterFallback("Proxima Nova Heavy", "Segoe UI");
+            RegisterFallback("Noto Serif Display", "Arial");
+            RegisterFallback("Noto Serif Display Bold", "Arial");
+
+            LoadInternalFonts();
+        }
+
+        public static string GetAppFontsDirectory()
+        {
+            try
+            {
+                string localDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts");
+                if (!Directory.Exists(localDir)) Directory.CreateDirectory(localDir);
+                return localDir;
+            }
+            catch
+            {
+                string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZenQOffice", "Fonts");
+                if (!Directory.Exists(appDataDir)) Directory.CreateDirectory(appDataDir);
+                return appDataDir;
+            }
+        }
+
+        public static List<string> GetCustomFontNames()
+        {
+            lock (_lock)
+            {
+                return new List<string>(_customFontNames);
+            }
+        }
+
+        public static void LoadInternalFonts()
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    List<string> dirsToScan = new List<string>();
+                    string d1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts");
+                    if (Directory.Exists(d1)) dirsToScan.Add(d1);
+                    string d2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZenQOffice", "Fonts");
+                    if (Directory.Exists(d2)) dirsToScan.Add(d2);
+
+                    foreach (string dir in dirsToScan)
+                    {
+                        foreach (string file in Directory.GetFiles(dir, "*.*"))
+                        {
+                            string ext = Path.GetExtension(file).ToLowerInvariant();
+                            if (ext == ".ttf" || ext == ".otf")
+                            {
+                                RegisterFontFileInternal(file);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error loading internal fonts: " + ex.Message);
+                }
+            }
+        }
+
+        public static bool ImportCustomFont(string sourceFilePath, out string importedFontName, out string errorMessage)
+        {
+            importedFontName = null;
+            errorMessage = null;
+
+            if (string.IsNullOrEmpty(sourceFilePath) || !File.Exists(sourceFilePath))
+            {
+                errorMessage = "Tệp phông chữ không tồn tại.";
+                return false;
+            }
+
+            string ext = Path.GetExtension(sourceFilePath).ToLowerInvariant();
+            if (ext != ".ttf" && ext != ".otf")
+            {
+                errorMessage = "Chỉ hỗ trợ tệp định dạng TrueType (.ttf) hoặc OpenType (.otf).";
+                return false;
+            }
+
+            try
+            {
+                string destDir = GetAppFontsDirectory();
+                string fileName = Path.GetFileName(sourceFilePath);
+                string destPath = Path.Combine(destDir, fileName);
+
+                if (!File.Exists(destPath) || new FileInfo(destPath).Length != new FileInfo(sourceFilePath).Length)
+                {
+                    File.Copy(sourceFilePath, destPath, true);
+                }
+
+                // Sao lưu thêm sang AppData để không bị mất khi dọn dẹp
+                try
+                {
+                    string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZenQOffice", "Fonts");
+                    if (!Directory.Exists(appDataDir)) Directory.CreateDirectory(appDataDir);
+                    string appDataPath = Path.Combine(appDataDir, fileName);
+                    if (!File.Exists(appDataPath)) File.Copy(sourceFilePath, appDataPath, true);
+                }
+                catch { }
+
+                string fontName = RegisterFontFileInternal(destPath);
+                if (string.IsNullOrEmpty(fontName))
+                {
+                    fontName = Path.GetFileNameWithoutExtension(sourceFilePath);
+                }
+
+                importedFontName = fontName;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
+        private static string RegisterFontFileInternal(string filePath)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    // Đăng ký với GDI ở cấp tiến trình
+                    try { AddFontResourceEx(filePath, FR_PRIVATE, IntPtr.Zero); } catch { }
+
+                    if (!_loadedFiles.Contains(filePath))
+                    {
+                        HashSet<string> before = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var f in _pfc.Families) before.Add(f.Name);
+
+                        _pfc.AddFontFile(filePath);
+                        _loadedFiles.Add(filePath);
+
+                        FontFamily newFam = null;
+                        foreach (var f in _pfc.Families)
+                        {
+                            if (!before.Contains(f.Name))
+                            {
+                                newFam = f;
+                                break;
+                            }
+                        }
+
+                        if (newFam == null && _pfc.Families.Length > 0)
+                        {
+                            newFam = _pfc.Families[_pfc.Families.Length - 1];
+                        }
+
+                        if (newFam != null)
+                        {
+                            _fontMap[newFam.Name] = newFam;
+                            if (!_customFontNames.Contains(newFam.Name))
+                            {
+                                _customFontNames.Add(newFam.Name);
+                            }
+                            return newFam.Name;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var f in _pfc.Families)
+                        {
+                            if (_fontMap.ContainsKey(f.Name)) return f.Name;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Register font error: " + ex.Message);
+                }
+            }
+            return null;
+        }
+
+        public static void RegisterFallback(string typeface, string fallbackFamily)
+        {
+            try
+            {
+                using (Font f = new Font(fallbackFamily, 12f))
+                {
+                    if (!_fontMap.ContainsKey(typeface))
+                    {
+                        _fontMap[typeface] = f.FontFamily;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static bool HasFont(string fontName)
+        {
+            if (string.IsNullOrEmpty(fontName)) return false;
+            lock (_lock)
+            {
+                return _fontMap.ContainsKey(fontName);
+            }
+        }
+
+        public static void ExtractAndRegisterFonts(ZipArchive archive)
+        {
+            if (archive == null) return;
+            lock (_lock)
+            {
+                try
+                {
+                    Dictionary<string, string> rIdToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    ZipArchiveEntry presEntry = archive.GetEntry("ppt/presentation.xml");
+                    if (presEntry != null)
+                    {
+                        XmlDocument pDoc = new XmlDocument();
+                        using (Stream s = presEntry.Open())
+                        using (StreamReader sr = new StreamReader(s, Encoding.UTF8))
+                        {
+                            pDoc.Load(sr);
+                        }
+
+                        XmlNodeList efList = pDoc.SelectNodes("//*[local-name()='embeddedFont']");
+                        if (efList != null)
+                        {
+                            foreach (XmlNode ef in efList)
+                            {
+                                XmlNode fNode = ef.SelectSingleNode("./*[local-name()='font']");
+                                string typeface = (fNode != null && fNode.Attributes["typeface"] != null) ? fNode.Attributes["typeface"].Value : "";
+                                if (string.IsNullOrEmpty(typeface)) continue;
+
+                                foreach (XmlNode rNode in ef.SelectNodes(".//*[local-name()='regular' or local-name()='bold' or local-name()='italic']"))
+                                {
+                                    string rId = (rNode.Attributes["r:id"] != null) ? rNode.Attributes["r:id"].Value : (rNode.Attributes["id"] != null ? rNode.Attributes["id"].Value : "");
+                                    if (!string.IsNullOrEmpty(rId) && !rIdToTypeface.ContainsKey(rId))
+                                    {
+                                        rIdToTypeface[rId] = typeface;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Dictionary<string, string> targetToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    ZipArchiveEntry presRelsEntry = archive.GetEntry("ppt/_rels/presentation.xml.rels");
+                    if (presRelsEntry != null)
+                    {
+                        XmlDocument prDoc = new XmlDocument();
+                        using (Stream rs = presRelsEntry.Open())
+                        using (StreamReader sr = new StreamReader(rs, Encoding.UTF8))
+                        {
+                            prDoc.Load(sr);
+                        }
+
+                        foreach (var kvp in rIdToTypeface)
+                        {
+                            XmlNode rel = prDoc.SelectSingleNode(string.Format("//*[local-name()='Relationship'][@Id='{0}']", kvp.Key));
+                            if (rel != null && rel.Attributes["Target"] != null)
+                            {
+                                string target = rel.Attributes["Target"].Value.Replace('\\', '/');
+                                if (!target.StartsWith("ppt/")) target = "ppt/" + target;
+                                targetToTypeface[target] = kvp.Value;
+                            }
+                        }
+                    }
+
+                    string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_Fonts");
+                    if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        string fn = entry.FullName.Replace('\\', '/');
+                        if (fn.StartsWith("ppt/fonts/", StringComparison.OrdinalIgnoreCase) && fn.EndsWith(".fntdata", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string typeface = "";
+                            targetToTypeface.TryGetValue(fn, out typeface);
+
+                            byte[] data;
+                            using (MemoryStream ms = new MemoryStream())
+                            {
+                                using (Stream es = entry.Open()) es.CopyTo(ms);
+                                data = ms.ToArray();
+                            }
+
+                            if (data.Length > 36)
+                            {
+                                uint eotSize = BitConverter.ToUInt32(data, 0);
+                                uint fontSize = BitConverter.ToUInt32(data, 4);
+                                if (eotSize > fontSize && fontSize > 0 && eotSize <= (uint)data.Length)
+                                {
+                                    int offset = (int)(eotSize - fontSize);
+                                    if (offset >= 0 && offset + fontSize <= data.Length)
+                                    {
+                                        bool isOtf = (offset + 4 <= data.Length && data[offset] == 0x4F && data[offset + 1] == 0x54 && data[offset + 2] == 0x54 && data[offset + 3] == 0x4F);
+                                        string ext = isOtf ? ".otf" : ".ttf";
+                                        string baseName = Path.GetFileNameWithoutExtension(fn);
+                                        string outPath = Path.Combine(tempDir, baseName + ext);
+
+                                        if (!File.Exists(outPath) || new FileInfo(outPath).Length != fontSize)
+                                        {
+                                            using (FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write))
+                                            {
+                                                fs.Write(data, offset, (int)fontSize);
+                                            }
+                                        }
+
+                                        if (!_loadedFiles.Contains(outPath))
+                                        {
+                                            HashSet<string> before = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                            foreach (var f in _pfc.Families) before.Add(f.Name);
+
+                                            _pfc.AddFontFile(outPath);
+                                            _loadedFiles.Add(outPath);
+
+                                            FontFamily newFam = null;
+                                            foreach (var f in _pfc.Families)
+                                            {
+                                                if (!before.Contains(f.Name))
+                                                {
+                                                    newFam = f;
+                                                    break;
+                                                }
+                                            }
+
+                                            if (newFam != null)
+                                            {
+                                                bool skipNoto = (typeface != null && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                                                (newFam.Name != null && newFam.Name.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) >= 0);
+                                                if (!skipNoto)
+                                                {
+                                                    if (!string.IsNullOrEmpty(typeface))
+                                                    {
+                                                        _fontMap[typeface] = newFam;
+                                                    }
+                                                    if (!_fontMap.ContainsKey(newFam.Name))
+                                                    {
+                                                        _fontMap[newFam.Name] = newFam;
+                                                    }
+                                                }
+                                            }
+                                            else if (!string.IsNullOrEmpty(typeface) && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) < 0)
+                                            {
+                                                foreach (var f in _pfc.Families)
+                                                {
+                                                    if (f.Name.IndexOf(typeface, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                        typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                                    {
+                                                        _fontMap[typeface] = f;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else if (!string.IsNullOrEmpty(typeface) && !_fontMap.ContainsKey(typeface) && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) < 0)
+                                        {
+                                            foreach (var f in _pfc.Families)
+                                            {
+                                                if (f.Name.IndexOf(typeface, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                                {
+                                                    _fontMap[typeface] = f;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("FONT EXTRACT EXCEPTION: " + ex.Message);
+                }
+            }
+        }
+
+        public static Font CreateFont(string fontName, float size, FontStyle style, GraphicsUnit unit = GraphicsUnit.Pixel)
+        {
+            if (size <= 0.5f) size = 12f;
+            if (!string.IsNullOrEmpty(fontName))
+            {
+                FontFamily fam;
+                lock (_lock)
+                {
+                    if (_fontMap.TryGetValue(fontName, out fam))
+                    {
+                        try
+                        {
+                            return new Font(fam, size, style, unit);
+                        }
+                        catch { }
+                    }
+                }
+
+                try
+                {
+                    return new Font(fontName, size, style, unit);
+                }
+                catch { }
+            }
+
+            try
+            {
+                return new Font("Segoe UI", size, style, unit);
+            }
+            catch
+            {
+                return new Font(FontFamily.GenericSansSerif, size, style, unit);
+            }
         }
     }
 }

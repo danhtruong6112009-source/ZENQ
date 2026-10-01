@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using GenOffice.Core;
@@ -30,7 +31,23 @@ namespace GenOffice.UI
     public class SlidesView
     {
         public PresentationRoot Presentation { get; set; }
-        public int ActiveSlideIndex { get; set; }
+        private int _activeSlideIndex;
+        public int ActiveSlideIndex
+        {
+            get { return _activeSlideIndex; }
+            set
+            {
+                if (_activeSlideIndex != value)
+                {
+                    if (SlideVideoPlayerManager.Instance.IsPlaying)
+                    {
+                        SlideVideoPlayerManager.Instance.Stop();
+                    }
+                    _activeSlideIndex = value;
+                    EnsureSlideVisibleInThumbnails(_activeSlideIndex);
+                }
+            }
+        }
         public int SelectedShapeIndex { get; set; }
         public List<int> SelectedShapeIndices { get; set; }
 
@@ -63,6 +80,16 @@ namespace GenOffice.UI
 
         // Scroll Offsets for Sidebars
         public int ThumbScrollY { get; set; }
+        public int LastThumbViewportHeight { get; set; } = 500;
+        public Rectangle ThumbScrollBarTrackRect = Rectangle.Empty;
+        public Rectangle ThumbScrollBarThumbRect = Rectangle.Empty;
+        public Rectangle BtnAddSlideBounds = Rectangle.Empty;
+        public Rectangle BtnDupSlideBounds = Rectangle.Empty;
+        private bool _isDraggingThumbScrollBar = false;
+        private int _thumbScrollDragStartMouseY = 0;
+        private int _thumbScrollDragStartScrollY = 0;
+        private bool _isHoverThumbScrollBar = false;
+        private bool _isHoverThumbScrollBarThumb = false;
         public int SidebarScrollY { get; set; }
 
         // Shape Drawing & Creation State
@@ -77,14 +104,33 @@ namespace GenOffice.UI
         public bool IsResizingShape { get; set; }
         public bool IsRotatingShape { get; set; }
         public int DragResizeHandleIndex { get; set; } // 0-7 handles, 8 rotation
+        public bool IsAdjustingCornerRadius { get; set; }
+        public float DragStartCornerRadius { get; set; }
         public Point DragStartMouse { get; set; }
         public Transform2D DragStartTransform { get; set; }
+        public Dictionary<int, Transform2D> DragStartTransforms { get; set; } = new Dictionary<int, Transform2D>();
+        private bool _pendingDeselectOnMouseUp = false;
+        private int _pendingDeselectIndex = -1;
+
+        // Rubberband / Marquee Multi-Shape Selection State
+        public bool IsRubberbandSelecting { get; set; }
+        public Point RubberbandStartPoint { get; set; }
+        public Point RubberbandCurrentPoint { get; set; }
+        private HashSet<int> _rubberbandInitialSelection = new HashSet<int>();
 
         // Inline Text Editing State
         public bool IsInlineEditing { get; set; }
         public ShapeNode EditingShape { get; set; }
         public string EditingTextBuffer { get; set; }
         public int CaretIndex { get; set; }
+        public int TextSelectionStart { get; set; }
+        public int TextSelectionLength { get; set; }
+        public bool IsSelectingText { get; set; }
+
+        // Caret screen coordinates for word suggestion popup positioning
+        public int CurrentCaretScreenX { get; set; }
+        public int CurrentCaretScreenY { get; set; }
+        public int CurrentCaretScreenH { get; set; }
 
         // Table Cell Inline Editing & Range Selection State
         public bool IsEditingTableCell { get; set; }
@@ -109,6 +155,10 @@ namespace GenOffice.UI
         public int DraggingSelectionPaneIndex { get; set; }
         public int DraggingSelectionPaneTargetIndex { get; set; }
         public Action InvalidateCallback;
+        public void Invalidate()
+        {
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
 
         // Background Removal & Color Picker (Chroma Keying) State
         public bool IsRemovingBackground { get; set; }
@@ -253,6 +303,30 @@ namespace GenOffice.UI
         public List<string> CustomShowNames { get; set; }
         public Dictionary<string, List<int>> CustomShows { get; set; }
 
+        // ==================== Dynamic Elements Drawer & Bottom Filmstrip Layout ====================
+        public bool IsElementsDrawerOpen { get; set; } = false;
+        public bool IsElementsDrawerCollapsed { get; set; } = false;
+        public int ElementsDrawerSelectedTab { get; set; } = 1; // 0: Mẫu, 1: Thành phần, 2: Văn bản, 3: Thương hiệu, 4: Tải lên, 5: Công cụ, 6: Dự án, 7: Ứng dụng
+        public string ElementsSearchQuery { get; set; } = "";
+        public int ElementsScrollY { get; set; } = 0;
+        public int BottomThumbScrollX { get; set; } = 0;
+        public Rectangle BtnCollapseDrawerBounds = Rectangle.Empty;
+        public Rectangle BtnCloseDrawerBounds = Rectangle.Empty;
+        public List<Rectangle> RailTabBounds = new List<Rectangle>();
+        public List<Rectangle> PillTabBounds = new List<Rectangle>();
+        public List<int> PillTabIndices = new List<int>();
+        public List<Rectangle> DrawerItemBounds = new List<Rectangle>();
+        public List<string> DrawerItemActions = new List<string>();
+        public List<Rectangle> BottomSlideThumbBounds = new List<Rectangle>();
+        public Rectangle BtnBottomAddSlideBounds = Rectangle.Empty;
+        public Rectangle TxtSearchBoxBounds = Rectangle.Empty;
+        public WpfShapeTaskPane ShapeTaskPane = new WpfShapeTaskPane();
+        public Control ParentControl { get; set; }
+        private TextBox _shapeSearchBox = null;
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern Int32 SendMessage(IntPtr hWnd, int msg, int wParam, [MarshalAs(UnmanagedType.LPWStr)] string lParam);
+        private const int EM_SETCUEBANNER = 0x1501;
+
         public SlidesView()
         {
             Presentation = new PresentationRoot();
@@ -264,7 +338,7 @@ namespace GenOffice.UI
             SidebarPanel = SidebarPanelType.None;
             IsSidebarOpen = false;
             ShowRuler = false;
-            ShowMouseGuides = true;
+            ShowMouseGuides = false;
             ShowGrid = false;
             SnapToGrid = true;
             ShowSmartGuides = true;
@@ -274,6 +348,12 @@ namespace GenOffice.UI
             IsPresenting = false;
             IsEndSlideShowScreen = false;
             ZoomLevel = 1.0f;
+            GenOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (cat) => {
+                if (InvalidateCallback != null) InvalidateCallback();
+            };
+            GenOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
+                if (InvalidateCallback != null) InvalidateCallback();
+            };
 
             IsRemovingBackground = false;
             BgRemovalTool = "Keep";
@@ -311,6 +391,8 @@ namespace GenOffice.UI
             IsDraggingShape = false;
             IsResizingShape = false;
             IsRotatingShape = false;
+            IsAdjustingCornerRadius = false;
+            DragStartCornerRadius = 0f;
             DragResizeHandleIndex = -1;
 
             IsInlineEditing = false;
@@ -446,8 +528,17 @@ namespace GenOffice.UI
             get
             {
                 SlideNode slide = ActiveSlide;
-                if (slide != null && SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
-                    return slide.Shapes[SelectedShapeIndex];
+                if (slide != null)
+                {
+                    if (SelectedShapeIndex >= 0 && SelectedShapeIndex < slide.Shapes.Count)
+                        return slide.Shapes[SelectedShapeIndex];
+                    if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                    {
+                        int firstIdx = SelectedShapeIndices[0];
+                        if (firstIdx >= 0 && firstIdx < slide.Shapes.Count)
+                            return slide.Shapes[firstIdx];
+                    }
+                }
                 return null;
             }
         }
@@ -856,7 +947,7 @@ namespace GenOffice.UI
                         Transform = new Transform2D(120f * sx, 70f * sy, 280f * sx, 45f * sy),
                         FillColor = 0xD97706,
                         StrokeWidth = 0f,
-                        Text = "GENOFFICE LUXURY",
+                        Text = "ZENQ LUXURY",
                         TextColor = 0xFFFFFF,
                         FontSize = 12f,
                         Bold = true,
@@ -1338,9 +1429,9 @@ namespace GenOffice.UI
             if (slide != null)
             {
                 slide.Transition = transType;
-                if (transType == TransitionType.GenOffice_CanvaFlow)
+                if (transType == TransitionType.GenOffice_SmoothFlow)
                 {
-                    slide.TransitionDuration = 2.20f; // Mặc định 2.20s chuẩn xác cho hiệu ứng Chảy tràn Canva
+                    slide.TransitionDuration = 2.20f; // Mặc định 2.20s chuẩn xác cho hiệu ứng Chảy tràn
                 }
                 else if (transType == TransitionType.Morph && slide.TransitionDuration <= 1.0f)
                 {
@@ -1397,8 +1488,160 @@ namespace GenOffice.UI
         private System.Diagnostics.Stopwatch _animStopwatch = new System.Diagnostics.Stopwatch();
         private Dictionary<ShapeNode, Bitmap> _morphShapeTextureCache = new Dictionary<ShapeNode, Bitmap>();
 
+        // Cached morph pair lists - rebuilt only when fromSlide/toSlide change, not every frame
+        private List<KeyValuePair<ShapeNode, ShapeNode>> _cachedMorphPairs = null;
+        private HashSet<ShapeNode> _cachedMorphFromUnpaired = null;
+        private HashSet<ShapeNode> _cachedMorphToUnpaired = null;
+        private int _cachedMorphFromIdx = -1;
+        private int _cachedMorphToIdx = -1;
+
+        // Slide Transition Fast Texture Cache (Eliminates CPU 4K image re-draw lag on every transition frame)
+        private bool _isBuildingTransitionCache = false;
+        private Bitmap _cachedTransBmpA = null;
+        private Bitmap _cachedTransBmpB = null;
+        private int _cachedTransFromIdx = -1;
+        private int _cachedTransToIdx = -1;
+        private Size _cachedTransSize = Size.Empty;
+
+        public void ClearTransitionCache()
+        {
+            if (_cachedTransBmpA != null)
+            {
+                try { _cachedTransBmpA.Dispose(); } catch { }
+                _cachedTransBmpA = null;
+            }
+            if (_cachedTransBmpB != null)
+            {
+                try { _cachedTransBmpB.Dispose(); } catch { }
+                _cachedTransBmpB = null;
+            }
+            _cachedTransFromIdx = -1;
+            _cachedTransToIdx = -1;
+            _cachedTransSize = Size.Empty;
+        }
+
+        private void EnsureTransitionCache(Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float scale)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0) return;
+            if (_cachedTransBmpA != null && _cachedTransBmpB != null &&
+                _cachedTransFromIdx == TransitionFromSlideIndex &&
+                _cachedTransToIdx == TransitionToSlideIndex &&
+                _cachedTransSize == rect.Size)
+            {
+                return;
+            }
+
+            ClearTransitionCache();
+            _cachedTransSize = rect.Size;
+            _cachedTransFromIdx = TransitionFromSlideIndex;
+            _cachedTransToIdx = TransitionToSlideIndex;
+
+            try
+            {
+                _isBuildingTransitionCache = true;
+
+                // 1. Bake fromSlide
+                _cachedTransBmpA = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                using (Graphics gA = Graphics.FromImage(_cachedTransBmpA))
+                {
+                    gA.SmoothingMode = SmoothingMode.AntiAlias;
+                    gA.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    gA.PixelOffsetMode = PixelOffsetMode.Half;
+                    gA.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
+                    DrawSlideFull(gA, originRect, fromSlide, scale, 1.0f, true);
+                }
+
+                // 2. Bake toSlide
+                _cachedTransBmpB = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                using (Graphics gB = Graphics.FromImage(_cachedTransBmpB))
+                {
+                    gB.SmoothingMode = SmoothingMode.AntiAlias;
+                    gB.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    gB.PixelOffsetMode = PixelOffsetMode.Half;
+                    gB.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
+                    DrawSlideFull(gB, originRect, toSlide, scale, 1.0f, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Transition Cache Error] {ex.Message}");
+                ClearTransitionCache();
+            }
+            finally
+            {
+                _isBuildingTransitionCache = false;
+            }
+        }
+
+        private static void DrawCachedSlideBitmap(Graphics g, RectangleF targetRect, Bitmap bmp, float opacity)
+        {
+            if (bmp == null || opacity <= 0.005f || targetRect.Width <= 0 || targetRect.Height <= 0) return;
+
+            int ix = (int)Math.Round(targetRect.X);
+            int iy = (int)Math.Round(targetRect.Y);
+            int iw = (int)Math.Round(targetRect.Width);
+            int ih = (int)Math.Round(targetRect.Height);
+
+            bool isIntegerPos = Math.Abs(targetRect.X - ix) < 0.05f && Math.Abs(targetRect.Y - iy) < 0.05f;
+
+            // 1:1 pixel-exact BitBlt khi kích thước tương đương và tọa độ nguyên: triệt tiêu hoàn toàn mờ bicubic và giật subpixel
+            if (isIntegerPos && Math.Abs(iw - bmp.Width) <= 1 && Math.Abs(ih - bmp.Height) <= 1)
+            {
+                InterpolationMode prevInterp = g.InterpolationMode;
+                PixelOffsetMode prevOffset = g.PixelOffsetMode;
+                g.InterpolationMode = InterpolationMode.NearestNeighbor;
+                // Giữ nguyên g.PixelOffsetMode (PixelOffsetMode.Half) - tuyệt đối không gán PixelOffsetMode.None
+                // vì sẽ làm lệch tọa độ -0.5px so với khi kết thúc chuyển cảnh dẫn đến giật hình!
+
+                if (opacity >= 0.995f)
+                {
+                    g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel);
+                }
+                else
+                {
+                    using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix
+                        {
+                            Matrix33 = Math.Max(0f, Math.Min(1.0f, opacity))
+                        };
+                        ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                        g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, ia);
+                    }
+                }
+
+                g.InterpolationMode = prevInterp;
+                g.PixelOffsetMode = prevOffset;
+                return;
+            }
+
+            if (opacity >= 0.995f)
+            {
+                g.DrawImage(bmp, targetRect.X, targetRect.Y, targetRect.Width, targetRect.Height);
+                return;
+            }
+
+            using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+            {
+                System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix
+                {
+                    Matrix33 = Math.Max(0f, Math.Min(1.0f, opacity))
+                };
+                ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                PointF[] destPoints = new PointF[] {
+                    new PointF(targetRect.X, targetRect.Y),
+                    new PointF(targetRect.Right, targetRect.Y),
+                    new PointF(targetRect.X, targetRect.Bottom)
+                };
+                g.DrawImage(bmp, destPoints, new RectangleF(0, 0, bmp.Width, bmp.Height), GraphicsUnit.Pixel, ia);
+            }
+        }
+
         public void ClearMorphTextureCache()
         {
+            ClearTransitionCache();
             foreach (KeyValuePair<ShapeNode, Bitmap> kvp in _morphShapeTextureCache)
             {
                 try
@@ -1411,11 +1654,19 @@ namespace GenOffice.UI
                 catch { }
             }
             _morphShapeTextureCache.Clear();
+            // Also invalidate cached pair lists so they are rebuilt for the next transition
+            _cachedMorphPairs = null;
+            _cachedMorphFromUnpaired = null;
+            _cachedMorphToUnpaired = null;
+            _cachedMorphFromIdx = -1;
+            _cachedMorphToIdx = -1;
         }
 
         public void TriggerTransition(int fromIdx, int toIdx, bool isPreview = false)
         {
             if (Presentation == null || Presentation.Slides.Count == 0) return;
+            // Khi chưa trình chiếu và không chủ động xem trước (Preview): không chạy hiệu ứng để tránh lag
+            if (!IsPresenting && !isPreview) return;
             ClearMorphTextureCache();
             TransitionFromSlideIndex = fromIdx;
             TransitionToSlideIndex = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, toIdx));
@@ -1462,7 +1713,7 @@ namespace GenOffice.UI
             if (shape == null && SelectedShape != null) shape = SelectedShape;
             if (shape == null)
             {
-                MessageBox.Show("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "GenOffice Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             IsDrawingMotionPathMode = true;
@@ -1500,7 +1751,7 @@ namespace GenOffice.UI
 
             if (targetShapeIds.Count == 0)
             {
-                MessageBox.Show("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "GenOffice Hoạt họa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "ZenQ Hoạt họa", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -1753,6 +2004,31 @@ namespace GenOffice.UI
         #region 60 FPS Update Loop (High Precision Stopwatch Delta-Time)
         public bool UpdateAnimationAndTransition()
         {
+            // Khi chưa trình chiếu và không ở chế độ xem trước (Preview) hay quét laser:
+            // Tuyệt đối không chạy hiệu ứng để tránh gây lag giao diện khi chỉnh sửa/cuộn
+            if (!IsPresenting && !IsPreviewingTransition && !IsPlayingAnimationPreview && !IsScanningActive)
+            {
+                bool hasPlayingVideo = false;
+                if (ActiveSlide != null && ActiveSlide.Shapes != null)
+                {
+                    for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+                    {
+                        ShapeNode shape = ActiveSlide.Shapes[i];
+                        if (shape != null && shape.Type == ShapeType.Video && shape.IsVideoPlaying)
+                        {
+                            shape.VideoCurrentTime += 0.016f;
+                            if (shape.VideoCurrentTime >= shape.VideoTotalTime)
+                            {
+                                shape.VideoCurrentTime = shape.VideoTotalTime;
+                                shape.IsVideoPlaying = false;
+                            }
+                            hasPlayingVideo = true;
+                        }
+                    }
+                }
+                return hasPlayingVideo;
+            }
+
             bool needRedraw = false;
 
             // 1. Update Slide Transition Progress (High Precision Stopwatch Timing)
@@ -1763,7 +2039,7 @@ namespace GenOffice.UI
                 float duration = 1.0f;
                 if (targetSlide != null)
                 {
-                    if (targetSlide.Transition == TransitionType.GenOffice_CanvaFlow && targetSlide.TransitionDuration <= 1.0f)
+                    if (targetSlide.Transition == TransitionType.GenOffice_SmoothFlow && targetSlide.TransitionDuration <= 1.0f)
                         duration = 2.20f;
                     else if (targetSlide.Transition == TransitionType.Morph && targetSlide.TransitionDuration <= 1.0f)
                         duration = 2.0f;
@@ -1776,17 +2052,27 @@ namespace GenOffice.UI
 
                 if (rawProgress >= 1.0f)
                 {
-                    TransitionProgress = 1.0f;
-                    IsTransitioning = false;
-                    IsPreviewingTransition = false;
-                    _transitionStopwatch.Stop();
-                    ClearMorphTextureCache();
+                    if (TransitionProgress < 1.0f)
+                    {
+                        // Đảm bảo vẽ ít nhất 1 khung hình ở đúng tọa độ tĩnh 1.0f hoàn tất
+                        TransitionProgress = 1.0f;
+                        needRedraw = true;
+                    }
+                    else
+                    {
+                        // Đã vẽ xong khung 1.0f hoàn tất, giờ mới kết thúc chuyển cảnh sạch sẽ không bao giờ bị giật
+                        IsTransitioning = false;
+                        IsPreviewingTransition = false;
+                        _transitionStopwatch.Stop();
+                        ClearMorphTextureCache();
+                        needRedraw = true;
+                    }
                 }
                 else
                 {
                     TransitionProgress = rawProgress;
+                    needRedraw = true;
                 }
-                needRedraw = true;
             }
 
             // 2. Update Animation Preview or Slide Show Step Progress
@@ -1802,21 +2088,34 @@ namespace GenOffice.UI
                     {
                         ShapeAnimation currentAnim = ActiveSlide.Animations[ActivePlayingAnimIndex];
                         float duration = (currentAnim.Duration > 0.05f) ? currentAnim.Duration : 0.5f;
-                        AnimationProgress = Math.Min(1.0f, elapsedSec / duration);
+                        float p = elapsedSec / duration;
 
-                        if (AnimationProgress >= 1.0f)
+                        if (p >= 1.0f)
                         {
-                            AnimationProgress = 0.0f;
-                            _animStopwatch.Restart();
-                            ActivePlayingAnimIndex++;
-                            if (ActivePlayingAnimIndex >= ActiveSlide.Animations.Count)
+                            if (AnimationProgress < 1.0f)
                             {
-                                IsPlayingAnimationPreview = false;
-                                ActivePlayingAnimIndex = -1;
-                                _animStopwatch.Stop();
+                                AnimationProgress = 1.0f;
+                                needRedraw = true;
+                            }
+                            else
+                            {
+                                AnimationProgress = 0.0f;
+                                _animStopwatch.Restart();
+                                ActivePlayingAnimIndex++;
+                                if (ActivePlayingAnimIndex >= ActiveSlide.Animations.Count)
+                                {
+                                    IsPlayingAnimationPreview = false;
+                                    ActivePlayingAnimIndex = -1;
+                                    _animStopwatch.Stop();
+                                }
+                                needRedraw = true;
                             }
                         }
-                        needRedraw = true;
+                        else
+                        {
+                            AnimationProgress = p;
+                            needRedraw = true;
+                        }
                     }
                     else
                     {
@@ -1828,15 +2127,27 @@ namespace GenOffice.UI
                 else if (IsPresenting && IsPlayingSlideAnimation)
                 {
                     float duration = GetCurrentStepMaxDuration(ActiveSlide, CurrentAnimationStep);
-                    AnimationProgress = Math.Min(1.0f, elapsedSec / duration);
+                    float p = elapsedSec / duration;
 
-                    if (AnimationProgress >= 1.0f)
+                    if (p >= 1.0f)
                     {
-                        AnimationProgress = 1.0f;
-                        IsPlayingSlideAnimation = false;
-                        _animStopwatch.Stop();
+                        if (AnimationProgress < 1.0f)
+                        {
+                            AnimationProgress = 1.0f;
+                            needRedraw = true;
+                        }
+                        else
+                        {
+                            IsPlayingSlideAnimation = false;
+                            _animStopwatch.Stop();
+                            needRedraw = true;
+                        }
                     }
-                    needRedraw = true;
+                    else
+                    {
+                        AnimationProgress = p;
+                        needRedraw = true;
+                    }
                 }
             }
 
@@ -1887,7 +2198,7 @@ namespace GenOffice.UI
             }
 
             // 5. Update Ambient Infinite Animations (e.g. Neon Pulse Infinite Breathing Loop)
-            if (ActiveSlide != null && ActiveSlide.Animations != null)
+            if (IsPresenting && ActiveSlide != null && ActiveSlide.Animations != null)
             {
                 foreach (ShapeAnimation anim in ActiveSlide.Animations)
                 {
@@ -1908,11 +2219,30 @@ namespace GenOffice.UI
         {
             GraphicsState gState = g.Save();
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.Bilinear;
-            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            // HighQualityBicubic produces smooth scaled images for Zoom; Bilinear can show block artifacts
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            // PixelOffsetMode.Half applies a 0.5-pixel sub-pixel offset so coordinates render without
+            // integer-grid snapping. HighSpeed rounds to integers every frame → direct jitter source.
+            g.PixelOffsetMode = PixelOffsetMode.Half;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-            float t = SmoothEase(progress);
+            float t = (type == TransitionType.Morph)
+                ? EaseInOutCubic(progress)  // Morph needs zero-velocity start/end to hide frame-timing jitter
+                : SmoothEase(progress);
+
+            if (type != TransitionType.Morph)
+            {
+                EnsureTransitionCache(rect, fromSlide, toSlide, scale);
+            }
+
+            // Khi tiến độ thực tế đạt 100% hoàn tất: Khóa chặt slide đích tại đúng hình chữ nhật chuẩn 1:1
+            // Không ngắt sớm ở t >= 0.999f (vốn đạt được từ khi progress mới 96.5% do đường cong Sin) làm giật hình
+            if (progress >= 0.9999f)
+            {
+                DrawSlideFull(g, rect, toSlide, scale);
+                g.Restore(gState);
+                return;
+            }
 
             switch (type)
             {
@@ -2086,8 +2416,8 @@ namespace GenOffice.UI
                 case TransitionType.GenOffice_GoldenRibbon:
                     RenderGoldenRibbonTransition(g, rect, fromSlide, toSlide, t, scale);
                     break;
-                case TransitionType.GenOffice_CanvaFlow:
-                    RenderCanvaFlowTransition(g, rect, fromSlide, toSlide, t, scale);
+                case TransitionType.GenOffice_SmoothFlow:
+                    RenderSmoothFlowTransition(g, rect, fromSlide, toSlide, t, scale);
                     break;
                 case TransitionType.None:
                 default:
@@ -2100,12 +2430,14 @@ namespace GenOffice.UI
 
         private void RenderMorphTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            if (t >= 0.999f)
+            // Thresholds raised so the interpolated morph runs for the full visible range.
+            // 0.999 was reached at only ~97% raw progress (SmoothEase), causing an early snap.
+            if (t >= 0.9999f)
             {
                 DrawSlideFull(g, rect, toSlide, scale);
                 return;
             }
-            if (t <= 0.001f)
+            if (t <= 0.0001f)
             {
                 DrawSlideFull(g, rect, fromSlide, scale);
                 return;
@@ -2139,140 +2471,117 @@ namespace GenOffice.UI
                 }
             }
 
-            // Pair matching shapes between fromSlide and toSlide (PowerPoint 365 Morph Matching Rules)
-            HashSet<ShapeNode> usedFromShapes = new HashSet<ShapeNode>();
-            HashSet<ShapeNode> usedToShapes = new HashSet<ShapeNode>();
-            List<KeyValuePair<ShapeNode, ShapeNode>> pairs = new List<KeyValuePair<ShapeNode, ShapeNode>>();
-
-            // Priority 1: Match by explicit MorphName (starts with !!)
-            for (int b = 0; b < toSlide.Shapes.Count; b++)
+            // --- Build / reuse cached pair lists (avoid O(n²) HashSet alloc every frame) ---
+            if (_cachedMorphFromIdx != TransitionFromSlideIndex || _cachedMorphToIdx != TransitionToSlideIndex
+                || _cachedMorphPairs == null)
             {
-                ShapeNode shapeB = toSlide.Shapes[b];
-                if (!string.IsNullOrEmpty(shapeB.MorphName) && shapeB.MorphName.StartsWith("!!"))
+                _cachedMorphPairs = new List<KeyValuePair<ShapeNode, ShapeNode>>();
+                _cachedMorphFromUnpaired = new HashSet<ShapeNode>();
+                _cachedMorphToUnpaired = new HashSet<ShapeNode>();
+
+                HashSet<ShapeNode> usedFromShapes = new HashSet<ShapeNode>();
+                HashSet<ShapeNode> usedToShapes = new HashSet<ShapeNode>();
+
+                // Priority 1: Match by explicit MorphName (with or without !!, case-insensitive)
+                for (int b = 0; b < toSlide.Shapes.Count; b++)
                 {
-                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                    ShapeNode shapeB = toSlide.Shapes[b];
+                    if (!string.IsNullOrEmpty(shapeB.MorphName))
                     {
-                        ShapeNode shapeA = fromSlide.Shapes[a];
-                        if (!usedFromShapes.Contains(shapeA) && shapeA.MorphName == shapeB.MorphName)
+                        string mNameB = shapeB.MorphName.TrimStart('!');
+                        for (int a = 0; a < fromSlide.Shapes.Count; a++)
                         {
-                            pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
-                            usedFromShapes.Add(shapeA);
-                            usedToShapes.Add(shapeB);
-                            break;
+                            ShapeNode shapeA = fromSlide.Shapes[a];
+                            if (!usedFromShapes.Contains(shapeA) && !string.IsNullOrEmpty(shapeA.MorphName))
+                            {
+                                string mNameA = shapeA.MorphName.TrimStart('!');
+                                if (string.Equals(mNameA, mNameB, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _cachedMorphPairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
+                                    usedFromShapes.Add(shapeA); usedToShapes.Add(shapeB); break;
+                                }
+                            }
                         }
                     }
                 }
-            }
-
-            // Priority 2: Match by exact non-empty Text (identical text moving or resizing)
-            for (int b = 0; b < toSlide.Shapes.Count; b++)
-            {
-                ShapeNode shapeB = toSlide.Shapes[b];
-                if (usedToShapes.Contains(shapeB)) continue;
-                if (string.IsNullOrWhiteSpace(shapeB.Text)) continue;
-
-                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                // Priority 2: Match by exact non-empty Text
+                for (int b = 0; b < toSlide.Shapes.Count; b++)
                 {
-                    ShapeNode shapeA = fromSlide.Shapes[a];
-                    if (usedFromShapes.Contains(shapeA)) continue;
-
-                    if (string.Equals(shapeA.Text != null ? shapeA.Text.Trim() : "", shapeB.Text != null ? shapeB.Text.Trim() : "", StringComparison.Ordinal))
+                    ShapeNode shapeB = toSlide.Shapes[b];
+                    if (usedToShapes.Contains(shapeB) || string.IsNullOrWhiteSpace(shapeB.Text)) continue;
+                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
                     {
-                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
-                        usedFromShapes.Add(shapeA);
-                        usedToShapes.Add(shapeB);
-                        break;
+                        ShapeNode shapeA = fromSlide.Shapes[a];
+                        if (usedFromShapes.Contains(shapeA)) continue;
+                        if (string.Equals(shapeA.Text != null ? shapeA.Text.Trim() : "", shapeB.Text != null ? shapeB.Text.Trim() : "", StringComparison.Ordinal))
+                        { _cachedMorphPairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB)); usedFromShapes.Add(shapeA); usedToShapes.Add(shapeB); break; }
                     }
                 }
-            }
-
-            // Priority 3: Match by ImagePath / CachedImage
-            for (int b = 0; b < toSlide.Shapes.Count; b++)
-            {
-                ShapeNode shapeB = toSlide.Shapes[b];
-                if (usedToShapes.Contains(shapeB)) continue;
-                if (shapeB.Type != ShapeType.Image && shapeB.CachedImage == null && string.IsNullOrEmpty(shapeB.ImagePath)) continue;
-
-                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                // Priority 3: Match by ImagePath / CachedImage
+                for (int b = 0; b < toSlide.Shapes.Count; b++)
                 {
-                    ShapeNode shapeA = fromSlide.Shapes[a];
-                    if (usedFromShapes.Contains(shapeA)) continue;
-
-                    if ((!string.IsNullOrEmpty(shapeA.ImagePath) && shapeA.ImagePath == shapeB.ImagePath) ||
-                        (shapeA.CachedImage != null && shapeA.CachedImage == shapeB.CachedImage) ||
-                        (shapeA.Type == ShapeType.Image && shapeB.Type == ShapeType.Image && !string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name))
+                    ShapeNode shapeB = toSlide.Shapes[b];
+                    if (usedToShapes.Contains(shapeB)) continue;
+                    if (shapeB.Type != ShapeType.Image && shapeB.CachedImage == null && string.IsNullOrEmpty(shapeB.ImagePath)) continue;
+                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
                     {
-                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
-                        usedFromShapes.Add(shapeA);
-                        usedToShapes.Add(shapeB);
-                        break;
+                        ShapeNode shapeA = fromSlide.Shapes[a];
+                        if (usedFromShapes.Contains(shapeA)) continue;
+                        if ((!string.IsNullOrEmpty(shapeA.ImagePath) && shapeA.ImagePath == shapeB.ImagePath) ||
+                            (shapeA.CachedImage != null && shapeA.CachedImage == shapeB.CachedImage) ||
+                            (shapeA.Type == ShapeType.Image && shapeB.Type == ShapeType.Image && !string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name))
+                        { _cachedMorphPairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB)); usedFromShapes.Add(shapeA); usedToShapes.Add(shapeB); break; }
                     }
                 }
-            }
-
-            // Priority 4: Match by Name (if user gave matching custom names)
-            for (int b = 0; b < toSlide.Shapes.Count; b++)
-            {
-                ShapeNode shapeB = toSlide.Shapes[b];
-                if (usedToShapes.Contains(shapeB)) continue;
-                if (string.IsNullOrEmpty(shapeB.Name)) continue;
-
-                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                // Priority 4: Match by Name
+                for (int b = 0; b < toSlide.Shapes.Count; b++)
                 {
-                    ShapeNode shapeA = fromSlide.Shapes[a];
-                    if (usedFromShapes.Contains(shapeA)) continue;
-
-                    if (!string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name)
+                    ShapeNode shapeB = toSlide.Shapes[b];
+                    if (usedToShapes.Contains(shapeB) || string.IsNullOrEmpty(shapeB.Name)) continue;
+                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
                     {
-                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
-                        usedFromShapes.Add(shapeA);
-                        usedToShapes.Add(shapeB);
-                        break;
+                        ShapeNode shapeA = fromSlide.Shapes[a];
+                        if (usedFromShapes.Contains(shapeA)) continue;
+                        if (!string.IsNullOrEmpty(shapeA.Name) && shapeA.Name == shapeB.Name)
+                        { _cachedMorphPairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB)); usedFromShapes.Add(shapeA); usedToShapes.Add(shapeB); break; }
                     }
                 }
-            }
-
-            // Priority 5: Cloned/Duplicated Pure Geometric Shapes without text
-            for (int b = 0; b < toSlide.Shapes.Count; b++)
-            {
-                ShapeNode shapeB = toSlide.Shapes[b];
-                if (usedToShapes.Contains(shapeB)) continue;
-                if (!string.IsNullOrEmpty(shapeB.Text)) continue;
-
-                for (int a = 0; a < fromSlide.Shapes.Count; a++)
+                // Priority 5: Cloned pure geometric shapes without text
+                for (int b = 0; b < toSlide.Shapes.Count; b++)
                 {
-                    ShapeNode shapeA = fromSlide.Shapes[a];
-                    if (usedFromShapes.Contains(shapeA)) continue;
-                    if (!string.IsNullOrEmpty(shapeA.Text)) continue;
-
-                    if (shapeA.Id == shapeB.Id && shapeA.Type == shapeB.Type)
+                    ShapeNode shapeB = toSlide.Shapes[b];
+                    if (usedToShapes.Contains(shapeB) || !string.IsNullOrEmpty(shapeB.Text)) continue;
+                    for (int a = 0; a < fromSlide.Shapes.Count; a++)
                     {
-                        pairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB));
-                        usedFromShapes.Add(shapeA);
-                        usedToShapes.Add(shapeB);
-                        break;
+                        ShapeNode shapeA = fromSlide.Shapes[a];
+                        if (usedFromShapes.Contains(shapeA) || !string.IsNullOrEmpty(shapeA.Text)) continue;
+                        if (shapeA.Id == shapeB.Id && shapeA.Type == shapeB.Type)
+                        { _cachedMorphPairs.Add(new KeyValuePair<ShapeNode, ShapeNode>(shapeA, shapeB)); usedFromShapes.Add(shapeA); usedToShapes.Add(shapeB); break; }
                     }
                 }
+                foreach (ShapeNode s in fromSlide.Shapes) if (!usedFromShapes.Contains(s)) _cachedMorphFromUnpaired.Add(s);
+                foreach (ShapeNode s in toSlide.Shapes)   if (!usedToShapes.Contains(s))   _cachedMorphToUnpaired.Add(s);
+
+                _cachedMorphFromIdx = TransitionFromSlideIndex;
+                _cachedMorphToIdx   = TransitionToSlideIndex;
             }
+
+            // --- Render using cached pairs ---
 
             // Render Unpaired shapes from Slide A (Smooth continuous Fade Out)
+            // No Clone() needed - pass fadeOut as opacityMultiplier directly.
+            // Original opacity is preserved; op = shape.FillOpacity * fadeOut (linear, correct).
             for (int a = 0; a < fromSlide.Shapes.Count; a++)
             {
                 ShapeNode shapeA = fromSlide.Shapes[a];
-                if (!usedFromShapes.Contains(shapeA))
-                {
-                    float fadeOut = Math.Max(0.0f, 1.0f - t) * shapeA.FillOpacity;
-                    if (fadeOut > 0.005f)
-                    {
-                        ShapeNode morphedA = shapeA.Clone();
-                        morphedA.FillOpacity = fadeOut;
-                        DrawShape(g, rect.X, rect.Y, scale, morphedA, false);
-                    }
-                }
+                if (!_cachedMorphFromUnpaired.Contains(shapeA)) continue;
+                float fadeOut = Math.Max(0.0f, 1.0f - t);
+                if (fadeOut > 0.005f)
+                    DrawShape(g, rect.X, rect.Y, scale, shapeA, false, fadeOut);
             }
 
             // Render Paired Shapes with Pure Vector Matrix Interpolation
-            foreach (KeyValuePair<ShapeNode, ShapeNode> pair in pairs)
+            foreach (KeyValuePair<ShapeNode, ShapeNode> pair in _cachedMorphPairs)
             {
                 ShapeNode sA = pair.Key;
                 ShapeNode sB = pair.Value;
@@ -2290,7 +2599,7 @@ namespace GenOffice.UI
                         {
                             ShapeNode morphedA = sA.Clone();
                             morphedA.FillOpacity = fadeOut;
-                            DrawShape(g, rect.X, rect.Y, scale, morphedA, false);
+                            DrawShape(g, rect.X, rect.Y, scale, morphedA, false, fadeOut);
                         }
                         continue;
                     }
@@ -2300,28 +2609,33 @@ namespace GenOffice.UI
             }
 
             // Render Unpaired shapes from Slide B (Fade In synchronized with movement)
+            // No Clone() needed - pass fadeIn as opacityMultiplier directly.
             for (int b = 0; b < toSlide.Shapes.Count; b++)
             {
                 ShapeNode shapeB = toSlide.Shapes[b];
-                if (!usedToShapes.Contains(shapeB))
+                if (!_cachedMorphToUnpaired.Contains(shapeB)) continue;
+                if (IsPresenting || IsPreviewingTransition)
                 {
-                    if (IsPresenting || IsPreviewingTransition)
-                    {
-                        bool isVis;
-                        float offX, offY, scX, scY, rDelta, opMul;
-                        GetShapeAnimationTransform(shapeB, toSlide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
-                        if (!isVis) continue;
-                    }
-
-                    float fadeIn = Math.Max(0.0f, Math.Min(1.0f, t)) * shapeB.FillOpacity;
-                    if (fadeIn > 0.005f)
-                    {
-                        ShapeNode morphedB = shapeB.Clone();
-                        morphedB.FillOpacity = fadeIn;
-                        DrawShape(g, rect.X, rect.Y, scale, morphedB, false);
-                    }
+                    bool isVis;
+                    float offX, offY, scX, scY, rDelta, opMul;
+                    GetShapeAnimationTransform(shapeB, toSlide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
+                    if (!isVis) continue;
                 }
+                float fadeIn = Math.Max(0.0f, Math.Min(1.0f, t));
+                if (fadeIn > 0.005f)
+                    DrawShape(g, rect.X, rect.Y, scale, shapeB, false, fadeIn);
             }
+        }
+
+        // PowerPoint-style smooth cubic ease-in-out: velocity=0 at both ends, peak at midpoint.
+        // Critical for Morph: when velocity=0 a late/early timer tick causes zero visible displacement.
+        private static float EaseInOutCubic(float p)
+        {
+            if (p <= 0f) return 0f;
+            if (p >= 1f) return 1f;
+            return p < 0.5f
+                ? 4f * p * p * p
+                : 1f - (float)Math.Pow(-2f * p + 2f, 3) / 2f;
         }
 
         public static float SmoothEase(float p)
@@ -2334,12 +2648,14 @@ namespace GenOffice.UI
 
         private void DrawMorphingShape(Graphics g, float slideX, float slideY, float scale, ShapeNode sA, ShapeNode sB, float t)
         {
-            if (t >= 0.999f)
+            // 0.999f threshold caused a snap at ~97% raw progress (SmoothEase(0.97) ≈ 0.999).
+            // Raising to 0.9998f means the snap only triggers at 99.97% raw — imperceptible.
+            if (t >= 0.9998f)
             {
                 DrawShape(g, slideX, slideY, scale, sB, false);
                 return;
             }
-            if (t <= 0.001f)
+            if (t <= 0.0002f)
             {
                 DrawShape(g, slideX, slideY, scale, sA, false);
                 return;
@@ -2387,36 +2703,43 @@ namespace GenOffice.UI
             Color cTextB = Color.FromArgb(sB.TextColor | unchecked((int)0xFF000000));
             morphed.TextColor = InterpolateColor(cTextA, cTextB, t).ToArgb() & 0xFFFFFF;
 
-            // 1. Draw morphing base container (Fill + Stroke + CustomPath)
+            // 1. Draw morphing base container (Fill + Stroke + CustomPath) without duplicate text
+            string origText = morphed.Text;
+            morphed.Text = "";
             DrawShape(g, slideX, slideY, scale, morphed, false);
+            morphed.Text = origText;
 
-            // 2. Render Text
+            // 2. Render Text cleanly
             if (sameText && !string.IsNullOrEmpty(sB.Text))
             {
-                // When identical text, render text formatted with target width to prevent line-wrapping reflow
+                // Text renders at the SAME interpolated size as the background (morphed.Transform.W/H).
+                // Using sB.W caused text to be offset from the background center as the shape grew,
+                // creating a "heat-haze" shimmer. Interpolated size keeps text locked inside the shape.
                 ShapeNode txtSame = morphed.Clone();
-                txtSame.FillColor = 0x00FFFFFF;
+                txtSame.FillOpacity = 0f;      // text-only pass: no fill drawn over morphed background
+                txtSame.FillColor = 0;
+                txtSame.StrokeColor = 0;
                 txtSame.StrokeWidth = 0;
                 txtSame.Text = sB.Text;
-                txtSame.Transform.Width = sB.Transform.Width;
-                txtSame.Transform.Height = sB.Transform.Height;
+                // Keep Width/Height == morphed (interpolated) so text stays inside the current frame's background.
+                // Do NOT override to sB.W/H: that offset text by up to (sB.W-sA.W)/2 pixels → shimmer.
                 txtSame.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
-                txtSame.FillOpacity = sA.FillOpacity + (sB.FillOpacity - sA.FillOpacity) * t;
                 txtSame.TextColor = morphed.TextColor;
-                DrawShape(g, slideX, slideY, scale, txtSame, false);
+                DrawShape(g, slideX, slideY, scale, txtSame, false, 1.0f);
             }
             else
             {
-                // Text A smoothly fades out with its original width (no line jump)
-                float fadeOutText = Math.Max(0.0f, 1.0f - t) * sA.FillOpacity;
-                if (fadeOutText > 0.005f && !string.IsNullOrEmpty(sA.Text))
+                // Text A smoothly fades out — keep same interpolated container size as background
+                float fadeOutText = Math.Max(0.0f, 1.0f - t);
+                if (fadeOutText > 0.01f && !string.IsNullOrEmpty(sA.Text))
                 {
                     ShapeNode txtA = morphed.Clone();
-                    txtA.FillColor = 0x00FFFFFF;
+                    txtA.FillOpacity = 0f;  // text-only pass: no fill rectangle
+                    txtA.FillColor = 0;
+                    txtA.StrokeColor = 0;
                     txtA.StrokeWidth = 0;
                     txtA.Text = sA.Text;
-                    txtA.Transform.Width = sA.Transform.Width;
-                    txtA.Transform.Height = sA.Transform.Height;
+                    // Use morphed size (not sA.W) so text stays inside the interpolating background shape
                     txtA.FontName = sA.FontName;
                     txtA.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
                     txtA.Bold = sA.Bold;
@@ -2424,21 +2747,21 @@ namespace GenOffice.UI
                     txtA.Underline = sA.Underline;
                     txtA.Alignment = sA.Alignment;
                     txtA.VerticalAlignment = sA.VerticalAlignment;
-                    txtA.FillOpacity = fadeOutText;
                     txtA.TextColor = sA.TextColor;
-                    DrawShape(g, slideX, slideY, scale, txtA, false);
+                    DrawShape(g, slideX, slideY, scale, txtA, false, fadeOutText);
                 }
 
-                // Text B smoothly fades in with its target width (no line jump)
-                float fadeInText = Math.Max(0.0f, t) * sB.FillOpacity;
-                if (fadeInText > 0.005f && !string.IsNullOrEmpty(sB.Text))
+                // Text B smoothly fades in — keep same interpolated container size as background
+                float fadeInText = Math.Max(0.0f, t);
+                if (fadeInText > 0.01f && !string.IsNullOrEmpty(sB.Text))
                 {
                     ShapeNode txtB = morphed.Clone();
-                    txtB.FillColor = 0x00FFFFFF;
+                    txtB.FillOpacity = 0f;  // text-only pass: no fill rectangle
+                    txtB.FillColor = 0;
+                    txtB.StrokeColor = 0;
                     txtB.StrokeWidth = 0;
                     txtB.Text = sB.Text;
-                    txtB.Transform.Width = sB.Transform.Width;
-                    txtB.Transform.Height = sB.Transform.Height;
+                    // Use morphed size (not sB.W) so text stays inside the interpolating background shape
                     txtB.FontName = sB.FontName;
                     txtB.FontSize = sA.FontSize + (sB.FontSize - sA.FontSize) * t;
                     txtB.Bold = sB.Bold;
@@ -2446,9 +2769,8 @@ namespace GenOffice.UI
                     txtB.Underline = sB.Underline;
                     txtB.Alignment = sB.Alignment;
                     txtB.VerticalAlignment = sB.VerticalAlignment;
-                    txtB.FillOpacity = fadeInText;
                     txtB.TextColor = sB.TextColor;
-                    DrawShape(g, slideX, slideY, scale, txtB, false);
+                    DrawShape(g, slideX, slideY, scale, txtB, false, fadeInText);
                 }
             }
         }
@@ -2466,6 +2788,39 @@ namespace GenOffice.UI
             {
                 ApplyThemeToSlide(slide, Presentation.CurrentTheme);
             }
+        }
+
+        public void InsertTextFromAI(string text)
+        {
+            if (string.IsNullOrEmpty(text) || Presentation == null || Presentation.Slides.Count == 0) return;
+            SaveUndoState();
+            int curIdx = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, ActiveSlideIndex));
+            var slide = Presentation.Slides[curIdx];
+
+            if (SelectedShape != null)
+            {
+                SelectedShape.Text = (SelectedShape.Text ?? "") + (string.IsNullOrEmpty(SelectedShape.Text) ? "" : "\n") + text;
+                return;
+            }
+
+            float canvasW = Presentation.CanvasWidth > 0 ? Presentation.CanvasWidth : 1920f;
+            float canvasH = Presentation.CanvasHeight > 0 ? Presentation.CanvasHeight : 1080f;
+
+            var shape = new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Text = text,
+                FontName = "Segoe UI",
+                FontSize = 24f,
+                TextColor = unchecked((int)0xFF1E293B),
+                FillColor = 0x00FFFFFF,
+                FillOpacity = 0f,
+                StrokeColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                Transform = new Transform2D(120f, 200f, canvasW - 240f, 400f)
+            };
+            slide.Shapes.Add(shape);
+            SelectedShapeIndex = slide.Shapes.Count - 1;
         }
 
         public void DuplicateActiveSlide()
@@ -2528,13 +2883,23 @@ namespace GenOffice.UI
             if (shape.Type == ShapeType.Image) return;
             IsInlineEditing = true;
             EditingShape = shape;
-            if (shape.Type != ShapeType.TextBox && shape.Alignment != TextAlignment.Left && shape.Alignment != TextAlignment.Right)
+            if (shape.Type != ShapeType.TextBox)
             {
-                shape.Alignment = TextAlignment.Center;
+                if (shape.Alignment != TextAlignment.Left && shape.Alignment != TextAlignment.Right && shape.Alignment != TextAlignment.Justify)
+                {
+                    shape.Alignment = TextAlignment.Center;
+                }
                 shape.VerticalAlignment = VerticalTextAlignment.Middle;
+                if ((shape.TextColor == 0x222222 || shape.TextColor == 0x0F172A) && shape.FillColor != 0x00FFFFFF && shape.FillColor != 0xFFFFFF)
+                {
+                    shape.TextColor = 0xFFFFFF;
+                }
             }
             EditingTextBuffer = shape.Text ?? "";
             CaretIndex = EditingTextBuffer.Length;
+            TextSelectionStart = 0;
+            TextSelectionLength = 0;
+            IsSelectingText = false;
             shape.IsEditingText = true;
         }
 
@@ -2542,12 +2907,19 @@ namespace GenOffice.UI
         {
             if (IsInlineEditing && EditingShape != null)
             {
+                if (VietnameseAutoCorrect.IsEnabled && !string.IsNullOrEmpty(EditingTextBuffer))
+                {
+                    EditingTextBuffer = VietnameseAutoCorrect.CorrectText(EditingTextBuffer);
+                }
                 EditingShape.Text = EditingTextBuffer;
                 EditingShape.IsEditingText = false;
             }
             IsInlineEditing = false;
             EditingShape = null;
             EditingTextBuffer = "";
+            TextSelectionStart = 0;
+            TextSelectionLength = 0;
+            IsSelectingText = false;
 
             EndTableInlineEditing();
         }
@@ -2584,7 +2956,12 @@ namespace GenOffice.UI
                 {
                     while (EditingTableShape.TableData.Count <= r) EditingTableShape.TableData.Add(new List<string>());
                     while (EditingTableShape.TableData[r].Count <= c) EditingTableShape.TableData[r].Add("");
-                    EditingTableShape.TableData[r][c] = EditingTableCellBuffer ?? "";
+                    string cellVal = EditingTableCellBuffer ?? "";
+                    if (VietnameseAutoCorrect.IsEnabled && !string.IsNullOrEmpty(cellVal))
+                    {
+                        cellVal = VietnameseAutoCorrect.CorrectText(cellVal);
+                    }
+                    EditingTableShape.TableData[r][c] = cellVal;
                 }
             }
             IsEditingTableCell = false;
@@ -2892,10 +3269,36 @@ namespace GenOffice.UI
             {
                 _slidesClipboardShape = SelectedShape.Clone();
                 _slidesClipboardSourceIndex = ActiveSlideIndex;
-                if (!string.IsNullOrEmpty(SelectedShape.Text))
+
+                Image imgToCopy = SelectedShape.CachedImage;
+                if (imgToCopy == null && !string.IsNullOrEmpty(SelectedShape.ImagePath) && System.IO.File.Exists(SelectedShape.ImagePath))
                 {
-                    try { Clipboard.SetText(SelectedShape.Text); } catch { }
+                    try { imgToCopy = Image.FromFile(SelectedShape.ImagePath); } catch { }
                 }
+
+                try
+                {
+                    DataObject data = new DataObject();
+                    data.SetData("GenOffice.SlideShape", true);
+                    if (imgToCopy != null)
+                    {
+                        using (Bitmap copyBmp = new Bitmap(imgToCopy))
+                        {
+                            data.SetImage(copyBmp);
+                            Clipboard.SetDataObject(data, true);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(SelectedShape.Text))
+                    {
+                        data.SetText(SelectedShape.Text);
+                        Clipboard.SetDataObject(data, true);
+                    }
+                    else
+                    {
+                        Clipboard.SetDataObject(data, true);
+                    }
+                }
+                catch { }
             }
         }
 
@@ -2915,12 +3318,8 @@ namespace GenOffice.UI
 
             if (SelectedShape != null && ActiveSlide != null && SelectedShapeIndex >= 0)
             {
-                _slidesClipboardShape = SelectedShape.Clone();
-                _slidesClipboardSourceIndex = ActiveSlideIndex;
-                if (!string.IsNullOrEmpty(SelectedShape.Text))
-                {
-                    try { Clipboard.SetText(SelectedShape.Text); } catch { }
-                }
+                Copy();
+                SaveUndoState();
                 ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
                 SelectedShapeIndex = -1;
                 EndInlineEditing();
@@ -2944,13 +3343,15 @@ namespace GenOffice.UI
                 return;
             }
 
-            if (_slidesClipboardShape != null && ActiveSlide != null)
+            bool isInternalShape = false;
+            try { isInternalShape = Clipboard.ContainsData("GenOffice.SlideShape"); } catch { }
+
+            if (isInternalShape && _slidesClipboardShape != null && ActiveSlide != null)
             {
                 ShapeNode pasteShape = _slidesClipboardShape.Clone();
                 // Giữ nguyên 100% vị trí khi dán qua slide khác!
                 if (ActiveSlideIndex == _slidesClipboardSourceIndex)
                 {
-                    // Dán trên cùng slide thì dịch nhẹ 20px để không đè lên hình cũ
                     pasteShape.Transform.X += 20f;
                     pasteShape.Transform.Y += 20f;
                     _slidesClipboardShape.Transform.X += 20f;
@@ -2958,11 +3359,65 @@ namespace GenOffice.UI
                 }
                 else
                 {
-                    // Dán qua slide khác: vị trí tuyệt đối giữ nguyên 100%
                     pasteShape.Transform.X = _slidesClipboardShape.Transform.X;
                     pasteShape.Transform.Y = _slidesClipboardShape.Transform.Y;
                 }
 
+                SaveUndoState();
+                ActiveSlide.AddShape(pasteShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                return;
+            }
+
+            // Dán hình ảnh từ Clipboard (Screenshots, browser Copy Image, ảnh copy từ WriterView...)
+            if (Clipboard.ContainsImage() && ActiveSlide != null)
+            {
+                Image clipImg = Clipboard.GetImage();
+                if (clipImg != null)
+                {
+                    PasteImageIntoSlide(clipImg);
+                    return;
+                }
+            }
+
+            // Dán file ảnh từ Windows Explorer
+            if (Clipboard.ContainsFileDropList() && ActiveSlide != null)
+            {
+                var files = Clipboard.GetFileDropList();
+                if (files != null && files.Count > 0)
+                {
+                    bool pastedAny = false;
+                    for (int i = 0; i < files.Count; i++)
+                    {
+                        string f = files[i];
+                        if (!string.IsNullOrEmpty(f) && System.IO.File.Exists(f))
+                        {
+                            string ext = System.IO.Path.GetExtension(f).ToLowerInvariant();
+                            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || 
+                                ext == ".gif" || ext == ".webp" || ext == ".ico" || ext == ".tiff" || ext == ".tif")
+                            {
+                                try
+                                {
+                                    using (Image loadedImg = Image.FromFile(f))
+                                    {
+                                        PasteImageIntoSlide(loadedImg, f);
+                                        pastedAny = true;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                    if (pastedAny) return;
+                }
+            }
+
+            if (_slidesClipboardShape != null && ActiveSlide != null)
+            {
+                ShapeNode pasteShape = _slidesClipboardShape.Clone();
+                pasteShape.Transform.X += 20f;
+                pasteShape.Transform.Y += 20f;
+                SaveUndoState();
                 ActiveSlide.AddShape(pasteShape);
                 SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
                 return;
@@ -2984,10 +3439,69 @@ namespace GenOffice.UI
                         FillColor = 0x00FFFFFF,
                         StrokeWidth = 0f
                     };
+                    SaveUndoState();
                     ActiveSlide.AddShape(tb);
                     SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
                 }
             }
+        }
+
+        public void PasteImageIntoSlide(Image clipImg, string sourceFilePath = null)
+        {
+            if (clipImg == null || ActiveSlide == null) return;
+            try
+            {
+                string tempPath = sourceFilePath;
+                if (string.IsNullOrEmpty(tempPath) || !System.IO.File.Exists(tempPath))
+                {
+                    string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GenOffice_Media");
+                    if (!System.IO.Directory.Exists(tempDir)) System.IO.Directory.CreateDirectory(tempDir);
+                    tempPath = System.IO.Path.Combine(tempDir, "slide_pasted_" + DateTime.Now.Ticks + ".png");
+                    using (Bitmap bmp = new Bitmap(clipImg))
+                    {
+                        bmp.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+                    }
+                }
+
+                float imgW = clipImg.Width;
+                float imgH = clipImg.Height;
+                float maxW = 560f;
+                float maxH = 380f;
+                if (imgW > maxW || imgH > maxH)
+                {
+                    float ratio = imgW / Math.Max(1f, imgH);
+                    if (ratio >= 1.0f)
+                    {
+                        imgW = maxW;
+                        imgH = imgW / ratio;
+                    }
+                    else
+                    {
+                        imgH = maxH;
+                        imgW = imgH * ratio;
+                    }
+                }
+
+                float posX = Math.Max(40f, (960f - imgW) / 2f);
+                float posY = Math.Max(40f, (540f - imgH) / 2f);
+
+                ShapeNode imgShape = new ShapeNode
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Type = ShapeType.Image,
+                    ImagePath = tempPath,
+                    CachedImage = new Bitmap(clipImg),
+                    Transform = new Transform2D(posX, posY, imgW, imgH),
+                    Text = "",
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f
+                };
+
+                SaveUndoState();
+                ActiveSlide.AddShape(imgShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            }
+            catch { }
         }
 
         public void Duplicate()
@@ -3019,6 +3533,7 @@ namespace GenOffice.UI
                 }
             }
             IsPresenting = true;
+            HideSearchBox();
             IsEndSlideShowScreen = false;
             CurrentAnimationStep = 0;
             IsPlayingSlideAnimation = false;
@@ -3196,10 +3711,18 @@ namespace GenOffice.UI
 
         public void GetScrollLimits(int canvasW, int canvasH, out int minScrollX, out int maxScrollX, out int minScrollY, out int maxScrollY)
         {
-            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
-            float scale = ZoomLevel * 0.58f;
-            int slideW = (int)(Presentation.CanvasWidth * scale);
-            int slideH = (int)(slideW / targetRatio);
+            float marginX = Math.Max(20f, canvasW * 0.04f);
+            float marginY = Math.Max(20f, canvasH * 0.04f);
+            float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+            float canvasHf = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
+
+            float fitScaleX = Math.Max(0.05f, (canvasW - marginX * 2) / canvasWf);
+            float fitScaleY = Math.Max(0.05f, (canvasH - marginY * 2) / canvasHf);
+            float baseFitScale = Math.Min(fitScaleX, fitScaleY);
+
+            float scale = ZoomLevel * baseFitScale;
+            int slideW = (int)Math.Round(canvasWf * scale);
+            int slideH = (int)Math.Round(canvasHf * scale);
 
             float wsMinX, wsMinY, wsMaxX, wsMaxY;
             GetActiveSlideWorkspaceBounds(out wsMinX, out wsMinY, out wsMaxX, out wsMaxY);
@@ -3238,18 +3761,135 @@ namespace GenOffice.UI
             CanvasScrollY = Math.Max(minY, Math.Min(maxY, CanvasScrollY));
         }
 
-        public void ZoomAt(Point mousePos, int delta, int width, int height)
+        public void GetEffectiveLayoutMetrics(int width, int height, out int leftSidebarW, out int canvasX, out int canvasW, out int contentY, out int contentH, out int bottomThumbH)
         {
             int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
+            contentY = topBarY;
+            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
             int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int canvasW = width - leftSidebarW - rightSidebarW;
+
+            if (IsElementsDrawerOpen)
+            {
+                int drawerW = IsElementsDrawerCollapsed ? 0 : 280;
+                leftSidebarW = drawerW;
+                bottomThumbH = 78;
+
+                canvasX = leftSidebarW;
+                canvasW = Math.Max(100, width - canvasX - rightSidebarW);
+                contentH = Math.Max(100, height - contentY - 26 - bottomThumbH);
+            }
+            else
+            {
+                leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+                bottomThumbH = 0;
+
+                canvasX = (isIsland && leftSidebarW > 0) ? (leftSidebarW + 10) : leftSidebarW;
+                canvasW = Math.Max(100, width - canvasX - rightSidebarW - ((isIsland && leftSidebarW > 0) ? 10 : 0));
+                contentH = Math.Max(100, height - contentY - 26);
+            }
+        }
+
+        public void OpenShapesDrawer()
+        {
+            if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
+            bool isAlreadyOpen = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && ShapeTaskPane.Mode == ShapePaneMode.ShapesOnly && !IsElementsDrawerCollapsed;
+            if (isAlreadyOpen)
+            {
+                IsElementsDrawerOpen = false;
+            }
+            else
+            {
+                ShapeTaskPane.Mode = ShapePaneMode.ShapesOnly;
+                ShapeTaskPane.ExpandedCategoryKey = null;
+                ShapeTaskPane.SearchText = "";
+                ShapeTaskPane.ScrollY = 0;
+                if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                IsElementsDrawerOpen = true;
+                ElementsDrawerSelectedTab = 1;
+                IsElementsDrawerCollapsed = false;
+            }
+            ZoomToFit();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void OpenGraphicsDrawer()
+        {
+            if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
+            bool isAlreadyOpen = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly && !IsElementsDrawerCollapsed;
+            if (isAlreadyOpen)
+            {
+                IsElementsDrawerOpen = false;
+            }
+            else
+            {
+                ShapeTaskPane.Mode = ShapePaneMode.GraphicsOnly;
+                ShapeTaskPane.ExpandedCategoryKey = null;
+                ShapeTaskPane.SearchText = "";
+                ShapeTaskPane.ScrollY = 0;
+                if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                IsElementsDrawerOpen = true;
+                ElementsDrawerSelectedTab = 1;
+                IsElementsDrawerCollapsed = false;
+            }
+            ZoomToFit();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ToggleElementsDrawer(int targetTab = -1)
+        {
+            if (targetTab >= 0)
+            {
+                if (IsElementsDrawerOpen && ElementsDrawerSelectedTab == targetTab && !IsElementsDrawerCollapsed)
+                {
+                    IsElementsDrawerOpen = false;
+                }
+                else
+                {
+                    IsElementsDrawerOpen = true;
+                    ElementsDrawerSelectedTab = targetTab;
+                    IsElementsDrawerCollapsed = false;
+                }
+            }
+            else
+            {
+                IsElementsDrawerOpen = !IsElementsDrawerOpen;
+                if (IsElementsDrawerOpen) IsElementsDrawerCollapsed = false;
+            }
+            ZoomToFit();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void CloseElementsDrawer()
+        {
+            IsElementsDrawerOpen = false;
+            if (_shapeSearchBox != null)
+            {
+                _shapeSearchBox.Visible = false;
+                _shapeSearchBox.Text = "";
+            }
+            if (ShapeTaskPane != null)
+            {
+                ShapeTaskPane.SearchText = "";
+            }
+            ZoomToFit();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ZoomToFit()
+        {
+            ZoomLevel = 1.0f;
+            CanvasScrollX = 0;
+            CanvasScrollY = 0;
+        }
+
+        public void ZoomAt(Point mousePos, int delta, int width, int height)
+        {
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
 
             int oldSlideX, oldSlideY, oldSlideW, oldSlideH;
             float oldScale;
-            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out oldSlideX, out oldSlideY, out oldSlideW, out oldSlideH, out oldScale);
+            GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out oldSlideX, out oldSlideY, out oldSlideW, out oldSlideH, out oldScale);
 
             float normX = (oldScale > 0) ? (mousePos.X - oldSlideX) / oldScale : 0;
             float normY = (oldScale > 0) ? (mousePos.Y - oldSlideY) / oldScale : 0;
@@ -3262,14 +3902,14 @@ namespace GenOffice.UI
 
             int newSlideX, newSlideY, newSlideW, newSlideH;
             float newScale;
-            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out newSlideX, out newSlideY, out newSlideW, out newSlideH, out newScale);
+            GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out newSlideX, out newSlideY, out newSlideW, out newSlideH, out newScale);
 
             if (ZoomLevel > 1.0f)
             {
                 int targetSlideX = (int)(mousePos.X - normX * newScale);
                 int targetSlideY = (int)(mousePos.Y - normY * newScale);
 
-                int centerOffsetX = leftSidebarW + (canvasW - newSlideW) / 2;
+                int centerOffsetX = canvasX + (canvasW - newSlideW) / 2;
                 int centerOffsetY = contentY + (contentH - newSlideH) / 2;
 
                 CanvasScrollX = centerOffsetX - targetSlideX;
@@ -3283,19 +3923,1222 @@ namespace GenOffice.UI
             }
         }
 
+        public void GetThumbnailMetrics(int leftSidebarW, out int thumbX, out int thumbW, out int thumbH)
+        {
+            float slideAspect = (Presentation != null && Presentation.CanvasHeight > 0)
+                ? ((float)Presentation.CanvasWidth / (float)Presentation.CanvasHeight)
+                : (16.0f / 9.0f);
+            if (slideAspect <= 0.01f) slideAspect = 16.0f / 9.0f;
+
+            int availableW = Math.Max(80, leftSidebarW - 48);
+            thumbW = Math.Min(160, availableW);
+            thumbH = (int)Math.Round(thumbW / slideAspect);
+            thumbX = 34 + (availableW - thumbW) / 2;
+        }
+
         public void GetSlideCanvasBounds(int canvasX, int canvasY, int canvasW, int canvasH, out int slideX, out int slideY, out int slideW, out int slideH, out float scale)
         {
-            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
-            scale = ZoomLevel * 0.58f;
-            slideW = (int)(Presentation.CanvasWidth * scale);
-            slideH = (int)(slideW / targetRatio);
+            float marginX = Math.Max(20f, canvasW * 0.04f);
+            float marginY = Math.Max(20f, canvasH * 0.04f);
+            float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+            float canvasHf = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
+
+            float fitScaleX = Math.Max(0.05f, (canvasW - marginX * 2) / canvasWf);
+            float fitScaleY = Math.Max(0.05f, (canvasH - marginY * 2) / canvasHf);
+            float baseFitScale = Math.Min(fitScaleX, fitScaleY);
+
+            scale = ZoomLevel * baseFitScale;
+            slideW = (int)Math.Round(canvasWf * scale);
+            slideH = (int)Math.Round(canvasHf * scale);
 
             int centerOffsetX = canvasX + (canvasW - slideW) / 2;
             int centerOffsetY = canvasY + (canvasH - slideH) / 2;
 
             slideX = centerOffsetX - CanvasScrollX;
             slideY = centerOffsetY - CanvasScrollY;
-            scale = (float)slideW / Presentation.CanvasWidth;
+            scale = (float)slideW / canvasWf;
+        }
+        #endregion
+
+        #region Elements Drawer & Bottom Filmstrip Layout Rendering
+                public void HideSearchBox()
+        {
+            if (_shapeSearchBox != null && _shapeSearchBox.Visible)
+            {
+                _shapeSearchBox.Visible = false;
+            }
+        }
+
+        public void UpdateShapeSearchBox()
+        {
+            if (ParentControl == null) return;
+
+            bool shouldBeVisible = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && !IsElementsDrawerCollapsed && ShapeTaskPane != null && !IsPresenting;
+
+            if (!shouldBeVisible)
+            {
+                HideSearchBox();
+                return;
+            }
+
+            Rectangle sb = ShapeTaskPane.SearchBoxBounds;
+            if (sb.Width <= 0 || sb.Height <= 0) return;
+
+            if (_shapeSearchBox == null)
+            {
+                _shapeSearchBox = new TextBox();
+                _shapeSearchBox.BorderStyle = BorderStyle.None;
+                _shapeSearchBox.BackColor = Color.White;
+                _shapeSearchBox.ForeColor = Color.FromArgb(15, 23, 42);
+                _shapeSearchBox.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+                _shapeSearchBox.TextChanged += (s, e) =>
+                {
+                    if (ShapeTaskPane != null)
+                    {
+                        ShapeTaskPane.SearchText = _shapeSearchBox.Text;
+                        ShapeTaskPane.ScrollY = 0;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                };
+                _shapeSearchBox.KeyDown += (s, e) =>
+                {
+                    if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.Enter)
+                    {
+                        if (e.KeyCode == Keys.Escape) _shapeSearchBox.Text = "";
+                        if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
+                        e.Handled = true;
+                    }
+                };
+                ParentControl.Controls.Add(_shapeSearchBox);
+            }
+            else
+            {
+                if (_shapeSearchBox.BackColor != Color.White)
+                {
+                    _shapeSearchBox.BackColor = Color.White;
+                }
+            }
+
+            string cue = (ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly)
+                ? "Tìm kiếm trong kho đồ họa..."
+                : "Tìm kiếm hình dạng...";
+            try
+            {
+                SendMessage(_shapeSearchBox.Handle, EM_SETCUEBANNER, 0, cue);
+            }
+            catch { }
+
+            int txtX = sb.X + 28;
+            int txtY = sb.Y + 6;
+            int txtW = Math.Max(20, sb.Width - 36);
+            int txtH = 20;
+
+            Rectangle targetBounds = new Rectangle(txtX, txtY, txtW, txtH);
+            if (_shapeSearchBox.Bounds != targetBounds)
+            {
+                _shapeSearchBox.SetBounds(txtX, txtY, txtW, txtH);
+            }
+
+            if (!_shapeSearchBox.Visible)
+            {
+                _shapeSearchBox.Visible = true;
+                _shapeSearchBox.BringToFront();
+            }
+        }
+
+        private void DrawElementsDrawerPanel(Graphics g, int totalW, int contentY, int totalH)
+        {
+            RailTabBounds.Clear();
+            PillTabBounds.Clear();
+            PillTabIndices.Clear();
+            DrawerItemBounds.Clear();
+            DrawerItemActions.Clear();
+
+            using (Font headFont = new Font("Segoe UI", 10.0f, FontStyle.Bold))
+            using (Font secFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font itemFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (Font pillFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                // If collapsed or width is 0, draw small expand button
+                if (IsElementsDrawerCollapsed || totalW <= 0)
+                {
+                    Rectangle colBtnCollapsed = new Rectangle(0, contentY + 12, 22, 28);
+                    BtnCollapseDrawerBounds = colBtnCollapsed;
+                    using (GraphicsPath colPath = CreateRoundedRectPath(new RectangleF(colBtnCollapsed.X, colBtnCollapsed.Y, colBtnCollapsed.Width, colBtnCollapsed.Height), 4f))
+                    using (SolidBrush colBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    using (Pen colPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                    using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
+                    using (Font chevFont = new Font("Segoe UI", 11f, FontStyle.Bold))
+                    {
+                        g.FillPath(colBg, colPath);
+                        g.DrawPath(colPen, colPath);
+                        g.DrawString("›", chevFont, arrowBrush, new RectangleF(colBtnCollapsed.X, colBtnCollapsed.Y - 1, colBtnCollapsed.Width, colBtnCollapsed.Height), sfCenter);
+                    }
+                    return;
+                }
+
+                // 1. Khi đang ở Tab 1 (Thành phần & Hình dạng), kết xuất toàn diện qua WPF Task Pane với hơn 500+ hình dạng
+                if (ElementsDrawerSelectedTab == 1)
+                {
+                    if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
+                    ShapeTaskPane.Draw(g, new Rectangle(0, contentY, totalW, totalH));
+                    UpdateShapeSearchBox();
+                    return;
+                }
+
+                // Task Pane Light Background & Right Border (280px Office style)
+                Rectangle drawerRect = new Rectangle(0, contentY, totalW, totalH);
+                using (SolidBrush drwBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                {
+                    g.FillRectangle(drwBg, drawerRect);
+                }
+                using (Pen drwBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                {
+                    g.DrawLine(drwBorder, totalW - 1, contentY, totalW - 1, contentY + totalH);
+                }
+
+                // 2. Header Bar (Light Office Header, 44px)
+                Rectangle headerRect = new Rectangle(0, contentY, totalW, 44);
+                using (SolidBrush hBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                {
+                    g.FillRectangle(hBg, headerRect);
+                }
+                using (Pen hBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                {
+                    g.DrawLine(hBorder, 0, contentY + 44, totalW, contentY + 44);
+                }
+
+                string[] titles = new string[] {
+                    "Mẫu trình chiếu",
+                    (ShapeTaskPane != null && ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly) ? "Đồ họa" : "Hình dạng",
+                    "Font chữ nội bộ",
+                    "Bảng màu thương hiệu",
+                    "Tải lên tệp ảnh",
+                    "Công cụ vẽ tự do",
+                    "Dự án gần đây",
+                    "Ứng dụng tiện ích"
+                };
+                string curTitle = (ElementsDrawerSelectedTab >= 0 && ElementsDrawerSelectedTab < titles.Length) ? titles[ElementsDrawerSelectedTab] : "Mở rộng";
+
+                using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                {
+                    g.DrawString(curTitle, headFont, titleBrush, 14, contentY + 12);
+                }
+
+                // Nút Đóng '✕' ở góc phải trên
+                Rectangle closeRect = new Rectangle(totalW - 32, contentY + 10, 22, 22);
+                BtnCloseDrawerBounds = closeRect;
+                using (SolidBrush closeBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                using (Pen closePen = new Pen(Color.FromArgb(71, 85, 105), 1.4f))
+                using (Pen cBorder = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                {
+                    g.FillEllipse(closeBg, closeRect);
+                    g.DrawEllipse(cBorder, closeRect);
+                    g.DrawLine(closePen, closeRect.X + 6, closeRect.Y + 6, closeRect.Right - 6, closeRect.Bottom - 6);
+                    g.DrawLine(closePen, closeRect.Right - 6, closeRect.Y + 6, closeRect.X + 6, closeRect.Bottom - 6);
+                }
+
+                // Nút Thu gọn '<' ở bên cạnh nút Đóng
+                Rectangle colBtn = new Rectangle(totalW - 58, contentY + 10, 22, 22);
+                BtnCollapseDrawerBounds = colBtn;
+                using (SolidBrush colBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                using (Pen colBorder = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                using (Font chevFont = new Font("Segoe UI", 10f, FontStyle.Bold))
+                {
+                    g.FillEllipse(colBg, colBtn);
+                    g.DrawEllipse(colBorder, colBtn);
+                    g.DrawString("‹", chevFont, arrowBrush, new RectangleF(colBtn.X, colBtn.Y - 1, colBtn.Width, colBtn.Height), sfCenter);
+                }
+
+                // 3. Ô tìm kiếm (Không còn hàng pill dư thừa vì Ribbon đã chọn đúng danh mục)
+                Rectangle searchBox = new Rectangle(12, contentY + 52, totalW - 24, 30);
+                TxtSearchBoxBounds = searchBox;
+                using (SolidBrush sBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen sPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                {
+                    g.FillRectangle(sBg, searchBox);
+                    g.DrawRectangle(sPen, searchBox);
+                }
+                using (SolidBrush phBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                using (Pen phPen = new Pen(Color.FromArgb(100, 116, 139), 1.4f))
+                {
+                    g.DrawEllipse(phPen, searchBox.X + 8, searchBox.Y + 9, 8, 8);
+                    g.DrawLine(phPen, searchBox.X + 15, searchBox.Y + 16, searchBox.X + 19, searchBox.Y + 20);
+                    g.DrawString("Tìm kiếm trong danh mục...", itemFont, phBrush, searchBox.X + 24, searchBox.Y + 7);
+                }
+
+                // 4. Nội dung chi tiết theo từng tab
+                int contentTop = contentY + 90;
+                DrawDrawerTabContent(g, 0, contentTop, totalW, totalH - 90, secFont, itemFont, sfCenter);
+            }
+        }
+
+        private void DrawDrawerTabContent(Graphics g, int leftX, int contentTop, int drawerW, int drawerH, Font secFont, Font itemFont, StringFormat sfCenter)
+        {
+            int curY = contentTop;
+
+            if (ElementsDrawerSelectedTab == 1) // Thành phần & Đồ họa
+            {
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush itemBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen itemBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                using (SolidBrush labelBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
+                {
+                    g.DrawString("Đề xuất nổi bật", secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    string[] icons = new string[] {
+                        "Target", "Rocket", "Lightbulb", "Chart",
+                        "ShoppingCart", "Laptop", "User", "Trophy",
+                        "Bell", "Calendar", "Lock", "CheckCircle",
+                        "StarBadge", "WaveLine"
+                    };
+                    string[] iconLabels = new string[] {
+                        "Mục tiêu", "Tên lửa", "Ý tưởng", "Biểu đồ",
+                        "Giỏ hàng", "Thiết bị", "Nhân sự", "Thành tích",
+                        "Thông báo", "Lịch hẹn", "Bảo mật", "Tích chọn",
+                        "Huy hiệu", "Lượn sóng"
+                    };
+
+                    int cols = 4;
+                    int btnSize = 56;
+                    int gap = 8;
+                    int startX = leftX + 12;
+
+                    for (int i = 0; i < icons.Length; i++)
+                    {
+                        int r = i / cols;
+                        int c = i % cols;
+                        Rectangle bRect = new Rectangle(startX + c * (btnSize + gap), curY + r * (btnSize + gap + 16), btnSize, btnSize);
+
+                        DrawerItemBounds.Add(bRect);
+                        DrawerItemActions.Add("icon:" + icons[i]);
+
+                        using (GraphicsPath ipPath = CreateRoundedRectPath(new RectangleF(bRect.X, bRect.Y, bRect.Width, bRect.Height), 6f))
+                        {
+                            g.FillPath(itemBg, ipPath);
+                            g.DrawPath(itemBorder, ipPath);
+                        }
+
+                        // Vẽ vector icon thu nhỏ
+                        using (GraphicsPath ip = VectorIconPresets.CreateIconPath(icons[i], btnSize - 20, btnSize - 20))
+                        using (Matrix m = new Matrix())
+                        using (SolidBrush iconB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                        {
+                            m.Translate(bRect.X + 10, bRect.Y + 8);
+                            GraphicsPath cloneP = (GraphicsPath)ip.Clone();
+                            cloneP.Transform(m);
+                            g.FillPath(iconB, cloneP);
+                            cloneP.Dispose();
+                        }
+
+                        // Nhãn tên
+                        string lbl = (i < iconLabels.Length) ? iconLabels[i] : icons[i];
+                        g.DrawString(lbl, itemFont, labelBrush, new RectangleF(bRect.X - 4, bRect.Bottom + 2, bRect.Width + 8, 14), sfCenter);
+                    }
+                }
+            }
+            else if (ElementsDrawerSelectedTab == 7) // Ứng dụng (Mini-Apps)
+            {
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush descB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                using (SolidBrush iconBoxBg = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                {
+                    g.DrawString("Tiện ích tích hợp", secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    // App Card 1: Tạo mã QR
+                    Rectangle c1 = new Rectangle(leftX + 12, curY, drawerW - 24, 56);
+                    DrawerItemBounds.Add(c1);
+                    DrawerItemActions.Add("app:qr");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(c1.X, c1.Y, c1.Width, c1.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    Rectangle iBox1 = new Rectangle(c1.X + 8, c1.Y + 8, 40, 40);
+                    g.FillRectangle(iconBoxBg, iBox1);
+                    using (Font qrIconFont = new Font("Segoe UI", 14f, FontStyle.Bold))
+                    using (SolidBrush qrIconB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                    {
+                        g.DrawString("⚅", qrIconFont, qrIconB, new RectangleF(iBox1.X, iBox1.Y + 2, iBox1.Width, iBox1.Height), sfCenter);
+                    }
+                    g.DrawString("Tạo mã QR", secFont, titleB, c1.X + 54, c1.Y + 10);
+                    g.DrawString("Chèn mã QR tức thì cho link hoặc văn bản", itemFont, descB, c1.X + 54, c1.Y + 30);
+                    curY += 64;
+
+                    // App Card 2: Biểu đồ thông minh
+                    Rectangle c4 = new Rectangle(leftX + 12, curY, drawerW - 24, 56);
+                    DrawerItemBounds.Add(c4);
+                    DrawerItemActions.Add("app:chart");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(c4.X, c4.Y, c4.Width, c4.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    Rectangle iBox4 = new Rectangle(c4.X + 8, c4.Y + 8, 40, 40);
+                    g.FillRectangle(iconBoxBg, iBox4);
+                    using (Font chtIconFont = new Font("Segoe UI", 12f, FontStyle.Bold))
+                    using (SolidBrush chtIconB = new SolidBrush(Color.FromArgb(124, 58, 237)))
+                    {
+                        g.DrawString("📊", chtIconFont, chtIconB, new RectangleF(iBox4.X, iBox4.Y + 4, iBox4.Width, iBox4.Height), sfCenter);
+                    }
+                    g.DrawString("Biểu đồ infographic", secFont, titleB, c4.X + 54, c4.Y + 10);
+                    g.DrawString("Chèn biểu đồ cột minh họa số liệu", itemFont, descB, c4.X + 54, c4.Y + 30);
+                }
+            }
+            else if (ElementsDrawerSelectedTab == 2) // Font chữ nội bộ
+            {
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush descB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    // 1. Nút Nhập Font chữ mới
+                    Rectangle btnImport = new Rectangle(leftX + 12, curY, drawerW - 24, 46);
+                    DrawerItemBounds.Add(btnImport);
+                    DrawerItemActions.Add("font:import");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(btnImport.X, btnImport.Y, btnImport.Width, btnImport.Height), 6f))
+                    using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(238, 242, 255)))
+                    using (Pen bPen = new Pen(Color.FromArgb(99, 102, 241), 1.2f))
+                    using (SolidBrush bText = new SolidBrush(Color.FromArgb(67, 56, 202)))
+                    using (Font bFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+                    {
+                        g.FillPath(btnBg, cPath);
+                        g.DrawPath(bPen, cPath);
+                        g.DrawString("+ Nhập Font chữ (.ttf, .otf)", bFont, bText, new RectangleF(btnImport.X, btnImport.Y, btnImport.Width, btnImport.Height), sfCenter);
+                    }
+                    curY += 56;
+
+                    // 2. Danh sách font chữ nội bộ đã nạp
+                    var customFonts = SlideFontManager.GetCustomFontNames();
+                    string fontCountText = (customFonts != null && customFonts.Count > 0) ? $" ({customFonts.Count})" : "";
+                    g.DrawString("Phông chữ nội bộ đã nạp" + fontCountText, secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    if (customFonts == null || customFonts.Count == 0)
+                    {
+                        Rectangle emptyBox = new Rectangle(leftX + 12, curY, drawerW - 24, 52);
+                        using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(emptyBox.X, emptyBox.Y, emptyBox.Width, emptyBox.Height), 6f))
+                        using (SolidBrush eBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                        using (Pen ePen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                        using (SolidBrush eText = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                        using (Font eFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
+                        {
+                            g.FillPath(eBg, cPath);
+                            g.DrawPath(ePen, cPath);
+                            g.DrawString("Chưa có font nội bộ nào.\nNhấn '+ Nhập Font chữ' ở trên để thêm tệp.", eFont, eText, new RectangleF(emptyBox.X + 8, emptyBox.Y + 8, emptyBox.Width - 16, emptyBox.Height - 16), sfCenter);
+                        }
+                        curY += 60;
+                    }
+                    else
+                    {
+                        for (int fi = 0; fi < customFonts.Count; fi++)
+                        {
+                            string fName = customFonts[fi];
+                            Rectangle fCard = new Rectangle(leftX + 12, curY, drawerW - 24, 54);
+                            DrawerItemBounds.Add(fCard);
+                            DrawerItemActions.Add("font:apply:" + fName);
+                            using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(fCard.X, fCard.Y, fCard.Width, fCard.Height), 6f))
+                            {
+                                g.FillPath(cardBg, cPath);
+                                g.DrawPath(cardBorder, cPath);
+                            }
+                            using (Font nameFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+                            {
+                                g.DrawString(fName, nameFont, titleB, fCard.X + 10, fCard.Y + 6);
+                            }
+                            try
+                            {
+                                using (Font pFont = SlideFontManager.CreateFont(fName, 12f, FontStyle.Regular, GraphicsUnit.Point))
+                                {
+                                    g.DrawString("Cộng hòa Xã hội Chủ nghĩa Việt Nam", pFont, descB, fCard.X + 10, fCard.Y + 28);
+                                }
+                            }
+                            catch
+                            {
+                                g.DrawString("Aa Bb Gg 1234567890", itemFont, descB, fCard.X + 10, fCard.Y + 28);
+                            }
+                            curY += 60;
+                        }
+                    }
+
+                    // 3. Kiểu chữ chèn nhanh
+                    g.DrawString("Kiểu chữ chèn nhanh", secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    Rectangle t1 = new Rectangle(leftX + 12, curY, drawerW - 24, 48);
+                    DrawerItemBounds.Add(t1);
+                    DrawerItemActions.Add("text:title");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(t1.X, t1.Y, t1.Width, t1.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    using (Font titleF = new Font("Segoe UI", 11f, FontStyle.Bold))
+                    {
+                        g.DrawString("Thêm tiêu đề lớn", titleF, titleB, t1.X + 14, t1.Y + 12);
+                    }
+                    curY += 56;
+
+                    Rectangle t2 = new Rectangle(leftX + 12, curY, drawerW - 24, 48);
+                    DrawerItemBounds.Add(t2);
+                    DrawerItemActions.Add("text:subtitle");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(t2.X, t2.Y, t2.Width, t2.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    using (Font subF = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+                    {
+                        g.DrawString("Thêm tiêu đề phụ", subF, titleB, t2.X + 14, t2.Y + 14);
+                    }
+                    curY += 56;
+
+                    Rectangle t3 = new Rectangle(leftX + 12, curY, drawerW - 24, 48);
+                    DrawerItemBounds.Add(t3);
+                    DrawerItemActions.Add("text:body");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(t3.X, t3.Y, t3.Width, t3.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    g.DrawString("Thêm văn bản nội dung", itemFont, descB, t3.X + 14, t3.Y + 16);
+                }
+            }
+            else if (ElementsDrawerSelectedTab == 3) // Thương hiệu / Bảng màu
+            {
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                {
+                    g.DrawString("Bảng phối màu 1-chạm", secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    string[] palettes = new string[] {
+                        "Hiện đại (Xanh dương)",
+                        "Sáng tạo (Cam rực rỡ)",
+                        "Thiên nhiên (Xanh ngọc)",
+                        "Sang trọng (Đen & Vàng)"
+                    };
+                    Color[][] previewColors = new Color[][] {
+                        new Color[] { Color.FromArgb(30, 64, 175), Color.FromArgb(59, 130, 246), Color.FromArgb(219, 234, 254) },
+                        new Color[] { Color.FromArgb(194, 65, 12), Color.FromArgb(249, 115, 22), Color.FromArgb(254, 215, 170) },
+                        new Color[] { Color.FromArgb(6, 95, 70), Color.FromArgb(16, 185, 129), Color.FromArgb(209, 250, 229) },
+                        new Color[] { Color.FromArgb(24, 24, 27), Color.FromArgb(217, 119, 6), Color.FromArgb(254, 243, 199) }
+                    };
+
+                    for (int i = 0; i < palettes.Length; i++)
+                    {
+                        Rectangle pCard = new Rectangle(leftX + 12, curY, drawerW - 24, 48);
+                        DrawerItemBounds.Add(pCard);
+                        DrawerItemActions.Add("palette:" + i);
+
+                        using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(pCard.X, pCard.Y, pCard.Width, pCard.Height), 6f))
+                        {
+                            g.FillPath(cardBg, cPath);
+                            g.DrawPath(cardBorder, cPath);
+                        }
+                        g.DrawString(palettes[i], itemFont, titleB, pCard.X + 12, pCard.Y + 16);
+
+                        // Color swatches preview
+                        int swX = pCard.Right - 70;
+                        for (int s = 0; s < 3; s++)
+                        {
+                            using (SolidBrush swB = new SolidBrush(previewColors[i][s]))
+                            {
+                                g.FillEllipse(swB, swX + s * 18, pCard.Y + 14, 16, 16);
+                            }
+                        }
+
+                        curY += 56;
+                    }
+                }
+            }
+            else // Mẫu (Templates)
+            {
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                {
+                    g.DrawString("Bố cục trang chiếu sẵn có", secFont, secBrush, leftX + 14, curY);
+                    curY += 22;
+
+                    string[] tNames = new string[] {
+                        "Giới thiệu & Tiêu đề",
+                        "So sánh 2 cột nội dung",
+                        "Quy trình 3 bước",
+                        "Thống kê chỉ số nổi bật"
+                    };
+
+                    for (int i = 0; i < tNames.Length; i++)
+                    {
+                        Rectangle tCard = new Rectangle(leftX + 12, curY, drawerW - 24, 48);
+                        DrawerItemBounds.Add(tCard);
+                        DrawerItemActions.Add("template:" + i);
+
+                        using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(tCard.X, tCard.Y, tCard.Width, tCard.Height), 6f))
+                        {
+                            g.FillPath(cardBg, cPath);
+                            g.DrawPath(cardBorder, cPath);
+                        }
+                        g.DrawString(tNames[i], itemFont, titleB, tCard.X + 14, tCard.Y + 16);
+
+                        curY += 56;
+                    }
+                }
+            }
+        }
+
+        private void DrawBottomSlideThumbnailStrip(Graphics g, int canvasX, int bottomY, int canvasW, int bottomH)
+        {
+            BottomSlideThumbBounds.Clear();
+            Rectangle stripRect = new Rectangle(canvasX, bottomY, canvasW, bottomH);
+
+            // 100% Light Office Theme Background for Thumbnail Strip
+            using (SolidBrush stripBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            {
+                g.FillRectangle(stripBg, stripRect);
+            }
+            using (Pen topPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.DrawLine(topPen, canvasX, bottomY, canvasX + canvasW, bottomY);
+            }
+
+            if (Presentation == null || Presentation.Slides == null) return;
+
+            int cardW = 86;
+            int cardH = 48;
+            int cardY = bottomY + (bottomH - cardH) / 2;
+            int curX = canvasX + 16 - BottomThumbScrollX;
+
+            using (Font numFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+            using (Font addFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
+            using (Font plusFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    Rectangle cRect = new Rectangle(curX, cardY, cardW, cardH);
+                    BottomSlideThumbBounds.Add(cRect);
+
+                    if (cRect.Right > canvasX && cRect.Left < canvasX + canvasW - 130)
+                    {
+                        SlideNode s = Presentation.Slides[i];
+
+                        // Nền thẻ slide
+                        using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(s.BgColor)))
+                        {
+                            g.FillRectangle(cardBg, cRect);
+                        }
+
+                        // Vẽ preview nhỏ từ ThumbnailCache nếu có
+                        if (s.ThumbnailCache != null && !s.IsThumbnailDirty)
+                        {
+                            g.DrawImage(s.ThumbnailCache, cRect);
+                        }
+
+                        // Viền lựa chọn: 2px xanh dương cho trang đang chọn, 1px xám cho trang khác
+                        if (i == ActiveSlideIndex)
+                        {
+                            using (Pen selPen = new Pen(Color.FromArgb(37, 99, 235), 2f))
+                            {
+                                g.DrawRectangle(selPen, cRect);
+                            }
+                        }
+                        else
+                        {
+                            using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                            {
+                                g.DrawRectangle(borderPen, cRect);
+                            }
+                        }
+
+                        // Huy hiệu số thứ tự trang: xanh dương nổi bật
+                        Rectangle badgeRect = new Rectangle(cRect.X + 3, cRect.Bottom - 15, 16, 12);
+                        using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                        using (SolidBrush badgeTxt = new SolidBrush(Color.White))
+                        {
+                            g.FillRectangle(badgeBg, badgeRect);
+                            g.DrawString((i + 1).ToString(), numFont, badgeTxt, badgeRect, sfCenter);
+                        }
+                    }
+
+                    curX += cardW + 10;
+                }
+
+                // Nút '+ Thêm trang' Office Style
+                Rectangle addRect = new Rectangle(curX, cardY, 46, cardH);
+                BtnBottomAddSlideBounds = addRect;
+                using (SolidBrush addBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                using (Pen addPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                using (SolidBrush addTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    g.FillRectangle(addBg, addRect);
+                    g.DrawRectangle(addPen, addRect);
+                    g.DrawString("+", plusFont, addTxt, new RectangleF(addRect.X, addRect.Y + 2, addRect.Width, 20), sfCenter);
+                    g.DrawString("Thêm", addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
+                }
+
+                // Thông tin trang ở góc phải
+                string pageInfo = string.Format("Trang {0} / {1}", ActiveSlideIndex + 1, Presentation.Slides.Count);
+                using (SolidBrush infoBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(pageInfo, addFont, infoBrush, canvasX + canvasW - 100, bottomY + (bottomH - 16) / 2);
+                }
+            }
+        }
+
+        public bool HandleElementsDrawerClick(Point mousePos, int leftSidebarW, int contentY, int totalH, Control parentControl)
+        {
+            // Nếu đang mở Tab 1 (Thành phần & Hình dạng), ủy quyền xử lý click cho WPF Shape Task Pane
+            if (ElementsDrawerSelectedTab == 1 && ShapeTaskPane != null)
+            {
+                if (ShapeTaskPane.SearchBoxBounds.Contains(mousePos))
+                {
+                    if (_shapeSearchBox != null && _shapeSearchBox.Visible)
+                    {
+                        _shapeSearchBox.Focus();
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return true;
+                }
+                if (ShapeTaskPane.HandleMouseDown(mousePos))
+                {
+                    if (parentControl != null) parentControl.Invalidate();
+                    return true;
+                }
+
+                string action, targetId;
+                if (ShapeTaskPane.HandleClick(mousePos, out action, out targetId))
+                {
+                    if (action == "Close")
+                    {
+                        CloseElementsDrawer();
+                    }
+                    else if (action == "Collapse")
+                    {
+                        IsElementsDrawerCollapsed = !IsElementsDrawerCollapsed;
+                        ZoomToFit();
+                    }
+                    else if (action == "InsertShape" && !string.IsNullOrEmpty(targetId))
+                    {
+                        InsertShapeFromPreset(targetId);
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return true;
+                }
+            }
+
+            // 1. Nút Đóng '✕'
+            if (!BtnCloseDrawerBounds.IsEmpty && BtnCloseDrawerBounds.Contains(mousePos))
+            {
+                CloseElementsDrawer();
+                if (parentControl != null) parentControl.Invalidate();
+                return true;
+            }
+
+            // 2. Nút Thu gọn / Mở rộng '<' / '>'
+            if (!BtnCollapseDrawerBounds.IsEmpty && BtnCollapseDrawerBounds.Contains(mousePos))
+            {
+                IsElementsDrawerCollapsed = !IsElementsDrawerCollapsed;
+                ZoomToFit();
+                if (parentControl != null) parentControl.Invalidate();
+                return true;
+            }
+
+            // 3. Click vào các mục nội dung trong Drawer
+            for (int i = 0; i < DrawerItemBounds.Count; i++)
+            {
+                if (DrawerItemBounds[i].Contains(mousePos) && i < DrawerItemActions.Count)
+                {
+                    ExecuteDrawerAction(DrawerItemActions[i], parentControl);
+                    return true;
+                }
+            }
+
+            return true;
+        }
+
+        public void InsertShapeFromPreset(string presetId)
+        {
+            if (ActiveSlide == null) return;
+            var preset = WpfShapeLibrary.FindPreset(presetId);
+            if (preset == null) return;
+
+            SaveUndoState();
+            if (preset.IsOnlineImage)
+            {
+                float imgW = 240f;
+                float imgH = 240f;
+                float imgCx = (Presentation.CanvasWidth - imgW) / 2f;
+                float imgCy = (Presentation.CanvasHeight - imgH) / 2f;
+
+                string localPath = GenOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
+                Bitmap bmp = GenOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl);
+                if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(localPath))
+                {
+                    try
+                    {
+                        string svgXml = System.IO.File.ReadAllText(localPath);
+                        bmp = GenOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgXml, 1600, 1600) ?? bmp;
+                    }
+                    catch { }
+                }
+
+                ShapeNode imgShape = new ShapeNode
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Type = ShapeType.Image,
+                    ImagePath = localPath,
+                    CachedImage = bmp,
+                    Transform = new Transform2D(imgCx, imgCy, imgW, imgH),
+                    FillColor = 0x00FFFFFF,
+                    StrokeColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    CornerRadius = 0f,
+                    Text = ""
+                };
+                ActiveSlide.AddShape(imgShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+                if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+            float w = (preset.Category == "Lines") ? 220f : 160f;
+            float h = (preset.Category == "Lines") ? 40f : 160f;
+            float cx = (Presentation.CanvasWidth - w) / 2f;
+            float cy = (Presentation.CanvasHeight - h) / 2f;
+
+            ShapeNode shape = new ShapeNode
+            {
+                Type = ShapeType.CustomPath,
+                CustomPath = preset.CreatePath(w, h),
+                PathWidth = w,
+                PathHeight = h,
+                Transform = new Transform2D(cx, cy, w, h),
+                FillColor = (preset.Category == "Lines") ? 0x00FFFFFF : Color.FromArgb(59, 130, 246).ToArgb(),
+                StrokeColor = (preset.Category == "Lines") ? Color.FromArgb(30, 64, 175).ToArgb() : 0x00FFFFFF,
+                StrokeWidth = (preset.Category == "Lines") ? 2f : 0f,
+                Text = ""
+            };
+            if (presetId == "rect_standard" || presetId == "rectangle" || presetId == "rect")
+            {
+                shape.Type = ShapeType.Rectangle;
+                shape.CornerRadius = 0f;
+                shape.CustomPath = null;
+            }
+            else if (presetId == "rect_round_sm")
+            {
+                shape.Type = ShapeType.RoundedRectangle;
+                shape.CornerRadius = 8f;
+                shape.CustomPath = null;
+            }
+            else if (presetId == "rect_round_md")
+            {
+                shape.Type = ShapeType.RoundedRectangle;
+                shape.CornerRadius = 16f;
+                shape.CustomPath = null;
+            }
+            else if (presetId == "rect_round_lg")
+            {
+                shape.Type = ShapeType.RoundedRectangle;
+                shape.CornerRadius = 24f;
+                shape.CustomPath = null;
+            }
+            else if (presetId == "rect_pill")
+            {
+                shape.Type = ShapeType.RoundedRectangle;
+                shape.CornerRadius = Math.Min(w, h) / 2f;
+                shape.CustomPath = null;
+            }
+            ActiveSlide.AddShape(shape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        private void ExecuteDrawerAction(string action, Control parentControl)
+        {
+            if (string.IsNullOrEmpty(action)) return;
+
+            if (action.StartsWith("icon:"))
+            {
+                string iconId = action.Substring(5);
+                InsertPresetVectorIcon(iconId);
+            }
+            else if (action == "app:qr")
+            {
+                using (CreateQrCodeDialogForm dlg = new CreateQrCodeDialogForm())
+                {
+                    if (dlg.ShowDialog(parentControl) == DialogResult.OK && dlg.GeneratedQrBitmap != null)
+                    {
+                        InsertQrCodeBitmap(dlg.GeneratedQrBitmap);
+                    }
+                }
+            }
+            else if (action == "app:chart")
+            {
+                InsertPresetVectorIcon("Chart");
+            }
+            else if (action == "font:import")
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "Tệp phông chữ (*.ttf;*.otf)|*.ttf;*.otf|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = "Nhập phông chữ nội bộ vào ZenQOffice";
+                    if (ofd.ShowDialog(parentControl) == DialogResult.OK)
+                    {
+                        string importedFont;
+                        string errMsg;
+                        if (SlideFontManager.ImportCustomFont(ofd.FileName, out importedFont, out errMsg))
+                        {
+                            if (SelectedShape != null)
+                            {
+                                SelectedShape.FontName = importedFont;
+                            }
+                            MessageBox.Show(parentControl, $"Đã nhập và kích hoạt thành công phông chữ '{importedFont}' vào ứng dụng!", "Nhập Font Thành Công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show(parentControl, "Không thể nhập phông chữ: " + (errMsg ?? "Lỗi không xác định"), "Lỗi nhập font", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                }
+            }
+            else if (action.StartsWith("font:apply:"))
+            {
+                string fName = action.Substring(11);
+                if (SelectedShape != null)
+                {
+                    SelectedShape.FontName = fName;
+                }
+                else
+                {
+                    InsertPresetText("Văn bản mẫu (" + fName + ")", 28f, false);
+                    if (SelectedShape != null) SelectedShape.FontName = fName;
+                }
+            }
+            else if (action == "text:title")
+            {
+                InsertPresetText("Tiêu đề trang chiếu", 40f, true);
+            }
+            else if (action == "text:subtitle")
+            {
+                InsertPresetText("Tiêu đề phụ hoặc thông điệp ngắn", 24f, false);
+            }
+            else if (action == "text:body")
+            {
+                InsertPresetText("Nhập nội dung chi tiết hoặc mô tả tại đây...", 18f, false);
+            }
+            else if (action.StartsWith("palette:"))
+            {
+                int pIdx = 0;
+                int.TryParse(action.Substring(8), out pIdx);
+                ApplyPalettePreset(pIdx);
+            }
+            else if (action.StartsWith("template:"))
+            {
+                int tIdx = 0;
+                int.TryParse(action.Substring(9), out tIdx);
+                InsertPresetTemplate(tIdx);
+            }
+
+            if (parentControl != null) parentControl.Invalidate();
+        }
+
+        public bool HandleBottomThumbnailStripClick(Point mousePos, int canvasX, int bottomY, int canvasW, int bottomH, Control parentControl)
+        {
+            // 1. Nút '+ Thêm trang'
+            if (!BtnBottomAddSlideBounds.IsEmpty && BtnBottomAddSlideBounds.Contains(mousePos))
+            {
+                AddSlide();
+                if (parentControl != null) parentControl.Invalidate();
+                return true;
+            }
+
+            // 2. Click chọn thẻ slide
+            for (int i = 0; i < BottomSlideThumbBounds.Count; i++)
+            {
+                if (BottomSlideThumbBounds[i].Contains(mousePos) && Presentation != null && i < Presentation.Slides.Count)
+                {
+                    ActiveSlideIndex = i;
+                    SelectedShapeIndex = -1;
+                    SelectedShapeIndices.Clear();
+                    if (parentControl != null) parentControl.Invalidate();
+                    return true;
+                }
+            }
+
+            return true;
+        }
+
+        public void InsertPresetVectorIcon(string iconId)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            float w = 140f;
+            float h = 140f;
+            float cx = (Presentation.CanvasWidth - w) / 2f;
+            float cy = (Presentation.CanvasHeight - h) / 2f;
+
+            ShapeNode shape = new ShapeNode
+            {
+                Type = ShapeType.CustomPath,
+                CustomPath = VectorIconPresets.CreateIconPath(iconId, w, h),
+                Transform = new Transform2D(cx, cy, w, h),
+                FillColor = Color.FromArgb(59, 130, 246).ToArgb(),
+                StrokeColor = Color.Transparent.ToArgb(),
+                StrokeWidth = 0f,
+                Text = ""
+            };
+            ActiveSlide.AddShape(shape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertQrCodeBitmap(Bitmap qrBmp)
+        {
+            if (ActiveSlide == null || qrBmp == null) return;
+            SaveUndoState();
+            float w = 240f;
+            float h = 240f;
+            float cx = (Presentation.CanvasWidth - w) / 2f;
+            float cy = (Presentation.CanvasHeight - h) / 2f;
+
+            ShapeNode shape = new ShapeNode
+            {
+                Type = ShapeType.Image,
+                CachedImage = qrBmp,
+                Transform = new Transform2D(cx, cy, w, h),
+                FillColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                Text = ""
+            };
+            ActiveSlide.AddShape(shape);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertPresetProgressBar(int percentage)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            float totalW = 480f;
+            float totalH = 36f;
+            float cx = (Presentation.CanvasWidth - totalW) / 2f;
+            float cy = (Presentation.CanvasHeight - totalH) / 2f;
+
+            // Thanh nền xám
+            ShapeNode bgBar = new ShapeNode
+            {
+                Type = ShapeType.RoundedRectangle,
+                Transform = new Transform2D(cx, cy, totalW, totalH),
+                FillColor = Color.FromArgb(226, 232, 240).ToArgb(),
+                StrokeWidth = 0f,
+                Text = ""
+            };
+
+            // Thanh tiến độ màu xanh
+            float fillW = totalW * (percentage / 100f);
+            ShapeNode fillBar = new ShapeNode
+            {
+                Type = ShapeType.RoundedRectangle,
+                Transform = new Transform2D(cx, cy, fillW, totalH),
+                FillColor = Color.FromArgb(37, 99, 235).ToArgb(),
+                StrokeWidth = 0f,
+                Text = percentage + "%",
+                TextColor = Color.White.ToArgb(),
+                FontSize = 14f,
+                Bold = true
+            };
+
+            ActiveSlide.AddShape(bgBar);
+            ActiveSlide.AddShape(fillBar);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertPresetKpiCard(string value, string subtitle)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            float w = 340f;
+            float h = 160f;
+            float cx = (Presentation.CanvasWidth - w) / 2f;
+            float cy = (Presentation.CanvasHeight - h) / 2f;
+
+            ShapeNode card = new ShapeNode
+            {
+                Type = ShapeType.RoundedRectangle,
+                Transform = new Transform2D(cx, cy, w, h),
+                FillColor = Color.FromArgb(248, 250, 252).ToArgb(),
+                StrokeColor = Color.FromArgb(203, 213, 225).ToArgb(),
+                StrokeWidth = 2f,
+                Text = value + "\n" + subtitle,
+                TextColor = Color.FromArgb(30, 41, 59).ToArgb(),
+                FontSize = 28f,
+                Bold = true
+            };
+            ActiveSlide.AddShape(card);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertPresetText(string text, float fontSize, bool isBold)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            float w = 600f;
+            float h = 80f;
+            float cx = (Presentation.CanvasWidth - w) / 2f;
+            float cy = (Presentation.CanvasHeight - h) / 2f;
+
+            ShapeNode tb = new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Transform = new Transform2D(cx, cy, w, h),
+                FillColor = 0x00FFFFFF,
+                StrokeWidth = 0f,
+                Text = text,
+                TextColor = Color.FromArgb(17, 24, 39).ToArgb(),
+                FontSize = fontSize,
+                Bold = isBold
+            };
+            ActiveSlide.AddShape(tb);
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ApplyPalettePreset(int paletteIndex)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+
+            Color[][] sets = new Color[][] {
+                new Color[] { Color.FromArgb(248, 250, 252), Color.FromArgb(30, 64, 175), Color.FromArgb(59, 130, 246), Color.FromArgb(15, 23, 42) },
+                new Color[] { Color.FromArgb(255, 247, 237), Color.FromArgb(194, 65, 12), Color.FromArgb(249, 115, 22), Color.FromArgb(67, 20, 7) },
+                new Color[] { Color.FromArgb(240, 253, 244), Color.FromArgb(6, 95, 70), Color.FromArgb(16, 185, 129), Color.FromArgb(2, 44, 34) },
+                new Color[] { Color.FromArgb(24, 24, 27), Color.FromArgb(217, 119, 6), Color.FromArgb(245, 158, 11), Color.FromArgb(254, 243, 199) }
+            };
+
+            int idx = Math.Max(0, Math.Min(sets.Length - 1, paletteIndex));
+            Color bgCol = sets[idx][0];
+            Color primeCol = sets[idx][1];
+            Color secCol = sets[idx][2];
+            Color txtCol = sets[idx][3];
+
+            ActiveSlide.BgColor = bgCol.ToArgb();
+
+            for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+            {
+                ShapeNode sh = ActiveSlide.Shapes[i];
+                if (sh.Type == ShapeType.TextBox)
+                {
+                    sh.TextColor = txtCol.ToArgb();
+                }
+                else if (sh.Type == ShapeType.CustomPath || sh.Type == ShapeType.RoundedRectangle || sh.Type == ShapeType.Rectangle)
+                {
+                    sh.FillColor = (i % 2 == 0) ? primeCol.ToArgb() : secCol.ToArgb();
+                    sh.TextColor = Color.White.ToArgb();
+                }
+            }
+
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertPresetTemplate(int templateIndex)
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            ActiveSlide.Shapes.Clear();
+
+            if (templateIndex == 0) // Giới thiệu & Tiêu đề
+            {
+                ActiveSlide.BgColor = Color.FromArgb(248, 250, 252).ToArgb();
+                ShapeNode title = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(120f, 240f, 900f, 100f),
+                    Text = "TIÊU ĐỀ BẢN THUYẾT TRÌNH",
+                    FontSize = 42f,
+                    Bold = true,
+                    TextColor = Color.FromArgb(15, 23, 42).ToArgb(),
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f
+                };
+                ShapeNode sub = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(120f, 360f, 800f, 60f),
+                    Text = "Mô tả ngắn gọn về dự án, mục tiêu và thông điệp chính",
+                    FontSize = 22f,
+                    TextColor = Color.FromArgb(100, 116, 139).ToArgb(),
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f
+                };
+                ActiveSlide.AddShape(title);
+                ActiveSlide.AddShape(sub);
+            }
+            else // Mẫu so sánh hoặc 3 bước
+            {
+                ActiveSlide.BgColor = Color.FromArgb(248, 250, 252).ToArgb();
+                ShapeNode hTitle = new ShapeNode
+                {
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D(80f, 80f, 1000f, 70f),
+                    Text = "QUY TRÌNH THỰC HIỆN DỰ ÁN",
+                    FontSize = 32f,
+                    Bold = true,
+                    TextColor = Color.FromArgb(15, 23, 42).ToArgb(),
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f
+                };
+                ActiveSlide.AddShape(hTitle);
+
+                string[] steps = new string[] { "1. Khảo sát & Lên ý tưởng", "2. Thiết kế & Triển khai", "3. Đánh giá & Bàn giao" };
+                for (int s = 0; s < 3; s++)
+                {
+                    ShapeNode sBox = new ShapeNode
+                    {
+                        Type = ShapeType.RoundedRectangle,
+                        Transform = new Transform2D(80f + s * 380f, 220f, 340f, 320f),
+                        FillColor = Color.White.ToArgb(),
+                        StrokeColor = Color.FromArgb(226, 232, 240).ToArgb(),
+                        StrokeWidth = 2f,
+                        Text = steps[s] + "\n\nChi tiết công việc và các mục tiêu cụ thể cần hoàn thành.",
+                        FontSize = 18f,
+                        TextColor = Color.FromArgb(51, 65, 85).ToArgb()
+                    };
+                    ActiveSlide.AddShape(sBox);
+                }
+            }
+
+            SelectedShapeIndex = -1;
+            SelectedShapeIndices.Clear();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
         #endregion
 
@@ -3313,15 +5156,8 @@ namespace GenOffice.UI
                 return;
             }
 
-            int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
-
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
-
-            int canvasX = leftSidebarW;
-            int canvasW = width - leftSidebarW - rightSidebarW;
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             Rectangle centerViewportRect = new Rectangle(canvasX, contentY, canvasW, contentH);
 
             // 1. Draw Center Viewport with Clipping
@@ -3341,7 +5177,7 @@ namespace GenOffice.UI
                     DrawNotesView(g, canvasX, contentY, canvasW, contentH);
                     break;
                 case ImpressViewMode.SlideSorter:
-                    DrawSlideSorterView(g, 0, contentY, width - rightSidebarW, contentH);
+                    DrawSlideSorterView(g, 0, contentY, width - (IsSidebarOpen ? 280 : 0), contentH);
                     break;
                 case ImpressViewMode.SlideMaster:
                     DrawSlideMasterView(g, canvasX, contentY, canvasW, contentH);
@@ -3350,13 +5186,19 @@ namespace GenOffice.UI
 
             g.Restore(origState);
 
-            // 2. Draw Left Slide Pane ON TOP
-            if (leftSidebarW > 0)
+            // 2. Draw Left Pane OR Elements Drawer ON TOP
+            if (IsElementsDrawerOpen)
+            {
+                DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
+                DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
+            }
+            else if (leftSidebarW > 0)
             {
                 DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
             }
 
             // 3. Draw Right Sidebar Task Pane (Animation Pane / Properties) ON TOP
+            int rightSidebarW = IsSidebarOpen ? 280 : 0;
             if (rightSidebarW > 0)
             {
                 DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, contentH);
@@ -3366,8 +5208,8 @@ namespace GenOffice.UI
         private void DrawNormalCanvasView(Graphics g, int x, int y, int w, int h)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.Bilinear;
-            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
             using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
@@ -3391,12 +5233,6 @@ namespace GenOffice.UI
 
             Rectangle slideRect = new Rectangle(slideX, slideY, slideW, slideH);
 
-            // Realistic PowerPoint Drop Shadow
-            using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
-            {
-                g.FillRectangle(shadowBrush, slideX + 6, slideY + 6, slideW, slideH);
-            }
-
             // If Transition Preview is running in normal canvas
             if (IsPreviewingTransition && IsTransitioning)
             {
@@ -3408,7 +5244,10 @@ namespace GenOffice.UI
             }
             else
             {
-                // Slide Background
+                // 1. Draw Slide Background & Gridlines clipped to slide canvas
+                GraphicsState slideClipState = g.Save();
+                g.IntersectClip(slideRect);
+
                 SlideNode slide = ActiveSlide;
                 if (slide != null)
                 {
@@ -3419,12 +5258,36 @@ namespace GenOffice.UI
                     g.FillRectangle(Brushes.White, slideRect);
                 }
 
-                // Render Shapes
+                // Render Gridlines (Đường lưới)
+                DrawGridlines(g, slideRect, scale);
+
+                // Render Guides (Đường dẫn hướng tâm)
+                DrawGuides(g, slideRect);
+
+                g.Restore(slideClipState);
+
+                // Border around slide canvas (chuẩn PowerPoint canvas edge)
+                using (Pen borderPen = new Pen(Color.FromArgb(215, 215, 215), 1.0f))
+                {
+                    g.DrawRectangle(borderPen, slideRect);
+                }
+
+                // 2. Render Shapes: In Normal view, shapes bleed freely onto the pasteboard canvas like PowerPoint.
+                // In ReadingView, shapes are clipped to slide canvas.
+                GraphicsState shapesClipState = null;
+                if (ViewMode == ImpressViewMode.ReadingView)
+                {
+                    shapesClipState = g.Save();
+                    g.IntersectClip(slideRect);
+                }
+
                 if (slide != null)
                 {
                     for (int i = 0; i < slide.Shapes.Count; i++)
                     {
                         ShapeNode shape = slide.Shapes[i];
+                        if (shape == null || !shape.IsVisible || (shape.Name != null && shape.Name.StartsWith("__morph_ghost__"))) continue;
+
                         bool isSel = (i == SelectedShapeIndex) || (SelectedShapeIndices != null && SelectedShapeIndices.Contains(i));
 
                         bool isVis;
@@ -3445,12 +5308,11 @@ namespace GenOffice.UI
 
                 // Render Table Insert Live Preview (Ghost Overlay)
                 DrawTableInsertPreviewOverlay(g, slideX, slideY, scale);
-            }
 
-            // Border around slide canvas
-            using (Pen borderPen = new Pen(Color.FromArgb(215, 215, 215), 1.0f))
-            {
-                g.DrawRectangle(borderPen, slideRect);
+                if (shapesClipState != null)
+                {
+                    g.Restore(shapesClipState);
+                }
             }
 
             // Render Pending Drawing Overlay
@@ -3461,6 +5323,26 @@ namespace GenOffice.UI
 
             // Render Smart Snap Guides & Equidistant Spacing Indicators
             DrawSmartGuidesAndSpacingIndicators(g, slideX, slideY, scale);
+
+            // Render Rubberband / Marquee Selection Box (Quét khối chọn đối tượng)
+            if (IsRubberbandSelecting)
+            {
+                int rx = Math.Min(RubberbandStartPoint.X, RubberbandCurrentPoint.X);
+                int ry = Math.Min(RubberbandStartPoint.Y, RubberbandCurrentPoint.Y);
+                int rw = Math.Abs(RubberbandStartPoint.X - RubberbandCurrentPoint.X);
+                int rh = Math.Abs(RubberbandStartPoint.Y - RubberbandCurrentPoint.Y);
+
+                if (rw > 1 && rh > 1)
+                {
+                    Rectangle boxRect = new Rectangle(rx, ry, rw, rh);
+                    using (SolidBrush boxBrush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
+                    using (Pen boxPen = new Pen(Color.FromArgb(200, 0, 120, 215), 1.0f))
+                    {
+                        g.FillRectangle(boxBrush, boxRect);
+                        g.DrawRectangle(boxPen, boxRect);
+                    }
+                }
+            }
 
             // Render Rulers
             if (ShowRuler)
@@ -3576,26 +5458,173 @@ namespace GenOffice.UI
             }
         }
 
+        public int GetTotalThumbContentHeight(int sidebarW = 210)
+        {
+            if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0) return 0;
+            int thumbX, thumbW, thumbH;
+            GetThumbnailMetrics(sidebarW, out thumbX, out thumbW, out thumbH);
+            int totalH = 10;
+            bool currentCollapsed = false;
+            for (int i = 0; i < Presentation.Slides.Count; i++)
+            {
+                SlideNode s = Presentation.Slides[i];
+                if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                {
+                    totalH += 24;
+                    currentCollapsed = s.IsSectionCollapsed;
+                }
+                if (currentCollapsed) continue;
+                totalH += thumbH + 14;
+            }
+            totalH += 30; // bottom comfort spacing
+            return totalH;
+        }
+
+        public int GetSlideIndexFromScrollY(int scrollY, int sidebarW = 210)
+        {
+            if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0) return 0;
+            int thumbX, thumbW, thumbH;
+            GetThumbnailMetrics(sidebarW, out thumbX, out thumbW, out thumbH);
+            int curY = 10;
+            bool currentCollapsed = false;
+            for (int i = 0; i < Presentation.Slides.Count; i++)
+            {
+                SlideNode s = Presentation.Slides[i];
+                if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                {
+                    curY += 24;
+                    currentCollapsed = s.IsSectionCollapsed;
+                }
+                if (currentCollapsed) continue;
+                if (curY + thumbH / 2 >= scrollY)
+                {
+                    return i;
+                }
+                curY += thumbH + 14;
+            }
+            return Math.Max(0, Presentation.Slides.Count - 1);
+        }
+
+        public string GetSlideTitle(int slideIndex)
+        {
+            if (Presentation == null || Presentation.Slides == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return "";
+            SlideNode slide = Presentation.Slides[slideIndex];
+            if (slide == null || slide.Shapes == null) return "";
+            foreach (ShapeNode sh in slide.Shapes)
+            {
+                if (sh == null) continue;
+                if (!string.IsNullOrWhiteSpace(sh.Text))
+                {
+                    string t = sh.Text.Trim();
+                    int nl = t.IndexOfAny(new char[] { '\r', '\n' });
+                    if (nl >= 0) t = t.Substring(0, nl).Trim();
+                    if (!string.IsNullOrWhiteSpace(t)) return t;
+                }
+            }
+            return "Slide " + (slideIndex + 1);
+        }
+
+        public void EnsureSlideVisibleInThumbnails(int slideIndex)
+        {
+            if (_isDraggingThumbScrollBar) return;
+            if (Presentation == null || Presentation.Slides == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return;
+            int viewH = (LastThumbViewportHeight > 0) ? LastThumbViewportHeight : 500;
+            int thumbX, thumbW, thumbH;
+            GetThumbnailMetrics(210, out thumbX, out thumbW, out thumbH);
+
+            int itemY = 10;
+            bool currentCollapsed = false;
+            for (int i = 0; i < slideIndex; i++)
+            {
+                SlideNode s = Presentation.Slides[i];
+                if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                {
+                    itemY += 24;
+                    currentCollapsed = s.IsSectionCollapsed;
+                }
+                if (!currentCollapsed) itemY += thumbH + 14;
+            }
+
+            if (itemY < ThumbScrollY)
+            {
+                ThumbScrollY = Math.Max(0, itemY - 10);
+            }
+            else if (itemY + thumbH > ThumbScrollY + viewH)
+            {
+                ThumbScrollY = itemY + thumbH - viewH + 20;
+            }
+
+            int totalH = GetTotalThumbContentHeight(210);
+            int maxScroll = Math.Max(0, totalH - viewH);
+            ThumbScrollY = Math.Max(0, Math.Min(maxScroll, ThumbScrollY));
+        }
+
         private void DrawLeftSlidePane(Graphics g, int sidebarW, int y, int h)
         {
-            using (SolidBrush leftBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+            int islandMarginX = 10;
+            int islandMarginTop = 3;
+            int islandMarginBtm = 8;
+
+            Rectangle paneRect = isIsland
+                ? new Rectangle(islandMarginX, y + islandMarginTop, sidebarW - islandMarginX, h - islandMarginTop - islandMarginBtm)
+                : new Rectangle(0, y, sidebarW, h);
+
+            if (isIsland)
             {
-                g.FillRectangle(leftBg, 0, y, sidebarW, h);
+                // Fill behind island panel with workspace background so margins are seamless
+                using (SolidBrush wsBrush = new SolidBrush(Color.FromArgb(240, 240, 240)))
+                {
+                    g.FillRectangle(wsBrush, 0, y, sidebarW, h);
+                }
+
+                // Island Card: Fluent 2 drop shadows for authentic floating card elevation
+                using (GraphicsPath sp1 = CreateRoundedRectPath(new RectangleF(paneRect.X, paneRect.Y + 1.5f, paneRect.Width, paneRect.Height), 8f))
+                using (SolidBrush sb1 = new SolidBrush(Color.FromArgb(8, 0, 0, 0)))
+                {
+                    g.FillPath(sb1, sp1);
+                }
+                using (GraphicsPath sp2 = CreateRoundedRectPath(new RectangleF(paneRect.X, paneRect.Y + 3.5f, paneRect.Width, paneRect.Height), 9f))
+                using (SolidBrush sb2 = new SolidBrush(Color.FromArgb(12, 0, 0, 0)))
+                {
+                    g.FillPath(sb2, sp2);
+                }
+
+                // Island Card Surface (Pure White with subtle border)
+                using (GraphicsPath cardPath = CreateRoundedRectPath(new RectangleF(paneRect.X, paneRect.Y, paneRect.Width, paneRect.Height), 8f))
+                using (SolidBrush cardBg = new SolidBrush(Color.White))
+                using (Pen cardBorder = new Pen(Color.FromArgb(218, 224, 233), 1.0f))
+                {
+                    g.FillPath(cardBg, cardPath);
+                    g.DrawPath(cardBorder, cardPath);
+                }
             }
-            using (Pen borderPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+            else
             {
-                g.DrawLine(borderPen, sidebarW, y, sidebarW, y + h);
+                // Standard Classic Full-Height Left Sidebar
+                using (SolidBrush leftBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+                {
+                    g.FillRectangle(leftBg, paneRect);
+                }
+                using (Pen borderPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+                {
+                    g.DrawLine(borderPen, sidebarW, y, sidebarW, y + h);
+                }
             }
 
-            // 1. Scrollable Thumbnail & Section Region (Clipped from y + 44 to y + h)
+            // 1. Scrollable Thumbnail & Section Region
+            int viewTop = paneRect.Y + 44;
+            int viewH = Math.Max(10, paneRect.Height - 48);
+            LastThumbViewportHeight = viewH;
+            Rectangle scrollClipRect = new Rectangle(paneRect.X, viewTop, paneRect.Width, viewH);
+
             GraphicsState paneState = g.Save();
-            Rectangle scrollClipRect = new Rectangle(0, y + 44, sidebarW, Math.Max(10, h - 44));
             g.SetClip(scrollClipRect);
 
-            int thumbY = y + 44 - ThumbScrollY;
-            int thumbW = 150;
-            int thumbH = Presentation.IsWidescreen ? (thumbW * 9 / 16) : (thumbW * 3 / 4);
-            int thumbX = 38;
+            int thumbX, thumbW, thumbH;
+            GetThumbnailMetrics(paneRect.Width, out thumbX, out thumbW, out thumbH);
+            int actualThumbX = paneRect.X + thumbX;
+            int thumbY = viewTop + 10 - ThumbScrollY;
 
             bool currentSectionCollapsed = false;
 
@@ -3620,15 +5649,15 @@ namespace GenOffice.UI
                         }
                         bool isCurrentSectionActive = (ActiveSlideIndex >= i && ActiveSlideIndex < nextSecIdx);
 
-                        if (thumbY + 22 >= y + 40 && thumbY <= y + h + 20)
+                        if (thumbY + 22 >= viewTop - 10 && thumbY <= viewTop + viewH + 20)
                         {
                             Color secCol = isCurrentSectionActive ? Color.FromArgb(185, 28, 28) : Color.FromArgb(51, 65, 85);
                             using (SolidBrush secBrush = new SolidBrush(secCol))
                             {
                                 string tri = s.IsSectionCollapsed ? "▶" : "▲";
                                 string countSuffix = s.IsSectionCollapsed ? (" (" + (nextSecIdx - i) + ")") : "";
-                                g.DrawString(tri, secFont, secBrush, 8, thumbY + 1);
-                                g.DrawString(secName + countSuffix, secFont, secBrush, 22, thumbY + 1);
+                                g.DrawString(tri, secFont, secBrush, paneRect.X + 8, thumbY + 1);
+                                g.DrawString(secName + countSuffix, secFont, secBrush, paneRect.X + 22, thumbY + 1);
                             }
                         }
 
@@ -3641,18 +5670,18 @@ namespace GenOffice.UI
                         continue;
                     }
 
-                    Rectangle frameRect = new Rectangle(thumbX, thumbY, thumbW, thumbH);
+                    Rectangle frameRect = new Rectangle(actualThumbX, thumbY, thumbW, thumbH);
 
-                    if (thumbY + thumbH >= y + 40 && thumbY <= y + h + 20)
+                    if (thumbY + thumbH >= viewTop - 10 && thumbY <= viewTop + viewH + 20)
                     {
                         // Slide number badge
                         Brush numBrush = (i == ActiveSlideIndex) ? new SolidBrush(Color.FromArgb(210, 71, 38)) : Brushes.Gray;
-                        g.DrawString((i + 1).ToString(), numFont, numBrush, 12, thumbY + thumbH / 2 - 8);
+                        g.DrawString((i + 1).ToString(), numFont, numBrush, paneRect.X + 8, thumbY + thumbH / 2 - 8);
 
                         // Hidden Slide Number Slashed Box (chuẩn PowerPoint)
                         if (s.IsHidden)
                         {
-                            Rectangle numBox = new Rectangle(7, thumbY + thumbH / 2 - 10, 20, 18);
+                            Rectangle numBox = new Rectangle(paneRect.X + 5, thumbY + thumbH / 2 - 10, 20, 18);
                             using (Pen slashPen = new Pen(Color.FromArgb(140, 140, 140), 1.2f))
                             {
                                 g.DrawRectangle(slashPen, numBox);
@@ -3663,39 +5692,73 @@ namespace GenOffice.UI
                         // Star badge if transition is set
                         if (s.Transition != TransitionType.None)
                         {
-                            g.DrawString("⭐", starFont, Brushes.Goldenrod, 10, thumbY + thumbH / 2 + 8);
+                            g.DrawString("⭐", starFont, Brushes.Goldenrod, paneRect.X + 6, thumbY + thumbH / 2 + 8);
                         }
 
                         // Thumbnail slide canvas
                         g.FillRectangle((i == ActiveSlideIndex) ? Brushes.White : Brushes.WhiteSmoke, frameRect);
 
-                        // Active PowerPoint Orange Border
+                        // Mini shape rendering chuẩn 100% như slide chính (2x supersampling downscaled for pixel-perfect typography)
+                        if (s.ThumbnailCache == null || s.IsThumbnailDirty || s.ThumbnailCache.Width != thumbW || s.ThumbnailCache.Height != thumbH)
+                        {
+                            if (s.ThumbnailCache != null)
+                            {
+                                s.ThumbnailCache.Dispose();
+                                s.ThumbnailCache = null;
+                            }
+
+                            int renderW = thumbW * 2;
+                            int renderH = thumbH * 2;
+                            float canvasW = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+                            float renderScale = (float)renderW / canvasW;
+
+                            using (Bitmap hiresBmp = new Bitmap(renderW, renderH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                            {
+                                using (Graphics bg = Graphics.FromImage(hiresBmp))
+                                {
+                                    bg.SmoothingMode = SmoothingMode.AntiAlias;
+                                    bg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    bg.PixelOffsetMode = PixelOffsetMode.Half;
+                                    bg.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+                                    Rectangle miniFrame = new Rectangle(0, 0, renderW, renderH);
+                                    DrawSlideBackground(bg, miniFrame, s);
+
+                                    foreach (ShapeNode shape in s.Shapes)
+                                    {
+                                        if (shape == null || !shape.IsVisible || (shape.Name != null && shape.Name.StartsWith("__morph_ghost__"))) continue;
+                                        DrawShape(bg, 0, 0, renderScale, shape, false);
+                                    }
+                                }
+
+                                Bitmap bmp = new Bitmap(thumbW, thumbH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                                using (Graphics fg = Graphics.FromImage(bmp))
+                                {
+                                    fg.SmoothingMode = SmoothingMode.AntiAlias;
+                                    fg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    fg.PixelOffsetMode = PixelOffsetMode.Half;
+                                    fg.DrawImage(hiresBmp, new Rectangle(0, 0, thumbW, thumbH));
+                                }
+                                s.ThumbnailCache = bmp;
+                                s.IsThumbnailDirty = false;
+                            }
+                        }
+
+                        g.DrawImage(s.ThumbnailCache, frameRect);
+
+                        // Active PowerPoint Orange Border (drawn ON TOP to frame content cleanly)
                         Color frameCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
                         using (Pen framePen = new Pen(frameCol, (i == ActiveSlideIndex) ? 2.5f : 1.0f))
                         {
                             g.DrawRectangle(framePen, frameRect);
                         }
 
-                        // Mini shape rendering chuẩn 100% như slide chính
-                        float miniScale = (float)thumbW / Presentation.CanvasWidth;
-                        GraphicsState state = g.Save();
-                        g.SetClip(frameRect);
-
-                        // Background
-                        DrawSlideBackground(g, frameRect, s);
-
-                        foreach (ShapeNode shape in s.Shapes)
-                        {
-                            DrawShape(g, thumbX, thumbY, miniScale, shape, false);
-                        }
-                        g.Restore(state);
-
                         // Hidden Slide Badge & Dimming
                         if (s.IsHidden)
                         {
                             using (Pen slashPen = new Pen(Color.FromArgb(220, 239, 68, 68), 2.0f))
                             {
-                                g.DrawLine(slashPen, 8, thumbY + thumbH / 2 - 8, 24, thumbY + thumbH / 2 + 8);
+                                g.DrawLine(slashPen, paneRect.X + 6, thumbY + thumbH / 2 - 8, paneRect.X + 22, thumbY + thumbH / 2 + 8);
                             }
                             using (SolidBrush dimBg = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
                             {
@@ -3711,32 +5774,160 @@ namespace GenOffice.UI
             g.Restore(paneState);
 
             // 2. Fixed Top Header Bar with "+ Slide Mới" & "Nhân Bản" (Drawn ON TOP of scrolling thumbnails)
-            using (SolidBrush topHeaderBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+            if (isIsland)
             {
-                g.FillRectangle(topHeaderBg, 0, y, sidebarW, 44);
+                using (Pen sepPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
+                {
+                    g.DrawLine(sepPen, paneRect.X + 8, paneRect.Y + 43, paneRect.Right - 8, paneRect.Y + 43);
+                }
+                int btnW = (paneRect.Width - 24) / 2;
+                BtnAddSlideBounds = new Rectangle(paneRect.X + 8, paneRect.Y + 8, btnW, 28);
+                BtnDupSlideBounds = new Rectangle(BtnAddSlideBounds.Right + 8, paneRect.Y + 8, btnW, 28);
             }
-            using (Pen sepPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+            else
             {
-                g.DrawLine(sepPen, 0, y + 43, sidebarW, y + 43);
+                using (SolidBrush topHeaderBg = new SolidBrush(Color.FromArgb(248, 249, 250)))
+                {
+                    g.FillRectangle(topHeaderBg, 0, y, sidebarW, 44);
+                }
+                using (Pen sepPen = new Pen(Color.FromArgb(229, 231, 235), 1.0f))
+                {
+                    g.DrawLine(sepPen, 0, y + 43, sidebarW, y + 43);
+                }
+                BtnAddSlideBounds = new Rectangle(8, y + 8, 92, 28);
+                BtnDupSlideBounds = new Rectangle(106, y + 8, 92, 28);
             }
 
-            Rectangle btnAdd = new Rectangle(8, y + 8, 92, 28);
-            Rectangle btnDup = new Rectangle(106, y + 8, 92, 28);
-
+            using (GraphicsPath ap = CreateRoundedRectPath(new RectangleF(BtnAddSlideBounds.X, BtnAddSlideBounds.Y, BtnAddSlideBounds.Width, BtnAddSlideBounds.Height), 4f))
             using (SolidBrush orangeBrush = new SolidBrush(Color.FromArgb(210, 71, 38)))
             {
-                g.FillRectangle(orangeBrush, btnAdd);
+                g.FillPath(orangeBrush, ap);
             }
             using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             {
-                g.DrawString("➕ Slide Mới", btnFont, Brushes.White, btnAdd.X + 8, btnAdd.Y + 5);
+                StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString("➕ Slide Mới", btnFont, Brushes.White, BtnAddSlideBounds, sfCenter);
             }
 
-            g.FillRectangle(Brushes.White, btnDup);
-            g.DrawRectangle(Pens.Silver, btnDup);
+            using (GraphicsPath dp = CreateRoundedRectPath(new RectangleF(BtnDupSlideBounds.X, BtnDupSlideBounds.Y, BtnDupSlideBounds.Width, BtnDupSlideBounds.Height), 4f))
+            using (SolidBrush dupBg = new SolidBrush(Color.White))
+            using (Pen dupBorder = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            {
+                g.FillPath(dupBg, dp);
+                g.DrawPath(dupBorder, dp);
+            }
             using (Font btnFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
             {
-                g.DrawString("📋 Nhân Bản", btnFont, Brushes.DimGray, btnDup.X + 12, btnDup.Y + 6);
+                StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using (SolidBrush dupTxt = new SolidBrush(Color.FromArgb(51, 65, 85)))
+                {
+                    g.DrawString("📋 Nhân Bản", btnFont, dupTxt, BtnDupSlideBounds, sfCenter);
+                }
+            }
+
+            // 3. Fast Vertical Scrollbar (Thanh cuộn nhanh)
+            int totalContentH = GetTotalThumbContentHeight(paneRect.Width);
+            int trackX = paneRect.Right - 9;
+            int trackY = viewTop + 2;
+            int trackW = 7;
+            int trackH = Math.Max(10, viewH - 4);
+            int maxScroll = Math.Max(0, totalContentH - viewH);
+
+            if (maxScroll > 0)
+            {
+                ThumbScrollBarTrackRect = new Rectangle(trackX - 3, trackY, trackW + 6, trackH);
+                int thumbBarH = Math.Max(26, (int)((float)viewH / totalContentH * trackH));
+                thumbBarH = Math.Min(thumbBarH, trackH);
+                int availY = trackH - thumbBarH;
+                int thumbBarY = trackY + (int)((float)ThumbScrollY / maxScroll * availY);
+                thumbBarY = Math.Max(trackY, Math.Min(trackY + availY, thumbBarY));
+                ThumbScrollBarThumbRect = new Rectangle(trackX, thumbBarY, trackW, thumbBarH);
+
+                // Draw Track when hovering or dragging
+                if (_isHoverThumbScrollBar || _isDraggingThumbScrollBar)
+                {
+                    using (GraphicsPath trkPath = CreateRoundedRectPath(new RectangleF(trackX, trackY, trackW, trackH), 3.5f))
+                    using (SolidBrush trkBrush = new SolidBrush(Color.FromArgb(16, 0, 0, 0)))
+                    {
+                        g.FillPath(trkBrush, trkPath);
+                    }
+                }
+
+                // Draw Thumb Pill Capsule
+                Color thumbCol;
+                if (_isDraggingThumbScrollBar)
+                    thumbCol = Color.FromArgb(110, 115, 128);
+                else if (_isHoverThumbScrollBarThumb)
+                    thumbCol = Color.FromArgb(145, 152, 165);
+                else
+                    thumbCol = Color.FromArgb(195, 200, 208);
+
+                using (GraphicsPath thumbPath = CreateRoundedRectPath(new RectangleF(trackX, thumbBarY, trackW, thumbBarH), 3.5f))
+                using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                {
+                    g.FillPath(thumbBrush, thumbPath);
+                }
+
+                // 4. Fast Scroll Callout Badge Tooltip (PowerPoint Signature Feature)
+                if (_isDraggingThumbScrollBar)
+                {
+                    int previewIdx = GetSlideIndexFromScrollY(ThumbScrollY, paneRect.Width);
+                    string slideNumStr = string.Format("Slide {0} / {1}", previewIdx + 1, Presentation.Slides.Count);
+                    string slideTitle = GetSlideTitle(previewIdx);
+
+                    int badgeW = 210;
+                    int badgeH = 46;
+                    int badgeX = isIsland ? (paneRect.Right + 8) : (sidebarW + 8);
+                    int badgeY = thumbBarY - badgeH / 2 + thumbBarH / 2;
+                    badgeY = Math.Max(viewTop, Math.Min(viewTop + viewH - badgeH, badgeY));
+
+                    Rectangle badgeRect = new Rectangle(badgeX, badgeY, badgeW, badgeH);
+
+                    // Badge Drop Shadow
+                    using (GraphicsPath sPath = CreateRoundedRectPath(new RectangleF(badgeRect.X + 2, badgeRect.Y + 2, badgeRect.Width, badgeRect.Height), 6f))
+                    using (SolidBrush sBrush = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                    {
+                        g.FillPath(sBrush, sPath);
+                    }
+
+                    // Badge Container
+                    using (GraphicsPath bPath = CreateRoundedRectPath(new RectangleF(badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height), 6f))
+                    using (SolidBrush bBg = new SolidBrush(Color.FromArgb(235, 28, 33, 44)))
+                    using (Pen bPen = new Pen(Color.FromArgb(60, 255, 255, 255), 1.0f))
+                    {
+                        g.FillPath(bBg, bPath);
+                        g.DrawPath(bPen, bPath);
+                    }
+
+                    // Pointing Arrow
+                    PointF[] arrowPts = new PointF[]
+                    {
+                        new PointF(badgeX, thumbBarY + thumbBarH / 2),
+                        new PointF(badgeX + 6, thumbBarY + thumbBarH / 2 - 5),
+                        new PointF(badgeX + 6, thumbBarY + thumbBarH / 2 + 5)
+                    };
+                    using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(235, 28, 33, 44)))
+                    {
+                        g.FillPolygon(arrowBrush, arrowPts);
+                    }
+
+                    using (Font bTitleFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+                    using (Font bSubFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
+                    {
+                        g.DrawString(slideNumStr, bTitleFont, Brushes.White, badgeRect.X + 10, badgeRect.Y + 6);
+                        using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(200, 210, 225)))
+                        using (StringFormat sfSub = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                        {
+                            RectangleF subRect = new RectangleF(badgeRect.X + 10, badgeRect.Y + 24, badgeRect.Width - 20, 16);
+                            g.DrawString(slideTitle, bSubFont, subBrush, subRect, sfSub);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                ThumbScrollBarTrackRect = Rectangle.Empty;
+                ThumbScrollBarThumbRect = Rectangle.Empty;
             }
         }
 
@@ -5243,6 +7434,13 @@ namespace GenOffice.UI
             snappedX = bestSnapX;
             snappedY = bestSnapY;
 
+            if (SnapToGrid)
+            {
+                float gridSize = 20.0f;
+                if (bestGuideX == null) snappedX = (float)Math.Round(snappedX / gridSize) * gridSize;
+                if (bestGuideY == null) snappedY = (float)Math.Round(snappedY / gridSize) * gridSize;
+            }
+
             if (bestGuideX != null) ActiveSmartGuides.Add(bestGuideX);
             if (bestGuideY != null) ActiveSmartGuides.Add(bestGuideY);
         }
@@ -5339,6 +7537,39 @@ namespace GenOffice.UI
 
             PointF[] bottomArrow = new PointF[] { new PointF(x, y2), new PointF(x - 3, y2 - 4), new PointF(x + 3, y2 - 4) };
             g.FillPolygon(b, bottomArrow);
+        }
+
+        private void DrawGridlines(Graphics g, Rectangle slideRect, float scale)
+        {
+            if (!ShowGrid || slideRect.Width <= 0 || slideRect.Height <= 0) return;
+            float gridStep = 40.0f * scale;
+            if (gridStep < 8f) return;
+
+            using (Pen gridPen = new Pen(Color.FromArgb(60, 160, 160, 160), 1f) { DashStyle = DashStyle.Dot })
+            {
+                for (float gx = slideRect.Left + gridStep; gx < slideRect.Right; gx += gridStep)
+                {
+                    g.DrawLine(gridPen, gx, slideRect.Top, gx, slideRect.Bottom);
+                }
+                for (float gy = slideRect.Top + gridStep; gy < slideRect.Bottom; gy += gridStep)
+                {
+                    g.DrawLine(gridPen, slideRect.Left, gy, slideRect.Right, gy);
+                }
+            }
+        }
+
+        private void DrawGuides(Graphics g, Rectangle slideRect)
+        {
+            if (!ShowMouseGuides || slideRect.Width <= 0 || slideRect.Height <= 0) return;
+
+            using (Pen guidePen = new Pen(Color.FromArgb(160, 210, 71, 38), 1.2f) { DashStyle = DashStyle.Dash })
+            {
+                int cx = slideRect.Left + slideRect.Width / 2;
+                g.DrawLine(guidePen, cx, slideRect.Top - 6, cx, slideRect.Bottom + 6);
+
+                int cy = slideRect.Top + slideRect.Height / 2;
+                g.DrawLine(guidePen, slideRect.Left - 6, cy, slideRect.Right + 6, cy);
+            }
         }
 
         private void DrawSlideRulers(Graphics g, int x, int y, int w, int h, int slideX, int slideY, int slideW, int slideH, float scale)
@@ -5710,6 +7941,29 @@ namespace GenOffice.UI
 
             if (a == null) return;
             p = Math.Max(0.0f, Math.Min(1.0f, p));
+
+            // Khi đạt 99.9% tiến trình trở lên: Khóa chặt hình vẽ tại tọa độ tĩnh tuyệt đối (0px, 1.0 scale, 1.0 opacity)
+            // Triệt tiêu 100% hiện tượng chữ/ảnh giật khựng 1 cái khi hoạt họa kết thúc
+            if (p >= 0.999f)
+            {
+                if (a.IsEntrance)
+                {
+                    isVisible = true;
+                    offsetX = 0f;
+                    offsetY = 0f;
+                    scaleX = 1.0f;
+                    scaleY = 1.0f;
+                    rotDelta = 0f;
+                    opacityMul = 1.0f;
+                    return;
+                }
+                else if (a.IsExit)
+                {
+                    isVisible = false;
+                    opacityMul = 0f;
+                    return;
+                }
+            }
 
             switch (a.Type)
             {
@@ -6395,7 +8649,7 @@ namespace GenOffice.UI
             return Color.FromArgb(alpha, r, g, b);
         }
 
-        private void DrawSlideBackground(Graphics g, RectangleF rect, SlideNode slide)
+        public void DrawSlideBackground(Graphics g, RectangleF rect, SlideNode slide)
         {
             if (rect.Width <= 0.001f || rect.Height <= 0.001f || slide == null) return;
 
@@ -6505,7 +8759,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawSlideBackground(Graphics g, Rectangle rect, SlideNode slide)
+        public void DrawSlideBackground(Graphics g, Rectangle rect, SlideNode slide)
         {
             DrawSlideBackground(g, new RectangleF(rect.X, rect.Y, rect.Width, rect.Height), slide);
         }
@@ -6584,20 +8838,36 @@ namespace GenOffice.UI
         {
             if (shape == null || shape.Type != ShapeType.Table) return;
 
+            if (presetIndex == 0)
+            {
+                // Preset 0: Basic Grid (Line đen, Nền trong chuẩn PPT)
+                shape.FillColor = 0x00FFFFFF;
+                shape.StrokeColor = 0x000000;
+                shape.TableHeaderRow = false;
+                shape.TableBandedRows = false;
+                shape.TableHasHeaderFill = false;
+                shape.TableHasBandedFill = false;
+                if (shape.TableCellFillColors != null) shape.TableCellFillColors.Clear();
+                if (shape.TableCellTextColors != null) shape.TableCellTextColors.Clear();
+                return;
+            }
+
             int[] headerColors = new int[] {
-                0x2563EB, // 0. Theme Blue
-                0xEA580C, // 1. Coral Orange
-                0x059669, // 2. Emerald Green
-                0x7C3AED, // 3. Royal Purple
-                0x1E293B, // 4. Dark Slate
-                0xDC2626, // 5. Ruby Red
-                0xD97706, // 6. Amber Gold
-                0x0D9488, // 7. Ocean Teal
-                0x4F46E5, // 8. Indigo
-                0xDB2777  // 9. Rose Pink
+                0x00FFFFFF, // 0. Basic fallback
+                0x2563EB,   // 1. Theme Blue
+                0xEA580C,   // 2. Coral Orange
+                0x059669,   // 3. Emerald Green
+                0x7C3AED,   // 4. Royal Purple
+                0x1E293B,   // 5. Dark Slate
+                0xDC2626,   // 6. Ruby Red
+                0xD97706,   // 7. Amber Gold
+                0x0D9488,   // 8. Ocean Teal
+                0x4F46E5,   // 9. Indigo
+                0xDB2777    // 10. Rose Pink
             };
 
             int[] borderColors = new int[] {
+                0x000000,
                 0x93C5FD,
                 0xFDBA74,
                 0x6EE7B7,
@@ -6615,6 +8885,8 @@ namespace GenOffice.UI
             shape.StrokeColor = borderColors[p];
             shape.TableHeaderRow = true;
             shape.TableBandedRows = true;
+            shape.TableHasHeaderFill = true;
+            shape.TableHasBandedFill = true;
 
             if (shape.TableCellFillColors != null) shape.TableCellFillColors.Clear();
             if (shape.TableCellTextColors != null) shape.TableCellTextColors.Clear();
@@ -6625,23 +8897,45 @@ namespace GenOffice.UI
             int cols = Math.Max(1, shape.TableColumns);
             int rows = Math.Max(1, shape.TableRows);
 
-            float cellW = baseW / cols;
-            float cellH = baseH / rows;
+            float[] colWidths = shape.GetComputedColumnWidths(baseW);
+            float[] rowHeights = shape.GetComputedRowHeights(baseH);
 
-            Color headCol = (shape.FillColor != 0x00FFFFFF && shape.FillColor != 0xF3F4F6)
-                ? Color.FromArgb(alpha, Color.FromArgb(shape.FillColor))
-                : Color.FromArgb(alpha, 210, 71, 38);
+            float[] colX = new float[cols + 1];
+            colX[0] = 0f;
+            for (int i = 0; i < cols; i++) colX[i + 1] = colX[i] + colWidths[i];
 
-            // Compute soft pastel banded tint from header color
-            Color oddRowCol = Color.FromArgb(alpha, 
-                Math.Min(255, 235 + (headCol.R / 12)), 
-                Math.Min(255, 235 + (headCol.G / 12)), 
-                Math.Min(255, 235 + (headCol.B / 12)));
+            float[] rowY = new float[rows + 1];
+            rowY[0] = 0f;
+            for (int i = 0; i < rows; i++) rowY[i + 1] = rowY[i] + rowHeights[i];
+
+            bool hasHeadFill = shape.TableHasHeaderFill && shape.TableHeaderRow;
+            bool hasBandFill = shape.TableHasBandedFill && shape.TableBandedRows;
+
+            Color headCol = (hasHeadFill && shape.FillColor != 0x00FFFFFF && shape.FillColor != 0 && shape.FillColor != 0xF3F4F6)
+                ? Color.FromArgb(alpha, (shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF)
+                : Color.FromArgb(alpha, 255, 255, 255);
+
+            // Determine base accent color for soft banded tint (20% accent + 80% white, matching PPT Light Style 3)
+            int accentRgb = (shape.FillColor != 0x00FFFFFF && shape.FillColor != 0 && shape.FillColor != 0xF3F4F6)
+                ? shape.FillColor
+                : ((shape.StrokeColor != 0x00FFFFFF && shape.StrokeColor != 0 && shape.StrokeColor != 0xCBD5E1)
+                    ? shape.StrokeColor
+                    : 0xFFFFFF);
+
+            Color accentCol = Color.FromArgb((accentRgb >> 16) & 0xFF, (accentRgb >> 8) & 0xFF, accentRgb & 0xFF);
+
+            // Compute soft pastel banded tint from accent color: 20% accent + 80% white (#ED7D31 -> #FBE5D6)
+            Color oddRowCol = (hasBandFill && accentRgb != 0xFFFFFF)
+                ? Color.FromArgb(alpha, 
+                    (int)Math.Min(255, accentCol.R * 0.2f + 255f * 0.8f), 
+                    (int)Math.Min(255, accentCol.G * 0.2f + 255f * 0.8f), 
+                    (int)Math.Min(255, accentCol.B * 0.2f + 255f * 0.8f))
+                : Color.FromArgb(alpha, 255, 255, 255);
             Color evenRowCol = Color.FromArgb(alpha, 255, 255, 255);
 
-            Color gridCol = (shape.StrokeColor != 0x00FFFFFF && shape.StrokeColor != 0)
-                ? Color.FromArgb(alpha, Color.FromArgb(shape.StrokeColor))
-                : Color.FromArgb(alpha, 203, 213, 225);
+            Color gridCol = (shape.StrokeColor == 0x00FFFFFF)
+                ? Color.FromArgb(0, 0, 0, 0)
+                : Color.FromArgb(alpha, (shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
 
             int minSelR = -1, maxSelR = -1, minSelC = -1, maxSelC = -1;
             if (isSelected && shape.TableSelectedCellRow >= 0 && shape.TableSelectedCellCol >= 0)
@@ -6664,7 +8958,7 @@ namespace GenOffice.UI
                     bool isHead = (r == 0 && shape.TableHeaderRow);
                     for (int c = 0; c < cols; c++)
                     {
-                        RectangleF cellRect = new RectangleF(c * cellW, r * cellH, cellW, cellH);
+                        RectangleF cellRect = new RectangleF(colX[c], rowY[r], colWidths[c], rowHeights[r]);
                         string cellKey = r + "," + c;
 
                         // Check custom fill color
@@ -6676,14 +8970,17 @@ namespace GenOffice.UI
                                 g.FillRectangle(custB, cellRect);
                             }
                         }
-                        else if (isHead)
+                        else if (isHead && hasHeadFill)
                         {
                             g.FillRectangle(headB, cellRect);
                         }
+                        else if (hasBandFill && (r % 2 == 1))
+                        {
+                            g.FillRectangle(oddB, cellRect);
+                        }
                         else
                         {
-                            SolidBrush b = (r % 2 == 1 && shape.TableBandedRows) ? oddB : evenB;
-                            g.FillRectangle(b, cellRect);
+                            g.FillRectangle(evenB, cellRect);
                         }
 
                         // Selection highlight overlay (Quét khối ô)
@@ -6703,15 +9000,15 @@ namespace GenOffice.UI
 
             // 2. Draw Table Cell Gridlines
             using (Pen gridPen = new Pen(gridCol, Math.Max(1.0f, 1.0f * scale)))
-            using (Pen borderPen = new Pen(headCol, Math.Max(1.5f, 1.5f * scale)))
+            using (Pen borderPen = new Pen(gridCol, Math.Max(1.5f, 1.5f * scale)))
             {
                 for (int r = 0; r <= rows; r++)
                 {
-                    g.DrawLine(gridPen, 0, r * cellH, baseW, r * cellH);
+                    g.DrawLine(gridPen, 0, rowY[r], baseW, rowY[r]);
                 }
                 for (int c = 0; c <= cols; c++)
                 {
-                    g.DrawLine(gridPen, c * cellW, 0, c * cellW, baseH);
+                    g.DrawLine(gridPen, colX[c], 0, colX[c], baseH);
                 }
                 g.DrawRectangle(borderPen, 0, 0, baseW, baseH);
             }
@@ -6721,10 +9018,10 @@ namespace GenOffice.UI
             {
                 using (Pen selBorderPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(1.8f, 2.0f * scale)))
                 {
-                    float selX = minSelC * cellW;
-                    float selY = minSelR * cellH;
-                    float selW = (maxSelC - minSelC + 1) * cellW;
-                    float selH = (maxSelR - minSelR + 1) * cellH;
+                    float selX = colX[minSelC];
+                    float selY = rowY[minSelR];
+                    float selW = colX[maxSelC + 1] - colX[minSelC];
+                    float selH = rowY[maxSelR + 1] - rowY[minSelR];
                     g.DrawRectangle(selBorderPen, selX, selY, selW, selH);
                 }
             }
@@ -6734,9 +9031,11 @@ namespace GenOffice.UI
             {
                 using (Pen editFocusPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(2.0f, 2.2f * scale)))
                 {
-                    float eX = EditingTableCol * cellW;
-                    float eY = EditingTableRow * cellH;
-                    g.DrawRectangle(editFocusPen, eX, eY, cellW, cellH);
+                    float eX = colX[EditingTableCol];
+                    float eY = rowY[EditingTableRow];
+                    float eW = colWidths[EditingTableCol];
+                    float eH = rowHeights[EditingTableRow];
+                    g.DrawRectangle(editFocusPen, eX, eY, eW, eH);
                 }
             }
 
@@ -6745,9 +9044,11 @@ namespace GenOffice.UI
             using (Font headFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
             using (Font bodyFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Regular, GraphicsUnit.Pixel))
             using (Font boldBodyFont = new Font(shape.FontName ?? "Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
-            using (SolidBrush headTextBrush = new SolidBrush(Color.FromArgb(alpha, 255, 255, 255)))
-            using (SolidBrush bodyTextBrush = new SolidBrush(Color.FromArgb(alpha, 30, 41, 59)))
-            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            using (SolidBrush headFillTextBrush = new SolidBrush(Color.FromArgb(alpha, 255, 255, 255)))
+            using (SolidBrush defaultDarkTextBrush = new SolidBrush(Color.FromArgb(alpha, 30, 41, 59)))
+            using (StringFormat sfNear = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            using (StringFormat sfFar = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center })
             {
                 for (int r = 0; r < rows; r++)
                 {
@@ -6772,7 +9073,7 @@ namespace GenOffice.UI
                         bool isBold = isHead || (shape.TableCellBolds != null && shape.TableCellBolds.ContainsKey(cellKey) && shape.TableCellBolds[cellKey]);
                         Font f = isHead ? headFont : (isBold ? boldBodyFont : bodyFont);
 
-                        Brush tb = isHead ? headTextBrush : bodyTextBrush;
+                        Brush tb;
                         bool disposedBrush = false;
                         if (shape.TableCellTextColors != null && shape.TableCellTextColors.ContainsKey(cellKey))
                         {
@@ -6781,10 +9082,31 @@ namespace GenOffice.UI
                         }
                         else if (isCellEditing)
                         {
-                            tb = Brushes.Black;
+                            tb = defaultDarkTextBrush;
+                        }
+                        else if (isHead && hasHeadFill)
+                        {
+                            tb = headFillTextBrush;
+                        }
+                        else
+                        {
+                            tb = defaultDarkTextBrush;
                         }
 
-                        RectangleF cRect = new RectangleF(c * cellW + 6, r * cellH + 2, cellW - 12, cellH - 4);
+                        // Resolve Alignment
+                        StringFormat sf = sfNear;
+                        if (shape.TableCellAlignments != null && shape.TableCellAlignments.TryGetValue(cellKey, out var align))
+                        {
+                            if (align == TextAlignment.Center) sf = sfCenter;
+                            else if (align == TextAlignment.Right) sf = sfFar;
+                            else sf = sfNear;
+                        }
+                        else if (isHead)
+                        {
+                            sf = sfCenter;
+                        }
+
+                        RectangleF cRect = new RectangleF(colX[c] + 6, rowY[r] + 2, Math.Max(1f, colWidths[c] - 12), Math.Max(1f, rowHeights[r] - 4));
                         if (!string.IsNullOrEmpty(cellTxt))
                         {
                             g.DrawString(cellTxt, f, tb, cRect, sf);
@@ -6796,7 +9118,23 @@ namespace GenOffice.UI
                             int caretPos = Math.Max(0, Math.Min(TableCaretIndex, cellTxt.Length));
                             string textBeforeCaret = cellTxt.Substring(0, caretPos);
                             SizeF measuredBefore = g.MeasureString(textBeforeCaret, f, (int)cRect.Width, sf);
-                            float caretX = cRect.Left + (string.IsNullOrEmpty(textBeforeCaret) ? 0f : measuredBefore.Width);
+                            float caretX;
+                            if (sf.Alignment == StringAlignment.Center)
+                            {
+                                SizeF fullMeasured = g.MeasureString(cellTxt, f, (int)cRect.Width, sf);
+                                float textStartX = cRect.Left + Math.Max(0, (cRect.Width - fullMeasured.Width) / 2f);
+                                caretX = textStartX + (string.IsNullOrEmpty(textBeforeCaret) ? 0f : measuredBefore.Width);
+                            }
+                            else if (sf.Alignment == StringAlignment.Far)
+                            {
+                                SizeF fullMeasured = g.MeasureString(cellTxt, f, (int)cRect.Width, sf);
+                                float textStartX = cRect.Right - fullMeasured.Width;
+                                caretX = textStartX + (string.IsNullOrEmpty(textBeforeCaret) ? 0f : measuredBefore.Width);
+                            }
+                            else
+                            {
+                                caretX = cRect.Left + (string.IsNullOrEmpty(textBeforeCaret) ? 0f : measuredBefore.Width);
+                            }
                             float caretY = cRect.Top + (cRect.Height - fontSize * 1.3f) / 2f;
                             float caretH = Math.Max(12f, fontSize * 1.3f);
 
@@ -7740,7 +10078,7 @@ namespace GenOffice.UI
             float b = shape.ImageBrightness;
             float c = shape.ImageContrast;
             float s = shape.ImageSaturation;
-            float op = Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity));
+            float op = (shape.FillOpacity <= 0.001f && shape.CachedImage != null) ? 1.0f : Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity));
 
             if (shape.ImageRecolor == "Grayscale") s = 0.0f;
             else if (shape.ImageRecolor == "Washout") { b = 0.45f; c = 0.55f; op *= 0.85f; }
@@ -7844,6 +10182,7 @@ namespace GenOffice.UI
             if (Presentation == null) return;
             try
             {
+                if (ActiveSlide != null) ActiveSlide.InvalidateThumbnail();
                 _undoStack.Add(Presentation.Clone());
                 if (_undoStack.Count > MaxUndoHistory) _undoStack.RemoveAt(0);
                 _redoStack.Clear();
@@ -7861,6 +10200,7 @@ namespace GenOffice.UI
                 _undoStack.RemoveAt(_undoStack.Count - 1);
                 Presentation = prev;
                 if (ActiveSlideIndex >= Presentation.Slides.Count) ActiveSlideIndex = Math.Max(0, Presentation.Slides.Count - 1);
+                if (ActiveSlide != null) ActiveSlide.InvalidateThumbnail();
 
                 // Đồng bộ nếu đang ở chế độ Xóa nền (Background Removal)
                 if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
@@ -7887,6 +10227,7 @@ namespace GenOffice.UI
                 _redoStack.RemoveAt(_redoStack.Count - 1);
                 Presentation = next;
                 if (ActiveSlideIndex >= Presentation.Slides.Count) ActiveSlideIndex = Math.Max(0, Presentation.Slides.Count - 1);
+                if (ActiveSlide != null) ActiveSlide.InvalidateThumbnail();
 
                 if (IsRemovingBackground && SelectedShape != null && SelectedShape.CachedImage != null)
                 {
@@ -8127,31 +10468,8 @@ namespace GenOffice.UI
 
             if (poster != null)
             {
+                // In PowerPoint: clean poster frame without any obstructive center play button
                 g.DrawImage(poster, vRect);
-                if (!shape.IsVideoPlaying)
-                {
-                    // Center Media Watermark Play Triangle on Poster
-                    float iconSz = Math.Min(baseW * 0.24f, baseH * 0.32f);
-                    float iconX = (baseW - iconSz) / 2f;
-                    float iconY = (baseH - iconSz) / 2f - (baseH > 80 ? 12 * scale : 0);
-
-                    using (SolidBrush discBg = new SolidBrush(Color.FromArgb(140, 0, 0, 0)))
-                    using (Pen discPen = new Pen(Color.FromArgb(200, 255, 255, 255), 2f * scale))
-                    {
-                        g.FillEllipse(discBg, iconX, iconY, iconSz, iconSz);
-                        g.DrawEllipse(discPen, iconX, iconY, iconSz, iconSz);
-
-                        PointF[] tri = new PointF[] {
-                            new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.28f),
-                            new PointF(iconX + iconSz * 0.72f, iconY + iconSz * 0.50f),
-                            new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.72f)
-                        };
-                        using (SolidBrush triB = new SolidBrush(Color.White))
-                        {
-                            g.FillPolygon(triB, tri);
-                        }
-                    }
-                }
             }
             else
             {
@@ -8161,38 +10479,35 @@ namespace GenOffice.UI
                     g.FillRectangle(bgGrad, vRect);
                 }
 
-                // Decorative Center Media Watermark Icon
-                float iconSz = Math.Min(baseW * 0.28f, baseH * 0.35f);
+                // Subtle professional media icon
+                float iconSz = Math.Min(32f * scale, Math.Min(baseW * 0.18f, baseH * 0.18f));
                 float iconX = (baseW - iconSz) / 2f;
-                float iconY = (baseH - iconSz) / 2f - (baseH > 80 ? 12 * scale : 0);
+                float iconY = (baseH - iconSz) / 2f - (baseH > 70 ? 8 * scale : 0);
 
-                using (SolidBrush discBg = new SolidBrush(Color.FromArgb(120, 0, 0, 0)))
-                using (Pen discPen = new Pen(Color.FromArgb(180, 255, 255, 255), 2f * scale))
+                using (Pen pen = new Pen(Color.FromArgb(148, 163, 184), 1.5f * scale))
+                using (SolidBrush brush = new SolidBrush(Color.FromArgb(30, 41, 59)))
                 {
-                    g.FillEllipse(discBg, iconX, iconY, iconSz, iconSz);
-                    g.DrawEllipse(discPen, iconX, iconY, iconSz, iconSz);
-
-                    // Large Play Triangle
-                    PointF[] tri = new PointF[] {
-                        new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.28f),
-                        new PointF(iconX + iconSz * 0.72f, iconY + iconSz * 0.50f),
-                        new PointF(iconX + iconSz * 0.38f, iconY + iconSz * 0.72f)
+                    g.FillRectangle(brush, iconX, iconY, iconSz, iconSz * 0.72f);
+                    g.DrawRectangle(pen, iconX, iconY, iconSz, iconSz * 0.72f);
+                    PointF[] lens = new PointF[] {
+                        new PointF(iconX + iconSz, iconY + iconSz * 0.18f),
+                        new PointF(iconX + iconSz * 1.35f, iconY + iconSz * 0.05f),
+                        new PointF(iconX + iconSz * 1.35f, iconY + iconSz * 0.67f),
+                        new PointF(iconX + iconSz, iconY + iconSz * 0.54f)
                     };
-                    using (SolidBrush triB = new SolidBrush(Color.White))
-                    {
-                        g.FillPolygon(triB, tri);
-                    }
+                    g.FillPolygon(brush, lens);
+                    g.DrawPolygon(pen, lens);
                 }
 
                 // Video File Name / Title Text
-                if (baseH > 90 * scale)
+                if (baseH > 60 * scale)
                 {
-                    string vName = !string.IsNullOrEmpty(shape.VideoPath) ? System.IO.Path.GetFileName(shape.VideoPath) : (shape.Name ?? "Video Trình Chiếu");
-                    using (Font vFont = new Font("Segoe UI", Math.Max(8f, 13f * scale), FontStyle.Bold))
-                    using (SolidBrush txtB = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    string vName = !string.IsNullOrEmpty(shape.VideoPath) ? System.IO.Path.GetFileName(shape.VideoPath) : (shape.Name ?? "Video");
+                    using (Font vFont = new Font("Segoe UI", Math.Max(8f, 11f * scale), FontStyle.Regular))
+                    using (SolidBrush txtB = new SolidBrush(Color.FromArgb(203, 213, 225)))
                     {
-                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
-                        RectangleF nameRect = new RectangleF(10 * scale, iconY + iconSz + 8 * scale, baseW - 20 * scale, 30 * scale);
+                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near, Trimming = StringTrimming.EllipsisCharacter };
+                        RectangleF nameRect = new RectangleF(8 * scale, iconY + iconSz + 6 * scale, baseW - 16 * scale, 24 * scale);
                         g.DrawString(vName, vFont, txtB, nameRect, sf);
                     }
                 }
@@ -8257,7 +10572,8 @@ namespace GenOffice.UI
             vPath.Dispose();
 
             // 3. PowerPoint On-Canvas Video Playback Bar Overlay (At Bottom)
-            if (baseH > 80 * scale)
+            // IN POWERPOINT: Only visible when the video shape is selected in edit mode!
+            if (!IsPresenting && isSelected && baseH > 80 * scale)
             {
                 float barH = Math.Max(26f, 34f * scale);
                 float barY = baseH - barH;
@@ -8471,7 +10787,7 @@ namespace GenOffice.UI
 
                         using (GraphicsPath path = (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
                             ? (GraphicsPath)shape.CustomPath.Clone()
-                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale))
                         {
                             if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
                             {
@@ -8516,7 +10832,7 @@ namespace GenOffice.UI
                         float glitchDist = (1.0f - p) * 10f * scale;
                         if (glitchDist > 0.5f)
                         {
-                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale))
                             {
                                 GraphicsState gsRed = g.Save();
                                 g.TranslateTransform(-glitchDist, -glitchDist * 0.5f);
@@ -8543,7 +10859,7 @@ namespace GenOffice.UI
                         if (p < 0.65f)
                         {
                             float trailDist = (1.0f - (p / 0.65f)) * 40f * scale;
-                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale))
                             {
                                 for (int t = 3; t >= 1; t--)
                                 {
@@ -8606,7 +10922,7 @@ namespace GenOffice.UI
 
                         using (GraphicsPath path = (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
                             ? (GraphicsPath)shape.CustomPath.Clone()
-                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            : CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale))
                         {
                             if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
                             {
@@ -8683,7 +10999,7 @@ namespace GenOffice.UI
                             RectangleF gRect = new RectangleF(gx - gw / 2f, -10, gw, baseH + 20);
 
                             GraphicsState gState = g.Save();
-                            using (GraphicsPath clipP = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                            using (GraphicsPath clipP = CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale))
                             {
                                 g.SetClip(clipP);
                                 using (LinearGradientBrush glareBrush = new LinearGradientBrush(gRect, Color.Transparent, Color.Transparent, 45f))
@@ -8762,13 +11078,181 @@ namespace GenOffice.UI
             }
         }
 
+        private static Bitmap ApplySoftEdgeAndBlur(Bitmap srcBmp, float softEdgePx, float blurPx)
+        {
+            if (srcBmp == null || (softEdgePx <= 0.01f && blurPx <= 0.01f)) return srcBmp;
+
+            int w = srcBmp.Width;
+            int h = srcBmp.Height;
+            if (w <= 0 || h <= 0) return srcBmp;
+
+            Bitmap result = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Imaging.BitmapData srcData = srcBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Imaging.BitmapData dstData = result.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            int stride = srcData.Stride;
+            int bytes = Math.Abs(stride) * h;
+            byte[] src = new byte[bytes];
+            byte[] dst = new byte[bytes];
+            System.Runtime.InteropServices.Marshal.Copy(srcData.Scan0, src, 0, bytes);
+
+            int feather = (int)Math.Ceiling(softEdgePx);
+
+            for (int y = 0; y < h; y++)
+            {
+                int rowOffset = y * stride;
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = rowOffset + x * 4;
+                    byte b = src[idx + 0];
+                    byte g = src[idx + 1];
+                    byte r = src[idx + 2];
+                    byte a = src[idx + 3];
+
+                    if (a > 0 && feather > 0)
+                    {
+                        int distLeft = x;
+                        int distRight = w - 1 - x;
+                        int distTop = y;
+                        int distBottom = h - 1 - y;
+                        int minDist = Math.Min(Math.Min(distLeft, distRight), Math.Min(distTop, distBottom));
+
+                        if (minDist < feather)
+                        {
+                            float factor = (float)minDist / feather;
+                            factor = factor * factor * (3.0f - 2.0f * factor);
+                            a = (byte)(a * factor);
+                        }
+                    }
+
+                    dst[idx + 0] = b;
+                    dst[idx + 1] = g;
+                    dst[idx + 2] = r;
+                    dst[idx + 3] = a;
+                }
+            }
+
+            System.Runtime.InteropServices.Marshal.Copy(dst, 0, dstData.Scan0, bytes);
+            srcBmp.UnlockBits(srcData);
+            result.UnlockBits(dstData);
+
+            if (blurPx > 0.5f)
+            {
+                Bitmap blurred = FastBoxBlur(result, (int)Math.Min(25, blurPx));
+                result.Dispose();
+                return blurred;
+            }
+
+            return result;
+        }
+
+        private static Bitmap FastBoxBlur(Bitmap image, int radius)
+        {
+            if (radius < 1 || image == null) return image;
+            int w = image.Width;
+            int h = image.Height;
+            if (w <= 0 || h <= 0) return image;
+
+            Bitmap output = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Imaging.BitmapData srcData = image.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Imaging.BitmapData dstData = output.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            int stride = srcData.Stride;
+            int bytes = Math.Abs(stride) * h;
+            byte[] src = new byte[bytes];
+            byte[] mid = new byte[bytes];
+            byte[] dst = new byte[bytes];
+            System.Runtime.InteropServices.Marshal.Copy(srcData.Scan0, src, 0, bytes);
+
+            int window = 2 * radius + 1;
+
+            // Horizontal pass
+            for (int y = 0; y < h; y++)
+            {
+                int rowOffset = y * stride;
+                int sumA = 0, sumR = 0, sumG = 0, sumB = 0;
+
+                for (int i = -radius; i <= radius; i++)
+                {
+                    int px = Math.Max(0, Math.Min(w - 1, i));
+                    int pidx = rowOffset + px * 4;
+                    sumB += src[pidx + 0];
+                    sumG += src[pidx + 1];
+                    sumR += src[pidx + 2];
+                    sumA += src[pidx + 3];
+                }
+
+                for (int x = 0; x < w; x++)
+                {
+                    int didx = rowOffset + x * 4;
+                    mid[didx + 0] = (byte)(sumB / window);
+                    mid[didx + 1] = (byte)(sumG / window);
+                    mid[didx + 2] = (byte)(sumR / window);
+                    mid[didx + 3] = (byte)(sumA / window);
+
+                    int leftPx = Math.Max(0, x - radius);
+                    int rightPx = Math.Min(w - 1, x + radius + 1);
+
+                    int lidx = rowOffset + leftPx * 4;
+                    int ridx = rowOffset + rightPx * 4;
+
+                    sumB += src[ridx + 0] - src[lidx + 0];
+                    sumG += src[ridx + 1] - src[lidx + 1];
+                    sumR += src[ridx + 2] - src[lidx + 2];
+                    sumA += src[ridx + 3] - src[lidx + 3];
+                }
+            }
+
+            // Vertical pass
+            for (int x = 0; x < w; x++)
+            {
+                int xOffset = x * 4;
+                int sumA = 0, sumR = 0, sumG = 0, sumB = 0;
+
+                for (int i = -radius; i <= radius; i++)
+                {
+                    int py = Math.Max(0, Math.Min(h - 1, i));
+                    int pidx = py * stride + xOffset;
+                    sumB += mid[pidx + 0];
+                    sumG += mid[pidx + 1];
+                    sumR += mid[pidx + 2];
+                    sumA += mid[pidx + 3];
+                }
+
+                for (int y = 0; y < h; y++)
+                {
+                    int didx = y * stride + xOffset;
+                    dst[didx + 0] = (byte)(sumB / window);
+                    dst[didx + 1] = (byte)(sumG / window);
+                    dst[didx + 2] = (byte)(sumR / window);
+                    dst[didx + 3] = (byte)(sumA / window);
+
+                    int topPy = Math.Max(0, y - radius);
+                    int btmPy = Math.Min(h - 1, y + radius + 1);
+
+                    int tidx = topPy * stride + xOffset;
+                    int bidx = btmPy * stride + xOffset;
+
+                    sumB += mid[bidx + 0] - mid[tidx + 0];
+                    sumG += mid[bidx + 1] - mid[tidx + 1];
+                    sumR += mid[bidx + 2] - mid[tidx + 2];
+                    sumA += mid[bidx + 3] - mid[tidx + 3];
+                }
+            }
+
+            System.Runtime.InteropServices.Marshal.Copy(dst, 0, dstData.Scan0, bytes);
+            image.UnlockBits(srcData);
+            output.UnlockBits(dstData);
+            return output;
+        }
+
         public void DrawShape(Graphics g, float slideX, float slideY, float scale, ShapeNode shape, bool isSelected, float opacityMultiplier = 1.0f, float animOffsetX = 0f, float animOffsetY = 0f, float animScaleX = 1.0f, float animScaleY = 1.0f, float animRotDelta = 0f, ShapeAnimation activeAnim = null, float activeAnimProgress = 0f)
         {
             if (!shape.IsVisible) return;
             if ((shape.IsDecorative || shape.PlaceholderType == "ThemeDecoration") && ActiveSlide != null && ActiveSlide.HideBackgroundGraphics) return;
             if (Math.Abs(animScaleX) <= 0.001f || Math.Abs(animScaleY) <= 0.001f) return;
 
-            if (activeAnim == null && ActiveSlide != null && ActiveSlide.Animations != null)
+            if (IsPresenting && activeAnim == null && ActiveSlide != null && ActiveSlide.Animations != null)
             {
                 foreach (ShapeAnimation a in ActiveSlide.Animations)
                 {
@@ -8798,6 +11282,12 @@ namespace GenOffice.UI
 
             GraphicsState state = g.Save();
 
+            // ALWAYS use AntiAlias for shape text. ClearTypeGridFit snaps each glyph to the
+            // integer pixel grid; when a shape moves (animation offset / scale) or its canvas
+            // position is fractional, the glyph snaps to a different pixel each frame → jitter.
+            // AntiAlias renders at any sub-pixel position without snapping → butter-smooth motion.
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
             // Transform matrix: Center anchor -> Rotation -> Scaling -> Local Top-Left
             float centerX = sx + (baseW / 2.0f);
             float centerY = sy + (baseH / 2.0f);
@@ -8821,16 +11311,18 @@ namespace GenOffice.UI
             RectangleF shapeRect = new RectangleF(0, 0, baseW, baseH);
 
             float op = Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity * opacityMultiplier));
-            if (op <= 0.001f)
+            float shapeOp = Math.Max(0.0f, Math.Min(1.0f, opacityMultiplier));
+            if (op <= 0.001f && string.IsNullOrEmpty(shape.Text) && !isSelected && shape.Type != ShapeType.TextBox && shape.CachedImage == null)
             {
                 g.Restore(state);
                 return;
             }
             int alpha = (int)(op * 255f);
+            int textAlpha = (int)(shapeOp * 255f);
 
             Color fillCol = Color.FromArgb(alpha, (shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF);
             Color strokeCol = Color.FromArgb(alpha, (shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
-            Color txtCol = Color.FromArgb(alpha, (shape.TextColor >> 16) & 0xFF, (shape.TextColor >> 8) & 0xFF, shape.TextColor & 0xFF);
+            Color txtCol = Color.FromArgb(textAlpha, (shape.TextColor >> 16) & 0xFF, (shape.TextColor >> 8) & 0xFF, shape.TextColor & 0xFF);
 
             // Draw Exclusive Animation Background Visuals (Multi-layer Neon Bloom, RGB Split Ghost, etc.)
             DrawExclusiveAnimationBackgroundVisuals(g, baseW, baseH, shape, activeAnim, activeAnimProgress, scale, opacityMultiplier);
@@ -8845,7 +11337,7 @@ namespace GenOffice.UI
                 {
                     float naturalSx = slideX + shape.Transform.X * scale;
                     float naturalSy = slideY + shape.Transform.Y * scale;
-                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
                 }
                 return;
             }
@@ -8859,7 +11351,7 @@ namespace GenOffice.UI
                 {
                     float naturalSx = slideX + shape.Transform.X * scale;
                     float naturalSy = slideY + shape.Transform.Y * scale;
-                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
                 }
                 return;
             }
@@ -8873,7 +11365,7 @@ namespace GenOffice.UI
                 {
                     float naturalSx = slideX + shape.Transform.X * scale;
                     float naturalSy = slideY + shape.Transform.Y * scale;
-                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
                 }
                 return;
             }
@@ -8889,18 +11381,37 @@ namespace GenOffice.UI
                 {
                     float naturalSx = slideX + shape.Transform.X * scale;
                     float naturalSy = slideY + shape.Transform.Y * scale;
-                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
                 }
                 return;
             }
 
             if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
             {
-                if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                if (!string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
                 {
                     try
                     {
-                        shape.CachedImage = Image.FromFile(shape.ImagePath);
+                        if (shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                        {
+                            int minRequiredW = Math.Max(1200, (int)(baseW * 1.5f));
+                            int minRequiredH = Math.Max(1200, (int)(baseH * 1.5f));
+                            if (shape.CachedImage == null || shape.CachedImage.Width < minRequiredW || shape.CachedImage.Height < minRequiredH)
+                            {
+                                int renderW = Math.Max(minRequiredW, 1600);
+                                int renderH = Math.Max(minRequiredH, 1600);
+                                Bitmap sharpSvg = GenOffice.Core.SvgRasterizer.RenderSvgToBitmap(System.IO.File.ReadAllText(shape.ImagePath), renderW, renderH);
+                                if (sharpSvg != null)
+                                {
+                                    shape.CachedImage = sharpSvg;
+                                    shape.InvalidateDisplayCache();
+                                }
+                            }
+                        }
+                        else if (shape.CachedImage == null)
+                        {
+                            shape.CachedImage = Image.FromFile(shape.ImagePath);
+                        }
                     }
                     catch { }
                 }
@@ -8913,21 +11424,78 @@ namespace GenOffice.UI
                         shape.OriginalHeight = shape.CachedImage.Height;
                     }
 
-                    float srcX = shape.CachedImage.Width * Math.Max(0f, Math.Min(0.85f, shape.CropLeft));
-                    float srcY = shape.CachedImage.Height * Math.Max(0f, Math.Min(0.85f, shape.CropTop));
-                    float srcW = shape.CachedImage.Width * Math.Max(0.05f, (1.0f - shape.CropLeft - shape.CropRight));
-                    float srcH = shape.CachedImage.Height * Math.Max(0.05f, (1.0f - shape.CropTop - shape.CropBottom));
+                    float cropL = Math.Max(0f, Math.Min(0.999f, shape.CropLeft));
+                    float cropT = Math.Max(0f, Math.Min(0.999f, shape.CropTop));
+                    float cropR = Math.Max(0f, Math.Min(0.999f - cropL, shape.CropRight));
+                    float cropB = Math.Max(0f, Math.Min(0.999f - cropT, shape.CropBottom));
+
+                    float srcX = shape.CachedImage.Width * cropL;
+                    float srcY = shape.CachedImage.Height * cropT;
+                    float srcW = shape.CachedImage.Width * Math.Max(0.001f, (1.0f - cropL - cropR));
+                    float srcH = shape.CachedImage.Height * Math.Max(0.001f, (1.0f - cropT - cropB));
                     RectangleF srcRect = new RectangleF(srcX, srcY, srcW, srcH);
+
+                    int bw = Math.Max(1, (int)Math.Round(baseW));
+                    int bh = Math.Max(1, (int)Math.Round(baseH));
+
+                    // High-performance display cache: avoids re-downsampling large 4K images on every animation frame
+                    bool isLargeImage = (shape.CachedImage.Width > bw * 1.25f || shape.CachedImage.Height > bh * 1.25f);
+                    Image imageToDraw = shape.CachedImage;
+                    RectangleF drawSrcRect = srcRect;
+
+                    if (isLargeImage && !IsCropping && bw > 0 && bh > 0)
+                    {
+                        if (shape.DisplayCachedImage == null ||
+                            shape.DisplayCachedW != bw ||
+                            shape.DisplayCachedH != bh ||
+                            Math.Abs(shape.DisplayCachedCropL - cropL) > 0.001f ||
+                            Math.Abs(shape.DisplayCachedCropT - cropT) > 0.001f ||
+                            Math.Abs(shape.DisplayCachedCropR - cropR) > 0.001f ||
+                            Math.Abs(shape.DisplayCachedCropB - cropB) > 0.001f)
+                        {
+                            shape.InvalidateDisplayCache();
+                            try
+                            {
+                                Bitmap dispBmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                                using (Graphics gDisp = Graphics.FromImage(dispBmp))
+                                {
+                                    gDisp.SmoothingMode = SmoothingMode.AntiAlias;
+                                    gDisp.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    gDisp.PixelOffsetMode = PixelOffsetMode.Half;
+                                    PointF[] dispDest = new PointF[] {
+                                        new PointF(0, 0),
+                                        new PointF(bw, 0),
+                                        new PointF(0, bh)
+                                    };
+                                    gDisp.DrawImage(shape.CachedImage, dispDest, srcRect, GraphicsUnit.Pixel);
+                                }
+                                shape.DisplayCachedImage = dispBmp;
+                                shape.DisplayCachedW = bw;
+                                shape.DisplayCachedH = bh;
+                                shape.DisplayCachedCropL = cropL;
+                                shape.DisplayCachedCropT = cropT;
+                                shape.DisplayCachedCropR = cropR;
+                                shape.DisplayCachedCropB = cropB;
+                            }
+                            catch { }
+                        }
+
+                        if (shape.DisplayCachedImage != null)
+                        {
+                            imageToDraw = shape.DisplayCachedImage;
+                            drawSrcRect = new RectangleF(0, 0, bw, bh);
+                        }
+                    }
 
                     // Khi đang ở Chế độ Cắt ảnh Tương tác (Interactive Crop Mode): Vẽ ảnh gốc mờ 35% ở phía sau
                     if (IsCropping && shape == SelectedShape)
                     {
-                        float fullVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
-                        float fullVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
+                        float fullVisWFrac = Math.Max(0.001f, 1.0f - cropL - cropR);
+                        float fullVisHFrac = Math.Max(0.001f, 1.0f - cropT - cropB);
                         float fullW = baseW / fullVisWFrac;
                         float fullH = baseH / fullVisHFrac;
-                        float fullX = -shape.CropLeft * fullW;
-                        float fullY = -shape.CropTop * fullH;
+                        float fullX = -cropL * fullW;
+                        float fullY = -cropT * fullH;
 
                         using (System.Drawing.Imaging.ImageAttributes dimIa = new System.Drawing.Imaging.ImageAttributes())
                         {
@@ -8948,10 +11516,29 @@ namespace GenOffice.UI
                     }
 
                     System.Drawing.Imaging.ColorMatrix cm = CreateImageColorMatrix(shape);
+                    cm.Matrix33 *= Math.Max(0.0f, Math.Min(1.0f, opacityMultiplier));
                     using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
                     {
                         ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                        PointF[] destPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
+
+                        PointF[] destPoints;
+                        bool hasFillRect = (Math.Abs(shape.FillRectLeft) > 0.0001f || Math.Abs(shape.FillRectTop) > 0.0001f || Math.Abs(shape.FillRectRight) > 0.0001f || Math.Abs(shape.FillRectBottom) > 0.0001f);
+                        if (hasFillRect)
+                        {
+                            float destX = baseW * shape.FillRectLeft;
+                            float destY = baseH * shape.FillRectTop;
+                            float destW = baseW * (1.0f - shape.FillRectLeft - shape.FillRectRight);
+                            float destH = baseH * (1.0f - shape.FillRectTop - shape.FillRectBottom);
+                            destPoints = new PointF[] {
+                                new PointF(destX, destY),
+                                new PointF(destX + destW, destY),
+                                new PointF(destX, destY + destH)
+                            };
+                        }
+                        else
+                        {
+                            destPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
+                        }
 
                         // Picture Styles / Crop to Shape / CustomPath Multi-Shape Clipping
                         GraphicsPath customCropPath = null;
@@ -8971,7 +11558,12 @@ namespace GenOffice.UI
                         else if (shape.Type != ShapeType.Image && shape.Type != ShapeType.TextBox && shape.Type != ShapeType.Rectangle)
                         {
                             // Method 1: Picture Fill on vector shape (RoundedRectangle, Hexagon, Star, Heart, etc.)
-                            customCropPath = CreateShapePath(shape.Type, 0, 0, baseW, baseH);
+                            customCropPath = CreateShapePath(shape.Type, 0, 0, baseW, baseH, shape.GetEffectiveCornerRadius() * scale);
+                        }
+                        else if (hasFillRect)
+                        {
+                            customCropPath = new GraphicsPath();
+                            customCropPath.AddRectangle(new RectangleF(0, 0, baseW, baseH));
                         }
 
                         GraphicsPath strokeOutlinePath = customCropPath != null ? (GraphicsPath)customCropPath.Clone() : null;
@@ -8980,7 +11572,7 @@ namespace GenOffice.UI
                         if (customCropPath != null)
                         {
                             cropShapeState = g.Save();
-                            g.SetClip(customCropPath);
+                            g.SetClip(customCropPath, CombineMode.Intersect);
                         }
 
                         if (shape.PictureStyleIndex == 7) // Beveled Oval
@@ -8988,8 +11580,8 @@ namespace GenOffice.UI
                             GraphicsPath ovalPath = new GraphicsPath();
                             ovalPath.AddEllipse(0, 0, baseW, baseH);
                             GraphicsState pState = g.Save();
-                            g.SetClip(ovalPath);
-                            g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                            g.SetClip(ovalPath, CombineMode.Intersect);
+                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
                             g.Restore(pState);
                             using (Pen ovalPen = new Pen(Color.White, Math.Max(3f, 4f * scale)))
                             {
@@ -9000,8 +11592,8 @@ namespace GenOffice.UI
                         {
                             GraphicsPath roundPath = CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(14 * scale));
                             GraphicsState pState = g.Save();
-                            g.SetClip(roundPath);
-                            g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                            g.SetClip(roundPath, CombineMode.Intersect);
+                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
                             g.Restore(pState);
                             using (Pen roundPen = new Pen(Color.FromArgb(200, 255, 255, 255), Math.Max(2f, 3f * scale)))
                             {
@@ -9029,7 +11621,7 @@ namespace GenOffice.UI
                                 if (beamY > 0.5f)
                                 {
                                     GraphicsState upperClip = g.Save();
-                                    g.SetClip(new RectangleF(0, 0, baseW, beamY));
+                                    g.SetClip(new RectangleF(0, 0, baseW, beamY), CombineMode.Intersect);
                                     g.DrawImage(ScanPendingResultBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
                                     g.Restore(upperClip);
                                 }
@@ -9038,7 +11630,7 @@ namespace GenOffice.UI
                                 if (beamY < baseH - 0.5f)
                                 {
                                     GraphicsState lowerClip = g.Save();
-                                    g.SetClip(new RectangleF(0, beamY, baseW, baseH - beamY));
+                                    g.SetClip(new RectangleF(0, beamY, baseW, baseH - beamY), CombineMode.Intersect);
                                     g.DrawImage(ScanSourceOriginalBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
                                     g.Restore(lowerClip);
                                 }
@@ -9048,7 +11640,43 @@ namespace GenOffice.UI
                             }
                             else
                             {
-                                g.DrawImage(shape.CachedImage, destPoints, srcRect, GraphicsUnit.Pixel, ia);
+                                if (shape.SoftEdgeRadius > 0.01f || shape.BlurRadius > 0.01f)
+                                {
+                                    bw = Math.Max(1, (int)Math.Ceiling(baseW));
+                                    bh = Math.Max(1, (int)Math.Ceiling(baseH));
+                                    float softPx = shape.SoftEdgeRadius * (96.0f / 72.0f) * scale;
+                                    float blurPx = shape.BlurRadius * (96.0f / 72.0f) * scale;
+
+                                    if (shape.CachedFeatheredBmp != null && shape.CachedFeatherW == bw && shape.CachedFeatherH == bh &&
+                                        Math.Abs(shape.CachedSoftPx - softPx) < 0.05f && Math.Abs(shape.CachedBlurPx - blurPx) < 0.05f)
+                                    {
+                                        g.DrawImage(shape.CachedFeatheredBmp, 0, 0);
+                                    }
+                                    else
+                                    {
+                                        shape.InvalidateFeatherCache();
+                                        using (Bitmap tmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                                        {
+                                            using (Graphics tg = Graphics.FromImage(tmp))
+                                            {
+                                                tg.SmoothingMode = SmoothingMode.AntiAlias;
+                                                tg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                                tg.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
+                                            }
+                                            Bitmap feathered = ApplySoftEdgeAndBlur(tmp, softPx, blurPx);
+                                            shape.CachedFeatheredBmp = feathered;
+                                            shape.CachedFeatherW = bw;
+                                            shape.CachedFeatherH = bh;
+                                            shape.CachedSoftPx = softPx;
+                                            shape.CachedBlurPx = blurPx;
+                                            g.DrawImage(feathered, 0, 0);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
+                                }
                             }
 
                             // Restore Crop to Shape Clip
@@ -9241,7 +11869,39 @@ namespace GenOffice.UI
             else
             {
                 // Fill & Stroke for vector shapes
-                using (SolidBrush fillBrush = new SolidBrush(fillCol))
+                Brush fillBrush = null;
+                if (shape.HasGradientFill && baseW > 1 && baseH > 1)
+                {
+                    if (shape.GradientStops != null && shape.GradientStops.Count >= 2)
+                    {
+                        LinearGradientBrush lgb = new LinearGradientBrush(new RectangleF(0, 0, baseW, baseH), Color.Transparent, Color.Transparent, shape.GradientAngle);
+                        ColorBlend cb = new ColorBlend(shape.GradientStops.Count);
+                        for (int si = 0; si < shape.GradientStops.Count; si++)
+                        {
+                            var st = shape.GradientStops[si];
+                            int stopAlpha = (int)(alpha * (1.0f - st.Transparency));
+                            stopAlpha = Math.Max(0, Math.Min(255, stopAlpha));
+                            cb.Colors[si] = Color.FromArgb(stopAlpha, Color.FromArgb(st.Color & 0xFFFFFF));
+                            cb.Positions[si] = Math.Max(0f, Math.Min(1f, st.Position));
+                        }
+                        cb.Positions[0] = 0f;
+                        cb.Positions[cb.Positions.Length - 1] = 1f;
+                        lgb.InterpolationColors = cb;
+                        fillBrush = lgb;
+                    }
+                    else
+                    {
+                        Color gCol1 = Color.FromArgb(alpha, Color.FromArgb(shape.FillColor & 0xFFFFFF));
+                        Color gCol2 = Color.FromArgb(alpha, Color.FromArgb(shape.GradientColor2 & 0xFFFFFF));
+                        fillBrush = new LinearGradientBrush(new RectangleF(0, 0, baseW, baseH), gCol1, gCol2, shape.GradientAngle);
+                    }
+                }
+                else
+                {
+                    fillBrush = new SolidBrush(fillCol);
+                }
+
+                using (fillBrush)
                 using (Pen strokePen = new Pen(strokeCol, Math.Max(1.0f, shape.StrokeWidth * scale)))
                 {
                     strokePen.DashStyle = shape.DashStyle;
@@ -9259,7 +11919,39 @@ namespace GenOffice.UI
                     {
                         GraphicsState pState = g.Save();
                         g.ScaleTransform(baseW / shape.PathWidth, baseH / shape.PathHeight);
-                        if (shape.FillColor != 0x00FFFFFF && fillCol.A > 0) g.FillPath(fillBrush, shape.CustomPath);
+                        Brush pathBrush = fillBrush;
+                        LinearGradientBrush customLgb = null;
+                        if (shape.HasGradientFill && shape.GradientStops != null && shape.GradientStops.Count >= 2)
+                        {
+                            customLgb = new LinearGradientBrush(new RectangleF(0, 0, shape.PathWidth, shape.PathHeight), Color.Transparent, Color.Transparent, shape.GradientAngle);
+                            ColorBlend cb = new ColorBlend(shape.GradientStops.Count);
+                            for (int si = 0; si < shape.GradientStops.Count; si++)
+                            {
+                                var st = shape.GradientStops[si];
+                                int stopAlpha = (int)(alpha * (1.0f - st.Transparency));
+                                stopAlpha = Math.Max(0, Math.Min(255, stopAlpha));
+                                cb.Colors[si] = Color.FromArgb(stopAlpha, Color.FromArgb(st.Color & 0xFFFFFF));
+                                cb.Positions[si] = Math.Max(0f, Math.Min(1f, st.Position));
+                            }
+                            cb.Positions[0] = 0f;
+                            cb.Positions[cb.Positions.Length - 1] = 1f;
+                            customLgb.InterpolationColors = cb;
+                            pathBrush = customLgb;
+                        }
+                        else if (shape.HasGradientFill)
+                        {
+                            Color gCol1 = Color.FromArgb(alpha, Color.FromArgb(shape.FillColor & 0xFFFFFF));
+                            Color gCol2 = Color.FromArgb(alpha, Color.FromArgb(shape.GradientColor2 & 0xFFFFFF));
+                            customLgb = new LinearGradientBrush(new RectangleF(0, 0, shape.PathWidth, shape.PathHeight), gCol1, gCol2, shape.GradientAngle);
+                            pathBrush = customLgb;
+                        }
+
+                        if ((shape.HasGradientFill || shape.FillColor != 0x00FFFFFF) && fillCol.A > 0)
+                        {
+                            g.FillPath(pathBrush, shape.CustomPath);
+                        }
+                        if (customLgb != null) customLgb.Dispose();
+
                         if (shape.StrokeWidth > 0 && strokeCol.A > 0)
                         {
                             float pw = Math.Max(1.0f, shape.StrokeWidth * (shape.PathWidth / Math.Max(1f, baseW)));
@@ -9272,10 +11964,11 @@ namespace GenOffice.UI
                     }
                     else
                     {
-                        using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH))
+                        float effectiveR = shape.GetEffectiveCornerRadius() * scale;
+                        using (GraphicsPath path = CreateShapePath(shape.Type, 0, 0, baseW, baseH, effectiveR))
                         {
-                            if (shape.FillColor != 0x00FFFFFF && fillCol.A > 0) g.FillPath(fillBrush, path);
-                            if (shape.StrokeWidth > 0 && strokeCol.A > 0) g.DrawPath(strokePen, path);
+                            if ((shape.HasGradientFill || shape.FillColor != 0x00FFFFFF) && fillCol.A > 0) g.FillPath(fillBrush, path);
+                            if (shape.StrokeWidth > 0 && strokeCol.A > 0 && shape.StrokeColor != 0x00FFFFFF) g.DrawPath(strokePen, path);
                         }
                     }
                 }
@@ -9301,15 +11994,52 @@ namespace GenOffice.UI
             if (!string.IsNullOrEmpty(dispText) || isEditingThis)
             {
                 // Calculate inner margin / padding constraint
-                float padX = Math.Max(2.0f, 6.0f * scale);
-                float padY = Math.Max(2.0f, 4.0f * scale);
-                if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Diamond || shape.Type == ShapeType.Triangle ||
-                    shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Callout)
+                float padLeft = shape.MarginLeft.HasValue ? shape.MarginLeft.Value * scale : Math.Max(0.5f, 6.0f * scale);
+                float padRight = shape.MarginRight.HasValue ? shape.MarginRight.Value * scale : Math.Max(0.5f, 6.0f * scale);
+                float padTop = shape.MarginTop.HasValue ? shape.MarginTop.Value * scale : Math.Max(0.5f, 4.0f * scale);
+                float padBottom = shape.MarginBottom.HasValue ? shape.MarginBottom.Value * scale : Math.Max(0.5f, 4.0f * scale);
+                if (shape.Type == ShapeType.Parallelogram)
                 {
-                    padX = Math.Max(4.0f, baseW * 0.08f);
-                    padY = Math.Max(4.0f, baseH * 0.08f);
+                    padLeft = Math.Max(padLeft, baseW * 0.22f);
+                    padRight = Math.Max(padRight, baseW * 0.22f);
                 }
-                RectangleF textBounds = new RectangleF(padX, padY, Math.Max(2.0f, baseW - padX * 2f), Math.Max(2.0f, baseH - padY * 2f));
+                else if (shape.Type == ShapeType.Trapezoid)
+                {
+                    padLeft = Math.Max(padLeft, baseW * 0.20f);
+                    padRight = Math.Max(padRight, baseW * 0.20f);
+                }
+                else if (shape.Type == ShapeType.Chevron || shape.Type == ShapeType.BlockArrowRight || shape.Type == ShapeType.BlockArrowLeft)
+                {
+                    padLeft = Math.Max(padLeft, baseW * 0.22f);
+                    padRight = Math.Max(padRight, baseW * 0.22f);
+                }
+                else if (shape.Type == ShapeType.Diamond)
+                {
+                    padLeft = Math.Max(padLeft, baseW * 0.22f);
+                    padRight = Math.Max(padRight, baseW * 0.22f);
+                    padTop = Math.Max(padTop, baseH * 0.22f);
+                    padBottom = Math.Max(padBottom, baseH * 0.22f);
+                }
+                else if (shape.Type == ShapeType.Triangle)
+                {
+                    padLeft = Math.Max(padLeft, baseW * 0.24f);
+                    padRight = Math.Max(padRight, baseW * 0.24f);
+                    padTop = Math.Max(padTop, baseH * 0.32f);
+                    padBottom = Math.Max(padBottom, baseH * 0.12f);
+                }
+                else if (shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Octagon)
+                {
+                    padLeft = Math.Max(padLeft, baseW * 0.20f);
+                    padRight = Math.Max(padRight, baseW * 0.20f);
+                }
+                else if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Callout)
+                {
+                    padLeft = Math.Max(1.0f, baseW * 0.10f);
+                    padRight = padLeft;
+                    padTop = Math.Max(1.0f, baseH * 0.10f);
+                    padBottom = padTop;
+                }
+                RectangleF textBounds = new RectangleF(padLeft, padTop, Math.Max(1.0f, baseW - padLeft - padRight), Math.Max(1.0f, baseH - padTop - padBottom));
 
                 // If editing, draw subtle inner dashed boundary
                 if (isEditingThis)
@@ -9320,8 +12050,13 @@ namespace GenOffice.UI
                     }
                 }
 
-                float calculatedFontSize = Math.Max(3.0f, shape.FontSize * scale);
-                using (Font font = new Font(shape.FontName, calculatedFontSize, shape.Bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
+                float calculatedFontSize = Math.Max(1.0f, shape.FontSize * scale);
+                FontStyle editFs = FontStyle.Regular;
+                if (shape.Bold) editFs |= FontStyle.Bold;
+                if (shape.Italic) editFs |= FontStyle.Italic;
+                if (shape.Underline) editFs |= FontStyle.Underline;
+                if (shape.Strikethrough) editFs |= FontStyle.Strikeout;
+                using (Font font = SlideFontManager.CreateFont(shape.FontName, calculatedFontSize, editFs, GraphicsUnit.Pixel))
                 {
                     if (isEditingThis)
                     {
@@ -9338,6 +12073,47 @@ namespace GenOffice.UI
                             startY = textBounds.Bottom - totalTextH;
                         else
                             startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+
+                        // Draw text selection highlight if TextSelectionLength != 0
+                        if (TextSelectionLength != 0)
+                        {
+                            int selStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                            int selEnd = Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+
+                            using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(100, 59, 130, 246)))
+                            {
+                                for (int li = 0; li < visualLines.Count; li++)
+                                {
+                                    VisualTextLine vl = visualLines[li];
+                                    int lineStart = vl.StartCharIndex;
+                                    int lineEnd = vl.StartCharIndex + vl.Length;
+
+                                    if (selEnd > lineStart && selStart < lineEnd)
+                                    {
+                                        int subStart = Math.Max(0, selStart - lineStart);
+                                        int subEnd = Math.Min(vl.Length, selEnd - lineStart);
+
+                                        string pre = vl.Text.Substring(0, Math.Min(subStart, vl.Text.Length));
+                                        string selTxt = vl.Text.Substring(subStart, Math.Min(subEnd - subStart, vl.Text.Length - subStart));
+
+                                        float preW = g.MeasureString(pre, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                                        float selW = g.MeasureString(selTxt, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+
+                                        float curX;
+                                        float lineWidth = g.MeasureString(vl.Text.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                                        if (shape.Alignment == TextAlignment.Left)
+                                            curX = textBounds.X;
+                                        else if (shape.Alignment == TextAlignment.Right)
+                                            curX = textBounds.Right - lineWidth;
+                                        else
+                                            curX = textBounds.X + (textBounds.Width - lineWidth) / 2f;
+
+                                        float curY = startY + li * lineHeight;
+                                        g.FillRectangle(selBrush, curX + preW, curY, selW, lineHeight);
+                                    }
+                                }
+                            }
+                        }
 
                         if (!string.IsNullOrEmpty(dispText) && alpha > 0)
                         {
@@ -9395,18 +12171,24 @@ namespace GenOffice.UI
                         float caretX = lineStartX + beforeWidth;
                         float caretY = startY + curLineIdx * lineHeight;
 
+                        CurrentCaretScreenX = (int)caretX;
+                        CurrentCaretScreenY = (int)(caretY + lineHeight + 2);
+                        CurrentCaretScreenH = (int)lineHeight;
+
                         using (Pen caretPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(1.5f, 2.0f * scale)))
                         {
                             g.DrawLine(caretPen, caretX, caretY, caretX, caretY + lineHeight);
                         }
                     }
-                    else if (!string.IsNullOrEmpty(dispText) && alpha > 0)
+                    // Guard uses textAlpha (= opacityMultiplier*255), NOT alpha (= FillOpacity*opacityMultiplier*255).
+                    // During Morph text-only passes FillOpacity is forced to 0f so alpha==0, but text must still render.
+                    else if (!string.IsNullOrEmpty(dispText) && textAlpha > 0)
                     {
                         // Blazing fast hardware-accelerated 60 FPS native rendering for slide show and transitions!
                         using (StringFormat sf = new StringFormat(StringFormat.GenericTypographic))
                         {
-                            sf.FormatFlags = StringFormatFlags.NoClip | StringFormatFlags.MeasureTrailingSpaces;
-                            sf.Trimming = StringTrimming.Word;
+                            sf.FormatFlags = (scale < 0.25f ? 0 : StringFormatFlags.NoClip) | StringFormatFlags.MeasureTrailingSpaces;
+                            sf.Trimming = StringTrimming.EllipsisWord;
                             if (shape.Alignment == TextAlignment.Center) sf.Alignment = StringAlignment.Center;
                             else if (shape.Alignment == TextAlignment.Right) sf.Alignment = StringAlignment.Far;
                             else sf.Alignment = StringAlignment.Near;
@@ -9531,9 +12313,17 @@ namespace GenOffice.UI
                             }
                             else
                             {
-                                using (SolidBrush txtBrush = new SolidBrush(txtCol))
+                                bool useRichRuns = (shape.TextRuns != null && (shape.TextRuns.Count > 1 || (shape.TextRuns.Count == 1 && (shape.TextRuns[0].HasGradient || shape.TextRuns[0].HasHighlight || shape.TextRuns[0].ParaLineSpacing.HasValue || shape.TextRuns[0].ParaSpaceBefore.HasValue || shape.TextRuns[0].ParaSpaceAfter.HasValue)))) || shape.Alignment == TextAlignment.Justify || Math.Abs(shape.LineSpacing - 1.2f) > 0.01f || (dispText != null && dispText.Contains('\n'));
+                                if (useRichRuns)
                                 {
-                                    g.DrawString(dispText, font, txtBrush, textBounds, sf);
+                                    DrawShapeTextRuns(g, shape, textBounds, scale, opacityMultiplier);
+                                }
+                                else
+                                {
+                                    using (SolidBrush txtBrush = new SolidBrush(txtCol))
+                                    {
+                                        g.DrawString(dispText, font, txtBrush, textBounds, sf);
+                                    }
                                 }
                             }
                         }
@@ -9564,13 +12354,385 @@ namespace GenOffice.UI
                 }
                 else
                 {
-                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation);
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
                 }
 
                 // Vẽ Kính lúp hút màu (Color Picker Loupe) nếu đang ở chế độ Chọn màu xóa (Chroma Keying CapCut)
                 if (IsColorPickingMode && HasColorPickHover)
                 {
                     DrawColorPickLoupe(g, ColorPickMouseCanvasPos, ColorPickHoverColor);
+                }
+            }
+        }
+
+        private class VisualRunLine
+        {
+            public List<ShapeTextToken> Tokens = new List<ShapeTextToken>();
+            public bool EndsWithNewline;
+            public bool IsFirstLineOfPara;
+            public float? LineSpacing;
+            public float? SpaceBefore;
+            public float? SpaceAfter;
+            public TextAlignment? Alignment;
+        }
+
+        private void DrawShapeTextRuns(Graphics g, ShapeNode shape, RectangleF textBounds, float scale, float opacityMultiplier)
+        {
+            List<SlideTextRun> runList = shape.TextRuns;
+            if (runList == null || runList.Count == 0)
+            {
+                if (!string.IsNullOrEmpty(shape.Text))
+                {
+                    runList = new List<SlideTextRun>
+                    {
+                        new SlideTextRun(shape.Text, shape.TextColor, shape.FontSize, shape.Bold, shape.FontName)
+                        {
+                            Italic = shape.Italic,
+                            Underline = shape.Underline,
+                            Strikethrough = shape.Strikethrough,
+                            HasHighlight = shape.HasHighlight,
+                            HighlightColor = shape.HighlightColor
+                        }
+                    };
+                }
+                else return;
+            }
+
+            // Break runs into word tokens
+            List<ShapeTextToken> tokens = new List<ShapeTextToken>();
+            foreach (var run in runList)
+            {
+                if (string.IsNullOrEmpty(run.Text)) continue;
+                float runFontSize = Math.Max(1.0f, run.FontSize * scale);
+                FontStyle fs = FontStyle.Regular;
+                if (run.Bold) fs |= FontStyle.Bold;
+                if (run.Italic) fs |= FontStyle.Italic;
+                if (run.Underline) fs |= FontStyle.Underline;
+                if (run.Strikethrough) fs |= FontStyle.Strikeout;
+                Font runFont = SlideFontManager.CreateFont(run.FontName, runFontSize, fs, GraphicsUnit.Pixel);
+
+                int rA = (int)(255 * opacityMultiplier);
+                Color rCol = Color.FromArgb(rA, Color.FromArgb(run.TextColor & 0xFFFFFF));
+                Color rCol2 = Color.FromArgb(rA, Color.FromArgb(run.GradientColor2 & 0xFFFFFF));
+                Color rHl = Color.FromArgb(rA, Color.FromArgb(run.HighlightColor & 0xFFFFFF));
+
+                string s = run.Text;
+                int start = 0;
+                for (int i = 0; i < s.Length; i++)
+                {
+                    if (s[i] == ' ' || s[i] == '\n')
+                    {
+                        if (i > start)
+                        {
+                            string w = s.Substring(start, i - start);
+                            float wW = g.MeasureString(w, runFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                            tokens.Add(new ShapeTextToken
+                            {
+                                Text = w,
+                                Color = rCol,
+                                Font = runFont,
+                                Width = wW,
+                                IsSpace = false,
+                                IsNewline = false,
+                                HasHighlight = run.HasHighlight,
+                                HighlightColor = rHl,
+                                HasGradient = run.HasGradient,
+                                GradientColor2 = rCol2,
+                                GradientAngle = run.GradientAngle,
+                                GradientStops = run.GradientStops,
+                                ParaLineSpacing = run.ParaLineSpacing,
+                                ParaSpaceBefore = run.ParaSpaceBefore,
+                                ParaSpaceAfter = run.ParaSpaceAfter,
+                                ParaAlignment = run.ParaAlignment
+                            });
+                        }
+                        string sp = s.Substring(i, 1);
+                        if (sp == "\n")
+                        {
+                            tokens.Add(new ShapeTextToken
+                            {
+                                Text = "\n",
+                                Color = rCol,
+                                Font = runFont,
+                                Width = 0,
+                                IsSpace = false,
+                                IsNewline = true,
+                                ParaLineSpacing = run.ParaLineSpacing,
+                                ParaSpaceBefore = run.ParaSpaceBefore,
+                                ParaSpaceAfter = run.ParaSpaceAfter,
+                                ParaAlignment = run.ParaAlignment
+                            });
+                        }
+                        else
+                        {
+                            float spW = g.MeasureString("A B", runFont, PointF.Empty, StringFormat.GenericTypographic).Width - g.MeasureString("AB", runFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                            if (spW <= 0) spW = runFontSize * 0.28f;
+                            tokens.Add(new ShapeTextToken
+                            {
+                                Text = " ",
+                                Color = rCol,
+                                Font = runFont,
+                                Width = spW,
+                                IsSpace = true,
+                                IsNewline = false,
+                                HasHighlight = run.HasHighlight,
+                                HighlightColor = rHl,
+                                ParaLineSpacing = run.ParaLineSpacing,
+                                ParaSpaceBefore = run.ParaSpaceBefore,
+                                ParaSpaceAfter = run.ParaSpaceAfter,
+                                ParaAlignment = run.ParaAlignment
+                            });
+                        }
+                        start = i + 1;
+                    }
+                }
+                if (start < s.Length)
+                {
+                    string w = s.Substring(start);
+                    float wW = g.MeasureString(w, runFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                    tokens.Add(new ShapeTextToken
+                    {
+                        Text = w,
+                        Color = rCol,
+                        Font = runFont,
+                        Width = wW,
+                        IsSpace = false,
+                        IsNewline = false,
+                        HasHighlight = run.HasHighlight,
+                        HighlightColor = rHl,
+                        HasGradient = run.HasGradient,
+                        GradientColor2 = rCol2,
+                        GradientAngle = run.GradientAngle,
+                        GradientStops = run.GradientStops,
+                        ParaLineSpacing = run.ParaLineSpacing,
+                        ParaSpaceBefore = run.ParaSpaceBefore,
+                        ParaSpaceAfter = run.ParaSpaceAfter,
+                        ParaAlignment = run.ParaAlignment
+                    });
+                }
+            }
+
+            if (tokens.Count == 0) return;
+
+            // Group into visual lines
+            List<VisualRunLine> lines = new List<VisualRunLine>();
+            VisualRunLine currentLine = new VisualRunLine { IsFirstLineOfPara = true };
+            float curLineW = 0f;
+            float maxW = textBounds.Width;
+            bool isFirstLineOfPara = true;
+
+            foreach (var tok in tokens)
+            {
+                if (tok.IsNewline)
+                {
+                    currentLine.EndsWithNewline = true;
+                    if (!currentLine.LineSpacing.HasValue) currentLine.LineSpacing = tok.ParaLineSpacing;
+                    if (!currentLine.SpaceBefore.HasValue) currentLine.SpaceBefore = tok.ParaSpaceBefore;
+                    if (!currentLine.SpaceAfter.HasValue) currentLine.SpaceAfter = tok.ParaSpaceAfter;
+                    if (!currentLine.Alignment.HasValue) currentLine.Alignment = tok.ParaAlignment;
+                    lines.Add(currentLine);
+                    isFirstLineOfPara = true;
+                    currentLine = new VisualRunLine { IsFirstLineOfPara = true };
+                    curLineW = 0f;
+                    continue;
+                }
+
+                if (curLineW + tok.Width > maxW && currentLine.Tokens.Count > 0 && !tok.IsSpace)
+                {
+                    lines.Add(currentLine);
+                    isFirstLineOfPara = false;
+                    currentLine = new VisualRunLine { IsFirstLineOfPara = false };
+                    curLineW = 0f;
+                }
+
+                if (!isFirstLineOfPara && tok.IsSpace && currentLine.Tokens.Count == 0) continue; // skip leading space on wrapped lines only
+                if (!currentLine.LineSpacing.HasValue) currentLine.LineSpacing = tok.ParaLineSpacing;
+                if (!currentLine.SpaceBefore.HasValue) currentLine.SpaceBefore = tok.ParaSpaceBefore;
+                if (!currentLine.SpaceAfter.HasValue) currentLine.SpaceAfter = tok.ParaSpaceAfter;
+                if (!currentLine.Alignment.HasValue) currentLine.Alignment = tok.ParaAlignment;
+                currentLine.Tokens.Add(tok);
+                curLineW += tok.Width;
+            }
+            if (currentLine.Tokens.Count > 0) lines.Add(currentLine);
+
+            // Compute total height and line heights
+            float[] lineHeights = new float[lines.Count];
+            float totalH = 0f;
+            for (int li = 0; li < lines.Count; li++)
+            {
+                float maxH = 0f;
+                foreach (var tok in lines[li].Tokens)
+                {
+                    if (tok.Font != null && tok.Font.Height > maxH) maxH = tok.Font.Height;
+                }
+                if (maxH <= 0) maxH = 16f * scale;
+
+                float effSpacing = lines[li].LineSpacing.HasValue ? lines[li].LineSpacing.Value : shape.LineSpacing;
+                float lh;
+                if (effSpacing > 4.0f)
+                {
+                    lh = effSpacing * scale;
+                }
+                else if (effSpacing < 0)
+                {
+                    lh = maxH * (-effSpacing) * 0.97f;
+                }
+                else if (effSpacing > 0 && Math.Abs(effSpacing - 1.2f) > 0.01f)
+                {
+                    lh = maxH * (effSpacing / 1.2f) * 0.97f;
+                }
+                else
+                {
+                    lh = maxH * 0.97f;
+                }
+                if (lines[li].IsFirstLineOfPara && lines[li].SpaceBefore.HasValue) lh += lines[li].SpaceBefore.Value * scale;
+                if (lines[li].EndsWithNewline && lines[li].SpaceAfter.HasValue) lh += lines[li].SpaceAfter.Value * scale;
+                lineHeights[li] = lh;
+                totalH += lh;
+            }
+
+            float startY;
+            if (shape.VerticalAlignment == VerticalTextAlignment.Top) startY = textBounds.Y;
+            else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom) startY = textBounds.Bottom - totalH;
+            else startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalH) / 2f);
+
+            // If line spacing is explicitly specified in points (shape.LineSpacing > 4.0f) and top-aligned,
+            // adjust startY so that GDI+'s baseline aligns with PowerPoint's typographic baseline.
+            float firstLineSpacing = (lines.Count > 0 && lines[0].LineSpacing.HasValue) ? lines[0].LineSpacing.Value : shape.LineSpacing;
+            if (shape.VerticalAlignment == VerticalTextAlignment.Top && firstLineSpacing > 4.0f && lines.Count > 0 && lines[0].Tokens.Count > 0)
+            {
+                Font firstFont = lines[0].Tokens[0].Font;
+                if (firstFont != null)
+                {
+                    try
+                    {
+                        float em = firstFont.FontFamily.GetEmHeight(firstFont.Style);
+                        if (em > 0)
+                        {
+                            float ascent = firstFont.FontFamily.GetCellAscent(firstFont.Style);
+                            float gdiBaselineOffset = firstFont.Size * (ascent / em);
+                            float pptBaselineOffset = (firstLineSpacing * 0.75f) * scale;
+                            float firstLineShift = pptBaselineOffset - gdiBaselineOffset;
+                            startY += firstLineShift;
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            // Draw lines
+            float lineY = startY;
+            for (int li = 0; li < lines.Count; li++)
+            {
+                var line = lines[li];
+                float lW = 0f;
+                int spaceCount = 0;
+                foreach (var t in line.Tokens)
+                {
+                    lW += t.Width;
+                    if (t.IsSpace) spaceCount++;
+                }
+
+                var lineAlgn = line.Alignment ?? shape.Alignment;
+                bool isLastLineOfPara = line.EndsWithNewline || (li == lines.Count - 1);
+                bool isJustified = (lineAlgn == TextAlignment.Justify && !isLastLineOfPara && spaceCount > 0);
+                float extraPerSpace = 0f;
+                if (isJustified)
+                {
+                    float extra = textBounds.Width - lW;
+                    if (extra > 0)
+                    {
+                        extraPerSpace = Math.Min(extra / spaceCount, lineHeights[li] * 0.8f);
+                    }
+                }
+
+                float lineX;
+                if (lineAlgn == TextAlignment.Center) lineX = textBounds.X + (textBounds.Width - lW) / 2f;
+                else if (lineAlgn == TextAlignment.Right) lineX = textBounds.Right - lW;
+                else lineX = textBounds.X;
+
+                float tokX = lineX;
+                foreach (var tok in line.Tokens)
+                {
+                    float curW = tok.Width + (tok.IsSpace && isJustified ? extraPerSpace : 0f);
+
+                    if (tok.HasHighlight && curW > 0)
+                    {
+                        using (SolidBrush hb = new SolidBrush(tok.HighlightColor))
+                        {
+                            g.FillRectangle(hb, tokX, lineY, curW, lineHeights[li]);
+                        }
+                    }
+
+                    if (!tok.IsSpace && !tok.IsNewline)
+                    {
+                        if (tok.HasGradient)
+                        {
+                            RectangleF gradRect;
+                            if (Math.Abs(tok.GradientAngle - 90f) < 5f || Math.Abs(tok.GradientAngle - 270f) < 5f)
+                            {
+                                gradRect = new RectangleF(lineX, startY, Math.Max(1f, lW), Math.Max(1f, totalH));
+                            }
+                            else
+                            {
+                                gradRect = new RectangleF(lineX, lineY, Math.Max(1f, lW), Math.Max(1f, lineHeights[li]));
+                            }
+                            using (LinearGradientBrush lgb = new LinearGradientBrush(gradRect, tok.Color, tok.GradientColor2, tok.GradientAngle))
+                            {
+                                lgb.WrapMode = WrapMode.TileFlipX;
+                                if (tok.GradientStops != null && tok.GradientStops.Count >= 2)
+                                {
+                                    ColorBlend cb = new ColorBlend(tok.GradientStops.Count);
+                                    for (int si = 0; si < tok.GradientStops.Count; si++)
+                                    {
+                                        var st = tok.GradientStops[si];
+                                        cb.Positions[si] = Math.Max(0f, Math.Min(1f, st.Position));
+                                        int stopAlpha = (int)(255 * opacityMultiplier * (1.0f - st.Transparency));
+                                        stopAlpha = Math.Max(0, Math.Min(255, stopAlpha));
+                                        cb.Colors[si] = Color.FromArgb(stopAlpha, Color.FromArgb(st.Color & 0xFFFFFF));
+                                    }
+                                    cb.Positions[0] = 0f;
+                                    cb.Positions[cb.Positions.Length - 1] = 1f;
+                                    lgb.InterpolationColors = cb;
+                                }
+                                if (shape.HasTextShadow)
+                                {
+                                    using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 80, 80, 80)))
+                                    {
+                                        g.DrawString(tok.Text, tok.Font, shadowBr, tokX + 1.2f * scale, lineY + 1.2f * scale, StringFormat.GenericTypographic);
+                                    }
+                                }
+                                g.DrawString(tok.Text, tok.Font, lgb, tokX, lineY, StringFormat.GenericTypographic);
+                            }
+                        }
+                        else
+                        {
+                            if (shape.HasTextShadow)
+                            {
+                                using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 80, 80, 80)))
+                                {
+                                    g.DrawString(tok.Text, tok.Font, shadowBr, tokX + 1.2f * scale, lineY + 1.2f * scale, StringFormat.GenericTypographic);
+                                }
+                            }
+                            using (SolidBrush b = new SolidBrush(tok.Color))
+                            {
+                                g.DrawString(tok.Text, tok.Font, b, tokX, lineY, StringFormat.GenericTypographic);
+                            }
+                        }
+                    }
+                    tokX += curW + (shape.CharacterSpacing * scale);
+                }
+                lineY += lineHeights[li];
+            }
+
+            // Dispose fonts created for tokens
+            HashSet<Font> disposedFonts = new HashSet<Font>();
+            foreach (var tok in tokens)
+            {
+                if (tok.Font != null && !disposedFonts.Contains(tok.Font))
+                {
+                    disposedFonts.Add(tok.Font);
+                    tok.Font.Dispose();
                 }
             }
         }
@@ -9601,19 +12763,21 @@ namespace GenOffice.UI
                 tableData.Add(row);
             }
 
-            int themePrimary = (Presentation != null) ? Presentation.ThemePrimaryColor : 0xD24726;
-
             ShapeNode tableShape = new ShapeNode
             {
                 Name = "Bảng " + cols + "x" + rows,
                 Type = ShapeType.Table,
                 Transform = new Transform2D(tx, ty, tw, th),
-                FillColor = themePrimary,
+                FillColor = 0x00FFFFFF, // Basic: Nền trong (transparent)
+                StrokeColor = 0x000000, // Line đen (black lines)
+                TextColor = 0x000000,
                 TableColumns = cols,
                 TableRows = rows,
                 TableData = tableData,
-                TableHeaderRow = true,
-                TableBandedRows = true,
+                TableHeaderRow = false,
+                TableBandedRows = false,
+                TableHasHeaderFill = false,
+                TableHasBandedFill = false,
                 TableSelectedCellRow = 0,
                 TableSelectedCellCol = 0,
                 TableSelectedEndRow = 0,
@@ -9626,11 +12790,11 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
         }
 
-        public void InsertWordArt(string text = "GENOFFICE WORDART", int styleIndex = 0)
+        public void InsertWordArt(string text = "ZENQ WORDART", int styleIndex = 0)
         {
             if (ActiveSlide == null) return;
             SaveUndoState();
-            if (string.IsNullOrEmpty(text)) text = "GENOFFICE WORDART";
+            if (string.IsNullOrEmpty(text)) text = "ZENQ WORDART";
             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
 
@@ -9760,12 +12924,16 @@ namespace GenOffice.UI
             float sx = (canvasW - sw) / 2f;
             float sy = (canvasH - sh) / 2f;
 
+            string[] defNodes = SmartArtRenderer.GetSmartArtNodeList(type, "");
+            string defText = (defNodes != null && defNodes.Length > 0) ? string.Join("|", defNodes) : "";
+
             ShapeNode smartArt = new ShapeNode
             {
                 Name = "SmartArt - " + (!string.IsNullOrEmpty(name) ? name : "Sơ đồ"),
                 Type = ShapeType.RoundedRectangle,
                 SmartArtType = type,
                 SmartArtTitle = name,
+                Text = defText,
                 Transform = new Transform2D(sx, sy, sw, sh),
                 FillColor = 0xF8FAFC,
                 StrokeColor = 0x2563EB,
@@ -9866,14 +13034,14 @@ namespace GenOffice.UI
                 Name = label,
                 Type = ShapeType.Video,
                 VideoPath = videoPath,
-                VideoStyleIndex = 1,
+                VideoStyleIndex = 0,
                 VideoStartMode = VideoStartMode.InClickSequence,
                 VideoVolume = VideoVolumeLevel.High,
-                VideoBookmarks = new List<float> { 25f, 68f },
+                VideoBookmarks = new List<float>(),
                 Transform = new Transform2D((canvasW - 640f) / 2f, (canvasH - 360f) / 2f, 640f, 360f),
-                FillColor = 0x0F172A,
-                StrokeColor = 0xFFFFFF,
-                StrokeWidth = 2.0f,
+                FillColor = 0x00000000,
+                StrokeColor = 0x00000000,
+                StrokeWidth = 0.0f,
                 Text = "",
                 TextColor = 0xFFFFFF,
                 FontSize = 18f,
@@ -9946,16 +13114,12 @@ namespace GenOffice.UI
             }
             else
             {
-                int topBarY = 155;
-                int contentY = topBarY;
-                int contentH = parentControl.ClientSize.Height - contentY - 26;
-                int rightSidebarW = IsSidebarOpen ? 280 : 0;
-                int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-                int canvasW = parentControl.ClientSize.Width - leftSidebarW - rightSidebarW;
+                int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+                GetEffectiveLayoutMetrics(parentControl.ClientSize.Width, parentControl.ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
 
                 int slideX, slideY, slideW, slideH;
                 float scale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
 
                 int sx = slideX + (int)(shape.Transform.X * scale);
                 int sy = slideY + (int)(shape.Transform.Y * scale);
@@ -10043,7 +13207,7 @@ namespace GenOffice.UI
             {
                 SelectedShape.TextColor = 0x2563EB;
                 SelectedShape.Underline = true;
-                if (string.IsNullOrEmpty(SelectedShape.Text)) SelectedShape.Text = !string.IsNullOrEmpty(urlOrSlide) ? urlOrSlide : "https://genoffice.vn";
+                if (string.IsNullOrEmpty(SelectedShape.Text)) SelectedShape.Text = !string.IsNullOrEmpty(urlOrSlide) ? urlOrSlide : "https://zenqoffice.vn";
             }
             else
             {
@@ -10074,7 +13238,7 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
         }
 
-        public void InsertHeaderFooter(string footerText = "Trình bày bởi GenOffice | Trang trình chiếu")
+        public void InsertHeaderFooter(string footerText = "Trình bày bởi ZENQ OFFICE | Trang trình chiếu")
         {
             if (ActiveSlide == null) return;
             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
@@ -10121,8 +13285,17 @@ namespace GenOffice.UI
             return new Point((int)Math.Round(center.X + dx * cos - dy * sin), (int)Math.Round(center.Y + dx * sin + dy * cos));
         }
 
-        private void DrawSelectedShapeHandles(Graphics g, float sx, float sy, float sw, float sh, float rotation)
+        public static bool CanShapeRoundCorners(ShapeNode shape)
         {
+            if (shape == null) return false;
+            if (shape.Type == ShapeType.Image || !string.IsNullOrEmpty(shape.ImagePath) || shape.CachedImage != null) return false;
+            if (shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.TextBox || shape.Type == ShapeType.Table || shape.Type == ShapeType.Chart || shape.Type == ShapeType.Video || shape.Type == ShapeType.Line || shape.Type == ShapeType.Ellipse) return false;
+            return (shape.Type == ShapeType.RoundedRectangle || shape.Type == ShapeType.Rectangle);
+        }
+
+        private void DrawSelectedShapeHandles(Graphics g, float sx, float sy, float sw, float sh, float rotation, ShapeNode shape = null)
+        {
+            ShapeNode targetShape = shape ?? SelectedShape;
             GraphicsState s = g.Save();
             PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
 
@@ -10197,9 +13370,48 @@ namespace GenOffice.UI
                 g.FillPolygon(arrowBrush, arrowHead);
             }
 
+            // 5. Draw Corner Rounding Handle at Top-Right (Icon bo góc bên phải góc trên của hình vuông/chữ nhật)
+            PointF unrotatedCornerH = PointF.Empty;
+            if (CanShapeRoundCorners(targetShape))
+            {
+                PointF topRight = localHandles[2];
+                float cornerHandleX = (sw < 50f) ? (topRight.X + (50f - sw) * 0.7f) : topRight.X;
+                float cornerHandleY = topRight.Y - 24f;
+                unrotatedCornerH = new PointF(cornerHandleX, cornerHandleY);
+
+                // Connecting Stem to Corner Rounding Knob
+                using (Pen cornerStemPen = new Pen(Color.FromArgb(217, 119, 6), 1.2f))
+                {
+                    g.DrawLine(cornerStemPen, topRight.X, topRight.Y, cornerHandleX, cornerHandleY);
+                }
+
+                // Circular Badge for Corner Rounding Knob (20x20 circle, white background with amber border & drop shadow)
+                RectangleF cornerCircle = new RectangleF(cornerHandleX - 10f, cornerHandleY - 10f, 20f, 20f);
+                using (SolidBrush shadowBg = new SolidBrush(Color.FromArgb(35, 0, 0, 0)))
+                {
+                    g.FillEllipse(shadowBg, cornerCircle.X + 1f, cornerCircle.Y + 1.5f, cornerCircle.Width, cornerCircle.Height);
+                }
+                using (SolidBrush whiteBg = new SolidBrush(Color.White))
+                using (Pen borderPen = new Pen(Color.FromArgb(217, 119, 6), 1.4f))
+                using (Pen refPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { DashStyle = DashStyle.Dot })
+                using (Pen arcPen = new Pen(Color.FromArgb(217, 119, 6), 2.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    g.FillEllipse(whiteBg, cornerCircle);
+                    g.DrawEllipse(borderPen, cornerCircle);
+
+                    // Square corner reference: dotted L shape (outside guide)
+                    g.DrawLine(refPen, cornerHandleX - 4.5f, cornerHandleY + 4f, cornerHandleX - 4.5f, cornerHandleY - 4.5f);
+                    g.DrawLine(refPen, cornerHandleX - 4.5f, cornerHandleY - 4.5f, cornerHandleX + 4f, cornerHandleY - 4.5f);
+
+                    // Rounded corner arc (inside curve)
+                    RectangleF arcRect = new RectangleF(cornerHandleX - 4.5f, cornerHandleY - 4.5f, 10f, 10f);
+                    g.DrawArc(arcPen, arcRect, 180, 90);
+                }
+            }
+
             g.Restore(s);
 
-            // 5. Draw Table Move Handle at Top-Left (Nút kéo bảng 4 chiều ✥ chuẩn PowerPoint)
+            // 6. Draw Table Move Handle at Top-Left (Nút kéo bảng 4 chiều ✥ chuẩn PowerPoint)
             if (SelectedShape != null && SelectedShape.Type == ShapeType.Table)
             {
                 RectangleF mvRect = new RectangleF(sx - 24f, sy - 24f, 22f, 22f);
@@ -10231,10 +13443,41 @@ namespace GenOffice.UI
                 }
             }
 
-            // 6. Rotation Degree Tooltip Badge (Hiển thị số độ xoay thời gian thực)
+            // 7. Rotation Degree Tooltip Badge (Hiển thị số độ xoay thời gian thực)
             if (IsRotatingShape || Math.Abs(rotation) > 0.01f)
             {
                 DrawRotationDegreeBadge(g, center, rotation, rotHandle);
+            }
+
+            // 8. Corner Radius Tooltip Badge (Hiển thị số pixel bo góc thời gian thực)
+            if (IsAdjustingCornerRadius && targetShape != null && !unrotatedCornerH.IsEmpty)
+            {
+                DrawCornerRadiusBadge(g, center, rotation, unrotatedCornerH, targetShape.GetEffectiveCornerRadius());
+            }
+        }
+
+        private void DrawCornerRadiusBadge(Graphics g, PointF center, float rotation, PointF unrotatedCornerH, float radiusPx)
+        {
+            string text = string.Format("Bo góc: {0:0} px", radiusPx);
+            PointF badgeCenter = RotatePoint(new PointF(unrotatedCornerH.X, unrotatedCornerH.Y - 18f), center, rotation);
+
+            using (Font crFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            {
+                SizeF sz = g.MeasureString(text, crFont);
+                float bw = sz.Width + 14f;
+                float bh = sz.Height + 5f;
+                RectangleF badgeRect = new RectangleF(badgeCenter.X - bw / 2f, badgeCenter.Y - bh / 2f, bw, bh);
+
+                using (GraphicsPath bPath = CreateRoundedRectPath(badgeRect, 4f))
+                using (SolidBrush darkBg = new SolidBrush(Color.FromArgb(235, 15, 23, 42)))
+                using (Pen bPen = new Pen(Color.FromArgb(217, 119, 6), 1.2f))
+                using (SolidBrush textBrush = new SolidBrush(Color.White))
+                {
+                    g.FillPath(darkBg, bPath);
+                    g.DrawPath(bPen, bPath);
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString(text, crFont, textBrush, badgeRect, sf);
+                }
             }
         }
 
@@ -10343,6 +13586,15 @@ namespace GenOffice.UI
             PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
             PointF unrotatedRotH = new PointF(sx + sw / 2f, sy - 24f);
             return RotatePoint(unrotatedRotH, center, rotation);
+        }
+
+        public PointF GetRotatedCornerRadiusHandle(float sx, float sy, float sw, float sh, float rotation)
+        {
+            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+            float cornerHandleX = (sw < 50f) ? (sx + sw + (50f - sw) * 0.7f) : (sx + sw);
+            float cornerHandleY = sy - 24f;
+            PointF unrotatedHandle = new PointF(cornerHandleX, cornerHandleY);
+            return RotatePoint(unrotatedHandle, center, rotation);
         }
 
         private PointF[] GetHandleCoordinates(float sx, float sy, float sw, float sh)
@@ -10455,7 +13707,96 @@ namespace GenOffice.UI
             return result;
         }
 
-        public static GraphicsPath CreateShapePath(ShapeType type, float x, float y, float w, float h)
+        public int GetTextCharIndexFromPoint(Point mousePos, ShapeNode shape, float slideX, float slideY, float scale)
+        {
+            if (shape == null) return 0;
+            string text = (IsInlineEditing && EditingShape == shape) ? (EditingTextBuffer ?? "") : (shape.Text ?? "");
+            if (string.IsNullOrEmpty(text)) return 0;
+
+            float baseW = shape.Transform.Width * scale;
+            float baseH = shape.Transform.Height * scale;
+            float sx = slideX + shape.Transform.X * scale;
+            float sy = slideY + shape.Transform.Y * scale;
+
+            PointF center = new PointF(sx + baseW / 2f, sy + baseH / 2f);
+            PointF localPt = RotatePoint(mousePos, center, -shape.Transform.Rotation);
+
+            float padX = Math.Max(2.0f, 6.0f * scale);
+            float padY = Math.Max(2.0f, 4.0f * scale);
+            if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Diamond || shape.Type == ShapeType.Triangle ||
+                shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Callout)
+            {
+                padX = Math.Max(4.0f, baseW * 0.08f);
+                padY = Math.Max(4.0f, baseH * 0.08f);
+            }
+            RectangleF textBounds = new RectangleF(padX, padY, Math.Max(2.0f, baseW - padX * 2f), Math.Max(2.0f, baseH - padY * 2f));
+
+            float calculatedFontSize = Math.Max(3.0f, shape.FontSize * scale);
+            using (Font font = new Font(shape.FontName, calculatedFontSize, shape.Bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
+            using (Bitmap tmpBmp = new Bitmap(1, 1))
+            using (Graphics g = Graphics.FromImage(tmpBmp))
+            {
+                List<VisualTextLine> visualLines = GetVisualWrappedLines(g, text, font, textBounds.Width);
+                if (visualLines.Count == 0) return 0;
+
+                float lineHeight = font.Height;
+                float totalTextH = Math.Max(lineHeight, visualLines.Count * lineHeight);
+
+                float startY;
+                if (shape.VerticalAlignment == VerticalTextAlignment.Top)
+                    startY = textBounds.Y;
+                else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom)
+                    startY = textBounds.Bottom - totalTextH;
+                else
+                    startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+
+                float relX = localPt.X - sx;
+                float relY = localPt.Y - sy;
+
+                int lineIdx = (int)((relY - startY) / lineHeight);
+                lineIdx = Math.Max(0, Math.Min(visualLines.Count - 1, lineIdx));
+
+                VisualTextLine vLine = visualLines[lineIdx];
+                string lineText = vLine.Text ?? "";
+
+                float cLineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                float lineStartX;
+                if (shape.Alignment == TextAlignment.Left)
+                    lineStartX = textBounds.X;
+                else if (shape.Alignment == TextAlignment.Right)
+                    lineStartX = textBounds.Right - cLineWidth;
+                else
+                    lineStartX = textBounds.X + (textBounds.Width - cLineWidth) / 2f;
+
+                float clickRelToLineX = relX - lineStartX;
+                if (clickRelToLineX <= 0)
+                {
+                    return vLine.StartCharIndex;
+                }
+                if (clickRelToLineX >= cLineWidth)
+                {
+                    return vLine.StartCharIndex + vLine.Length;
+                }
+
+                // Find closest char index
+                int bestCol = 0;
+                float bestDist = float.MaxValue;
+                for (int c = 0; c <= lineText.Length; c++)
+                {
+                    string sub = lineText.Substring(0, c);
+                    float subW = g.MeasureString(sub, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                    float dist = Math.Abs(subW - clickRelToLineX);
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        bestCol = c;
+                    }
+                }
+                return vLine.StartCharIndex + bestCol;
+            }
+        }
+
+        public static GraphicsPath CreateShapePath(ShapeType type, float x, float y, float w, float h, float cornerRadius = -1f)
         {
             GraphicsPath path = new GraphicsPath();
             RectangleF rect = new RectangleF(x, y, w, h);
@@ -10464,21 +13805,49 @@ namespace GenOffice.UI
             {
                 case ShapeType.Rectangle:
                 case ShapeType.TextBox:
-                    path.AddRectangle(rect);
+                    if (type == ShapeType.Rectangle && cornerRadius > 0.5f)
+                    {
+                        float maxR = Math.Min(w, h) / 2f;
+                        float r = Math.Min(maxR, cornerRadius);
+                        float d = r * 2f;
+                        RectangleF arc = new RectangleF(rect.Location, new SizeF(d, d));
+                        path.AddArc(arc, 180, 90);
+                        arc.X = rect.Right - d;
+                        path.AddArc(arc, 270, 90);
+                        arc.Y = rect.Bottom - d;
+                        path.AddArc(arc, 0, 90);
+                        arc.X = rect.Left;
+                        path.AddArc(arc, 90, 90);
+                        path.CloseFigure();
+                    }
+                    else
+                    {
+                        path.AddRectangle(rect);
+                    }
                     break;
 
                 case ShapeType.RoundedRectangle:
-                    float radius = Math.Min(16f, Math.Min(w, h) * 0.2f);
-                    float d = radius * 2f;
-                    RectangleF arc = new RectangleF(rect.Location, new SizeF(d, d));
-                    path.AddArc(arc, 180, 90);
-                    arc.X = rect.Right - d;
-                    path.AddArc(arc, 270, 90);
-                    arc.Y = rect.Bottom - d;
-                    path.AddArc(arc, 0, 90);
-                    arc.X = rect.Left;
-                    path.AddArc(arc, 90, 90);
-                    path.CloseFigure();
+                    {
+                        float maxR = Math.Min(w, h) / 2f;
+                        float r = (cornerRadius >= 0f) ? Math.Min(maxR, cornerRadius) : Math.Min(20f, maxR);
+                        if (r > 0.5f)
+                        {
+                            float d = r * 2f;
+                            RectangleF arc = new RectangleF(rect.Location, new SizeF(d, d));
+                            path.AddArc(arc, 180, 90);
+                            arc.X = rect.Right - d;
+                            path.AddArc(arc, 270, 90);
+                            arc.Y = rect.Bottom - d;
+                            path.AddArc(arc, 0, 90);
+                            arc.X = rect.Left;
+                            path.AddArc(arc, 90, 90);
+                            path.CloseFigure();
+                        }
+                        else
+                        {
+                            path.AddRectangle(rect);
+                        }
+                    }
                     break;
 
                 case ShapeType.Ellipse:
@@ -10900,7 +14269,7 @@ namespace GenOffice.UI
             }
             else
             {
-                using (GraphicsPath baseP = CreateShapePath(shape.Type, x, y, w, h))
+                using (GraphicsPath baseP = CreateShapePath(shape.Type, x, y, w, h, shape.GetEffectiveCornerRadius()))
                 {
                     path.AddPath(baseP, false);
                 }
@@ -11291,6 +14660,38 @@ namespace GenOffice.UI
                     slide.Shapes.RemoveAt(indices[i]);
                 }
             }
+        }
+
+        public void DeleteSelectedShapes()
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+            {
+                List<int> sorted = SelectedShapeIndices.Distinct().OrderByDescending(x => x).ToList();
+                foreach (int idx in sorted)
+                {
+                    if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                    {
+                        ActiveSlide.Shapes.RemoveAt(idx);
+                    }
+                }
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndex = -1;
+            }
+            else if (SelectedShapeIndex >= 0 && SelectedShapeIndex < ActiveSlide.Shapes.Count)
+            {
+                ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
+                SelectedShapeIndex = -1;
+            }
+            else if (SelectedShape != null && ActiveSlide.Shapes.Contains(SelectedShape))
+            {
+                ActiveSlide.Shapes.Remove(SelectedShape);
+                SelectedShapeIndex = -1;
+                if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+            }
+            EndInlineEditing();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void BringShapeToFront()
@@ -11792,10 +15193,12 @@ namespace GenOffice.UI
             {
                 shape.Text = newText;
                 shape.PictureStyleIndex = newColor;
+                this.Invalidate();
             }))
             {
                 dlg.ShowDialog();
             }
+            this.Invalidate();
         }
 
         public void ShowShapeContextMenu(Control parentControl, Point screenPos, int shapeIndex)
@@ -13557,6 +16960,9 @@ namespace GenOffice.UI
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.Half;
+            // AntiAlias is mandatory for smooth sub-pixel text rendering during animations and
+            // transitions. ClearTypeGridFit would snap every glyph to an integer pixel grid,
+            // causing visible character-level jitter whenever shapes move at fractional positions.
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
             // 1. Chế độ Diễn giả (Presenter View) trên màn hình chính khi thuyết trình 2 màn hình hoặc người dùng bật
@@ -13598,33 +17004,38 @@ namespace GenOffice.UI
                 return;
             }
 
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
             g.FillRectangle(Brushes.Black, 0, 0, screenW, screenH);
 
-            float targetRatio = Presentation.IsWidescreen ? (16.0f / 9.0f) : (4.0f / 3.0f);
-            int slideW = screenW;
-            int slideH = (int)(screenW / targetRatio);
-            if (slideH > screenH)
-            {
-                slideH = screenH;
-                slideW = (int)(screenH * targetRatio);
-            }
+            float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+            float canvasHf = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
+
+            float fitScaleX = (float)screenW / canvasWf;
+            float fitScaleY = (float)screenH / canvasHf;
+            float scale = Math.Min(fitScaleX, fitScaleY);
+
+            int slideW = (int)Math.Round(canvasWf * scale);
+            int slideH = (int)Math.Round(canvasHf * scale);
             int slideX = (screenW - slideW) / 2;
             int slideY = (screenH - slideH) / 2;
 
             if (IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape != null)
             {
                 ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
-                float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
                 if (vs.VideoPlayFullScreen)
                 {
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(slideX, slideY, slideW, slideH));
                 }
                 else
                 {
-                    int vsx = slideX + (int)(vs.Transform.X * scaleP);
-                    int vsy = slideY + (int)(vs.Transform.Y * scaleP);
-                    int vsw = (int)(vs.Transform.Width * scaleP);
-                    int vsh = (int)(vs.Transform.Height * scaleP);
+                    int vsx = slideX + (int)(vs.Transform.X * scale);
+                    int vsy = slideY + (int)(vs.Transform.Y * scale);
+                    int vsw = (int)(vs.Transform.Width * scale);
+                    int vsh = (int)(vs.Transform.Height * scale);
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
                 }
             }
@@ -13648,7 +17059,6 @@ namespace GenOffice.UI
                 SlideNode fromSlide = (TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count && TransitionFromSlideIndex != TransitionToSlideIndex)
                     ? Presentation.Slides[TransitionFromSlideIndex]
                     : new SlideNode { BgColor = toSlide.BgColor, IsGradientBg = toSlide.IsGradientBg, BgColor2 = toSlide.BgColor2 };
-                float scale = (float)slideW / Presentation.CanvasWidth;
                 RenderTransitionFrame(g, slideRect, fromSlide, toSlide, toSlide.Transition, TransitionProgress, scale);
             }
             else
@@ -13657,7 +17067,6 @@ namespace GenOffice.UI
                 if (slide != null)
                 {
                     DrawSlideBackground(g, slideRect, slide);
-                    float scale = (float)slideW / Presentation.CanvasWidth;
                     foreach (ShapeNode shape in slide.Shapes)
                     {
                         bool isVis;
@@ -13725,12 +17134,12 @@ namespace GenOffice.UI
         public int GetHoverToolbarButtonAt(Point p, int screenH)
         {
             int barY = screenH - 46;
+            if (p.Y < barY - 10 || p.Y > screenH) return -1;
             for (int i = 0; i < 6; i++)
             {
                 int btnX = 24 + i * 36;
-                int dx = p.X - (btnX + 14);
-                int dy = p.Y - (barY + 14);
-                if (dx * dx + dy * dy <= 16 * 16)
+                Rectangle btnRect = new Rectangle(btnX - 4, barY - 4, 36, 36);
+                if (btnRect.Contains(p))
                 {
                     return i;
                 }
@@ -13743,6 +17152,25 @@ namespace GenOffice.UI
             int barY = screenH - 46;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
+            // Sleek frosted translucent pill background container for bottom-left tools
+            int totalW = 6 * 36 + 10;
+            RectangleF pillRect = new RectangleF(18, barY - 4, totalW, 36);
+            using (SolidBrush pillBg = new SolidBrush(Color.FromArgb(145, 18, 22, 30)))
+            using (Pen pillPen = new Pen(Color.FromArgb(85, 255, 255, 255), 1.0f))
+            {
+                using (GraphicsPath pillPath = new GraphicsPath())
+                {
+                    float r = 18f;
+                    pillPath.AddArc(pillRect.X, pillRect.Y, r, r, 180, 90);
+                    pillPath.AddArc(pillRect.Right - r, pillRect.Y, r, r, 270, 90);
+                    pillPath.AddArc(pillRect.Right - r, pillRect.Bottom - r, r, r, 0, 90);
+                    pillPath.AddArc(pillRect.X, pillRect.Bottom - r, r, r, 90, 90);
+                    pillPath.CloseFigure();
+                    g.FillPath(pillBg, pillPath);
+                    g.DrawPath(pillPen, pillPath);
+                }
+            }
+
             for (int i = 0; i < 6; i++)
             {
                 int btnX = 24 + i * 36;
@@ -13750,9 +17178,9 @@ namespace GenOffice.UI
                 bool isActive = (i == 2 && (AnnotationPenMode || LaserPointerMode)) || (i == 4 && IsSlideZoomActive) || (i == 3 && IsSlideSorterModalOpen);
 
                 Color bgCol = isActive ? Color.FromArgb(220, 210, 71, 38)
-                    : (isHovered ? Color.FromArgb(190, 60, 60, 60) : Color.FromArgb(70, 20, 20, 20));
-                Color borderCol = isHovered ? Color.FromArgb(240, 255, 255, 255) : Color.FromArgb(90, 255, 255, 255);
-                Color iconCol = (isActive || isHovered) ? Color.White : Color.FromArgb(210, 255, 255, 255);
+                    : (isHovered ? Color.FromArgb(190, 70, 70, 70) : Color.FromArgb(60, 35, 35, 35));
+                Color borderCol = isHovered ? Color.FromArgb(240, 255, 255, 255) : Color.FromArgb(80, 255, 255, 255);
+                Color iconCol = (isActive || isHovered) ? Color.White : Color.FromArgb(220, 255, 255, 255);
 
                 using (SolidBrush bgBrush = new SolidBrush(bgCol))
                 using (Pen bPen = new Pen(borderCol, 1.2f))
@@ -14027,12 +17455,6 @@ namespace GenOffice.UI
 
             Rectangle curSlideRect = new Rectangle(curX, curY, curW, curH);
 
-            // Vẽ slide hiện tại (kèm bóng đổ và viền sáng)
-            using (SolidBrush shadow = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
-            {
-                g.FillRectangle(shadow, curX + 6, curY + 6, curW, curH);
-            }
-
             if (IsEndSlideShowScreen)
             {
                 g.FillRectangle(Brushes.Black, curSlideRect);
@@ -14274,10 +17696,13 @@ namespace GenOffice.UI
                 // Vẽ nội dung thẻ
                 DrawSlideBackground(g, cardRect, s);
                 float miniScale = (float)cardW / Presentation.CanvasWidth;
+                GraphicsState cardClipState = g.Save();
+                g.SetClip(cardRect, CombineMode.Intersect);
                 foreach (ShapeNode shape in s.Shapes)
                 {
                     DrawShape(g, cx, cy, miniScale, shape, false);
                 }
+                g.Restore(cardClipState);
 
                 // Viền sáng quanh slide đang chọn
                 bool isActive = (i == ActiveSlideIndex);
@@ -14296,13 +17721,52 @@ namespace GenOffice.UI
             }
         }
 
-        public void ShowMoreOptionsMenu(Control parent, Point pt)
+        public void ShowPresentationHelp()
+        {
+            MessageBox.Show(
+                "PHÍM TẮT TRÌNH CHIẾU POWERPOINT:\n\n" +
+                "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Phải/Lên, Space, Enter, PageDown\n" +
+                "• Lùi slide / bước trước đó: Mũi tên Trái/Xuống, Backspace, PageUp\n" +
+                "• Bút vẽ (Pen): Phím P hoặc Ctrl+P\n" +
+                "• Con trỏ Laser đỏ: Phím L hoặc Ctrl+L\n" +
+                "• Bút dạ quang (Highlighter): Phím H hoặc Ctrl+I\n" +
+                "• Xóa tất cả nét vẽ trên slide: Phím E\n" +
+                "• Mũi tên chuột bình thường: Ctrl+A\n" +
+                "• Màn hình đen: Phím B | Màn hình trắng: Phím W\n" +
+                "• Xem danh sách tất cả slide (Grid): Nút Grid góc dưới trái\n" +
+                "• Thu phóng slide (Zoom): Nút Kính lúp góc dưới trái\n" +
+                "• Chế độ Diễn giả (Presenter View): Alt+F5\n" +
+                "• Menu chuột phải: Chứa đầy đủ các tùy chọn như PowerPoint\n" +
+                "• Kết thúc trình chiếu: Phím Escape (Esc)",
+                "Trợ giúp Trình chiếu ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        public void ShowPresentationContextMenu(Control parent, Point pt)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.RenderMode = ToolStripRenderMode.System;
             menu.Font = new Font("Segoe UI", 9.5f);
 
-            ToolStripMenuItem miLastViewed = new ToolStripMenuItem("Last Viewed (Quay lại slide vừa xem)");
+            // 1. Next
+            ToolStripMenuItem miNext = new ToolStripMenuItem("Tiếp theo (Next) [Space / Click]", null, (s, e) =>
+            {
+                AdvancePresenterStep();
+                if (parent != null) parent.Invalidate();
+            });
+            miNext.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            menu.Items.Add(miNext);
+
+            // 2. Previous
+            ToolStripMenuItem miPrev = new ToolStripMenuItem("Trước đó (Previous) [Backspace / ◀]", null, (s, e) =>
+            {
+                PreviousPresenterStep();
+                if (parent != null) parent.Invalidate();
+            });
+            miPrev.Enabled = (ActiveSlideIndex > 0 || CurrentAnimationStep > 0);
+            menu.Items.Add(miPrev);
+
+            // 3. Last Viewed
+            ToolStripMenuItem miLastViewed = new ToolStripMenuItem("Vừa xem (Last Viewed)");
             miLastViewed.Enabled = (LastViewedSlideIndex >= 0 && LastViewedSlideIndex < Presentation.Slides.Count);
             miLastViewed.Click += (s, e) =>
             {
@@ -14317,68 +17781,157 @@ namespace GenOffice.UI
             };
             menu.Items.Add(miLastViewed);
 
-            ToolStripMenuItem miCustomShow = new ToolStripMenuItem("Custom Show");
-            miCustomShow.DropDownItems.Add(new ToolStripMenuItem("Slide Show Toàn bộ (1 - " + Presentation.Slides.Count + ")", null, (s, e) => { }));
-            menu.Items.Add(miCustomShow);
+            // 4. See All Slides (Grid)
+            ToolStripMenuItem miSeeAll = new ToolStripMenuItem("Xem tất cả slide (See All Slides) [Grid]", null, (s, e) =>
+            {
+                IsSlideSorterModalOpen = true;
+                if (parent != null) parent.Invalidate();
+            });
+            menu.Items.Add(miSeeAll);
 
-            menu.Items.Add(new ToolStripSeparator());
+            // 5. Zoom In
+            ToolStripMenuItem miZoom = new ToolStripMenuItem("Thu phóng (Zoom In)", null, (s, e) =>
+            {
+                IsSlideZoomActive = !IsSlideZoomActive;
+                SlideZoomCenter = pt;
+                if (parent != null) parent.Invalidate();
+            });
+            miZoom.Checked = IsSlideZoomActive;
+            menu.Items.Add(miZoom);
 
-            ToolStripMenuItem miPresenter = new ToolStripMenuItem(IsPresenterViewMode ? "Hide Presenter View (Chiếu slide toàn màn hình)" : "Show Presenter View (Xem Chế độ Diễn giả)");
-            miPresenter.Click += (s, e) =>
+            // 6. Show Presenter View
+            ToolStripMenuItem miPresenter = new ToolStripMenuItem(IsPresenterViewMode ? "Ẩn Chế độ Diễn giả (Hide Presenter View)" : "Xem Chế độ Diễn giả (Show Presenter View) [Alt+F5]", null, (s, e) =>
             {
                 IsPresenterViewMode = !IsPresenterViewMode;
                 if (parent != null) parent.Invalidate();
-            };
+            });
             menu.Items.Add(miPresenter);
 
-            ToolStripMenuItem miScreen = new ToolStripMenuItem("Screen");
-            ToolStripMenuItem miBlack = new ToolStripMenuItem("Black Screen (Màn hình Đen) [B]", null, (s, e) => { BlackScreenMode = !BlackScreenMode; WhiteScreenMode = false; if (parent != null) parent.Invalidate(); });
-            ToolStripMenuItem miWhite = new ToolStripMenuItem("White Screen (Màn hình Trắng) [W]", null, (s, e) => { WhiteScreenMode = !WhiteScreenMode; BlackScreenMode = false; if (parent != null) parent.Invalidate(); });
-            ToolStripMenuItem miTaskbar = new ToolStripMenuItem("Show Taskbar (Hiện thanh Taskbar)", null, (s, e) => { if (parent is Form) ((Form)parent).TopMost = false; });
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 7. Pointer Options ▶
+            ToolStripMenuItem miPointerOptions = new ToolStripMenuItem("Tùy chọn con trỏ (Pointer Options)");
+
+            ToolStripMenuItem miArrow = new ToolStripMenuItem("Mũi tên thông thường (Arrow) [Ctrl+A]", null, (s, e) =>
+            {
+                LaserPointerMode = false;
+                AnnotationPenMode = false;
+                Cursor.Show();
+                if (parent != null) parent.Invalidate();
+            });
+            miArrow.Checked = (!LaserPointerMode && !AnnotationPenMode);
+            miPointerOptions.DropDownItems.Add(miArrow);
+
+            ToolStripMenuItem miLaser = new ToolStripMenuItem("Con trỏ Laser đỏ (Laser Pointer) [L / Ctrl+L]", null, (s, e) =>
+            {
+                LaserPointerMode = true;
+                AnnotationPenMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            miLaser.Checked = LaserPointerMode;
+            miPointerOptions.DropDownItems.Add(miLaser);
+
+            ToolStripMenuItem miPen = new ToolStripMenuItem("Bút vẽ ghi chú (Pen) [P / Ctrl+P]", null, (s, e) =>
+            {
+                AnnotationPenMode = true;
+                LaserPointerMode = false;
+                IsHighlighter = false;
+                AnnotationWidth = 4f;
+                if (parent != null) parent.Invalidate();
+            });
+            miPen.Checked = (AnnotationPenMode && !IsHighlighter);
+            miPointerOptions.DropDownItems.Add(miPen);
+
+            ToolStripMenuItem miHighlighter = new ToolStripMenuItem("Bút dạ quang (Highlighter) [H / Ctrl+I]", null, (s, e) =>
+            {
+                AnnotationPenMode = true;
+                LaserPointerMode = false;
+                IsHighlighter = true;
+                AnnotationWidth = 14f;
+                AnnotationColor = Color.FromArgb(140, 255, 255, 0);
+                if (parent != null) parent.Invalidate();
+            });
+            miHighlighter.Checked = (AnnotationPenMode && IsHighlighter);
+            miPointerOptions.DropDownItems.Add(miHighlighter);
+
+            ToolStripMenuItem miEraser = new ToolStripMenuItem("Tẩy nét vẽ (Eraser) [E]", null, (s, e) =>
+            {
+                AnnotationPenMode = false;
+                LaserPointerMode = false;
+                PenStrokes.Clear();
+                CurrentStroke.Clear();
+                if (parent != null) parent.Invalidate();
+            });
+            miPointerOptions.DropDownItems.Add(miEraser);
+
+            ToolStripMenuItem miEraseAll = new ToolStripMenuItem("Xóa toàn bộ nét vẽ trên Slide (Erase All Ink)", null, (s, e) =>
+            {
+                PenStrokes.Clear();
+                CurrentStroke.Clear();
+                if (parent != null) parent.Invalidate();
+            });
+            miPointerOptions.DropDownItems.Add(miEraseAll);
+
+            miPointerOptions.DropDownItems.Add(new ToolStripSeparator());
+
+            // Ink Color submenu
+            ToolStripMenuItem miInkColor = new ToolStripMenuItem("Màu mực vẽ (Ink Color)");
+            Color[] colors = new Color[] { Color.Red, Color.Yellow, Color.LimeGreen, Color.DeepSkyBlue, Color.White, Color.Black };
+            string[] colorNames = new string[] { "Đỏ (Red)", "Vàng (Yellow)", "Xanh lá (Green)", "Xanh lam (Blue)", "Trắng (White)", "Đen (Black)" };
+            for (int ci = 0; ci < colors.Length; ci++)
+            {
+                Color col = colors[ci];
+                string name = colorNames[ci];
+                ToolStripMenuItem miCol = new ToolStripMenuItem(name, null, (s, e) =>
+                {
+                    AnnotationColor = Color.FromArgb(230, col.R, col.G, col.B);
+                    AnnotationPenMode = true;
+                    LaserPointerMode = false;
+                    if (parent != null) parent.Invalidate();
+                });
+                if (AnnotationColor.ToArgb() == Color.FromArgb(230, col.R, col.G, col.B).ToArgb()) miCol.Checked = true;
+                miInkColor.DropDownItems.Add(miCol);
+            }
+            miPointerOptions.DropDownItems.Add(miInkColor);
+
+            menu.Items.Add(miPointerOptions);
+
+            // 8. Screen ▶
+            ToolStripMenuItem miScreen = new ToolStripMenuItem("Màn hình (Screen)");
+            ToolStripMenuItem miBlack = new ToolStripMenuItem("Màn hình Đen (Black Screen) [B]", null, (s, e) =>
+            {
+                BlackScreenMode = !BlackScreenMode;
+                WhiteScreenMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            miBlack.Checked = BlackScreenMode;
+            ToolStripMenuItem miWhite = new ToolStripMenuItem("Màn hình Trắng (White Screen) [W]", null, (s, e) =>
+            {
+                WhiteScreenMode = !WhiteScreenMode;
+                BlackScreenMode = false;
+                if (parent != null) parent.Invalidate();
+            });
+            miWhite.Checked = WhiteScreenMode;
+            ToolStripMenuItem miTaskbar = new ToolStripMenuItem("Hiện thanh Taskbar (Show Taskbar)", null, (s, e) =>
+            {
+                if (parent is Form) ((Form)parent).TopMost = false;
+            });
             miScreen.DropDownItems.Add(miBlack);
             miScreen.DropDownItems.Add(miWhite);
             miScreen.DropDownItems.Add(miTaskbar);
             menu.Items.Add(miScreen);
 
-            ToolStripMenuItem miDisplay = new ToolStripMenuItem("Display Settings");
-            ToolStripMenuItem miSwap = new ToolStripMenuItem("Swap Presenter View and Slide Show (Hoán đổi 2 màn hình)", null, (s, e) =>
+            // 9. Help
+            ToolStripMenuItem miHelp = new ToolStripMenuItem("Trợ giúp phím tắt (Help) [F1]", null, (s, e) =>
             {
-                IsPresenterViewMode = !IsPresenterViewMode;
-                if (parent != null) parent.Invalidate();
-            });
-            ToolStripMenuItem miDuplicate = new ToolStripMenuItem("Duplicate Slide Show (Nhân bản bản chiếu)", null, (s, e) =>
-            {
-                IsPresenterViewMode = false;
-                if (parent != null) parent.Invalidate();
-            });
-            miDisplay.DropDownItems.Add(miSwap);
-            miDisplay.DropDownItems.Add(miDuplicate);
-            menu.Items.Add(miDisplay);
-
-            ToolStripMenuItem miArrow = new ToolStripMenuItem("Arrow Options");
-            miArrow.DropDownItems.Add(new ToolStripMenuItem("Automatic (Tự động ẩn)", null, (s, e) => { }));
-            miArrow.DropDownItems.Add(new ToolStripMenuItem("Visible (Luôn hiển thị)", null, (s, e) => { Cursor.Show(); }));
-            miArrow.DropDownItems.Add(new ToolStripMenuItem("Hidden (Ẩn con trỏ)", null, (s, e) => { Cursor.Hide(); }));
-            menu.Items.Add(miArrow);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            ToolStripMenuItem miHelp = new ToolStripMenuItem("Help (Trợ giúp phím tắt) [F1]", null, (s, e) =>
-            {
-                MessageBox.Show(
-                    "PHÍM TẮT TRÌNH CHIẾU POWERPOINT:\n\n" +
-                    "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Lên (▲), Phải (▶), Space, Enter, PageDown\n" +
-                    "• Lùi slide / bước trước đó: Chuột Phải, Mũi tên Xuống (▼), Trái (◀), Backspace, PageUp\n" +
-                    "• Bút vẽ (Pen): Phím P\n" +
-                    "• Con trỏ Laser (Laser Pointer): Phím L\n" +
-                    "• Màn hình đen: Phím B | Màn hình trắng: Phím W\n" +
-                    "• Xóa tất cả nét vẽ: Phím E\n" +
-                    "• Thoát trình chiếu: Phím Escape (Esc)",
-                    "Trợ giúp Trình chiếu GenOffice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowPresentationHelp();
             });
             menu.Items.Add(miHelp);
 
-            ToolStripMenuItem miEndShow = new ToolStripMenuItem("End Show (Kết thúc trình chiếu) [Esc]", null, (s, e) =>
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 10. End Show
+            ToolStripMenuItem miEndShow = new ToolStripMenuItem("Kết thúc trình chiếu (End Show) [Esc]", null, (s, e) =>
             {
                 StopPresenting();
                 if (parent != null) parent.Invalidate();
@@ -14389,11 +17942,28 @@ namespace GenOffice.UI
             menu.Show(parent, pt);
         }
 
+        public void ShowMoreOptionsMenu(Control parent, Point pt)
+        {
+            ShowPresentationContextMenu(parent, pt);
+        }
+
         public void ShowPenOptionsMenu(Control parent, Point pt)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.RenderMode = ToolStripRenderMode.System;
             menu.Font = new Font("Segoe UI", 9.5f);
+
+            ToolStripMenuItem miArrow = new ToolStripMenuItem("Arrow (Con trỏ chuột thường / Tắt bút) [A / Esc]", null, (s, e) =>
+            {
+                LaserPointerMode = false;
+                AnnotationPenMode = false;
+                Cursor.Show();
+                if (parent != null) parent.Invalidate();
+            });
+            miArrow.Checked = (!LaserPointerMode && !AnnotationPenMode);
+            menu.Items.Add(miArrow);
+
+            menu.Items.Add(new ToolStripSeparator());
 
             ToolStripMenuItem miLaser = new ToolStripMenuItem("Laser Pointer (Con trỏ Laser đỏ) [L]", null, (s, e) =>
             {
@@ -14417,11 +17987,18 @@ namespace GenOffice.UI
 
             ToolStripMenuItem miHigh = new ToolStripMenuItem("Highlighter (Bút dạ quang) [H]", null, (s, e) =>
             {
-                AnnotationPenMode = true;
-                LaserPointerMode = false;
-                IsHighlighter = true;
-                AnnotationColor = Color.FromArgb(140, 255, 255, 0);
-                AnnotationWidth = 14.0f;
+                if (AnnotationPenMode && IsHighlighter)
+                {
+                    AnnotationPenMode = false;
+                }
+                else
+                {
+                    AnnotationPenMode = true;
+                    LaserPointerMode = false;
+                    IsHighlighter = true;
+                    AnnotationColor = Color.FromArgb(140, 255, 255, 0);
+                    AnnotationWidth = 14.0f;
+                }
                 if (parent != null) parent.Invalidate();
             });
             miHigh.Checked = (AnnotationPenMode && IsHighlighter);
@@ -14491,64 +18068,44 @@ namespace GenOffice.UI
         private void DrawSlideFull(Graphics g, RectangleF targetRect, SlideNode slide, float baseScale, float opacity = 1.0f, bool isFromSlide = false)
         {
             if (slide == null || targetRect.Width <= 0 || targetRect.Height <= 0) return;
+
+            // Ultra-fast 60 FPS cached texture blitting during transitions (eliminates 4K bicubic CPU rescale)
+            if (IsTransitioning && !_isBuildingTransitionCache && _cachedTransBmpA != null && _cachedTransBmpB != null)
+            {
+                Bitmap cachedBmp = null;
+                SlideNode fromSlide = (Presentation != null && TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count)
+                    ? Presentation.Slides[TransitionFromSlideIndex] : null;
+                SlideNode toSlide = (Presentation != null && TransitionToSlideIndex >= 0 && TransitionToSlideIndex < Presentation.Slides.Count)
+                    ? Presentation.Slides[TransitionToSlideIndex] : null;
+
+                if (isFromSlide || (slide != null && slide == fromSlide && fromSlide != toSlide))
+                {
+                    cachedBmp = _cachedTransBmpA;
+                }
+                else if (!isFromSlide && (slide != null && slide == toSlide))
+                {
+                    cachedBmp = _cachedTransBmpB;
+                }
+                else
+                {
+                    cachedBmp = isFromSlide ? _cachedTransBmpA : _cachedTransBmpB;
+                }
+
+                if (cachedBmp != null)
+                {
+                    GraphicsState cState = g.Save();
+                    g.IntersectClip(targetRect);
+                    DrawCachedSlideBitmap(g, targetRect, cachedBmp, opacity);
+                    g.Restore(cState);
+                    return;
+                }
+            }
+
             GraphicsState gs = g.Save();
             g.IntersectClip(targetRect);
 
-            // Matrix-based smooth scaling transform to lock layout & eliminate text glyph jittering:
-            float targetScale = targetRect.Width / Presentation.CanvasWidth;
-            if (baseScale > 0.001f && Math.Abs(targetScale - baseScale) > 0.005f)
-            {
-                float sx = targetScale / baseScale;
-                g.TranslateTransform(targetRect.X, targetRect.Y);
-                g.ScaleTransform(sx, sx);
-
-                RectangleF baseRect = new RectangleF(0, 0, Presentation.CanvasWidth * baseScale, Presentation.CanvasHeight * baseScale);
-                DrawSlideBackground(g, baseRect, slide);
-
-                bool isSlideShowOrPreview = IsPresenting || IsPreviewingTransition;
-                bool treatAsFromSlide = isFromSlide;
-                if (isSlideShowOrPreview && !treatAsFromSlide)
-                {
-                    if (IsTransitioning && TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count)
-                    {
-                        if (Presentation.Slides[TransitionFromSlideIndex] == slide && TransitionFromSlideIndex != TransitionToSlideIndex)
-                        {
-                            treatAsFromSlide = true;
-                        }
-                    }
-                }
-
-                for (int i = 0; i < slide.Shapes.Count; i++)
-                {
-                    ShapeNode sh = slide.Shapes[i];
-                    if (isSlideShowOrPreview)
-                    {
-                        if (treatAsFromSlide)
-                        {
-                            DrawShape(g, 0, 0, baseScale, sh, false, opacity);
-                        }
-                        else
-                        {
-                            bool isVis;
-                            float offX, offY, scX, scY, rDelta, opMul;
-                            GetShapeAnimationTransform(sh, slide, 0, true, false, -1, 0f, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul);
-                            if (isVis)
-                            {
-                                DrawShape(g, 0, 0, baseScale, sh, false, opacity * opMul, offX, offY, scX, scY, rDelta);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        DrawShape(g, 0, 0, baseScale, sh, false, opacity);
-                    }
-                }
-                g.Restore(gs);
-                return;
-            }
-
             DrawSlideBackground(g, targetRect, slide);
-            float slideScale = targetRect.Width / Presentation.CanvasWidth;
+            float slideScale = (baseScale > 0.0001f) ? baseScale : (targetRect.Width / (Presentation != null ? Presentation.CanvasWidth : 1920f));
 
             bool isSlideShowOrPreviewDirect = IsPresenting || IsPreviewingTransition;
             bool treatAsFromSlideDirect = isFromSlide;
@@ -14596,8 +18153,14 @@ namespace GenOffice.UI
 
         private void RenderFadeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
-            DrawSlideFull(g, rect, toSlide, scale, t);
+            if (fromSlide != null && t < 0.999f)
+            {
+                DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
+            }
+            if (toSlide != null)
+            {
+                DrawSlideFull(g, rect, toSlide, scale, t, false);
+            }
         }
 
         private void RenderPushTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
@@ -14627,14 +18190,14 @@ namespace GenOffice.UI
 
             GraphicsState gs = g.Save();
             g.SetClip(rect);
-            DrawSlideFull(g, rectA, fromSlide, scale);
-            DrawSlideFull(g, rectB, toSlide, scale);
+            DrawSlideFull(g, rectA, fromSlide, scale, 1.0f, true);
+            DrawSlideFull(g, rectB, toSlide, scale, 1.0f, false);
             g.Restore(gs);
         }
 
         private void RenderWipeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, fromSlide, scale);
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
             RectangleF wipeClip;
             switch (dir)
@@ -14655,13 +18218,13 @@ namespace GenOffice.UI
             }
             GraphicsState st = g.Save();
             g.SetClip(wipeClip);
-            DrawSlideFull(g, rect, toSlide, scale);
+            DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             g.Restore(st);
         }
 
         private void RenderSplitTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, fromSlide, scale);
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Vertical;
             GraphicsState st = g.Save();
             if (dir == TransitionDirection.Horizontal || dir == TransitionDirection.In)
@@ -14676,13 +18239,13 @@ namespace GenOffice.UI
                 RectangleF splitClip = new RectangleF(rect.X + rect.Width / 2f - splitW, rect.Y, splitW * 2f, rect.Height);
                 g.SetClip(splitClip);
             }
-            DrawSlideFull(g, rect, toSlide, scale);
+            DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             g.Restore(st);
         }
 
         private void RenderRevealTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, toSlide, scale);
+            DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
             RectangleF rectA;
             switch (dir)
@@ -14703,19 +18266,19 @@ namespace GenOffice.UI
             }
             GraphicsState gs = g.Save();
             g.SetClip(rect);
-            DrawSlideFull(g, rectA, fromSlide, scale);
+            DrawSlideFull(g, rectA, fromSlide, scale, 1.0f, true);
             g.Restore(gs);
         }
 
         private void RenderCutTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            if (t < 0.5f) DrawSlideFull(g, rect, fromSlide, scale);
-            else DrawSlideFull(g, rect, toSlide, scale);
+            if (t < 0.5f) DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
+            else DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
         }
 
         private void RenderCoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, fromSlide, scale);
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
             RectangleF rectB;
             switch (dir)
@@ -14736,13 +18299,13 @@ namespace GenOffice.UI
             }
             GraphicsState gs = g.Save();
             g.SetClip(rect);
-            DrawSlideFull(g, rectB, toSlide, scale);
+            DrawSlideFull(g, rectB, toSlide, scale, 1.0f, false);
             g.Restore(gs);
         }
 
         private void RenderUncoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, toSlide, scale);
+            DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromLeft;
             RectangleF rectA;
             switch (dir)
@@ -14763,7 +18326,7 @@ namespace GenOffice.UI
             }
             GraphicsState gs = g.Save();
             g.SetClip(rect);
-            DrawSlideFull(g, rectA, fromSlide, scale);
+            DrawSlideFull(g, rectA, fromSlide, scale, 1.0f, true);
             g.Restore(gs);
         }
 
@@ -14771,7 +18334,7 @@ namespace GenOffice.UI
         {
             if (t < 0.5f)
             {
-                DrawSlideFull(g, rect, fromSlide, scale);
+                DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
                 int flashAlpha = (int)(255 * (t * 2.0f));
                 using (SolidBrush b = new SolidBrush(Color.FromArgb(Math.Min(255, flashAlpha), 255, 255, 255)))
                 {
@@ -14780,7 +18343,7 @@ namespace GenOffice.UI
             }
             else
             {
-                DrawSlideFull(g, rect, toSlide, scale);
+                DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
                 int flashAlpha = (int)(255 * (1.0f - (t - 0.5f) * 2.0f));
                 using (SolidBrush b = new SolidBrush(Color.FromArgb(Math.Max(0, flashAlpha), 255, 255, 255)))
                 {
@@ -14791,7 +18354,7 @@ namespace GenOffice.UI
 
         private void RenderShapeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
-            DrawSlideFull(g, rect, fromSlide, scale);
+            DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) * 0.6f;
             float curR = maxR * t;
             using (GraphicsPath path = new GraphicsPath())
@@ -14799,7 +18362,7 @@ namespace GenOffice.UI
                 path.AddEllipse(rect.X + rect.Width / 2f - curR, rect.Y + rect.Height / 2f - curR, curR * 2, curR * 2);
                 GraphicsState gs = g.Save();
                 g.SetClip(path);
-                DrawSlideFull(g, rect, toSlide, scale);
+                DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
                 g.Restore(gs);
             }
         }
@@ -16192,7 +19755,7 @@ namespace GenOffice.UI
             }
         }
 
-        private float CanvaEaseInOut(float t)
+        private float SmoothFlowEaseInOut(float t)
         {
             if (t <= 0.0f) return 0.0f;
             if (t >= 1.0f) return 1.0f;
@@ -16201,7 +19764,7 @@ namespace GenOffice.UI
                 : (float)(1.0 - Math.Pow(-2.0 * t + 2.0, 4) / 2.0);
         }
 
-        private void RenderCanvaFlowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderSmoothFlowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             GraphicsState gsClip = g.Save();
             g.IntersectClip(rect);
@@ -16216,7 +19779,7 @@ namespace GenOffice.UI
             float slideCanvasH = (float)rect.Height;
 
             // 1. Layer 1: Background Parallax Camera Glide (Tầng nền trôi êm 0.40x)
-            float bgEase = CanvaEaseInOut(t);
+            float bgEase = SmoothFlowEaseInOut(t);
             float bgParallax = 0.40f;
             if (fromSlide != null)
             {
@@ -16493,6 +20056,23 @@ namespace GenOffice.UI
         #region Mouse & Keyboard Interaction Handlers
         public void HandleMouseDown(Point mousePos, int width, int height, MouseButtons buttons = MouseButtons.Left, Control parentControl = null)
         {
+            if (!IsPresenting && parentControl != null && parentControl.CanFocus)
+            {
+                bool isClickInSearchBox = (IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && ShapeTaskPane != null && ShapeTaskPane.SearchBoxBounds.Contains(mousePos));
+                if (!isClickInSearchBox)
+                {
+                    if (_shapeSearchBox != null && _shapeSearchBox.Focused)
+                    {
+                        _shapeSearchBox.Enabled = false;
+                        _shapeSearchBox.Enabled = true;
+                    }
+                    if (!parentControl.Focused)
+                    {
+                        parentControl.Focus();
+                    }
+                }
+            }
+
             if (IsPresenting)
             {
                 // Nếu đang ở Màn hình Đen Kết thúc Slide Show
@@ -16594,24 +20174,32 @@ namespace GenOffice.UI
                         if (mousePos.X >= 24 && mousePos.X <= 70)
                         {
                             PreviousPresenterStep();
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tiến (160..206)
                         if (mousePos.X >= 160 && mousePos.X <= 206)
                         {
                             AdvancePresenterStep();
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Bút & Laser (240..350)
                         if (mousePos.X >= 240 && mousePos.X <= 350)
                         {
                             ShowPenOptionsMenu(parentControl, new Point(mousePos.X, height - 70));
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tất cả Slide Grid (360..490)
                         if (mousePos.X >= 360 && mousePos.X <= 490)
                         {
                             IsSlideSorterModalOpen = true;
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Zoom (500..590)
@@ -16619,12 +20207,16 @@ namespace GenOffice.UI
                         {
                             IsSlideZoomActive = !IsSlideZoomActive;
                             SlideZoomCenter = new Point(width / 4, height / 2);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Màn đen (600..720)
                         if (mousePos.X >= 600 && mousePos.X <= 720)
                         {
                             BlackScreenMode = !BlackScreenMode;
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                     }
@@ -16637,11 +20229,15 @@ namespace GenOffice.UI
                         if (mousePos.X >= width - 80 && mousePos.X <= width - 54)
                         {
                             PresenterNotesFontSize = Math.Max(10, PresenterNotesFontSize - 2);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         if (mousePos.X >= width - 48 && mousePos.X <= width - 22)
                         {
                             PresenterNotesFontSize = Math.Min(28, PresenterNotesFontSize + 2);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                     }
@@ -16655,6 +20251,8 @@ namespace GenOffice.UI
                     {
                         PreviousPresenterStep();
                     }
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
 
@@ -16676,6 +20274,8 @@ namespace GenOffice.UI
                     if (rx >= 6 && rx <= 30 && ry >= 26)
                     {
                         AdvancePresenterStep();
+                        if (parentControl != null) parentControl.Invalidate();
+                        if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -16694,6 +20294,7 @@ namespace GenOffice.UI
                             RehearsalTotalStartTime = DateTime.Now;
                         }
                         if (parentControl != null) parentControl.Invalidate();
+                        if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -16703,6 +20304,7 @@ namespace GenOffice.UI
                         RehearsalSlideStartTime = DateTime.Now;
                         RehearsalSlideElapsed = TimeSpan.Zero;
                         if (parentControl != null) parentControl.Invalidate();
+                        if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -16735,6 +20337,8 @@ namespace GenOffice.UI
                             ShowMoreOptionsMenu(parentControl, new Point(24 + 5 * 36, height - 50));
                             break;
                     }
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
 
@@ -16793,6 +20397,8 @@ namespace GenOffice.UI
                         AdvancePresenterStep();
                     }
                 }
+                if (parentControl != null) parentControl.Invalidate();
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -16804,30 +20410,98 @@ namespace GenOffice.UI
                 return;
             }
 
-            int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int canvasW = width - leftSidebarW - rightSidebarW;
 
-            // 1. Left Slide Pane Click
-            if (ViewMode != ImpressViewMode.SlideSorter && mousePos.X <= leftSidebarW)
+            if (IsElementsDrawerOpen)
             {
-                IsDrawingShapeMode = false;
-                IsDrawingActive = false;
-                int sidebarY = contentY;
-
-                if (mousePos.Y >= sidebarY + 8 && mousePos.Y <= sidebarY + 36)
+                // 1. Click in Elements Rail & Drawer (X <= leftSidebarW)
+                if (mousePos.X <= leftSidebarW && mousePos.Y >= contentY && mousePos.Y <= height - 26)
                 {
-                    if (mousePos.X >= 8 && mousePos.X <= 100) AddSlide();
-                    else if (mousePos.X >= 106 && mousePos.X <= 198) DuplicateActiveSlide();
+                    if (HandleElementsDrawerClick(mousePos, leftSidebarW, contentY, height - contentY - 26, parentControl))
+                        return;
+                }
+
+                // 2. Click in Chevron Collapse Button
+                if (!BtnCollapseDrawerBounds.IsEmpty && BtnCollapseDrawerBounds.Contains(mousePos))
+                {
+                    IsElementsDrawerCollapsed = !IsElementsDrawerCollapsed;
+                    ZoomToFit();
+                    if (parentControl != null) parentControl.Invalidate();
                     return;
                 }
 
-                int curY = sidebarY + 44 - ThumbScrollY;
-                int thumbW = 150;
-                int thumbH = Presentation.IsWidescreen ? (thumbW * 9 / 16) : (thumbW * 3 / 4);
+                // 3. Click in Bottom Horizontal Filmstrip
+                if (bottomThumbH > 0 && mousePos.Y >= height - 26 - bottomThumbH && mousePos.Y <= height - 26 && mousePos.X >= canvasX)
+                {
+                    if (HandleBottomThumbnailStripClick(mousePos, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH, parentControl))
+                        return;
+                }
+            }
+            else
+            {
+                // 1. Left Slide Pane Click
+                bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                int islandMarginX = 10;
+                int islandMarginTop = 3;
+                int islandMarginBtm = 8;
+                Rectangle paneRect = isIsland
+                    ? new Rectangle(islandMarginX, contentY + islandMarginTop, leftSidebarW - islandMarginX, contentH - islandMarginTop - islandMarginBtm)
+                    : new Rectangle(0, contentY, leftSidebarW, contentH);
+
+                if (ViewMode != ImpressViewMode.SlideSorter && (isIsland ? paneRect.Contains(mousePos) : mousePos.X <= leftSidebarW))
+                {
+                    IsDrawingShapeMode = false;
+                    IsDrawingActive = false;
+
+                // 1. Buttons "+ Slide Mới" & "Nhân Bản"
+                if (!BtnAddSlideBounds.IsEmpty && BtnAddSlideBounds.Contains(mousePos))
+                {
+                    AddSlide();
+                    return;
+                }
+                if (!BtnDupSlideBounds.IsEmpty && BtnDupSlideBounds.Contains(mousePos))
+                {
+                    DuplicateActiveSlide();
+                    return;
+                }
+
+                // 2. Fast Scrollbar Thumb click (start drag)
+                if (!ThumbScrollBarThumbRect.IsEmpty && ThumbScrollBarThumbRect.Contains(mousePos))
+                {
+                    _isDraggingThumbScrollBar = true;
+                    _thumbScrollDragStartMouseY = mousePos.Y;
+                    _thumbScrollDragStartScrollY = ThumbScrollY;
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+
+                // 3. Fast Scrollbar Track click (jump)
+                if (!ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos))
+                {
+                    int trackH = ThumbScrollBarTrackRect.Height;
+                    int thumbBarH = ThumbScrollBarThumbRect.Height;
+                    int availY = trackH - thumbBarH;
+                    int totalContentH = GetTotalThumbContentHeight(paneRect.Width);
+                    int maxScroll = Math.Max(0, totalContentH - (paneRect.Height - 48));
+                    if (availY > 0 && maxScroll > 0)
+                    {
+                        float ratio = (float)(mousePos.Y - ThumbScrollBarTrackRect.Y - thumbBarH / 2) / availY;
+                        ratio = Math.Max(0f, Math.Min(1f, ratio));
+                        ThumbScrollY = (int)(ratio * maxScroll);
+                        _isDraggingThumbScrollBar = true;
+                        _thumbScrollDragStartMouseY = mousePos.Y;
+                        _thumbScrollDragStartScrollY = ThumbScrollY;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+
+                // 4. Slide Thumbnails & Section Headers click
+                int thumbX, thumbW, thumbH;
+                GetThumbnailMetrics(paneRect.Width, out thumbX, out thumbW, out thumbH);
+                int curY = paneRect.Y + 44 + 10 - ThumbScrollY;
                 bool currentCollapsed = false;
 
                 for (int i = 0; i < Presentation.Slides.Count; i++)
@@ -16835,7 +20509,7 @@ namespace GenOffice.UI
                     SlideNode s = Presentation.Slides[i];
                     if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
                     {
-                        Rectangle secRect = new Rectangle(6, curY, leftSidebarW - 10, 24);
+                        Rectangle secRect = new Rectangle(paneRect.X + 6, curY, paneRect.Width - 10, 24);
                         if (secRect.Contains(mousePos))
                         {
                             if (buttons == MouseButtons.Right)
@@ -16848,7 +20522,10 @@ namespace GenOffice.UI
                                 s.IsSectionCollapsed = !s.IsSectionCollapsed;
                                 ActiveSlideIndex = i;
                                 SelectedShapeIndex = -1;
+                                if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                                 EndInlineEditing();
+                                CanvasScrollX = 0;
+                                CanvasScrollY = 0;
                                 if (parentControl != null) parentControl.Invalidate();
                                 return;
                             }
@@ -16874,11 +20551,15 @@ namespace GenOffice.UI
                             int prevIdx = ActiveSlideIndex;
                             ActiveSlideIndex = i;
                             SelectedShapeIndex = -1;
+                            if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                             EndInlineEditing();
+                            CanvasScrollX = 0;
+                            CanvasScrollY = 0;
 
-                            if (prevIdx != i && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                            // Khi chua trinh chieu thi khong cho chay hieu ung vi se lag
+                            if (IsPresenting && prevIdx != i && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                             {
-                                TriggerTransition(prevIdx, i, true);
+                                TriggerTransition(prevIdx, i, false);
                             }
                             if (parentControl != null) parentControl.Invalidate();
                             return;
@@ -16893,6 +20574,7 @@ namespace GenOffice.UI
                     ShowThumbnailContextMenu(parentControl, mousePos, Math.Max(0, Presentation.Slides.Count - 1));
                 }
                 return;
+            }
             }
 
             // 2. Right Task Pane Click (if open)
@@ -17608,7 +21290,7 @@ namespace GenOffice.UI
 
                 int slideX, slideY, slideW, slideH;
                 float scale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
 
                 // Xử lý Chế độ Vẽ tự do đường chuyển động (Motion Path Freehand Drawing Mode)
                 if (IsDrawingMotionPathMode)
@@ -17796,6 +21478,34 @@ namespace GenOffice.UI
                             IsSelectingTableCells = false;
                             DragStartMouse = mousePos;
                             DragStartTransform = shape.Transform.Clone();
+                            DragStartTransforms.Clear();
+                            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                            {
+                                foreach (int idx in SelectedShapeIndices)
+                                {
+                                    if (idx >= 0 && idx < slide.Shapes.Count)
+                                    {
+                                        DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                    }
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    // Corner rounding knob (Icon bo góc)
+                    if (CanShapeRoundCorners(shape))
+                    {
+                        PointF crH = GetRotatedCornerRadiusHandle(sx, sy, sw, sh, shape.Transform.Rotation);
+                        float dCrX = mousePos.X - crH.X;
+                        float dCrY = mousePos.Y - crH.Y;
+                        if (dCrX * dCrX + dCrY * dCrY <= 196f) // 14px hit radius
+                        {
+                            SaveUndoState();
+                            IsAdjustingCornerRadius = true;
+                            DragStartMouse = mousePos;
+                            DragStartTransform = shape.Transform.Clone();
+                            DragStartCornerRadius = shape.GetEffectiveCornerRadius();
                             return;
                         }
                     }
@@ -17870,29 +21580,40 @@ namespace GenOffice.UI
                     bool isCtrlOrShift = (Control.ModifierKeys & Keys.Control) != 0 || (Control.ModifierKeys & Keys.Shift) != 0;
                     if (isCtrlOrShift)
                     {
-                        if (SelectedShapeIndices.Contains(hitIndex))
-                        {
-                            SelectedShapeIndices.Remove(hitIndex);
-                            SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
-                        }
-                        else
+                        EndInlineEditing();
+                        if (SelectedShapeIndices == null) SelectedShapeIndices = new List<int>();
+                        if (!SelectedShapeIndices.Contains(hitIndex))
                         {
                             SelectedShapeIndices.Add(hitIndex);
                             SelectedShapeIndex = hitIndex;
+                            _pendingDeselectOnMouseUp = false;
+                        }
+                        else
+                        {
+                            // Already in selection -> keep selected so mouse drag moves all of them; deselect on mouse up if clicked without drag
+                            SelectedShapeIndex = hitIndex;
+                            _pendingDeselectOnMouseUp = true;
+                            _pendingDeselectIndex = hitIndex;
                         }
                     }
                     else
                     {
-                        if (!SelectedShapeIndices.Contains(hitIndex) || SelectedShapeIndices.Count > 1)
+                        if (SelectedShapeIndices == null) SelectedShapeIndices = new List<int>();
+                        if (!SelectedShapeIndices.Contains(hitIndex))
                         {
                             EndInlineEditing();
                             SelectedShapeIndices.Clear();
                             SelectedShapeIndices.Add(hitIndex);
                             SelectedShapeIndex = hitIndex;
                         }
+                        else
+                        {
+                            SelectedShapeIndex = hitIndex;
+                        }
+                        _pendingDeselectOnMouseUp = false;
                     }
 
-                    if (hitShape.Type == ShapeType.Table)
+                    if (hitShape.Type == ShapeType.Table && (SelectedShapeIndices == null || SelectedShapeIndices.Count <= 1))
                     {
                         int sx = slideX + (int)(hitShape.Transform.X * scale);
                         int sy = slideY + (int)(hitShape.Transform.Y * scale);
@@ -17905,13 +21626,9 @@ namespace GenOffice.UI
 
                         int cols = Math.Max(1, hitShape.TableColumns);
                         int rows = Math.Max(1, hitShape.TableRows);
-                        float cellW = sw / (float)cols;
-                        float cellH = sh / (float)rows;
 
-                        int c = (int)((mousePos.X - sx) / cellW);
-                        int r = (int)((mousePos.Y - sy) / cellH);
-                        c = Math.Max(0, Math.Min(cols - 1, c));
-                        r = Math.Max(0, Math.Min(rows - 1, r));
+                        int c = hitShape.HitTestColumn(mousePos.X - sx, sw);
+                        int r = hitShape.HitTestRow(mousePos.Y - sy, sh);
 
                         hitShape.TableSelectedCellRow = r;
                         hitShape.TableSelectedCellCol = c;
@@ -17926,6 +21643,17 @@ namespace GenOffice.UI
                             IsSelectingTableCells = false;
                             DragStartMouse = mousePos;
                             DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+                            DragStartTransforms.Clear();
+                            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                            {
+                                foreach (int idx in SelectedShapeIndices)
+                                {
+                                    if (idx >= 0 && idx < slide.Shapes.Count)
+                                    {
+                                        DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                    }
+                                }
+                            }
 
                             if (buttons == MouseButtons.Right)
                             {
@@ -17958,8 +21686,8 @@ namespace GenOffice.UI
                         int vh = (int)(hitShape.Transform.Height * scale);
                         float barH = Math.Max(26f, 34f * scale);
 
-                        // 1. Playback Bar Click (Play, Timeline, Volume)
-                        if (mousePos.Y >= vy + vh - barH && mousePos.Y <= vy + vh && mousePos.X >= vx && mousePos.X <= vx + vw)
+                        // 1. Playback Bar Click (Play, Timeline, Volume) - ONLY when shape is already selected!
+                        if (SelectedShape == hitShape && mousePos.Y >= vy + vh - barH && mousePos.Y <= vy + vh && mousePos.X >= vx && mousePos.X <= vx + vw)
                         {
                             float relX = mousePos.X - vx;
                             float btnSz = barH * 0.55f;
@@ -17985,23 +21713,21 @@ namespace GenOffice.UI
                             }
                             else
                             {
-                                hitShape.VideoVolume = (hitShape.VideoVolume == VideoVolumeLevel.Mute) ? VideoVolumeLevel.High : VideoVolumeLevel.Mute;
+                                SlideVideoPlayerManager.Instance.ToggleVolume();
                                 return;
                             }
                         }
+                    }
 
-                        // 2. Center Play button click
-                        if (!SlideVideoPlayerManager.Instance.IsPlaying || SlideVideoPlayerManager.Instance.ActiveShape != hitShape)
-                        {
-                            float iconSz = Math.Min(vw * 0.28f, vh * 0.35f);
-                            float iconX = vx + (vw - iconSz) / 2f;
-                            float iconY = vy + (vh - iconSz) / 2f;
-                            if (new RectangleF(iconX, iconY, iconSz, iconSz).Contains(mousePos))
-                            {
-                                PlayVideoPreview(hitShape, parentControl);
-                                return;
-                            }
-                        }
+                    if (IsInlineEditing && EditingShape == hitShape)
+                    {
+                        IsDraggingShape = false;
+                        CaretIndex = GetTextCharIndexFromPoint(mousePos, hitShape, slideX, slideY, scale);
+                        TextSelectionStart = CaretIndex;
+                        TextSelectionLength = 0;
+                        IsSelectingText = true;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
                     }
 
                     SyncSelectedAnimationWithShape();
@@ -18009,13 +21735,40 @@ namespace GenOffice.UI
                     IsDraggingShape = true;
                     DragStartMouse = mousePos;
                     DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+                    DragStartTransforms.Clear();
+                    if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                    {
+                        foreach (int idx in SelectedShapeIndices)
+                        {
+                            if (idx >= 0 && idx < slide.Shapes.Count)
+                            {
+                                DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    SelectedShapeIndex = -1;
-                    SelectedShapeIndices.Clear();
+                    bool isCtrlOrShift = (Control.ModifierKeys & Keys.Control) != 0 || (Control.ModifierKeys & Keys.Shift) != 0;
+                    if (!isCtrlOrShift)
+                    {
+                        SelectedShapeIndex = -1;
+                        SelectedShapeIndices.Clear();
+                        _rubberbandInitialSelection.Clear();
+                    }
+                    else
+                    {
+                        _rubberbandInitialSelection = new HashSet<int>(SelectedShapeIndices);
+                    }
                     SelectedAnimationIndex = -1;
                     EndInlineEditing();
+
+                    if (buttons == MouseButtons.Left)
+                    {
+                        IsRubberbandSelecting = true;
+                        RubberbandStartPoint = mousePos;
+                        RubberbandCurrentPoint = mousePos;
+                    }
                 }
 
                 if (buttons == MouseButtons.Right)
@@ -18031,23 +21784,91 @@ namespace GenOffice.UI
                     return;
                 }
             }
+            else if (ViewMode == ImpressViewMode.SlideSorter && Presentation != null)
+            {
+                int cardW = 240;
+                int cardH = Presentation.IsWidescreen ? (cardW * 9 / 16) : (cardW * 3 / 4);
+                int padding = 30;
+                int cols = Math.Max(1, (width - padding) / (cardW + padding));
+
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    int row = i / cols;
+                    int col = i % cols;
+                    int cx = padding + col * (cardW + padding);
+                    int cy = contentY + padding + row * (cardH + padding + 30);
+                    Rectangle cardRect = new Rectangle(cx, cy, cardW, cardH + 28);
+
+                    if (cardRect.Contains(mousePos))
+                    {
+                        ActiveSlideIndex = i;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+            }
+            else if (ViewMode == ImpressViewMode.Outline && Presentation != null)
+            {
+                int itemH = 50;
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    int itemY = contentY + 20 + i * (itemH + 10);
+                    Rectangle itemRect = new Rectangle(leftSidebarW + 30, itemY, canvasW - 60, itemH);
+                    if (itemRect.Contains(mousePos))
+                    {
+                        ActiveSlideIndex = i;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+            }
         }
 
         public void HandleDoubleClick(Point mousePos, int width, int height, Control parentControl = null)
         {
             if (IsPresenting) return;
+            if (ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.Outline)
+            {
+                ViewMode = ImpressViewMode.Normal;
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
             if (ActiveSlide == null) return;
 
-            int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int canvasW = width - leftSidebarW - rightSidebarW;
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
 
             int slideX, slideY, slideW, slideH;
             float scale;
-            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+            GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            if (SelectedShape != null && CanShapeRoundCorners(SelectedShape))
+            {
+                ShapeNode selShape = SelectedShape;
+                int ssx = slideX + (int)(selShape.Transform.X * scale);
+                int ssy = slideY + (int)(selShape.Transform.Y * scale);
+                int ssw = (int)(selShape.Transform.Width * scale);
+                int ssh = (int)(selShape.Transform.Height * scale);
+                PointF crH = GetRotatedCornerRadiusHandle(ssx, ssy, ssw, ssh, selShape.Transform.Rotation);
+                float dCrX = mousePos.X - crH.X;
+                float dCrY = mousePos.Y - crH.Y;
+                if (dCrX * dCrX + dCrY * dCrY <= 196f)
+                {
+                    SaveUndoState();
+                    if (selShape.GetEffectiveCornerRadius() > 0.5f)
+                    {
+                        selShape.CornerRadius = 0f;
+                        selShape.Type = ShapeType.Rectangle;
+                    }
+                    else
+                    {
+                        selShape.CornerRadius = Math.Min(20f, Math.Min(selShape.Transform.Width, selShape.Transform.Height) / 2f);
+                        selShape.Type = ShapeType.RoundedRectangle;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+            }
 
             for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
             {
@@ -18125,6 +21946,10 @@ namespace GenOffice.UI
                     else
                     {
                         StartInlineEditing(shape);
+                        CaretIndex = GetTextCharIndexFromPoint(mousePos, shape, slideX, slideY, scale);
+                        TextSelectionStart = CaretIndex;
+                        TextSelectionLength = 0;
+                        if (parentControl != null) parentControl.Invalidate();
                     }
                     break;
                 }
@@ -18149,6 +21974,8 @@ namespace GenOffice.UI
                 {
                     CurrentStroke.Add(mousePos);
                 }
+
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -18158,18 +21985,54 @@ namespace GenOffice.UI
                 return;
             }
 
-            int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
+            if (IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && ShapeTaskPane != null)
+            {
+                if (ShapeTaskPane.HandleMouseMove(mousePos))
+                {
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+            }
+
+            // Left Thumbnail Fast Scrollbar Dragging & Hover
+            if (_isDraggingThumbScrollBar)
+            {
+                int trackH = ThumbScrollBarTrackRect.Height;
+                int thumbBarH = ThumbScrollBarThumbRect.Height;
+                int availY = trackH - thumbBarH;
+                bool isIslandMode = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                int paneW = isIslandMode ? 200 : 210;
+                int viewH = (LastThumbViewportHeight > 0) ? LastThumbViewportHeight : 500;
+                int totalContentH = GetTotalThumbContentHeight(paneW);
+                int maxScroll = Math.Max(0, totalContentH - viewH);
+                if (availY > 0 && maxScroll > 0)
+                {
+                    int deltaY = mousePos.Y - _thumbScrollDragStartMouseY;
+                    int newScroll = _thumbScrollDragStartScrollY + (int)((float)deltaY / availY * maxScroll);
+                    ThumbScrollY = Math.Max(0, Math.Min(maxScroll, newScroll));
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+                return;
+            }
+
+            bool prevHoverThumb = _isHoverThumbScrollBarThumb;
+            bool prevHoverTrack = _isHoverThumbScrollBar;
+            _isHoverThumbScrollBarThumb = !ThumbScrollBarThumbRect.IsEmpty && ThumbScrollBarThumbRect.Contains(mousePos);
+            _isHoverThumbScrollBar = !ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos);
+            if (prevHoverThumb != _isHoverThumbScrollBarThumb || prevHoverTrack != _isHoverThumbScrollBar)
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int canvasW = width - leftSidebarW - rightSidebarW;
 
             if (IsColorPickingMode && SelectedShape != null && SelectedShape.CachedImage != null)
             {
                 int cpSlideX, cpSlideY, cpSlideW, cpSlideH;
                 float cpScale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out cpSlideX, out cpSlideY, out cpSlideW, out cpSlideH, out cpScale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out cpSlideX, out cpSlideY, out cpSlideW, out cpSlideH, out cpScale);
                 ShapeNode cpShape = SelectedShape;
                 float imgX = cpSlideX + cpShape.Transform.X * cpScale;
                 float imgY = cpSlideY + cpShape.Transform.Y * cpScale;
@@ -18197,7 +22060,7 @@ namespace GenOffice.UI
             {
                 int bgSlideX, bgSlideY, bgSlideW, bgSlideH;
                 float bgScale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out bgSlideX, out bgSlideY, out bgSlideW, out bgSlideH, out bgScale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out bgSlideX, out bgSlideY, out bgSlideW, out bgSlideH, out bgScale);
                 ShapeNode bgShape = SelectedShape;
                 float imgX = bgSlideX + bgShape.Transform.X * bgScale;
                 float imgY = bgSlideY + bgShape.Transform.Y * bgScale;
@@ -18234,7 +22097,7 @@ namespace GenOffice.UI
                 {
                     int cropSlideX, cropSlideY, cropSlideW, cropSlideH;
                     float cropScale;
-                    GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out cropSlideX, out cropSlideY, out cropSlideW, out cropSlideH, out cropScale);
+                    GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out cropSlideX, out cropSlideY, out cropSlideW, out cropSlideH, out cropScale);
                     ShapeNode cropTarget = SelectedShape;
 
                     float dx = (mousePos.X - CropDragStartMouse.X) / cropScale;
@@ -18312,7 +22175,7 @@ namespace GenOffice.UI
             {
                 int tblSlideX, tblSlideY, tblSlideW, tblSlideH;
                 float tblScale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out tblSlideX, out tblSlideY, out tblSlideW, out tblSlideH, out tblScale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out tblSlideX, out tblSlideY, out tblSlideW, out tblSlideH, out tblScale);
 
                 int sx = tblSlideX + (int)(SelectedShape.Transform.X * tblScale);
                 int sy = tblSlideY + (int)(SelectedShape.Transform.Y * tblScale);
@@ -18321,13 +22184,9 @@ namespace GenOffice.UI
 
                 int cols = Math.Max(1, SelectedShape.TableColumns);
                 int rows = Math.Max(1, SelectedShape.TableRows);
-                float cellW = sw / (float)cols;
-                float cellH = sh / (float)rows;
 
-                int c = (int)((mousePos.X - sx) / cellW);
-                int r = (int)((mousePos.Y - sy) / cellH);
-                c = Math.Max(0, Math.Min(cols - 1, c));
-                r = Math.Max(0, Math.Min(rows - 1, r));
+                int c = SelectedShape.HitTestColumn(mousePos.X - sx, sw);
+                int r = SelectedShape.HitTestRow(mousePos.Y - sy, sh);
 
                 SelectedShape.TableSelectedEndRow = r;
                 SelectedShape.TableSelectedEndCol = c;
@@ -18474,7 +22333,78 @@ namespace GenOffice.UI
 
             int slideX, slideY, slideW, slideH;
             float scale;
-            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+            GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            // 0. Rubberband / Marquee Multi-Shape Selection MouseMove (Quét khối chọn đối tượng)
+            if (IsRubberbandSelecting && ActiveSlide != null)
+            {
+                RubberbandCurrentPoint = mousePos;
+                int rx = Math.Min(RubberbandStartPoint.X, RubberbandCurrentPoint.X);
+                int ry = Math.Min(RubberbandStartPoint.Y, RubberbandCurrentPoint.Y);
+                int rw = Math.Abs(RubberbandStartPoint.X - RubberbandCurrentPoint.X);
+                int rh = Math.Abs(RubberbandStartPoint.Y - RubberbandCurrentPoint.Y);
+                RectangleF marqueeRect = new RectangleF(rx, ry, rw, rh);
+
+                SelectedShapeIndices.Clear();
+                if (_rubberbandInitialSelection != null && _rubberbandInitialSelection.Count > 0)
+                {
+                    foreach (int initIdx in _rubberbandInitialSelection)
+                    {
+                        if (initIdx >= 0 && initIdx < ActiveSlide.Shapes.Count)
+                            SelectedShapeIndices.Add(initIdx);
+                    }
+                }
+
+                if (rw > 3 || rh > 3)
+                {
+                    for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+                    {
+                        ShapeNode s = ActiveSlide.Shapes[i];
+                        if (s == null || !s.IsVisible || (s.Name != null && s.Name.StartsWith("__morph_ghost__"))) continue;
+
+                        float sx = slideX + s.Transform.X * scale;
+                        float sy = slideY + s.Transform.Y * scale;
+                        float sw = s.Transform.Width * scale;
+                        float sh = s.Transform.Height * scale;
+
+                        // Kiểm tra quét full 100% cả khung của thành phần đó theo đúng yêu cầu người dùng
+                        bool isFullyEnclosed = true;
+                        if (Math.Abs(s.Transform.Rotation) > 0.01f)
+                        {
+                            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+                            PointF[] corners = new PointF[] {
+                                RotatePoint(new PointF(sx, sy), center, s.Transform.Rotation),
+                                RotatePoint(new PointF(sx + sw, sy), center, s.Transform.Rotation),
+                                RotatePoint(new PointF(sx, sy + sh), center, s.Transform.Rotation),
+                                RotatePoint(new PointF(sx + sw, sy + sh), center, s.Transform.Rotation)
+                            };
+                            for (int ci = 0; ci < 4; ci++)
+                            {
+                                if (corners[ci].X < marqueeRect.Left || corners[ci].X > marqueeRect.Right ||
+                                    corners[ci].Y < marqueeRect.Top || corners[ci].Y > marqueeRect.Bottom)
+                                {
+                                    isFullyEnclosed = false;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            isFullyEnclosed = (sx >= marqueeRect.Left && (sx + sw) <= marqueeRect.Right &&
+                                               sy >= marqueeRect.Top && (sy + sh) <= marqueeRect.Bottom);
+                        }
+
+                        if (isFullyEnclosed && !SelectedShapeIndices.Contains(i))
+                        {
+                            SelectedShapeIndices.Add(i);
+                        }
+                    }
+                }
+
+                SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
 
             // 1. Motion Path Freehand Sketching MouseMove
             if (IsDrawingMotionPathMode && IsDrawingMotionPathActive)
@@ -18547,8 +22477,27 @@ namespace GenOffice.UI
                 return;
             }
 
+            if (IsSelectingText && IsInlineEditing && EditingShape != null)
+            {
+                int currIdx = GetTextCharIndexFromPoint(mousePos, EditingShape, slideX, slideY, scale);
+                TextSelectionLength = currIdx - TextSelectionStart;
+                CaretIndex = currIdx;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
             if (IsDraggingShape && shape != null)
             {
+                if (_pendingDeselectOnMouseUp)
+                {
+                    int dmx = Math.Abs(mousePos.X - DragStartMouse.X);
+                    int dmy = Math.Abs(mousePos.Y - DragStartMouse.Y);
+                    if (dmx > 3 || dmy > 3)
+                    {
+                        _pendingDeselectOnMouseUp = false;
+                    }
+                }
+
                 float rawDx = (mousePos.X - DragStartMouse.X) / scale;
                 float rawDy = (mousePos.Y - DragStartMouse.Y) / scale;
 
@@ -18558,8 +22507,26 @@ namespace GenOffice.UI
                 float snappedX, snappedY;
                 ApplySmartSnapping(shape, rawX, rawY, out snappedX, out snappedY);
 
-                shape.Transform.X = snappedX;
-                shape.Transform.Y = snappedY;
+                float deltaX = snappedX - DragStartTransform.X;
+                float deltaY = snappedY - DragStartTransform.Y;
+
+                if (DragStartTransforms != null && DragStartTransforms.Count > 1)
+                {
+                    foreach (KeyValuePair<int, Transform2D> kvp in DragStartTransforms)
+                    {
+                        int sIdx = kvp.Key;
+                        if (ActiveSlide != null && sIdx >= 0 && sIdx < ActiveSlide.Shapes.Count)
+                        {
+                            ActiveSlide.Shapes[sIdx].Transform.X = kvp.Value.X + deltaX;
+                            ActiveSlide.Shapes[sIdx].Transform.Y = kvp.Value.Y + deltaY;
+                        }
+                    }
+                }
+                else
+                {
+                    shape.Transform.X = snappedX;
+                    shape.Transform.Y = snappedY;
+                }
 
                 if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
                 {
@@ -18572,6 +22539,38 @@ namespace GenOffice.UI
                 return;
             }
 
+            if (IsAdjustingCornerRadius && shape != null)
+            {
+                float dx = (mousePos.X - DragStartMouse.X) / scale;
+                float dy = (mousePos.Y - DragStartMouse.Y) / scale;
+
+                float rotRad = (float)(-shape.Transform.Rotation * Math.PI / 180.0);
+                float cosR = (float)Math.Cos(rotRad);
+                float sinR = (float)Math.Sin(rotRad);
+                float localDx = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * cosR - dy * sinR) : dx;
+                float localDy = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * sinR + dy * cosR) : dy;
+
+                // Dragging inward (leftward / downward relative to top-right corner) increases radius
+                // Dragging outward (rightward / upward) decreases radius to 0
+                float inwardDelta = (-localDx + localDy) * 0.7071f;
+
+                float maxR = Math.Min(shape.Transform.Width, shape.Transform.Height) / 2f;
+                float newR = Math.Max(0f, Math.Min(maxR, DragStartCornerRadius + inwardDelta));
+                shape.CornerRadius = (float)Math.Round(newR);
+
+                if (shape.Type == ShapeType.Rectangle && shape.CornerRadius > 0.5f)
+                {
+                    shape.Type = ShapeType.RoundedRectangle;
+                }
+                else if (shape.Type == ShapeType.RoundedRectangle && shape.CornerRadius <= 0.5f)
+                {
+                    shape.Type = ShapeType.Rectangle;
+                }
+
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
             if (IsResizingShape && shape != null)
             {
                 float dx = (mousePos.X - DragStartMouse.X) / scale;
@@ -18579,69 +22578,120 @@ namespace GenOffice.UI
                 float startW = DragStartTransform.Width;
                 float startH = DragStartTransform.Height;
                 float ratio = startW / Math.Max(1.0f, startH);
+                bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0;
+
+                float rotRad = (float)(-shape.Transform.Rotation * Math.PI / 180.0);
+                float cosR = (float)Math.Cos(rotRad);
+                float sinR = (float)Math.Sin(rotRad);
+                float localDx = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * cosR - dy * sinR) : dx;
+                float localDy = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * sinR + dy * cosR) : dy;
 
                 switch (DragResizeHandleIndex)
                 {
-                    case 0: // Top-Left (Góc: Kéo đều tỉ lệ vuông góc)
+                    case 0: // Top-Left (Góc trên trái: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
                         {
-                            float drag = (Math.Abs(dx) > Math.Abs(dy * ratio)) ? -dx : -(dy * ratio);
-                            float newW = Math.Max(20f, startW + drag);
-                            float newH = newW / ratio;
-                            shape.Transform.X = DragStartTransform.X + (startW - newW);
-                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                            shape.Transform.Width = newW;
-                            shape.Transform.Height = newH;
+                            if (keepAspect)
+                            {
+                                float drag = (Math.Abs(localDx) > Math.Abs(localDy * ratio)) ? -localDx : -(localDy * ratio);
+                                float newW = Math.Max(10f, startW + drag);
+                                float newH = newW / ratio;
+                                shape.Transform.X = DragStartTransform.X + (startW - newW);
+                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
+                            else
+                            {
+                                float newW = Math.Max(10f, startW - localDx);
+                                float newH = Math.Max(10f, startH - localDy);
+                                shape.Transform.X = DragStartTransform.X + (startW - newW);
+                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
                         }
                         break;
                     case 1: // Top-Center (Cạnh trên)
                         {
-                            float newH = Math.Max(20f, startH - dy);
+                            float newH = Math.Max(10f, startH - localDy);
                             shape.Transform.Y = DragStartTransform.Y + (startH - newH);
                             shape.Transform.Height = newH;
                         }
                         break;
-                    case 2: // Top-Right (Góc: Kéo đều tỉ lệ vuông góc)
+                    case 2: // Top-Right (Góc trên phải: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
                         {
-                            float drag = (Math.Abs(dx) > Math.Abs(-dy * ratio)) ? dx : -(dy * ratio);
-                            float newW = Math.Max(20f, startW + drag);
-                            float newH = newW / ratio;
-                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                            shape.Transform.Width = newW;
-                            shape.Transform.Height = newH;
+                            if (keepAspect)
+                            {
+                                float drag = (Math.Abs(localDx) > Math.Abs(-localDy * ratio)) ? localDx : -(localDy * ratio);
+                                float newW = Math.Max(10f, startW + drag);
+                                float newH = newW / ratio;
+                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
+                            else
+                            {
+                                float newW = Math.Max(10f, startW + localDx);
+                                float newH = Math.Max(10f, startH - localDy);
+                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
                         }
                         break;
                     case 3: // Right-Center (Cạnh phải)
                         {
-                            shape.Transform.Width = Math.Max(20f, startW + dx);
+                            shape.Transform.Width = Math.Max(10f, startW + localDx);
                         }
                         break;
-                    case 4: // Bottom-Right (Góc: Kéo đều tỉ lệ vuông góc)
+                    case 4: // Bottom-Right (Góc dưới phải: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
                         {
-                            float drag = (Math.Abs(dx) > Math.Abs(dy * ratio)) ? dx : (dy * ratio);
-                            float newW = Math.Max(20f, startW + drag);
-                            float newH = newW / ratio;
-                            shape.Transform.Width = newW;
-                            shape.Transform.Height = newH;
+                            if (keepAspect)
+                            {
+                                float drag = (Math.Abs(localDx) > Math.Abs(localDy * ratio)) ? localDx : (localDy * ratio);
+                                float newW = Math.Max(10f, startW + drag);
+                                float newH = newW / ratio;
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
+                            else
+                            {
+                                float newW = Math.Max(10f, startW + localDx);
+                                float newH = Math.Max(10f, startH + localDy);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
                         }
                         break;
                     case 5: // Bottom-Center (Cạnh dưới)
                         {
-                            shape.Transform.Height = Math.Max(20f, startH + dy);
+                            shape.Transform.Height = Math.Max(10f, startH + localDy);
                         }
                         break;
-                    case 6: // Bottom-Left (Góc: Kéo đều tỉ lệ vuông góc)
+                    case 6: // Bottom-Left (Góc dưới trái: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
                         {
-                            float drag = (Math.Abs(-dx) > Math.Abs(dy * ratio)) ? -dx : (dy * ratio);
-                            float newW = Math.Max(20f, startW + drag);
-                            float newH = newW / ratio;
-                            shape.Transform.X = DragStartTransform.X + (startW - newW);
-                            shape.Transform.Width = newW;
-                            shape.Transform.Height = newH;
+                            if (keepAspect)
+                            {
+                                float drag = (Math.Abs(-localDx) > Math.Abs(localDy * ratio)) ? -localDx : (localDy * ratio);
+                                float newW = Math.Max(10f, startW + drag);
+                                float newH = newW / ratio;
+                                shape.Transform.X = DragStartTransform.X + (startW - newW);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
+                            else
+                            {
+                                float newW = Math.Max(10f, startW - localDx);
+                                float newH = Math.Max(10f, startH + localDy);
+                                shape.Transform.X = DragStartTransform.X + (startW - newW);
+                                shape.Transform.Width = newW;
+                                shape.Transform.Height = newH;
+                            }
                         }
                         break;
                     case 7: // Left-Center (Cạnh trái)
                         {
-                            float newW = Math.Max(20f, startW - dx);
+                            float newW = Math.Max(10f, startW - localDx);
                             shape.Transform.X = DragStartTransform.X + (startW - newW);
                             shape.Transform.Width = newW;
                         }
@@ -18909,16 +22959,13 @@ namespace GenOffice.UI
 
         public Cursor GetCursorForPosition(Point mousePos, int width, int height)
         {
-            int topBarY = 155;
-            int contentY = topBarY;
-            int contentH = height - contentY - 26;
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-            int canvasW = width - leftSidebarW - rightSidebarW;
 
             // 1. Khi rê chuột qua thanh thumbnail bên trái, ribbon ở trên, task pane bên phải hoặc thanh trạng thái ở dưới:
             // Luôn trả về con trỏ chuột bình thường (Cursors.Default)
-            if (mousePos.Y < topBarY || mousePos.Y >= height - 26 || mousePos.X < leftSidebarW || mousePos.X >= width - rightSidebarW)
+            if (mousePos.Y < contentY || mousePos.Y >= height - 26 || mousePos.X < canvasX || mousePos.X >= width - rightSidebarW)
             {
                 return Cursors.Default;
             }
@@ -18935,7 +22982,7 @@ namespace GenOffice.UI
             {
                 return Cursors.Default;
             }
-            if (hasVScroll && mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW)
+            if (hasVScroll && mousePos.X >= canvasX + canvasW - sbW && mousePos.X <= canvasX + canvasW)
             {
                 return Cursors.Default;
             }
@@ -18967,7 +23014,7 @@ namespace GenOffice.UI
 
             int slideX, slideY, slideW, slideH;
             float scale;
-            GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+            GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
 
             // Kiểm tra con trỏ trên chấm đỏ End Dot của Đường chuyển động
             if (ActiveSlide != null && ActiveSlide.Animations != null && ActiveSlide.Animations.Count > 0)
@@ -19028,6 +23075,18 @@ namespace GenOffice.UI
                     return Cursors.Default;
                 }
 
+                // Corner rounding knob (Icon bo góc)
+                if (CanShapeRoundCorners(shape))
+                {
+                    PointF crH = GetRotatedCornerRadiusHandle(sx, sy, sw, sh, shape.Transform.Rotation);
+                    float dCrX = mousePos.X - crH.X;
+                    float dCrY = mousePos.Y - crH.Y;
+                    if (dCrX * dCrX + dCrY * dCrY <= 196f) // 14px radius
+                    {
+                        return Cursors.Hand;
+                    }
+                }
+
                 // Rotation knob (Mũi tên xoay)
                 PointF rotH = GetRotatedRotationHandle(sx, sy, sw, sh, shape.Transform.Rotation);
                 float dRotX = mousePos.X - rotH.X;
@@ -19086,7 +23145,35 @@ namespace GenOffice.UI
                     : new RectangleF(sx, sy, sw, sh);
                 if (shapeBounds.Contains(unrotatedMouse))
                 {
+                    if (IsInlineEditing && EditingShape == shape)
+                    {
+                        return Cursors.IBeam;
+                    }
                     return Cursors.SizeAll;
+                }
+            }
+
+            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 1 && ActiveSlide != null)
+            {
+                foreach (int idx in SelectedShapeIndices)
+                {
+                    if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                    {
+                        ShapeNode shp = ActiveSlide.Shapes[idx];
+                        int msx = slideX + (int)(shp.Transform.X * scale);
+                        int msy = slideY + (int)(shp.Transform.Y * scale);
+                        int msw = (int)(shp.Transform.Width * scale);
+                        int msh = (int)(shp.Transform.Height * scale);
+                        PointF mcenter = new PointF(msx + msw / 2f, msy + msh / 2f);
+                        PointF munrot = RotatePoint(mousePos, mcenter, -shp.Transform.Rotation);
+                        RectangleF mbounds = (shp.Type == ShapeType.Line)
+                            ? new RectangleF(msx - 8f, msy - 8f, Math.Max(16f, msw + 16f), Math.Max(16f, msh + 16f))
+                            : new RectangleF(msx, msy, msw, msh);
+                        if (mbounds.Contains(munrot))
+                        {
+                            return Cursors.SizeAll;
+                        }
+                    }
                 }
             }
 
@@ -19095,6 +23182,33 @@ namespace GenOffice.UI
 
         public void HandleMouseUp(Point mousePos, int width, int height)
         {
+            if (ShapeTaskPane != null && ShapeTaskPane.IsDraggingScrollbar)
+            {
+                ShapeTaskPane.HandleMouseUp(mousePos);
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+
+            if (_isDraggingThumbScrollBar)
+            {
+                _isDraggingThumbScrollBar = false;
+                bool isIslandMode = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                int paneW = isIslandMode ? 200 : 210;
+                int targetIdx = GetSlideIndexFromScrollY(ThumbScrollY, paneW);
+                if (targetIdx >= 0 && Presentation != null && Presentation.Slides != null && targetIdx < Presentation.Slides.Count)
+                {
+                    ActiveSlideIndex = targetIdx;
+                    SelectedShapeIndex = -1;
+                    if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                    EndInlineEditing();
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+
+            if (IsSelectingText)
+            {
+                IsSelectingText = false;
+            }
+
             if (IsPresenting)
             {
                 if (AnnotationPenMode && CurrentStroke.Count > 0)
@@ -19185,37 +23299,54 @@ namespace GenOffice.UI
                 IsDrawingActive = false;
                 IsDrawingShapeMode = false;
 
-                int topBarY = 155;
-                int contentY = topBarY;
-                int contentH = height - contentY - 26;
-                int rightSidebarW = IsSidebarOpen ? 280 : 0;
-                int leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
-                int canvasW = width - leftSidebarW - rightSidebarW;
+                int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+                GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
 
                 int slideX, slideY, slideW, slideH;
                 float scale;
-                GetSlideCanvasBounds(leftSidebarW, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
 
                 bool canCreateShape = (PendingShapeType == ShapeType.Line)
                     ? (w1 > 4 || h1 > 4)
                     : (w1 > 6 && h1 > 6);
 
+                float canvasXPos = 0f, canvasYPos = 0f, canvasWPos = 0f, canvasHPos = 0f;
+                if (!canCreateShape && ActiveSlide != null)
+                {
+                    // Single-click insert: insert standard shape at clicked position
+                    canCreateShape = true;
+                    float defW = (PendingShapeType == ShapeType.Line) ? 180f : 240f;
+                    float defH = (PendingShapeType == ShapeType.Line) ? 0f : 140f;
+                    float clickCanvasX = (ShapeDrawStart.X - slideX) / scale;
+                    float clickCanvasY = (ShapeDrawStart.Y - slideY) / scale;
+                    canvasXPos = clickCanvasX - defW / 2f;
+                    canvasYPos = clickCanvasY - defH / 2f;
+                    canvasWPos = defW;
+                    canvasHPos = defH;
+                }
+                else if (canCreateShape && ActiveSlide != null)
+                {
+                    canvasXPos = (x1 - slideX) / scale;
+                    canvasYPos = (y1 - slideY) / scale;
+                    canvasWPos = Math.Max(0f, w1 / scale);
+                    canvasHPos = Math.Max(0f, h1 / scale);
+                }
+
                 if (canCreateShape && ActiveSlide != null)
                 {
                     SaveUndoState();
-                    float canvasXPos = (x1 - slideX) / scale;
-                    float canvasYPos = (y1 - slideY) / scale;
-                    float canvasWPos = Math.Max(0f, w1 / scale);
-                    float canvasHPos = Math.Max(0f, h1 / scale);
-
                     ShapeNode newShape = new ShapeNode
                     {
                         Type = PendingShapeType,
+                        CornerRadius = (PendingShapeType == ShapeType.RoundedRectangle) ? 20f : 0f,
                         Transform = new Transform2D(canvasXPos, canvasYPos, canvasWPos, canvasHPos),
                         FillColor = (PendingShapeType == ShapeType.TextBox || PendingShapeType == ShapeType.Line) ? 0x00FFFFFF : 0x4472C4,
-                        StrokeColor = (PendingShapeType == ShapeType.TextBox) ? 0x00FFFFFF : 0x203864,
-                        StrokeWidth = (PendingShapeType == ShapeType.TextBox) ? 0.0f : 1.5f,
-                        Text = (PendingShapeType == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : ""
+                        StrokeColor = (PendingShapeType == ShapeType.Line) ? 0x4472C4 : 0x00FFFFFF,
+                        StrokeWidth = (PendingShapeType == ShapeType.Line) ? 1.5f : 0.0f,
+                        Text = (PendingShapeType == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : "",
+                        Alignment = (PendingShapeType == ShapeType.TextBox) ? TextAlignment.Left : TextAlignment.Center,
+                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        TextColor = (PendingShapeType == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF
                     };
 
                     ActiveSlide.AddShape(newShape);
@@ -19258,6 +23389,25 @@ namespace GenOffice.UI
                 DraggingAnimationPaneTargetIndex = -1;
             }
 
+            if (_pendingDeselectOnMouseUp && _pendingDeselectIndex >= 0)
+            {
+                if (SelectedShapeIndices != null && SelectedShapeIndices.Contains(_pendingDeselectIndex))
+                {
+                    SelectedShapeIndices.Remove(_pendingDeselectIndex);
+                    SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
+                }
+                _pendingDeselectOnMouseUp = false;
+                _pendingDeselectIndex = -1;
+            }
+
+            if (IsRubberbandSelecting)
+            {
+                IsRubberbandSelecting = false;
+                _rubberbandInitialSelection.Clear();
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+            if (DragStartTransforms != null) DragStartTransforms.Clear();
+
             IsPanningCanvas = false;
             IsDraggingHScrollBar = false;
             IsDraggingVScrollBar = false;
@@ -19265,6 +23415,7 @@ namespace GenOffice.UI
             IsSelectingTableCells = false;
             IsResizingShape = false;
             IsRotatingShape = false;
+            IsAdjustingCornerRadius = false;
             IsDraggingGradientStop = false;
             DraggingBgSliderType = 0;
             ShowSnapGuideX = false;
@@ -19284,11 +23435,36 @@ namespace GenOffice.UI
                     CurrentAnimationStep = 0;
                     IsPlayingSlideAnimation = false;
                     _animStopwatch.Stop();
+                    AnimationProgress = 0.0f;
                     return;
                 }
                 IsEndSlideShowScreen = false;
                 StopPresenting();
                 return;
+            }
+
+            // 1. Khi đang chạy chuyển cảnh (Transition) mà người dùng bấm Next:
+            // Hoàn tất tức thì chuyển cảnh hiện tại, đưa về slide mới và tiếp tục chuyển tiếp ngay với 1 lần bấm duy nhất!
+            if (IsTransitioning)
+            {
+                TransitionProgress = 1.0f;
+                IsTransitioning = false;
+                IsPreviewingTransition = false;
+                _transitionStopwatch.Stop();
+                ClearMorphTextureCache();
+                CurrentAnimationStep = 0;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+                AnimationProgress = 0.0f;
+            }
+
+            // 2. Khi một bước hoạt họa (Animation) đang di chuyển dở mà người dùng bấm Next:
+            // Đưa ngay bước hoạt họa đó về trạng thái kết thúc (hoàn thành) và dừng lại
+            if (IsPlayingSlideAnimation)
+            {
+                AnimationProgress = 1.0f;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
             }
 
             SlideNode slide = ActiveSlide;
@@ -19320,6 +23496,7 @@ namespace GenOffice.UI
                 CurrentAnimationStep = 0;
                 IsPlayingSlideAnimation = false;
                 _animStopwatch.Stop();
+                AnimationProgress = 0.0f;
                 TriggerTransition(prevIdx, ActiveSlideIndex, false);
             }
             else
@@ -19332,6 +23509,7 @@ namespace GenOffice.UI
                     CurrentAnimationStep = 0;
                     IsPlayingSlideAnimation = false;
                     _animStopwatch.Stop();
+                    AnimationProgress = 0.0f;
                     TriggerTransition(prevIdx, ActiveSlideIndex, false);
                 }
                 else
@@ -19350,6 +23528,28 @@ namespace GenOffice.UI
                 return;
             }
 
+            // 1. Khi đang chuyển cảnh mà bấm Lùi: Kết thúc ngay hiệu ứng chuyển cảnh và lùi slide ngay với 1 lần bấm!
+            if (IsTransitioning)
+            {
+                TransitionProgress = 1.0f;
+                IsTransitioning = false;
+                IsPreviewingTransition = false;
+                _transitionStopwatch.Stop();
+                ClearMorphTextureCache();
+                CurrentAnimationStep = 0;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+                AnimationProgress = 0.0f;
+            }
+
+            // 2. Khi đang phát hoạt họa mà bấm Lùi: Hủy hoạt họa đang chạy
+            if (IsPlayingSlideAnimation)
+            {
+                AnimationProgress = 0.0f;
+                IsPlayingSlideAnimation = false;
+                _animStopwatch.Stop();
+            }
+
             if (Presentation == null) return;
             SlideNode slide = ActiveSlide;
 
@@ -19359,6 +23559,7 @@ namespace GenOffice.UI
                 CurrentAnimationStep--;
                 IsPlayingSlideAnimation = false;
                 _animStopwatch.Stop();
+                AnimationProgress = 0.0f;
                 return;
             }
 
@@ -19376,6 +23577,7 @@ namespace GenOffice.UI
                 ActiveSlideIndex = prevTarget;
                 IsPlayingSlideAnimation = false;
                 _animStopwatch.Stop();
+                AnimationProgress = 0.0f;
                 // Đặt slide trước đó ở trạng thái đã hoàn thành toàn bộ bước hoạt họa
                 CurrentAnimationStep = GetTotalAnimationSteps(ActiveSlide);
                 TriggerTransition(prevIdx, ActiveSlideIndex, true);
@@ -19401,10 +23603,39 @@ namespace GenOffice.UI
                     }
                 }
 
+                if (IsSlideSorterModalOpen)
+                {
+                    if (key == Keys.Escape) { IsSlideSorterModalOpen = false; return; }
+                }
+                if (IsSlideZoomActive)
+                {
+                    if (key == Keys.Escape) { IsSlideZoomActive = false; return; }
+                }
+                if (BlackScreenMode || WhiteScreenMode)
+                {
+                    if (key == Keys.Escape || key == Keys.B || key == Keys.W)
+                    {
+                        BlackScreenMode = false;
+                        WhiteScreenMode = false;
+                        return;
+                    }
+                }
+
+                if (AnnotationPenMode || LaserPointerMode)
+                {
+                    if (key == Keys.Escape)
+                    {
+                        AnnotationPenMode = false;
+                        LaserPointerMode = false;
+                        Cursor.Show();
+                        return;
+                    }
+                }
+
                 if (key == Keys.Escape) { StopPresenting(); return; }
                 
-                // Điều hướng bàn phím: Lên/Phải/Space/Enter/PageDown -> TIẾN; Xuống/Trái/Back/PageUp -> LÙI
-                if (key == Keys.Up || key == Keys.Right || key == Keys.Space || key == Keys.PageDown || key == Keys.Enter || key == Keys.Return)
+                // Điều hướng bàn phím: Lên/Phải/Space/Enter/PageDown/N -> TIẾN; Xuống/Trái/Back/PageUp -> LÙI
+                if (key == Keys.Up || key == Keys.Right || key == Keys.Space || key == Keys.PageDown || key == Keys.Enter || key == Keys.Return || key == Keys.N)
                 {
                     AdvancePresenterStep();
                 }
@@ -19412,11 +23643,33 @@ namespace GenOffice.UI
                 {
                     PreviousPresenterStep();
                 }
+                else if (key == Keys.Home)
+                {
+                    ActiveSlideIndex = 0;
+                    CurrentAnimationStep = 0;
+                    TriggerTransition(-1, 0, false);
+                }
+                else if (key == Keys.End && Presentation != null && Presentation.Slides.Count > 0)
+                {
+                    ActiveSlideIndex = Presentation.Slides.Count - 1;
+                    CurrentAnimationStep = 0;
+                    TriggerTransition(-1, ActiveSlideIndex, false);
+                }
                 else if (key == Keys.L) LaserPointerMode = !LaserPointerMode;
                 else if (key == Keys.P) AnnotationPenMode = !AnnotationPenMode;
+                else if (key == Keys.H)
+                {
+                    AnnotationPenMode = true;
+                    LaserPointerMode = false;
+                    IsHighlighter = true;
+                    AnnotationWidth = 14f;
+                    AnnotationColor = Color.FromArgb(140, 255, 255, 0);
+                }
+                else if (key == Keys.A) { LaserPointerMode = false; AnnotationPenMode = false; }
                 else if (key == Keys.E) { PenStrokes.Clear(); CurrentStroke.Clear(); }
                 else if (key == Keys.B) BlackScreenMode = !BlackScreenMode;
                 else if (key == Keys.W) WhiteScreenMode = !WhiteScreenMode;
+                else if (key == Keys.F1) ShowPresentationHelp();
                 return;
             }
 
@@ -19500,24 +23753,101 @@ namespace GenOffice.UI
                     EndInlineEditing();
                     return;
                 }
+
+                if ((Control.ModifierKeys & Keys.Control) != 0)
+                {
+                    if (key == Keys.A)
+                    {
+                        TextSelectionStart = 0;
+                        TextSelectionLength = EditingTextBuffer.Length;
+                        CaretIndex = EditingTextBuffer.Length;
+                        return;
+                    }
+                    if (key == Keys.C)
+                    {
+                        if (TextSelectionLength != 0)
+                        {
+                            int sStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                            int sLen = Math.Abs(TextSelectionLength);
+                            Clipboard.SetText(EditingTextBuffer.Substring(sStart, sLen));
+                        }
+                        return;
+                    }
+                    if (key == Keys.X)
+                    {
+                        if (TextSelectionLength != 0)
+                        {
+                            int sStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                            int sLen = Math.Abs(TextSelectionLength);
+                            Clipboard.SetText(EditingTextBuffer.Substring(sStart, sLen));
+                            EditingTextBuffer = EditingTextBuffer.Remove(sStart, sLen);
+                            CaretIndex = sStart;
+                            TextSelectionStart = sStart;
+                            TextSelectionLength = 0;
+                            EditingShape.Text = EditingTextBuffer;
+                        }
+                        return;
+                    }
+                    if (key == Keys.V)
+                    {
+                        if (Clipboard.ContainsText())
+                        {
+                            string clip = Clipboard.GetText();
+                            if (TextSelectionLength != 0)
+                            {
+                                int sStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                                int sLen = Math.Abs(TextSelectionLength);
+                                EditingTextBuffer = EditingTextBuffer.Remove(sStart, sLen);
+                                CaretIndex = sStart;
+                            }
+                            EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, clip);
+                            CaretIndex += clip.Length;
+                            TextSelectionStart = CaretIndex;
+                            TextSelectionLength = 0;
+                            EditingShape.Text = EditingTextBuffer;
+                        }
+                        return;
+                    }
+                }
+
+                if (TextSelectionLength != 0 && (key == Keys.Back || key == Keys.Delete))
+                {
+                    int sStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                    int sLen = Math.Abs(TextSelectionLength);
+                    EditingTextBuffer = EditingTextBuffer.Remove(sStart, sLen);
+                    CaretIndex = sStart;
+                    TextSelectionStart = sStart;
+                    TextSelectionLength = 0;
+                    EditingShape.Text = EditingTextBuffer;
+                    return;
+                }
+
                 if (key == Keys.Left)
                 {
+                    TextSelectionLength = 0;
                     CaretIndex = Math.Max(0, CaretIndex - 1);
+                    TextSelectionStart = CaretIndex;
                     return;
                 }
                 if (key == Keys.Right)
                 {
+                    TextSelectionLength = 0;
                     CaretIndex = Math.Min(EditingTextBuffer.Length, CaretIndex + 1);
+                    TextSelectionStart = CaretIndex;
                     return;
                 }
                 if (key == Keys.Home)
                 {
+                    TextSelectionLength = 0;
                     CaretIndex = 0;
+                    TextSelectionStart = CaretIndex;
                     return;
                 }
                 if (key == Keys.End)
                 {
+                    TextSelectionLength = 0;
                     CaretIndex = EditingTextBuffer.Length;
+                    TextSelectionStart = CaretIndex;
                     return;
                 }
                 if (key == Keys.Delete)
@@ -19579,22 +23909,53 @@ namespace GenOffice.UI
                     if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
+                if (key == Keys.A && ActiveSlide != null && ActiveSlide.Shapes.Count > 0)
+                {
+                    SelectedShapeIndices.Clear();
+                    for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+                    {
+                        if (ActiveSlide.Shapes[i].IsVisible) SelectedShapeIndices.Add(i);
+                    }
+                    SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
             }
 
             if (key == Keys.F5) StartPresenting(true);
-            else if (key == Keys.Delete && SelectedShapeIndex >= 0 && ActiveSlide != null)
+            else if ((key == Keys.Delete || key == Keys.Back) && (SelectedShapeIndex >= 0 || (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0) || SelectedShape != null) && ActiveSlide != null)
             {
-                SaveUndoState();
-                ActiveSlide.Shapes.RemoveAt(SelectedShapeIndex);
-                SelectedShapeIndex = -1;
-                if (InvalidateCallback != null) InvalidateCallback();
+                DeleteSelectedShapes();
             }
-            else if (SelectedShape != null)
+            else if (SelectedShape != null || (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0))
             {
-                if (key == Keys.Left) SelectedShape.Transform.X -= 5f;
-                else if (key == Keys.Right) SelectedShape.Transform.X += 5f;
-                else if (key == Keys.Up) SelectedShape.Transform.Y -= 5f;
-                else if (key == Keys.Down) SelectedShape.Transform.Y += 5f;
+                float nudgeDx = 0, nudgeDy = 0;
+                if (key == Keys.Left) nudgeDx = -5f;
+                else if (key == Keys.Right) nudgeDx = 5f;
+                else if (key == Keys.Up) nudgeDy = -5f;
+                else if (key == Keys.Down) nudgeDy = 5f;
+
+                if (nudgeDx != 0 || nudgeDy != 0)
+                {
+                    SaveUndoState();
+                    if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 1)
+                    {
+                        foreach (int idx in SelectedShapeIndices)
+                        {
+                            if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                            {
+                                ActiveSlide.Shapes[idx].Transform.X += nudgeDx;
+                                ActiveSlide.Shapes[idx].Transform.Y += nudgeDy;
+                            }
+                        }
+                    }
+                    else if (SelectedShape != null)
+                    {
+                        SelectedShape.Transform.X += nudgeDx;
+                        SelectedShape.Transform.Y += nudgeDy;
+                    }
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
             }
             else
             {
@@ -19606,7 +23967,10 @@ namespace GenOffice.UI
                         int prevIdx = ActiveSlideIndex;
                         ActiveSlideIndex++;
                         SelectedShapeIndex = -1;
-                        if (ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                        if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                        CanvasScrollX = 0;
+                        CanvasScrollY = 0;
+                        if (IsPresenting && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                         {
                             TriggerTransition(prevIdx, ActiveSlideIndex, false);
                         }
@@ -19619,10 +23983,73 @@ namespace GenOffice.UI
                         int prevIdx = ActiveSlideIndex;
                         ActiveSlideIndex--;
                         SelectedShapeIndex = -1;
-                        if (ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
+                        if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                        CanvasScrollX = 0;
+                        CanvasScrollY = 0;
+                        if (IsPresenting && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                         {
                             TriggerTransition(prevIdx, ActiveSlideIndex, true);
                         }
+                    }
+                }
+            }
+        }
+
+        private string GetWordBeforePos(string text, int pos)
+        {
+            if (string.IsNullOrEmpty(text) || pos <= 0 || pos > text.Length) return "";
+            int start = pos - 1;
+            while (start >= 0 && !VietnameseAutoCorrect.IsWordDelimiter(text[start]))
+            {
+                start--;
+            }
+            start++;
+            if (start >= pos) return "";
+            return text.Substring(start, pos - start);
+        }
+
+        public string GetCurrentWordBeforeCursor(out int wordStart)
+        {
+            if (IsInlineEditing && EditingShape != null && !string.IsNullOrEmpty(EditingTextBuffer))
+            {
+                return VietnameseWordPredictor.GetWordBeforePos(EditingTextBuffer, CaretIndex, out wordStart);
+            }
+            if (IsEditingTableCell && EditingTableShape != null && !string.IsNullOrEmpty(EditingTableCellBuffer))
+            {
+                return VietnameseWordPredictor.GetWordBeforePos(EditingTableCellBuffer, TableCaretIndex, out wordStart);
+            }
+            wordStart = -1;
+            return "";
+        }
+
+        public void ReplaceWordAtCursor(string newWord)
+        {
+            if (IsInlineEditing && EditingShape != null && !string.IsNullOrEmpty(EditingTextBuffer))
+            {
+                int wordStart;
+                string wordBefore = VietnameseWordPredictor.GetWordBeforePos(EditingTextBuffer, CaretIndex, out wordStart);
+                if (!string.IsNullOrEmpty(wordBefore) && wordStart >= 0)
+                {
+                    EditingTextBuffer = EditingTextBuffer.Remove(wordStart, wordBefore.Length).Insert(wordStart, newWord + " ");
+                    CaretIndex = wordStart + newWord.Length + 1;
+                    EditingShape.Text = EditingTextBuffer;
+                }
+            }
+            else if (IsEditingTableCell && EditingTableShape != null && !string.IsNullOrEmpty(EditingTableCellBuffer))
+            {
+                int wordStart;
+                string wordBefore = VietnameseWordPredictor.GetWordBeforePos(EditingTableCellBuffer, TableCaretIndex, out wordStart);
+                if (!string.IsNullOrEmpty(wordBefore) && wordStart >= 0)
+                {
+                    EditingTableCellBuffer = EditingTableCellBuffer.Remove(wordStart, wordBefore.Length).Insert(wordStart, newWord + " ");
+                    TableCaretIndex = wordStart + newWord.Length + 1;
+                    int r = EditingTableRow;
+                    int c = EditingTableCol;
+                    if (r >= 0 && r < EditingTableShape.TableRows && c >= 0 && c < EditingTableShape.TableColumns)
+                    {
+                        while (EditingTableShape.TableData.Count <= r) EditingTableShape.TableData.Add(new List<string>());
+                        while (EditingTableShape.TableData[r].Count <= c) EditingTableShape.TableData[r].Add("");
+                        EditingTableShape.TableData[r][c] = EditingTableCellBuffer;
                     }
                 }
             }
@@ -19640,16 +24067,60 @@ namespace GenOffice.UI
                         TableCaretIndex--;
                     }
                 }
-                else if (!char.IsControl(keyChar))
+                else if (!char.IsControl(keyChar) || keyChar == '\r' || keyChar == '\n')
                 {
-                    EditingTableCellBuffer = EditingTableCellBuffer.Insert(TableCaretIndex, keyChar.ToString());
-                    TableCaretIndex++;
+                    if (VietnameseAutoCorrect.IsEnabled)
+                    {
+                        if (VietnameseAutoCorrect.IsWordDelimiter(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(EditingTableCellBuffer, TableCaretIndex);
+                            string correctedWord;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryCorrectWord(wordBefore, out correctedWord))
+                            {
+                                int wordStart = TableCaretIndex - wordBefore.Length;
+                                EditingTableCellBuffer = EditingTableCellBuffer.Remove(wordStart, wordBefore.Length).Insert(wordStart, correctedWord);
+                                TableCaretIndex = wordStart + correctedWord.Length;
+                            }
+                        }
+                        else if (!char.IsControl(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(EditingTableCellBuffer, TableCaretIndex);
+                            int charsToRemove;
+                            string textToInsert;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryProcessChar(wordBefore, keyChar, out charsToRemove, out textToInsert))
+                            {
+                                int removeStart = TableCaretIndex - charsToRemove;
+                                EditingTableCellBuffer = EditingTableCellBuffer.Remove(removeStart, charsToRemove).Insert(removeStart, textToInsert);
+                                TableCaretIndex = removeStart + textToInsert.Length;
+                                return;
+                            }
+                        }
+                    }
+
+                    string ins = (keyChar == '\r' || keyChar == '\n') ? "\n" : keyChar.ToString();
+                    EditingTableCellBuffer = EditingTableCellBuffer.Insert(TableCaretIndex, ins);
+                    TableCaretIndex += ins.Length;
                 }
                 return;
             }
 
             if (IsInlineEditing && EditingShape != null)
             {
+                if (TextSelectionLength != 0 && (keyChar == '\b' || !char.IsControl(keyChar) || keyChar == '\r' || keyChar == '\n'))
+                {
+                    int sStart = Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength);
+                    int sLen = Math.Abs(TextSelectionLength);
+                    EditingTextBuffer = EditingTextBuffer.Remove(sStart, sLen);
+                    CaretIndex = sStart;
+                    TextSelectionStart = sStart;
+                    TextSelectionLength = 0;
+                    if (keyChar == '\b')
+                    {
+                        EditingShape.Text = EditingTextBuffer;
+                        return;
+                    }
+                }
+
                 if (keyChar == '\b')
                 {
                     if (EditingTextBuffer.Length > 0 && CaretIndex > 0)
@@ -19658,16 +24129,42 @@ namespace GenOffice.UI
                         CaretIndex--;
                     }
                 }
-                else if (keyChar == '\r' || keyChar == '\n')
+                else if (!char.IsControl(keyChar) || keyChar == '\r' || keyChar == '\n')
                 {
-                    EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, "\n");
-                    CaretIndex++;
+                    if (VietnameseAutoCorrect.IsEnabled)
+                    {
+                        if (VietnameseAutoCorrect.IsWordDelimiter(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(EditingTextBuffer, CaretIndex);
+                            string correctedWord;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryCorrectWord(wordBefore, out correctedWord))
+                            {
+                                int wordStart = CaretIndex - wordBefore.Length;
+                                EditingTextBuffer = EditingTextBuffer.Remove(wordStart, wordBefore.Length).Insert(wordStart, correctedWord);
+                                CaretIndex = wordStart + correctedWord.Length;
+                            }
+                        }
+                        else if (!char.IsControl(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(EditingTextBuffer, CaretIndex);
+                            int charsToRemove;
+                            string textToInsert;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryProcessChar(wordBefore, keyChar, out charsToRemove, out textToInsert))
+                            {
+                                int removeStart = CaretIndex - charsToRemove;
+                                EditingTextBuffer = EditingTextBuffer.Remove(removeStart, charsToRemove).Insert(removeStart, textToInsert);
+                                CaretIndex = removeStart + textToInsert.Length;
+                                EditingShape.Text = EditingTextBuffer;
+                                return;
+                            }
+                        }
+                    }
+
+                    string ins = (keyChar == '\r' || keyChar == '\n') ? "\n" : keyChar.ToString();
+                    EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, ins);
+                    CaretIndex += ins.Length;
                 }
-                else if (!char.IsControl(keyChar))
-                {
-                    EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, keyChar.ToString());
-                    CaretIndex++;
-                }
+                EditingShape.Text = EditingTextBuffer;
             }
         }
         #endregion

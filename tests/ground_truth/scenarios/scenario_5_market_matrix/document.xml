@@ -1,0 +1,98 @@
+<ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <ns0:body>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+          <ns0:sz ns0:val="36" />
+        </ns0:rPr>
+        <ns0:t>MARKET MATRIX POSITIONING &amp; TARGET SEGMENTATION</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:p>
+      <ns0:r>
+        <ns0:rPr>
+          <ns0:b />
+        </ns0:rPr>
+        <ns0:t>Forecast &amp; Milestone Data:</ns0:t>
+      </ns0:r>
+    </ns0:p>
+    <ns0:tbl>
+      <ns0:tblPr>
+        <ns0:tblBorders>
+          <ns0:top ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:left ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:bottom ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:right ns0:val="double" ns0:sz="12" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideH ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+          <ns0:insideV ns0:val="single" ns0:sz="8" ns0:space="0" ns0:color="4472C4" />
+        </ns0:tblBorders>
+      </ns0:tblPr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="4472C4" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:rPr>
+                <ns0:b />
+                <ns0:color ns0:val="FFFFFF" />
+              </ns0:rPr>
+              <ns0:t>Phase / Qtr</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:tcPr>
+            <ns0:shd ns0:val="clear" ns0:color="auto" ns0:fill="4472C4" />
+          </ns0:tcPr>
+          <ns0:p>
+            <ns0:r>
+              <ns0:rPr>
+                <ns0:b />
+                <ns0:color ns0:val="FFFFFF" />
+              </ns0:rPr>
+              <ns0:t>Target Metric</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Stage 1</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Initial Rollout</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+      <ns0:tr>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Stage 2</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+        <ns0:tc>
+          <ns0:p>
+            <ns0:r>
+              <ns0:t>Full Operational Delivery</ns0:t>
+            </ns0:r>
+          </ns0:p>
+        </ns0:tc>
+      </ns0:tr>
+    </ns0:tbl>
+    <ns0:sectPr>
+      <ns0:pgSz ns0:w="12240" ns0:h="15840" />
+    </ns0:sectPr>
+  </ns0:body>
+</ns0:document>

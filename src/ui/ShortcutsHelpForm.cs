@@ -8,7 +8,7 @@ namespace GenOffice.UI
     {
         public ShortcutsHelpForm()
         {
-            this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - GenOffice Suite";
+            this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - ZENQ OFFICE Suite";
             this.Size = new Size(820, 620);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -28,7 +28,7 @@ namespace GenOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "⌨ BẢNG TRA CỨU PHÍM TẮT GENOFFICE / MICROSOFT WORD",
+                Text = "⌨ BẢNG TRA CỨU PHÍM TẮT ZENQ OFFICE / MICROSOFT WORD",
                 Font = new Font("Segoe UI", 12.5f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(18, 12),
