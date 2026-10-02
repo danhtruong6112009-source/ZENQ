@@ -163,7 +163,7 @@ namespace GenOffice.Core
                             ? appForm.SlidesView.Presentation 
                             : tab.PresentationData;
 
-                        if (pres != null && pres.Slides != null && pres.Slides.Count > 0 && (tab.IsModified || !string.IsNullOrEmpty(tab.DraftFile)))
+                        if (pres != null && pres.Slides != null && pres.Slides.Count > 0)
                         {
                             draftName = string.Format("draft_s_{0}.pptx", i);
                             string draftPath = Path.Combine(autoSaveDir, draftName);
@@ -173,7 +173,7 @@ namespace GenOffice.Core
                     else if (tab.Mode == OfficeAppMode.Calc)
                     {
                         CalcView cv = (i == appForm.Ribbon.ActiveDocIndex && appForm.CalcView != null) ? appForm.CalcView : null;
-                        if (tab.IsModified || !string.IsNullOrEmpty(tab.DraftFile))
+                        if (true)
                         {
                             draftName = string.Format("draft_c_{0}.xlsx", i);
                             string draftPath = Path.Combine(autoSaveDir, draftName);
@@ -195,11 +195,11 @@ namespace GenOffice.Core
                         }
                     }
 
-                    // Don't save empty untouched blank tabs with no file, no draft content and no modification
-                    if (string.IsNullOrEmpty(tab.FilePath) && string.IsNullOrEmpty(draftName) && !tab.IsModified)
-                    {
-                        continue;
-                    }
+                    // Always save tabs to preserve session state
+                    // if (string.IsNullOrEmpty(tab.FilePath) && string.IsNullOrEmpty(draftName) && !tab.IsModified)
+                    // {
+                    //    continue;
+                    // }
 
                     TabSessionItem item = new TabSessionItem
                     {
