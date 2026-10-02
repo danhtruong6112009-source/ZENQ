@@ -8,7 +8,6 @@
         Deactivated="Window_Deactivated">
     
     <Window.Resources>
-        <!-- Styles for Mini Toolbar Buttons -->
         <Style x:Key="MiniBtnStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -87,13 +86,13 @@
                     <ComboBoxItem>24</ComboBoxItem>
                     <ComboBoxItem>36</ComboBoxItem>
                 </ComboBox>
-                <Button Style="{StaticResource MiniBtnStyle}" FontWeight="Bold" ToolTip="Bold" Click="BtnBold_Click">B</Button>
-                <Button Style="{StaticResource MiniBtnStyle}" FontStyle="Italic" ToolTip="Italic" Click="BtnItalic_Click">I</Button>
-                <Button Style="{StaticResource MiniBtnStyle}" ToolTip="Underline" Click="BtnUnderline_Click">
+                <Button Style="{StaticResource MiniBtnStyle}" FontWeight="Bold" ToolTip="In đậm" Click="BtnBold_Click">B</Button>
+                <Button Style="{StaticResource MiniBtnStyle}" FontStyle="Italic" ToolTip="In nghiêng" Click="BtnItalic_Click">I</Button>
+                <Button Style="{StaticResource MiniBtnStyle}" ToolTip="Gạch chân" Click="BtnUnderline_Click">
                     <TextBlock TextDecorations="Underline">U</TextBlock>
                 </Button>
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="5,2"/>
-                <Button Style="{StaticResource MiniBtnStyle}" ToolTip="Font Color" Click="BtnColor_Click">
+                <Button Style="{StaticResource MiniBtnStyle}" ToolTip="Màu chữ" Click="BtnColor_Click">
                     <StackPanel>
                         <TextBlock Text="A" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
                         <Rectangle Fill="Red" Height="4" Width="12" Margin="0,1,0,0"/>
@@ -103,19 +102,19 @@
         </Border>
         
         <!-- Context Menu List -->
-        <Border Grid.Row="1" Background="White" BorderBrush="#D2D2D2" BorderThickness="1" CornerRadius="4" Padding="2" HorizontalAlignment="Left" MinWidth="200">
+        <Border Grid.Row="1" Background="White" BorderBrush="#D2D2D2" BorderThickness="1" CornerRadius="4" Padding="2" HorizontalAlignment="Left" MinWidth="220">
             <StackPanel>
-                <MenuItem Header="Cut" Style="{StaticResource CtxMenuItemStyle}" Click="MenuCut_Click">
+                <MenuItem Header="Cắt (Cut)" Style="{StaticResource CtxMenuItemStyle}" Click="MenuCut_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="✂"/>
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Copy" Style="{StaticResource CtxMenuItemStyle}" Click="MenuCopy_Click">
+                <MenuItem Header="Sao chép (Copy)" Style="{StaticResource CtxMenuItemStyle}" Click="MenuCopy_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="📄"/>
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Paste" Style="{StaticResource CtxMenuItemStyle}" Click="MenuPaste_Click">
+                <MenuItem Header="Dán (Paste)" Style="{StaticResource CtxMenuItemStyle}" Click="MenuPaste_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="📋"/>
                     </MenuItem.Icon>
@@ -123,33 +122,43 @@
                 
                 <Rectangle Height="1" Fill="#E0E0E0" Margin="30,2,2,2"/>
                 
-                <MenuItem Header="Bring to Front" Style="{StaticResource CtxMenuItemStyle}" Click="MenuBringFront_Click">
+                <MenuItem Header="Lên trên cùng" Style="{StaticResource CtxMenuItemStyle}" Click="MenuBringFront_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="⏫"/>
                     </MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Send to Back" Style="{StaticResource CtxMenuItemStyle}" Click="MenuSendBack_Click">
+                <MenuItem Header="Lên 1 lớp" Style="{StaticResource CtxMenuItemStyle}" Click="MenuBringForward_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🔼"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Xuống dưới cùng" Style="{StaticResource CtxMenuItemStyle}" Click="MenuSendBack_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="⏬"/>
                     </MenuItem.Icon>
                 </MenuItem>
-                
-                <Rectangle Height="1" Fill="#E0E0E0" Margin="30,2,2,2"/>
-                
-                <MenuItem Header="Group" Style="{StaticResource CtxMenuItemStyle}" Click="MenuGroup_Click">
+                <MenuItem Header="Xuống 1 lớp" Style="{StaticResource CtxMenuItemStyle}" Click="MenuSendBackward_Click">
                     <MenuItem.Icon>
-                        <TextBlock Text="🔗"/>
-                    </MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Ungroup" Style="{StaticResource CtxMenuItemStyle}" Click="MenuUngroup_Click">
-                    <MenuItem.Icon>
-                        <TextBlock Text="🔗"/>
+                        <TextBlock Text="🔽"/>
                     </MenuItem.Icon>
                 </MenuItem>
                 
                 <Rectangle Height="1" Fill="#E0E0E0" Margin="30,2,2,2"/>
                 
-                <MenuItem Header="Format Shape..." Style="{StaticResource CtxMenuItemStyle}" Click="MenuFormat_Click">
+                <MenuItem Header="Nhóm (Group)" Style="{StaticResource CtxMenuItemStyle}" Click="MenuGroup_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🔗"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Bỏ nhóm (Ungroup)" Style="{StaticResource CtxMenuItemStyle}" Click="MenuUngroup_Click">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🔗"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                
+                <Rectangle Height="1" Fill="#E0E0E0" Margin="30,2,2,2"/>
+                
+                <MenuItem Header="Định dạng hình (Format Shape)..." Style="{StaticResource CtxMenuItemStyle}" Click="MenuFormat_Click">
                     <MenuItem.Icon>
                         <TextBlock Text="🖌"/>
                     </MenuItem.Icon>

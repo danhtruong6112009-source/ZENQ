@@ -15255,7 +15255,9 @@ namespace GenOffice.UI
                 wpfMenu.CopyRequested += (s, e) => { Copy(); };
                 wpfMenu.PasteRequested += (s, e) => { Paste(); if (parentControl != null) parentControl.Invalidate(); };
                 wpfMenu.BringToFrontRequested += (s, e) => { BringShapeToFront(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.BringForwardRequested += (s, e) => { BringShapeForward(); if (parentControl != null) parentControl.Invalidate(); };
                 wpfMenu.SendToBackRequested += (s, e) => { SendShapeToBack(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.SendBackwardRequested += (s, e) => { SendShapeBackward(); if (parentControl != null) parentControl.Invalidate(); };
                 wpfMenu.GroupRequested += (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); };
                 wpfMenu.UngroupRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); };
                 wpfMenu.FormatShapeRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); }; // Just invalidate for now
