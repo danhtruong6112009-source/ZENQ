@@ -13479,7 +13479,7 @@ namespace GenOffice.UI
             }
 
             // 7. Rotation Degree Tooltip Badge (Hiển thị số độ xoay thời gian thực)
-            if (IsRotatingShape || Math.Abs(rotation) > 0.01f)
+            if (IsRotatingShape)
             {
                 DrawRotationDegreeBadge(g, center, rotation, rotHandle);
             }
