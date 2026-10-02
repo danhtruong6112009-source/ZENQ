@@ -3343,7 +3343,7 @@ namespace GenOffice.UI
 
                 // Standard Action Toolbar Body
                 g.FillRectangle(Brushes.White, 0, 64, width, 91);
-                g.DrawLine(Pens.LightGray, 0, 154, width, 154);
+                //g.DrawLine(Pens.LightGray, 0, 154, width, 154);
             }
 
             if (CurrentMode == OfficeAppMode.Writer)

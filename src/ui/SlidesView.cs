@@ -157,7 +157,8 @@ namespace GenOffice.UI
         public Action InvalidateCallback;
         public void Invalidate()
         {
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         // Background Removal & Color Picker (Chroma Keying) State
@@ -349,9 +350,11 @@ namespace GenOffice.UI
             IsEndSlideShowScreen = false;
             ZoomLevel = 1.0f;
             GenOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (cat) => {
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             };
             GenOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             };
 
@@ -1720,7 +1723,8 @@ namespace GenOffice.UI
             IsDrawingMotionPathActive = false;
             ActiveDrawingMotionShape = shape;
             CurrentDrawingMotionPoints.Clear();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ApplyOrAddShapeAnimation(AnimationType animType, bool isAddAdditional)
@@ -1821,6 +1825,7 @@ namespace GenOffice.UI
             if (anim != null)
             {
                 anim.Direction = direction;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
         }
@@ -3809,7 +3814,8 @@ namespace GenOffice.UI
                 IsElementsDrawerCollapsed = false;
             }
             ZoomToFit();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void OpenGraphicsDrawer()
@@ -3832,7 +3838,8 @@ namespace GenOffice.UI
                 IsElementsDrawerCollapsed = false;
             }
             ZoomToFit();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ToggleElementsDrawer(int targetTab = -1)
@@ -3856,7 +3863,8 @@ namespace GenOffice.UI
                 if (IsElementsDrawerOpen) IsElementsDrawerCollapsed = false;
             }
             ZoomToFit();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void CloseElementsDrawer()
@@ -3872,7 +3880,8 @@ namespace GenOffice.UI
                 ShapeTaskPane.SearchText = "";
             }
             ZoomToFit();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ZoomToFit()
@@ -3997,7 +4006,8 @@ namespace GenOffice.UI
                     {
                         ShapeTaskPane.SearchText = _shapeSearchBox.Text;
                         ShapeTaskPane.ScrollY = 0;
-                        if (InvalidateCallback != null) InvalidateCallback();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     }
                 };
                 _shapeSearchBox.KeyDown += (s, e) =>
@@ -4716,6 +4726,7 @@ namespace GenOffice.UI
                 SelectedShapeIndices.Clear();
                 SelectedShapeIndices.Add(SelectedShapeIndex);
                 if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -4771,7 +4782,8 @@ namespace GenOffice.UI
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
             if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         private void ExecuteDrawerAction(string action, Control parentControl)
@@ -4912,7 +4924,8 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertQrCodeBitmap(Bitmap qrBmp)
@@ -4937,7 +4950,8 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPresetProgressBar(int percentage)
@@ -4978,7 +4992,8 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPresetKpiCard(string value, string subtitle)
@@ -5006,7 +5021,8 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPresetText(string text, float fontSize, bool isBold)
@@ -5033,7 +5049,8 @@ namespace GenOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ApplyPalettePreset(int paletteIndex)
@@ -5070,7 +5087,8 @@ namespace GenOffice.UI
                 }
             }
 
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPresetTemplate(int templateIndex)
@@ -5142,7 +5160,8 @@ namespace GenOffice.UI
 
             SelectedShapeIndex = -1;
             SelectedShapeIndices.Clear();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
         #endregion
 
@@ -9221,7 +9240,8 @@ namespace GenOffice.UI
 
             IsColorPickingMode = true;
             HasColorPickHover = false;
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ExecuteColorPickRemoval(ShapeNode shape, Color targetColor, float normX = 0f, float normY = 0f)
@@ -9345,7 +9365,8 @@ namespace GenOffice.UI
             ScanProgress = 0.0f;
             IsScanningActive = true;
 
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public static Color GetPixelColorFromImage(Image img, float normX, float normY)
@@ -9664,7 +9685,8 @@ namespace GenOffice.UI
             }
             shape.CachedImage = resultBmp;
             RefreshBgRemovalMaskBitmap(shape);
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void EndBackgroundRemoval(bool applyChanges)
@@ -9695,7 +9717,8 @@ namespace GenOffice.UI
             BgRemovalStrokes.Clear();
             CurrentDrawingStroke = null;
             IsDrawingBgStroke = false;
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void DeleteLastBgMark()
@@ -10216,6 +10239,7 @@ namespace GenOffice.UI
                     RecomputeAllStrokes(SelectedShape);
                 }
 
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
             catch { }
@@ -10238,6 +10262,7 @@ namespace GenOffice.UI
                     RecomputeAllStrokes(SelectedShape);
                 }
 
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
             catch { }
@@ -10358,7 +10383,8 @@ namespace GenOffice.UI
             SelectedShape.FillOpacity = 1.0f;
             SelectedShape.OriginalWidth = img.Width;
             SelectedShape.OriginalHeight = img.Height;
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPictureFillDialog(Control parentControl = null)
@@ -10391,7 +10417,8 @@ namespace GenOffice.UI
             SelectedShape.CachedImage = null;
             SelectedShape.ImagePath = "";
             if (parentControl != null) parentControl.Invalidate();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
         #endregion
 
@@ -11922,7 +11949,11 @@ namespace GenOffice.UI
                     else if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
                     {
                         GraphicsState pState = g.Save();
-                        g.ScaleTransform(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                        g.IntersectClip(new RectangleF(0, 0, baseW, baseH));
+                        float fullW = baseW / Math.Max(0.001f, 1.0f - shape.CropLeft - shape.CropRight);
+                        float fullH = baseH / Math.Max(0.001f, 1.0f - shape.CropTop - shape.CropBottom);
+                        g.TranslateTransform(-fullW * shape.CropLeft, -fullH * shape.CropTop);
+                        g.ScaleTransform(fullW / shape.PathWidth, fullH / shape.PathHeight);
                         Brush pathBrush = fillBrush;
                         LinearGradientBrush customLgb = null;
                         if (shape.HasGradientFill && shape.GradientStops != null && shape.GradientStops.Count >= 2)
@@ -14695,7 +14726,8 @@ namespace GenOffice.UI
                 if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
             }
             EndInlineEditing();
-            if (InvalidateCallback != null) InvalidateCallback();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void BringShapeToFront()
@@ -15208,6 +15240,39 @@ namespace GenOffice.UI
         public void ShowShapeContextMenu(Control parentControl, Point screenPos, int shapeIndex)
         {
             if (ActiveSlide == null || shapeIndex < 0 || shapeIndex >= ActiveSlide.Shapes.Count) return;
+            
+            try
+            {
+                var wpfMenu = new WpfSlidesContextMenu();
+                
+                System.Drawing.Point pt = parentControl.PointToScreen(screenPos);
+                wpfMenu.Left = pt.X;
+                wpfMenu.Top = pt.Y;
+                
+                ShapeNode shapeNode = ActiveSlide.Shapes[shapeIndex];
+                
+                wpfMenu.CutRequested += (s, e) => { Cut(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.CopyRequested += (s, e) => { Copy(); };
+                wpfMenu.PasteRequested += (s, e) => { Paste(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.BringToFrontRequested += (s, e) => { BringShapeToFront(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.SendToBackRequested += (s, e) => { SendShapeToBack(); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.GroupRequested += (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.UngroupRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); };
+                wpfMenu.FormatShapeRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); }; // Just invalidate for now
+                
+                // For Font formatting, we can apply to EditingShape or SelectedShape
+                wpfMenu.BoldRequested += (s, e) => { if (shapeNode != null) { shapeNode.Bold = !shapeNode.Bold; if (parentControl != null) parentControl.Invalidate(); } };
+                wpfMenu.ItalicRequested += (s, e) => { if (shapeNode != null) { shapeNode.Italic = !shapeNode.Italic; if (parentControl != null) parentControl.Invalidate(); } };
+                wpfMenu.UnderlineRequested += (s, e) => { if (shapeNode != null) { shapeNode.Underline = !shapeNode.Underline; if (parentControl != null) parentControl.Invalidate(); } };
+                
+                wpfMenu.Show();
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed to show WPF context menu: " + ex.Message);
+            }
+
             ShapeNode shape = ActiveSlide.Shapes[shapeIndex];
 
             ContextMenuStrip menu = new ContextMenuStrip();
@@ -20179,7 +20244,8 @@ namespace GenOffice.UI
                         {
                             PreviousPresenterStep();
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tiến (160..206)
@@ -20187,7 +20253,8 @@ namespace GenOffice.UI
                         {
                             AdvancePresenterStep();
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Bút & Laser (240..350)
@@ -20195,7 +20262,8 @@ namespace GenOffice.UI
                         {
                             ShowPenOptionsMenu(parentControl, new Point(mousePos.X, height - 70));
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tất cả Slide Grid (360..490)
@@ -20203,7 +20271,8 @@ namespace GenOffice.UI
                         {
                             IsSlideSorterModalOpen = true;
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Zoom (500..590)
@@ -20212,7 +20281,8 @@ namespace GenOffice.UI
                             IsSlideZoomActive = !IsSlideZoomActive;
                             SlideZoomCenter = new Point(width / 4, height / 2);
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Màn đen (600..720)
@@ -20220,7 +20290,8 @@ namespace GenOffice.UI
                         {
                             BlackScreenMode = !BlackScreenMode;
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                     }
@@ -20234,14 +20305,16 @@ namespace GenOffice.UI
                         {
                             PresenterNotesFontSize = Math.Max(10, PresenterNotesFontSize - 2);
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         if (mousePos.X >= width - 48 && mousePos.X <= width - 22)
                         {
                             PresenterNotesFontSize = Math.Min(28, PresenterNotesFontSize + 2);
                             if (parentControl != null) parentControl.Invalidate();
-                            if (InvalidateCallback != null) InvalidateCallback();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                     }
@@ -20256,7 +20329,8 @@ namespace GenOffice.UI
                         PreviousPresenterStep();
                     }
                     if (parentControl != null) parentControl.Invalidate();
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
 
@@ -20279,7 +20353,8 @@ namespace GenOffice.UI
                     {
                         AdvancePresenterStep();
                         if (parentControl != null) parentControl.Invalidate();
-                        if (InvalidateCallback != null) InvalidateCallback();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -20298,7 +20373,8 @@ namespace GenOffice.UI
                             RehearsalTotalStartTime = DateTime.Now;
                         }
                         if (parentControl != null) parentControl.Invalidate();
-                        if (InvalidateCallback != null) InvalidateCallback();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -20308,7 +20384,8 @@ namespace GenOffice.UI
                         RehearsalSlideStartTime = DateTime.Now;
                         RehearsalSlideElapsed = TimeSpan.Zero;
                         if (parentControl != null) parentControl.Invalidate();
-                        if (InvalidateCallback != null) InvalidateCallback();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
 
@@ -20342,7 +20419,8 @@ namespace GenOffice.UI
                             break;
                     }
                     if (parentControl != null) parentControl.Invalidate();
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
 
@@ -20402,6 +20480,7 @@ namespace GenOffice.UI
                     }
                 }
                 if (parentControl != null) parentControl.Invalidate();
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -21384,7 +21463,8 @@ namespace GenOffice.UI
                     {
                         IsColorPickingMode = false;
                         HasColorPickHover = false;
-                        if (InvalidateCallback != null) InvalidateCallback();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                         return;
                     }
                 }
@@ -21475,7 +21555,7 @@ namespace GenOffice.UI
                     if (shape.Type == ShapeType.Table)
                     {
                         Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
-                        if (moveHandleRect.Contains(mousePos))
+                        if (buttons == MouseButtons.Left && moveHandleRect.Contains(mousePos))
                         {
                             SaveUndoState();
                             IsDraggingShape = true;
@@ -21518,7 +21598,7 @@ namespace GenOffice.UI
                     PointF rotH = GetRotatedRotationHandle(sx, sy, sw, sh, shape.Transform.Rotation);
                     float dRotX = mousePos.X - rotH.X;
                     float dRotY = mousePos.Y - rotH.Y;
-                    if (dRotX * dRotX + dRotY * dRotY <= 144f) // 12px hit radius
+                    if (buttons == MouseButtons.Left && dRotX * dRotX + dRotY * dRotY <= 144f) // 12px hit radius
                     {
                         SaveUndoState();
                         IsRotatingShape = true;
@@ -21533,13 +21613,17 @@ namespace GenOffice.UI
                     {
                         float dHX = mousePos.X - handles[hIdx].X;
                         float dHY = mousePos.Y - handles[hIdx].Y;
-                        if (dHX * dHX + dHY * dHY <= 64f) // 8px hit radius
+                        if (buttons == MouseButtons.Left && dHX * dHX + dHY * dHY <= 64f) // 8px hit radius
                         {
                             SaveUndoState();
                             IsResizingShape = true;
                             DragResizeHandleIndex = hIdx;
                             DragStartMouse = mousePos;
                             DragStartTransform = shape.Transform.Clone();
+                            CropInitialLeft = shape.CropLeft;
+                            CropInitialTop = shape.CropTop;
+                            CropInitialRight = shape.CropRight;
+                            CropInitialBottom = shape.CropBottom;
                             return;
                         }
                     }
@@ -21558,7 +21642,7 @@ namespace GenOffice.UI
                     if (shape.Type == ShapeType.Table)
                     {
                         Rectangle moveHandleRect = new Rectangle(sx - 24, sy - 24, 24, 24);
-                        if (moveHandleRect.Contains(mousePos))
+                        if (buttons == MouseButtons.Left && moveHandleRect.Contains(mousePos))
                         {
                             hitIndex = i;
                             break;
@@ -21642,19 +21726,22 @@ namespace GenOffice.UI
                         // 1. Nhấp vào Nút Kéo 4 chiều ✥ HOẶC Viền ngoài của bảng -> KÉO DI CHUYỂN BẢNG
                         if (isMoveHandle || isNearOuterBorder)
                         {
-                            SaveUndoState();
-                            IsDraggingShape = true;
-                            IsSelectingTableCells = false;
-                            DragStartMouse = mousePos;
-                            DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
-                            DragStartTransforms.Clear();
-                            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                            if (buttons == MouseButtons.Left)
                             {
-                                foreach (int idx in SelectedShapeIndices)
+                                SaveUndoState();
+                                IsDraggingShape = true;
+                                IsSelectingTableCells = false;
+                                DragStartMouse = mousePos;
+                                DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+                                DragStartTransforms.Clear();
+                                if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
                                 {
-                                    if (idx >= 0 && idx < slide.Shapes.Count)
+                                    foreach (int idx in SelectedShapeIndices)
                                     {
-                                        DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                        if (idx >= 0 && idx < slide.Shapes.Count)
+                                        {
+                                            DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                        }
                                     }
                                 }
                             }
@@ -21735,18 +21822,21 @@ namespace GenOffice.UI
                     }
 
                     SyncSelectedAnimationWithShape();
-                    SaveUndoState();
-                    IsDraggingShape = true;
-                    DragStartMouse = mousePos;
-                    DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
-                    DragStartTransforms.Clear();
-                    if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                    if (buttons == MouseButtons.Left)
                     {
-                        foreach (int idx in SelectedShapeIndices)
+                        SaveUndoState();
+                        IsDraggingShape = true;
+                        DragStartMouse = mousePos;
+                        DragStartTransform = slide.Shapes[hitIndex].Transform.Clone();
+                        DragStartTransforms.Clear();
+                        if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
                         {
-                            if (idx >= 0 && idx < slide.Shapes.Count)
+                            foreach (int idx in SelectedShapeIndices)
                             {
-                                DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                if (idx >= 0 && idx < slide.Shapes.Count)
+                                {
+                                    DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                }
                             }
                         }
                     }
@@ -21979,6 +22069,7 @@ namespace GenOffice.UI
                     CurrentStroke.Add(mousePos);
                 }
 
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -21993,7 +22084,8 @@ namespace GenOffice.UI
             {
                 if (ShapeTaskPane.HandleMouseMove(mousePos))
                 {
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
             }
@@ -22014,7 +22106,8 @@ namespace GenOffice.UI
                     int deltaY = mousePos.Y - _thumbScrollDragStartMouseY;
                     int newScroll = _thumbScrollDragStartScrollY + (int)((float)deltaY / availY * maxScroll);
                     ThumbScrollY = Math.Max(0, Math.Min(maxScroll, newScroll));
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 }
                 return;
             }
@@ -22025,6 +22118,7 @@ namespace GenOffice.UI
             _isHoverThumbScrollBar = !ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos);
             if (prevHoverThumb != _isHoverThumbScrollBarThumb || prevHoverTrack != _isHoverThumbScrollBar)
             {
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -22056,6 +22150,7 @@ namespace GenOffice.UI
                 {
                     HasColorPickHover = false;
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22276,6 +22371,7 @@ namespace GenOffice.UI
                 float scrollPerPx = (float)(maxScrollX - minScrollX) / trackScrollableW;
                 CanvasScrollX = ScrollBarDragStartScrollX + (int)(deltaMouseX * scrollPerPx);
                 ClampScroll(canvasW, contentH);
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22297,6 +22393,7 @@ namespace GenOffice.UI
                 float scrollPerPx = (float)(maxScrollY - minScrollY) / trackScrollableH;
                 CanvasScrollY = ScrollBarDragStartScrollY + (int)(deltaMouseY * scrollPerPx);
                 ClampScroll(canvasW, contentH);
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22321,7 +22418,8 @@ namespace GenOffice.UI
 
                 if (oldHoverH != IsHoverHScrollBarThumb || oldHoverV != IsHoverVScrollBarThumb)
                 {
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 }
             }
 
@@ -22406,6 +22504,7 @@ namespace GenOffice.UI
                 }
 
                 SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22436,6 +22535,7 @@ namespace GenOffice.UI
                         CurrentDrawingMotionPoints.Add(newPt);
                     }
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22450,6 +22550,7 @@ namespace GenOffice.UI
                 DraggingMotionAnim.EndOffsetX = mouseSlideX - scx;
                 DraggingMotionAnim.EndOffsetY = mouseSlideY - scy;
                 DraggingMotionAnim.HasCustomEndOffset = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22486,6 +22587,7 @@ namespace GenOffice.UI
                 int currIdx = GetTextCharIndexFromPoint(mousePos, EditingShape, slideX, slideY, scale);
                 TextSelectionLength = currIdx - TextSelectionStart;
                 CaretIndex = currIdx;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22540,6 +22642,8 @@ namespace GenOffice.UI
                     int vh = (int)(shape.Transform.Height * scale);
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -22571,6 +22675,7 @@ namespace GenOffice.UI
                     shape.Type = ShapeType.Rectangle;
                 }
 
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22582,7 +22687,8 @@ namespace GenOffice.UI
                 float startW = DragStartTransform.Width;
                 float startH = DragStartTransform.Height;
                 float ratio = startW / Math.Max(1.0f, startH);
-                bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0;
+                bool isGraphic = shape.Type == ShapeType.Image || shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.Video;
+                bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0 || isGraphic;
 
                 float rotRad = (float)(-shape.Transform.Rotation * Math.PI / 180.0);
                 float cosR = (float)Math.Cos(rotRad);
@@ -22590,117 +22696,82 @@ namespace GenOffice.UI
                 float localDx = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * cosR - dy * sinR) : dx;
                 float localDy = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * sinR + dy * cosR) : dy;
 
+                float ax = 0.5f, ay = 0.5f;
                 switch (DragResizeHandleIndex)
                 {
-                    case 0: // Top-Left (Góc trên trái: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
-                        {
-                            if (keepAspect)
-                            {
-                                float drag = (Math.Abs(localDx) > Math.Abs(localDy * ratio)) ? -localDx : -(localDy * ratio);
-                                float newW = Math.Max(10f, startW + drag);
-                                float newH = newW / ratio;
-                                shape.Transform.X = DragStartTransform.X + (startW - newW);
-                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                            else
-                            {
-                                float newW = Math.Max(10f, startW - localDx);
-                                float newH = Math.Max(10f, startH - localDy);
-                                shape.Transform.X = DragStartTransform.X + (startW - newW);
-                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                        }
-                        break;
-                    case 1: // Top-Center (Cạnh trên)
-                        {
-                            float newH = Math.Max(10f, startH - localDy);
-                            shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                            shape.Transform.Height = newH;
-                        }
-                        break;
-                    case 2: // Top-Right (Góc trên phải: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
-                        {
-                            if (keepAspect)
-                            {
-                                float drag = (Math.Abs(localDx) > Math.Abs(-localDy * ratio)) ? localDx : -(localDy * ratio);
-                                float newW = Math.Max(10f, startW + drag);
-                                float newH = newW / ratio;
-                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                            else
-                            {
-                                float newW = Math.Max(10f, startW + localDx);
-                                float newH = Math.Max(10f, startH - localDy);
-                                shape.Transform.Y = DragStartTransform.Y + (startH - newH);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                        }
-                        break;
-                    case 3: // Right-Center (Cạnh phải)
-                        {
-                            shape.Transform.Width = Math.Max(10f, startW + localDx);
-                        }
-                        break;
-                    case 4: // Bottom-Right (Góc dưới phải: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
-                        {
-                            if (keepAspect)
-                            {
-                                float drag = (Math.Abs(localDx) > Math.Abs(localDy * ratio)) ? localDx : (localDy * ratio);
-                                float newW = Math.Max(10f, startW + drag);
-                                float newH = newW / ratio;
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                            else
-                            {
-                                float newW = Math.Max(10f, startW + localDx);
-                                float newH = Math.Max(10f, startH + localDy);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                        }
-                        break;
-                    case 5: // Bottom-Center (Cạnh dưới)
-                        {
-                            shape.Transform.Height = Math.Max(10f, startH + localDy);
-                        }
-                        break;
-                    case 6: // Bottom-Left (Góc dưới trái: Kéo đa hướng tự do, giữ Shift để khóa tỉ lệ)
-                        {
-                            if (keepAspect)
-                            {
-                                float drag = (Math.Abs(-localDx) > Math.Abs(localDy * ratio)) ? -localDx : (localDy * ratio);
-                                float newW = Math.Max(10f, startW + drag);
-                                float newH = newW / ratio;
-                                shape.Transform.X = DragStartTransform.X + (startW - newW);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                            else
-                            {
-                                float newW = Math.Max(10f, startW - localDx);
-                                float newH = Math.Max(10f, startH + localDy);
-                                shape.Transform.X = DragStartTransform.X + (startW - newW);
-                                shape.Transform.Width = newW;
-                                shape.Transform.Height = newH;
-                            }
-                        }
-                        break;
-                    case 7: // Left-Center (Cạnh trái)
-                        {
-                            float newW = Math.Max(10f, startW - localDx);
-                            shape.Transform.X = DragStartTransform.X + (startW - newW);
-                            shape.Transform.Width = newW;
-                        }
-                        break;
+                    case 0: ax = 1f; ay = 1f; break; // Top-Left
+                    case 1: ax = 0.5f; ay = 1f; break; // Top-Center
+                    case 2: ax = 0f; ay = 1f; break; // Top-Right
+                    case 3: ax = 0f; ay = 0.5f; break; // Right-Center
+                    case 4: ax = 0f; ay = 0f; break; // Bottom-Right
+                    case 5: ax = 0.5f; ay = 0f; break; // Bottom-Center
+                    case 6: ax = 1f; ay = 0f; break; // Bottom-Left
+                    case 7: ax = 1f; ay = 0.5f; break; // Left-Center
                 }
+
+                float newW = startW, newH = startH;
+                
+                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 1 || DragResizeHandleIndex == 2)
+                    newH = Math.Max(10f, startH - localDy);
+                else if (DragResizeHandleIndex == 4 || DragResizeHandleIndex == 5 || DragResizeHandleIndex == 6)
+                    newH = Math.Max(10f, startH + localDy);
+                    
+                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 6 || DragResizeHandleIndex == 7)
+                    newW = Math.Max(10f, startW - localDx);
+                else if (DragResizeHandleIndex == 2 || DragResizeHandleIndex == 3 || DragResizeHandleIndex == 4)
+                    newW = Math.Max(10f, startW + localDx);
+
+                if (keepAspect && (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 2 || DragResizeHandleIndex == 4 || DragResizeHandleIndex == 6))
+                {
+                    if (Math.Abs(newW - startW) > Math.Abs(newH - startH) * ratio)
+                        newH = newW / ratio;
+                    else
+                        newW = newH * ratio;
+                }
+
+                bool isMiddleHandle = (DragResizeHandleIndex == 1 || DragResizeHandleIndex == 3 || DragResizeHandleIndex == 5 || DragResizeHandleIndex == 7);
+                if (isGraphic && isMiddleHandle)
+                {
+                    float initVisWFrac = Math.Max(0.05f, 1.0f - CropInitialLeft - CropInitialRight);
+                    float initVisHFrac = Math.Max(0.05f, 1.0f - CropInitialTop - CropInitialBottom);
+                    float fullW = startW / initVisWFrac;
+                    float fullH = startH / initVisHFrac;
+                    float newVisWFrac = newW / fullW;
+                    float newVisHFrac = newH / fullH;
+
+                    if (DragResizeHandleIndex == 3)
+                        shape.CropRight = Math.Max(0f, Math.Min(0.85f - CropInitialLeft, 1.0f - CropInitialLeft - newVisWFrac));
+                    else if (DragResizeHandleIndex == 7)
+                        shape.CropLeft = Math.Max(0f, Math.Min(0.85f - CropInitialRight, 1.0f - CropInitialRight - newVisWFrac));
+                    else if (DragResizeHandleIndex == 5)
+                        shape.CropBottom = Math.Max(0f, Math.Min(0.85f - CropInitialTop, 1.0f - CropInitialTop - newVisHFrac));
+                    else if (DragResizeHandleIndex == 1)
+                        shape.CropTop = Math.Max(0f, Math.Min(0.85f - CropInitialBottom, 1.0f - CropInitialBottom - newVisHFrac));
+
+                    newW = Math.Max(10f, fullW * Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight));
+                    newH = Math.Max(10f, fullH * Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom));
+                }
+
+                float rotPosRad = (float)(shape.Transform.Rotation * Math.PI / 180.0);
+                float cosP = (float)Math.Cos(rotPosRad);
+                float sinP = (float)Math.Sin(rotPosRad);
+                
+                float dcx = (0.5f - ax) * (newW - startW);
+                float dcy = (0.5f - ay) * (newH - startH);
+                
+                float globalDcx = dcx * cosP - dcy * sinP;
+                float globalDcy = dcx * sinP + dcy * cosP;
+
+                float oldCG_X = DragStartTransform.X + startW / 2f;
+                float oldCG_Y = DragStartTransform.Y + startH / 2f;
+                
+                float newCG_X = oldCG_X + globalDcx;
+                float newCG_Y = oldCG_Y + globalDcy;
+
+                shape.Transform.X = newCG_X - newW / 2f;
+                shape.Transform.Y = newCG_Y - newH / 2f;
+                shape.Transform.Width = newW;
+                shape.Transform.Height = newH;
 
                 if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
                 {
@@ -22710,6 +22781,8 @@ namespace GenOffice.UI
                     int vh = (int)(shape.Transform.Height * scale);
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
         }
@@ -22961,6 +23034,19 @@ namespace GenOffice.UI
             }
         }
 
+        
+        private Cursor GetRotatedResizeCursor(int handleIndex, float rotationDeg)
+        {
+            float[] baseAngles = new float[] { 315f, 270f, 45f, 0f, 135f, 90f, 225f, 180f };
+            float angle = baseAngles[handleIndex] + rotationDeg;
+            angle = angle % 180f;
+            if (angle < 0) angle += 180f;
+            if (angle < 22.5f || angle >= 157.5f) return Cursors.SizeWE;
+            if (angle >= 22.5f && angle < 67.5f) return Cursors.SizeNESW;
+            if (angle >= 67.5f && angle < 112.5f) return Cursors.SizeNS;
+            return Cursors.SizeNWSE;
+        }
+
         public Cursor GetCursorForPosition(Point mousePos, int width, int height)
         {
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
@@ -23102,19 +23188,13 @@ namespace GenOffice.UI
 
                 // 8 resize handles
                 PointF[] handles = GetRotatedHandleCoordinates(sx, sy, sw, sh, shape.Transform.Rotation);
-                Cursor[] handleCursors = new Cursor[] {
-                    Cursors.SizeNWSE, Cursors.SizeNS, Cursors.SizeNESW,
-                    Cursors.SizeWE, Cursors.SizeNWSE, Cursors.SizeNS,
-                    Cursors.SizeNESW, Cursors.SizeWE
-                };
-
                 for (int hIdx = 0; hIdx < handles.Length; hIdx++)
                 {
                     float dHX = mousePos.X - handles[hIdx].X;
                     float dHY = mousePos.Y - handles[hIdx].Y;
                     if (dHX * dHX + dHY * dHY <= 64f) // 8px radius
                     {
-                        return handleCursors[hIdx];
+                        return GetRotatedResizeCursor(hIdx, shape.Transform.Rotation);
                     }
                 }
 
@@ -23189,6 +23269,7 @@ namespace GenOffice.UI
             if (ShapeTaskPane != null && ShapeTaskPane.IsDraggingScrollbar)
             {
                 ShapeTaskPane.HandleMouseUp(mousePos);
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -23205,6 +23286,7 @@ namespace GenOffice.UI
                     if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                     EndInlineEditing();
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -23264,6 +23346,7 @@ namespace GenOffice.UI
                 {
                     CurrentDrawingMotionPoints.Clear();
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -23275,6 +23358,7 @@ namespace GenOffice.UI
                 DraggingMotionAnim = null;
                 DraggingMotionShape = null;
                 PlayAnimationPreview();
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -23408,6 +23492,7 @@ namespace GenOffice.UI
             {
                 IsRubberbandSelecting = false;
                 _rubberbandInitialSelection.Clear();
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
             if (DragStartTransforms != null) DragStartTransforms.Clear();
@@ -23881,7 +23966,8 @@ namespace GenOffice.UI
                 {
                     IsColorPickingMode = false;
                     HasColorPickHover = false;
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
                 if (IsDrawingShapeMode || IsDrawingActive)
@@ -23904,13 +23990,15 @@ namespace GenOffice.UI
                 if (key == Keys.Z)
                 {
                     Undo();
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
                 if (key == Keys.Y)
                 {
                     Redo();
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
                 if (key == Keys.A && ActiveSlide != null && ActiveSlide.Shapes.Count > 0)
@@ -23921,7 +24009,8 @@ namespace GenOffice.UI
                         if (ActiveSlide.Shapes[i].IsVisible) SelectedShapeIndices.Add(i);
                     }
                     SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
             }
@@ -23958,7 +24047,8 @@ namespace GenOffice.UI
                         SelectedShape.Transform.X += nudgeDx;
                         SelectedShape.Transform.Y += nudgeDy;
                     }
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 }
             }
             else
