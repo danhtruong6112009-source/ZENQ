@@ -22348,19 +22348,19 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 6: Văn bản (Text) ====================
-                else if (x >= 874 && x <= 928 && y >= 68 && y <= 124) // Hộp chữ
+                else if (x >= 742 && x <= 796 && y >= 68 && y <= 124) // Hộp chữ
                 {
                     slidesView.StartShapeDrawMode(ShapeType.TextBox);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 930 && x <= 990 && y >= 68 && y <= 124) // Đầu & Chân
+                else if (x >= 798 && x <= 856 && y >= 68 && y <= 124) // Đầu & Chân
                 {
                     slidesView.InsertHeaderFooter();
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 992 && x <= 1050 && y >= 68 && y <= 124) // WordArt ▾
+                else if (x >= 860 && x <= 916 && y >= 68 && y <= 124) // WordArt ▾
                 {
                     using (WordArtGalleryForm waDlg = new WordArtGalleryForm())
                     {
@@ -22373,9 +22373,9 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 7: Ký hiệu (Symbols) ====================
-                else if (x >= 1060 && x <= 1120 && y >= 68 && y <= 124) // Công thức ▾
+                else if (x >= 928 && x <= 986 && y >= 68 && y <= 124) // Công thức ▾
                 {
-                    Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(1060, 130)) : new Point(1060, 130);
+                    Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(928, 130)) : new Point(928, 130);
                     QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
                     eqDlg.OnEquationSelected = (formula) =>
                     {
@@ -22400,9 +22400,9 @@ namespace GenOffice.UI
                     eqDlg.Show();
                     return true;
                 }
-                else if (x >= 1122 && x <= 1178 && y >= 68 && y <= 124) // Ký hiệu ▾
+                else if (x >= 990 && x <= 1046 && y >= 68 && y <= 124) // Ký hiệu ▾
                 {
-                    Point symPt = parentForm != null ? parentForm.PointToScreen(new Point(1122, 130)) : new Point(1122, 130);
+                    Point symPt = parentForm != null ? parentForm.PointToScreen(new Point(990, 130)) : new Point(990, 130);
                     QuickSymbolDropDownForm symDlg = new QuickSymbolDropDownForm(symPt);
                     symDlg.OnSymbolSelected = (sym) =>
                     {
@@ -22425,7 +22425,7 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 8: Phương tiện (Media) ====================
-                else if (x >= 1188 && x <= 1244 && y >= 68 && y <= 124) // Video ▾
+                else if (x >= 1056 && x <= 1112 && y >= 68 && y <= 124) // Video ▾
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
@@ -22442,7 +22442,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 1246 && x <= 1308 && y >= 68 && y <= 124) // Âm thanh ▾
+                else if (x >= 1114 && x <= 1176 && y >= 68 && y <= 124) // Âm thanh ▾
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
@@ -22459,7 +22459,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 1310 && x <= 1384 && y >= 68 && y <= 124) // Ghi màn hình
+                else if (x >= 1178 && x <= 1252 && y >= 68 && y <= 124) // Ghi màn hình
                 {
                     slidesView.InsertVideo();
                     if (parentForm != null) parentForm.Invalidate();
