@@ -2,7 +2,7 @@
 using System;
 using System.IO;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public static class PptxTemplate
     {

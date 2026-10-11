@@ -2,7 +2,7 @@
 #include <vector>
 #include <cmath>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 SlidesView::SlidesView() {
     // Add sample slide shapes
@@ -265,4 +265,4 @@ void SlidesView::handleClick(int x, int y, HWND hWnd) {
     }
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

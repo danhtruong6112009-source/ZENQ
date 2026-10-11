@@ -7,10 +7,10 @@ using System.Text;
 using PdfSharp;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public class CalcPdfOptions
     {

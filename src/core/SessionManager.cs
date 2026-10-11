@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public class TabSessionItem
     {
@@ -106,7 +106,10 @@ namespace GenOffice.Core
                     if (tab.Mode == OfficeAppMode.Home) continue; // Home là tab mặc định
 
                     string draftName = "";
-                    if (tab.Mode == OfficeAppMode.Writer)
+                    // Tối ưu tốc độ đóng app: nếu tệp đã lưu trên đĩa và KHÔNG có sửa đổi thì không cần nén draft nặng
+                    bool needsDraft = tab.IsModified || string.IsNullOrEmpty(tab.FilePath);
+
+                    if (needsDraft && tab.Mode == OfficeAppMode.Writer)
                     {
                         string wText = (i == appForm.Ribbon.ActiveDocIndex && appForm.WriterView != null && appForm.WriterView.PieceTable != null)
                             ? appForm.WriterView.PieceTable.GetText()
@@ -157,7 +160,7 @@ namespace GenOffice.Core
                             }
                         }
                     }
-                    else if (tab.Mode == OfficeAppMode.Slides)
+                    else if (string.IsNullOrEmpty(tab.FilePath) && needsDraft && tab.Mode == OfficeAppMode.Slides)
                     {
                         PresentationRoot pres = (i == appForm.Ribbon.ActiveDocIndex && appForm.SlidesView != null) 
                             ? appForm.SlidesView.Presentation 
@@ -170,29 +173,26 @@ namespace GenOffice.Core
                             try { Format.PptxHandler.SavePptx(draftPath, pres); } catch { }
                         }
                     }
-                    else if (tab.Mode == OfficeAppMode.Calc)
+                    else if (needsDraft && tab.Mode == OfficeAppMode.Calc)
                     {
                         CalcView cv = (i == appForm.Ribbon.ActiveDocIndex && appForm.CalcView != null) ? appForm.CalcView : null;
-                        if (true)
+                        draftName = string.Format("draft_c_{0}.xlsx", i);
+                        string draftPath = Path.Combine(autoSaveDir, draftName);
+                        try
                         {
-                            draftName = string.Format("draft_c_{0}.xlsx", i);
-                            string draftPath = Path.Combine(autoSaveDir, draftName);
-                            try
+                            if (cv != null && cv.Sheets != null && cv.Sheets.Count > 0)
                             {
-                                if (cv != null && cv.Sheets != null && cv.Sheets.Count > 0)
-                                {
-                                    Format.XlsxHandler.SaveXlsx(draftPath, cv);
-                                }
-                                else if (tab.CalcSheets != null && tab.CalcSheets.Count > 0)
-                                {
-                                    CalcView tempCv = new CalcView();
-                                    tempCv.Sheets = tab.CalcSheets;
-                                    tempCv.SheetNames = tab.CalcSheetNames;
-                                    Format.XlsxHandler.SaveXlsx(draftPath, tempCv);
-                                }
+                                Format.XlsxHandler.SaveXlsx(draftPath, cv);
                             }
-                            catch { }
+                            else if (tab.CalcSheets != null && tab.CalcSheets.Count > 0)
+                            {
+                                CalcView tempCv = new CalcView();
+                                tempCv.Sheets = tab.CalcSheets;
+                                tempCv.SheetNames = tab.CalcSheetNames;
+                                Format.XlsxHandler.SaveXlsx(draftPath, tempCv);
+                            }
                         }
+                        catch { }
                     }
 
                     // Always save tabs to preserve session state
@@ -465,7 +465,7 @@ namespace GenOffice.Core
                                         appForm.Ribbon.DocTabs[currentIdx].IsModified = true;
                                     }
                                 }
-                                else if (item.Mode == OfficeAppMode.Slides && appForm.SlidesView != null)
+                                else if (item.Mode == OfficeAppMode.Slides && appForm.SlidesView != null && !hasFile)
                                 {
                                     appForm.SlidesView.Presentation = Format.PptxHandler.LoadPptx(draftPath);
                                     appForm.SlidesView.ActiveSlideIndex = Math.Max(0, Math.Min(appForm.SlidesView.Presentation.Slides.Count - 1, item.ActiveSlideIndex));

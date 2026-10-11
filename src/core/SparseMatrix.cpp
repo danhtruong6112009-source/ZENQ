@@ -2,7 +2,7 @@
 #include <cctype>
 #include <algorithm>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 bool SparseMatrix::hasCell(uint32_t row, uint32_t col) const {
     return grid.find(encodeKey(row, col)) != grid.end();
@@ -82,4 +82,4 @@ std::pair<uint32_t, uint32_t> SparseMatrix::parseCellAddress(const std::string& 
     return {row, col};
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

@@ -6,9 +6,9 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class CalcSelectionFormat
     {
@@ -566,24 +566,175 @@ namespace GenOffice.UI
             AddSheet("Sheet1");
             AddSheet("Sheet2");
             AddSheet("Sheet3");
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
         }
 
         private void InitFormulas()
         {
             AllFormulas = new List<FormulaSuggestion>
             {
+                // Toán học & Thống kê cơ bản
                 new FormulaSuggestion("SUM", "=SUM(number1, [number2], ...)", "Tính tổng tất cả các số trong một dải ô được chọn."),
                 new FormulaSuggestion("AVERAGE", "=AVERAGE(number1, [number2], ...)", "Tính giá trị trung bình cộng của các đối số."),
                 new FormulaSuggestion("COUNT", "=COUNT(value1, [value2], ...)", "Đếm số lượng ô có chứa giá trị số."),
+                new FormulaSuggestion("COUNTA", "=COUNTA(value1, [value2], ...)", "Đếm số lượng ô không trống trong dải ô."),
+                new FormulaSuggestion("COUNTBLANK", "=COUNTBLANK(range)", "Đếm số lượng ô trống trong dải ô."),
                 new FormulaSuggestion("MAX", "=MAX(number1, [number2], ...)", "Trả về giá trị lớn nhất trong tập hợp dữ liệu."),
                 new FormulaSuggestion("MIN", "=MIN(number1, [number2], ...)", "Trả về giá trị nhỏ nhất trong tập hợp dữ liệu."),
-                new FormulaSuggestion("IF", "=IF(logical_test, value_if_true, value_if_false)", "Kiểm tra điều kiện logic và trả về giá trị tương ứng."),
-                new FormulaSuggestion("VLOOKUP", "=VLOOKUP(lookup_value, table_array, col_index, [range_lookup])", "Tìm kiếm một giá trị trong cột đầu tiên của bảng."),
-                new FormulaSuggestion("CONCATENATE", "=CONCATENATE(text1, [text2], ...)", "Nối nhiều chuỗi văn bản lại thành một chuỗi duy nhất."),
-                new FormulaSuggestion("ROUND", "=ROUND(number, num_digits)", "Làm tròn một số đến số chữ số thập phân đã định."),
                 new FormulaSuggestion("PRODUCT", "=PRODUCT(number1, [number2], ...)", "Nhân tất cả các số được đưa ra làm đối số."),
+                new FormulaSuggestion("SUMPRODUCT", "=SUMPRODUCT(array1, [array2], ...)", "Nhân các thành phần tương ứng trong mảng và trả về tổng."),
+                new FormulaSuggestion("SUBTOTAL", "=SUBTOTAL(function_num, ref1, ...)", "Trả về tổng phụ trong danh sách hoặc cơ sở dữ liệu (1-11 hoặc 101-111)."),
+                new FormulaSuggestion("AGGREGATE", "=AGGREGATE(function_num, options, ref1, ...)", "Tính toán tổng hợp (SUM, AVERAGE, LARGE, SMALL...) bỏ qua lỗi/hàng ẩn."),
+                // Thống kê có điều kiện (1 & nhiều điều kiện)
+                new FormulaSuggestion("SUMIF", "=SUMIF(range, criteria, [sum_range])", "Tính tổng các ô thỏa mãn một điều kiện."),
+                new FormulaSuggestion("SUMIFS", "=SUMIFS(sum_range, criteria_range1, criteria1, ...)", "Tính tổng các ô thỏa mãn nhiều điều kiện chuẩn Excel."),
+                new FormulaSuggestion("COUNTIF", "=COUNTIF(range, criteria)", "Đếm số ô thỏa mãn một điều kiện."),
+                new FormulaSuggestion("COUNTIFS", "=COUNTIFS(criteria_range1, criteria1, ...)", "Đếm số ô thỏa mãn nhiều điều kiện chuẩn Excel."),
+                new FormulaSuggestion("AVERAGEIF", "=AVERAGEIF(range, criteria, [average_range])", "Tính trung bình cộng các ô thỏa mãn một điều kiện."),
+                new FormulaSuggestion("AVERAGEIFS", "=AVERAGEIFS(average_range, criteria_range1, criteria1, ...)", "Tính trung bình cộng các ô thỏa mãn nhiều điều kiện."),
+                new FormulaSuggestion("MAXIFS", "=MAXIFS(max_range, criteria_range1, criteria1, ...)", "Trả về giá trị lớn nhất trong các ô thỏa mãn nhiều điều kiện."),
+                new FormulaSuggestion("MINIFS", "=MINIFS(min_range, criteria_range1, criteria1, ...)", "Trả về giá trị nhỏ nhất trong các ô thỏa mãn nhiều điều kiện."),
+                // Thống kê nâng cao
+                new FormulaSuggestion("MEDIAN", "=MEDIAN(number1, [number2], ...)", "Trả về số trung vị của các số đã cho."),
+                new FormulaSuggestion("MODE", "=MODE(number1, [number2], ...)", "Trả về giá trị xuất hiện nhiều nhất trong tập dữ liệu."),
+                new FormulaSuggestion("STDEV", "=STDEV(number1, [number2], ...)", "Ước tính độ lệch chuẩn dựa trên mẫu."),
+                new FormulaSuggestion("STDEV.P", "=STDEV.P(number1, [number2], ...)", "Tính độ lệch chuẩn trên toàn bộ quần thể."),
+                new FormulaSuggestion("VAR", "=VAR(number1, [number2], ...)", "Ước tính phương sai dựa trên mẫu."),
+                new FormulaSuggestion("VAR.P", "=VAR.P(number1, [number2], ...)", "Tính phương sai trên toàn bộ quần thể."),
+                new FormulaSuggestion("LARGE", "=LARGE(array, k)", "Trả về giá trị lớn thứ k trong tập dữ liệu."),
+                new FormulaSuggestion("SMALL", "=SMALL(array, k)", "Trả về giá trị nhỏ thứ k trong tập dữ liệu."),
+                new FormulaSuggestion("RANK", "=RANK(number, ref, [order])", "Trả về thứ hạng của một số trong danh sách."),
+                new FormulaSuggestion("PERCENTILE", "=PERCENTILE(array, k)", "Trả về phân vị thứ k của các giá trị trong dải ô."),
+                new FormulaSuggestion("QUARTILE", "=QUARTILE(array, quart)", "Trả về tứ phân vị của tập dữ liệu."),
+                new FormulaSuggestion("CORREL", "=CORREL(array1, array2)", "Trả về hệ số tương quan giữa hai tập dữ liệu."),
+                new FormulaSuggestion("FORECAST", "=FORECAST(x, known_y's, known_x's)", "Dự báo giá trị tương lai bằng hồi quy tuyến tính."),
+                new FormulaSuggestion("SLOPE", "=SLOPE(known_y's, known_x's)", "Trả về độ dốc của đường hồi quy tuyến tính."),
+                new FormulaSuggestion("INTERCEPT", "=INTERCEPT(known_y's, known_x's)", "Trả về giao điểm trục tung của đường hồi quy tuyến tính."),
+                // Làm tròn & Toán học
+                new FormulaSuggestion("ROUND", "=ROUND(number, num_digits)", "Làm tròn một số đến số chữ số thập phân đã định."),
+                new FormulaSuggestion("ROUNDUP", "=ROUNDUP(number, num_digits)", "Làm tròn số ra xa số 0 (lên)."),
+                new FormulaSuggestion("ROUNDDOWN", "=ROUNDDOWN(number, num_digits)", "Làm tròn số về gần số 0 (xuống)."),
+                new FormulaSuggestion("MROUND", "=MROUND(number, multiple)", "Làm tròn số đến bội số gần nhất."),
+                new FormulaSuggestion("CEILING", "=CEILING(number, significance)", "Làm tròn số lên đến bội số nguyên gần nhất."),
+                new FormulaSuggestion("FLOOR", "=FLOOR(number, significance)", "Làm tròn số xuống đến bội số nguyên gần nhất."),
+                new FormulaSuggestion("INT", "=INT(number)", "Làm tròn số xuống tới số nguyên gần nhất."),
+                new FormulaSuggestion("TRUNC", "=TRUNC(number, [num_digits])", "Cắt cụt một số thành số nguyên hoặc số chữ số thập phân."),
+                new FormulaSuggestion("ABS", "=ABS(number)", "Trả về giá trị tuyệt đối của một số."),
+                new FormulaSuggestion("MOD", "=MOD(number, divisor)", "Trả về phần dư sau khi chia."),
+                new FormulaSuggestion("QUOTIENT", "=QUOTIENT(numerator, denominator)", "Trả về phần nguyên của phép chia."),
+                new FormulaSuggestion("POWER", "=POWER(number, power)", "Trả về kết quả của một số nâng lên lũy thừa."),
+                new FormulaSuggestion("SQRT", "=SQRT(number)", "Trả về căn bậc hai của một số."),
+                new FormulaSuggestion("EXP", "=EXP(number)", "Trả về cơ số e nâng lên lũy thừa của số đã cho."),
+                new FormulaSuggestion("LN", "=LN(number)", "Trả về lô-ga-rít tự nhiên của một số."),
+                new FormulaSuggestion("LOG", "=LOG(number, [base])", "Trả về lô-ga-rít của một số theo cơ số chỉ định."),
+                new FormulaSuggestion("LOG10", "=LOG10(number)", "Trả về lô-ga-rít cơ số 10 của một số."),
+                new FormulaSuggestion("FACT", "=FACT(number)", "Trả về giai thừa của một số."),
+                new FormulaSuggestion("COMBIN", "=COMBIN(number, number_chosen)", "Trả về số tổ hợp chập k của n phần tử."),
+                new FormulaSuggestion("PERMUT", "=PERMUT(number, number_chosen)", "Trả về số chỉnh hợp chập k của n phần tử."),
+                new FormulaSuggestion("GCD", "=GCD(number1, [number2], ...)", "Trả về ước số chung lớn nhất."),
+                new FormulaSuggestion("LCM", "=LCM(number1, [number2], ...)", "Trả về bội số chung nhỏ nhất."),
+                new FormulaSuggestion("RAND", "=RAND()", "Trả về một số thực ngẫu nhiên từ 0 đến 1."),
+                new FormulaSuggestion("RANDBETWEEN", "=RANDBETWEEN(bottom, top)", "Trả về số nguyên ngẫu nhiên nằm giữa hai số chỉ định."),
+                new FormulaSuggestion("PI", "=PI()", "Trả về hằng số Pi (3.14159265358979)."),
+                new FormulaSuggestion("SIN", "=SIN(number)", "Trả về sin của một góc (radian)."),
+                new FormulaSuggestion("COS", "=COS(number)", "Trả về cosin của một góc (radian)."),
+                new FormulaSuggestion("TAN", "=TAN(number)", "Trả về tang của một góc (radian)."),
+                new FormulaSuggestion("RADIANS", "=RADIANS(angle)", "Chuyển đổi độ sang radian."),
+                new FormulaSuggestion("DEGREES", "=DEGREES(angle)", "Chuyển đổi radian sang độ."),
+                // Logic & Kiểm tra thông tin
+                new FormulaSuggestion("IF", "=IF(logical_test, value_if_true, value_if_false)", "Kiểm tra điều kiện logic và trả về giá trị tương ứng."),
+                new FormulaSuggestion("IFS", "=IFS(logical_test1, value1, ...)", "Kiểm tra nhiều điều kiện và trả về giá trị của điều kiện đúng đầu tiên."),
+                new FormulaSuggestion("SWITCH", "=SWITCH(expression, val1, result1, ..., [default])", "So khớp biểu thức với danh sách giá trị và trả về kết quả tương ứng."),
+                new FormulaSuggestion("AND", "=AND(logical1, [logical2], ...)", "Trả về TRUE nếu tất cả các đối số đều đúng."),
+                new FormulaSuggestion("OR", "=OR(logical1, [logical2], ...)", "Trả về TRUE nếu bất kỳ đối số nào đúng."),
+                new FormulaSuggestion("XOR", "=XOR(logical1, [logical2], ...)", "Trả về phép OR loại trừ của tất cả các đối số."),
+                new FormulaSuggestion("NOT", "=NOT(logical)", "Đảo ngược giá trị logic của đối số."),
+                new FormulaSuggestion("IFERROR", "=IFERROR(value, value_if_error)", "Trả về giá trị thay thế nếu công thức bị lỗi."),
+                new FormulaSuggestion("IFNA", "=IFNA(value, value_if_na)", "Trả về giá trị thay thế nếu biểu thức trả về lỗi #N/A."),
+                new FormulaSuggestion("ISBLANK", "=ISBLANK(value)", "Kiểm tra ô có trống hay không."),
+                new FormulaSuggestion("ISNUMBER", "=ISNUMBER(value)", "Kiểm tra giá trị có phải là số hay không."),
+                new FormulaSuggestion("ISTEXT", "=ISTEXT(value)", "Kiểm tra giá trị có phải là văn bản hay không."),
+                new FormulaSuggestion("ISERROR", "=ISERROR(value)", "Kiểm tra giá trị có phải là lỗi bất kỳ hay không."),
+                new FormulaSuggestion("ISNA", "=ISNA(value)", "Kiểm tra giá trị có phải là lỗi #N/A hay không."),
+                new FormulaSuggestion("ISFORMULA", "=ISFORMULA(reference)", "Kiểm tra ô tham chiếu có chứa công thức hay không."),
+                new FormulaSuggestion("ISEVEN", "=ISEVEN(number)", "Trả về TRUE nếu số chẵn."),
+                new FormulaSuggestion("ISODD", "=ISODD(number)", "Trả về TRUE nếu số lẻ."),
+                // Dò tìm & Tham chiếu
+                new FormulaSuggestion("VLOOKUP", "=VLOOKUP(lookup_value, table_array, col_index, [range_lookup])", "Tìm kiếm một giá trị trong cột đầu tiên của bảng."),
+                new FormulaSuggestion("HLOOKUP", "=HLOOKUP(lookup_value, table_array, row_index, [range_lookup])", "Tìm kiếm một giá trị trong hàng đầu tiên của bảng."),
+                new FormulaSuggestion("XLOOKUP", "=XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found])", "Tìm kiếm hiện đại theo dải ô hoặc mảng."),
+                new FormulaSuggestion("LOOKUP", "=LOOKUP(lookup_value, lookup_vector, [result_vector])", "Tìm kiếm một giá trị trong một véc-tơ hoặc mảng."),
+                new FormulaSuggestion("INDEX", "=INDEX(array, row_num, [column_num])", "Trả về giá trị tại giao điểm của hàng và cột trong mảng."),
+                new FormulaSuggestion("MATCH", "=MATCH(lookup_value, lookup_array, [match_type])", "Trả về vị trí tương đối của một mục trong dải ô."),
+                new FormulaSuggestion("CHOOSE", "=CHOOSE(index_num, value1, [value2], ...)", "Chọn một giá trị từ danh sách dựa trên số chỉ mục."),
+                new FormulaSuggestion("INDIRECT", "=INDIRECT(ref_text)", "Trả về tham chiếu được chỉ định bởi một chuỗi văn bản."),
+                new FormulaSuggestion("OFFSET", "=OFFSET(reference, rows, cols)", "Trả về giá trị ô dịch chuyển từ ô tham chiếu."),
+                new FormulaSuggestion("ROW", "=ROW([reference])", "Trả về số thứ tự hàng của một tham chiếu."),
+                new FormulaSuggestion("COLUMN", "=COLUMN([reference])", "Trả về số thứ tự cột của một tham chiếu."),
+                new FormulaSuggestion("ROWS", "=ROWS(array)", "Trả về số lượng hàng trong một tham chiếu."),
+                new FormulaSuggestion("COLUMNS", "=COLUMNS(array)", "Trả về số lượng cột trong một tham chiếu."),
+                new FormulaSuggestion("ADDRESS", "=ADDRESS(row_num, column_num, [abs_num])", "Tạo địa chỉ ô dưới dạng văn bản từ số hàng và cột."),
+                new FormulaSuggestion("FORMULATEXT", "=FORMULATEXT(reference)", "Trả về công thức dưới dạng chuỗi văn bản."),
+                // Văn bản (Text)
+                new FormulaSuggestion("CONCATENATE", "=CONCATENATE(text1, [text2], ...)", "Nối nhiều chuỗi văn bản lại thành một chuỗi duy nhất."),
+                new FormulaSuggestion("CONCAT", "=CONCAT(text1, [text2], ...)", "Nối văn bản từ nhiều chuỗi hoặc dải ô."),
+                new FormulaSuggestion("TEXTJOIN", "=TEXTJOIN(delimiter, ignore_empty, text1, ...)", "Nối nhiều chuỗi với ký tự phân cách chỉ định."),
+                new FormulaSuggestion("LEFT", "=LEFT(text, [num_chars])", "Trích xuất các ký tự đầu tiên bên trái chuỗi."),
+                new FormulaSuggestion("RIGHT", "=RIGHT(text, [num_chars])", "Trích xuất các ký tự cuối cùng bên phải chuỗi."),
+                new FormulaSuggestion("MID", "=MID(text, start_num, num_chars)", "Trích xuất chuỗi con từ vị trí chỉ định."),
+                new FormulaSuggestion("LEN", "=LEN(text)", "Trả về độ dài (số ký tự) của chuỗi."),
+                new FormulaSuggestion("TRIM", "=TRIM(text)", "Loại bỏ khoảng trắng thừa khỏi chuỗi văn bản."),
+                new FormulaSuggestion("CLEAN", "=CLEAN(text)", "Loại bỏ tất cả các ký tự không in được khỏi văn bản."),
+                new FormulaSuggestion("UPPER", "=UPPER(text)", "Chuyển đổi văn bản sang chữ IN HOA."),
+                new FormulaSuggestion("LOWER", "=LOWER(text)", "Chuyển đổi văn bản sang chữ thường."),
+                new FormulaSuggestion("PROPER", "=PROPER(text)", "Viết hoa chữ cái đầu tiên của mỗi từ."),
+                new FormulaSuggestion("SUBSTITUTE", "=SUBSTITUTE(text, old_text, new_text, [instance_num])", "Thay thế văn bản cũ bằng văn bản mới trong chuỗi."),
+                new FormulaSuggestion("REPLACE", "=REPLACE(old_text, start_num, num_chars, new_text)", "Thay thế một phần của chuỗi văn bản dựa trên vị trí và số ký tự."),
+                new FormulaSuggestion("FIND", "=FIND(find_text, within_text, [start_num])", "Tìm vị trí chuỗi con (phân biệt chữ hoa/thường)."),
+                new FormulaSuggestion("SEARCH", "=SEARCH(find_text, within_text, [start_num])", "Tìm vị trí chuỗi con (không phân biệt hoa/thường, hỗ trợ * ?)."),
+                new FormulaSuggestion("EXACT", "=EXACT(text1, text2)", "So sánh hai chuỗi có giống hệt nhau không."),
+                new FormulaSuggestion("REPT", "=REPT(text, number_times)", "Lặp lại văn bản một số lần nhất định."),
+                new FormulaSuggestion("VALUE", "=VALUE(text)", "Chuyển đổi chuỗi văn bản đại diện cho số thành số."),
+                new FormulaSuggestion("TEXT", "=TEXT(value, format_text)", "Định dạng một số và chuyển đổi thành văn bản."),
+                new FormulaSuggestion("FIXED", "=FIXED(number, [decimals], [no_commas])", "Làm tròn số và định dạng dưới dạng văn bản có dấu phẩy."),
+                new FormulaSuggestion("CHAR", "=CHAR(number)", "Trả về ký tự theo mã số ASCII/ANSI."),
+                new FormulaSuggestion("CODE", "=CODE(text)", "Trả về mã số của ký tự đầu tiên trong chuỗi."),
+                // Ngày & Giờ (Date & Time)
                 new FormulaSuggestion("TODAY", "=TODAY()", "Trả về ngày tháng hiện tại của hệ thống."),
-                new FormulaSuggestion("NOW", "=NOW()", "Trả về ngày tháng và thời gian hiện tại của hệ thống.")
+                new FormulaSuggestion("NOW", "=NOW()", "Trả về ngày tháng và thời gian hiện tại của hệ thống."),
+                new FormulaSuggestion("DATE", "=DATE(year, month, day)", "Tạo ngày hợp lệ từ Năm, Tháng, Ngày."),
+                new FormulaSuggestion("TIME", "=TIME(hour, minute, second)", "Tạo thời gian hợp lệ từ Giờ, Phút, Giây."),
+                new FormulaSuggestion("YEAR", "=YEAR(serial_number)", "Trả về năm của một ngày."),
+                new FormulaSuggestion("MONTH", "=MONTH(serial_number)", "Trả về tháng của một ngày (1-12)."),
+                new FormulaSuggestion("DAY", "=DAY(serial_number)", "Trả về ngày trong tháng (1-31)."),
+                new FormulaSuggestion("HOUR", "=HOUR(serial_number)", "Trả về giờ (0-23)."),
+                new FormulaSuggestion("MINUTE", "=MINUTE(serial_number)", "Trả về phút (0-59)."),
+                new FormulaSuggestion("SECOND", "=SECOND(serial_number)", "Trả về giây (0-59)."),
+                new FormulaSuggestion("WEEKDAY", "=WEEKDAY(serial_number, [return_type])", "Trả về thứ trong tuần của một ngày."),
+                new FormulaSuggestion("WEEKNUM", "=WEEKNUM(serial_number, [return_type])", "Trả về số tuần trong năm."),
+                new FormulaSuggestion("DATEDIF", "=DATEDIF(start_date, end_date, unit)", "Tính số ngày, tháng hoặc năm giữa hai ngày."),
+                new FormulaSuggestion("DAYS", "=DAYS(end_date, start_date)", "Trả về số ngày giữa hai ngày."),
+                new FormulaSuggestion("DAYS360", "=DAYS360(start_date, end_date, [method])", "Tính số ngày giữa hai ngày dựa trên năm 360 ngày."),
+                new FormulaSuggestion("EDATE", "=EDATE(start_date, months)", "Trả về ngày cách ngày bắt đầu một số tháng."),
+                new FormulaSuggestion("EOMONTH", "=EOMONTH(start_date, months)", "Trả về ngày cuối cùng của tháng trước hoặc sau một số tháng."),
+                new FormulaSuggestion("WORKDAY", "=WORKDAY(start_date, days, [holidays])", "Trả về ngày làm việc trước hoặc sau một số ngày làm việc."),
+                new FormulaSuggestion("NETWORKDAYS", "=NETWORKDAYS(start_date, end_date)", "Trả về số ngày làm việc trọn vẹn giữa hai ngày."),
+                new FormulaSuggestion("YEARFRAC", "=YEARFRAC(start_date, end_date, [basis])", "Tính tỷ lệ năm giữa hai ngày."),
+                // Tài chính (Financial)
+                new FormulaSuggestion("PMT", "=PMT(rate, nper, pv, [fv], [type])", "Tính khoản thanh toán định kỳ cho khoản vay với lãi suất không đổi."),
+                new FormulaSuggestion("IPMT", "=IPMT(rate, per, nper, pv, [fv], [type])", "Tính tiền lãi phải trả trong một kỳ của khoản đầu tư/vay."),
+                new FormulaSuggestion("PPMT", "=PPMT(rate, per, nper, pv, [fv], [type])", "Tính khoản thanh toán vốn gốc trong một kỳ của khoản vay."),
+                new FormulaSuggestion("PV", "=PV(rate, nper, pmt, [fv], [type])", "Tính giá trị hiện tại (Present Value) của khoản đầu tư."),
+                new FormulaSuggestion("FV", "=FV(rate, nper, pmt, [pv], [type])", "Tính giá trị tương lai (Future Value) của khoản đầu tư."),
+                new FormulaSuggestion("NPV", "=NPV(rate, value1, [value2], ...)", "Tính giá trị hiện tại ròng (Net Present Value) của dòng tiền."),
+                new FormulaSuggestion("IRR", "=IRR(values, [guess])", "Tính tỷ suất hoàn vốn nội bộ (Internal Rate of Return)."),
+                new FormulaSuggestion("RATE", "=RATE(nper, pmt, pv, [fv], [type], [guess])", "Tính lãi suất mỗi kỳ của một niên kim."),
+                new FormulaSuggestion("NPER", "=NPER(rate, pmt, pv, [fv], [type])", "Tính tổng số kỳ thanh toán của một khoản vay/đầu tư."),
+                new FormulaSuggestion("SLN", "=SLN(cost, salvage, life)", "Tính khấu hao đường thẳng của tài sản cho một kỳ."),
+                new FormulaSuggestion("SYD", "=SYD(cost, salvage, life, per)", "Tính khấu hao theo tổng số năm sử dụng của tài sản."),
+                new FormulaSuggestion("DDB", "=DDB(cost, salvage, life, period, [factor])", "Tính khấu hao theo số dư giảm dần kép."),
+                new FormulaSuggestion("EFFECT", "=EFFECT(nominal_rate, npery)", "Tính lãi suất thực tế hàng năm."),
+                new FormulaSuggestion("NOMINAL", "=NOMINAL(effect_rate, npery)", "Tính lãi suất danh nghĩa hàng năm.")
             };
             ActiveSuggestions = new List<FormulaSuggestion>();
             SelectedSuggestionIndex = 0;
@@ -627,6 +778,7 @@ namespace GenOffice.UI
 
         public void LoadSheetState(int sheetIndex)
         {
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
             if (SheetStates == null) SheetStates = new List<CalcSheetState>();
             while (SheetStates.Count < Sheets.Count)
             {
@@ -1059,7 +1211,7 @@ namespace GenOffice.UI
         public int GetRowHeight(uint row)
         {
             if (CustomRowHeights.ContainsKey(row)) return CustomRowHeights[row];
-            return DefaultRowHeight;
+            return AppSettings.Instance.TouchModeEnabled ? (DefaultRowHeight + 6) : DefaultRowHeight;
         }
 
         public int GetColX(uint col)
@@ -1094,6 +1246,11 @@ namespace GenOffice.UI
             EditSelStart = 0;
             EditSelLength = 0;
             EditSelectionAnchor = 0;
+
+            if (initialText == null && AppSettings.Instance.TouchModeEnabled && AppSettings.Instance.AutoSummonTouchKeyboard)
+            {
+                PeripheralDeviceManager.ToggleTouchKeyboard();
+            }
         }
 
         public void CommitCellEdit()
@@ -1102,6 +1259,14 @@ namespace GenOffice.UI
         }
 
         public void Draw(Graphics g, int width, int height)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height);
+            }
+        }
+
+        public void Draw(D2DGraphics g, int width, int height)
         {
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -1709,8 +1874,8 @@ namespace GenOffice.UI
                     g.DrawRectangle(selPen, selX1, selY1, selW, selH);
                 }
 
-                // Excel Fill Handle (Square dot at bottom-right corner)
-                int handleSize = 6;
+                // Excel Fill Handle (Square dot at bottom-right corner - larger in Touch Mode)
+                int handleSize = AppSettings.Instance.TouchModeEnabled ? 10 : 6;
                 Rectangle handleRect = new Rectangle(selX1 + selW - handleSize / 2, selY1 + selH - handleSize / 2, handleSize, handleSize);
                 g.FillRectangle(Color.FromArgb(16, 124, 65).ToBrush(), handleRect);
                 g.DrawRectangle(Pens.White, handleRect);
@@ -2012,12 +2177,9 @@ namespace GenOffice.UI
             using (SolidBrush tabBgB = new SolidBrush(Color.FromArgb(243, 244, 246))) g.FillRectangle(tabBgB, 0, tabY, width, 28);
             using (Pen p = new Pen(Color.FromArgb(226, 232, 240))) g.DrawLine(p, 0, tabY, width, tabY);
 
-            // Sheet Navigation Buttons ◀ ▶
-            using (Font navFont = new Font("Segoe UI", 9f, FontStyle.Bold))
-            {
-                g.DrawString("◀", navFont, Brushes.Gray, 8, tabY + 5);
-                g.DrawString("▶", navFont, Brushes.Gray, 24, tabY + 5);
-            }
+            // Sheet Navigation Buttons (< >) using Windows 11 Fluent Icons
+            FluentIconRenderer.DrawGlyph(g, "\uE76B", new Rectangle(4, tabY + 4, 20, 20), Color.FromArgb(100, 116, 139), 8.5f);
+            FluentIconRenderer.DrawGlyph(g, "\uE76C", new Rectangle(24, tabY + 4, 20, 20), Color.FromArgb(100, 116, 139), 8.5f);
 
             int tabX = 46;
             using (Font tabFont = new Font("Segoe UI", 9f, FontStyle.Regular))
@@ -2060,10 +2222,7 @@ namespace GenOffice.UI
                     g.FillPath(Brushes.White, addPath);
                     using (Pen ap = new Pen(Color.FromArgb(203, 213, 225))) g.DrawPath(ap, addPath);
                 }
-                using (Font plusFont = new Font("Segoe UI", 10.5f, FontStyle.Bold))
-                {
-                    g.DrawString("+", plusFont, Color.FromArgb(16, 124, 65).ToBrush(), addTabRect.X + 4, addTabRect.Y - 1);
-                }
+                FluentIconRenderer.DrawGlyph(g, "\uE710", addTabRect, Color.FromArgb(16, 124, 65), 8.5f);
                 tabX += 32;
             }
 
@@ -2076,23 +2235,17 @@ namespace GenOffice.UI
                 g.FillRectangle(Brushes.WhiteSmoke, hTrack);
                 g.DrawRectangle(Pens.LightGray, hTrack);
 
-                // Left Arrow ◀
+                // Left Arrow
                 Rectangle lBtn = new Rectangle(hScrollX, tabY + 4, 16, 20);
                 g.FillRectangle(Brushes.White, lBtn);
                 g.DrawRectangle(Pens.LightGray, lBtn);
-                using (Font aFont = new Font("Segoe UI", 7f, FontStyle.Bold))
-                {
-                    g.DrawString("◀", aFont, Brushes.DimGray, lBtn.X + 3, lBtn.Y + 3);
-                }
+                FluentIconRenderer.DrawGlyph(g, "\uE76B", lBtn, Color.DimGray, 7.5f);
 
-                // Right Arrow ▶
+                // Right Arrow
                 Rectangle rBtn = new Rectangle(hScrollX + hScrollW - 16, tabY + 4, 16, 20);
                 g.FillRectangle(Brushes.White, rBtn);
                 g.DrawRectangle(Pens.LightGray, rBtn);
-                using (Font aFont = new Font("Segoe UI", 7f, FontStyle.Bold))
-                {
-                    g.DrawString("▶", aFont, Brushes.DimGray, rBtn.X + 4, rBtn.Y + 3);
-                }
+                FluentIconRenderer.DrawGlyph(g, "\uE76C", rBtn, Color.DimGray, 7.5f);
 
                 // Horizontal Thumb
                 int hTrackAvail = hScrollW - 32;
@@ -2117,7 +2270,7 @@ namespace GenOffice.UI
                 // Left: Ready / Edit
                 using (SolidBrush statB = new SolidBrush(Color.FromArgb(100, 116, 139)))
                 {
-                    g.DrawString(IsEditing ? "Chỉnh sửa (Edit)" : "Sẵn sàng (Ready)", statFont, statB, 12, statY + 6);
+                    g.DrawString(IsEditing ? "Chỉnh sửa" : "Sẵn sàng", statFont, statB, 12, statY + 6);
                 }
 
                 // Calculation Metrics (Average, Count, Sum for selected range)
@@ -2171,7 +2324,7 @@ namespace GenOffice.UI
             SelectedSuggestionIndex = 0;
         }
 
-        private void DrawFormulaSuggestions(Graphics g, int x, int y)
+        private void DrawFormulaSuggestions(D2DGraphics g, int x, int y)
         {
             string query = EditText.Length > 1 ? EditText.Substring(1).Trim().ToUpper() : "";
             FilterFormulaSuggestions(query);
@@ -2497,6 +2650,17 @@ namespace GenOffice.UI
             int tabY = height - 56;
             if (y >= tabY && y <= tabY + 28)
             {
+                if (x >= 4 && x < 24)
+                {
+                    if (ActiveSheetIndex > 0) SwitchToSheet(ActiveSheetIndex - 1);
+                    return true;
+                }
+                if (x >= 24 && x < 46)
+                {
+                    if (ActiveSheetIndex < SheetNames.Count - 1) SwitchToSheet(ActiveSheetIndex + 1);
+                    return true;
+                }
+
                 int tabX = 46;
                 for (int s = 0; s < SheetNames.Count; s++)
                 {
@@ -3312,7 +3476,7 @@ namespace GenOffice.UI
             ContextMenuStrip cms = new ContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
-            cms.Items.Add("📊 Chỉnh sửa số liệu biểu đồ (Edit Data in Sheet)...", null, (s, e) =>
+            cms.Items.Add("📊 Chỉnh sửa số liệu biểu đồ...", null, (s, e) =>
             {
                 OpenChartEditor(shape);
                 if (parentControl != null) parentControl.Invalidate();
@@ -3697,13 +3861,25 @@ namespace GenOffice.UI
                 ShowSheetProtectedWarning();
                 return;
             }
-            if (ch == '\r')
+            bool shift = (Control.ModifierKeys & Keys.Shift) == Keys.Shift;
+            bool ctrl = (Control.ModifierKeys & Keys.Control) == Keys.Control;
+            bool alt = (Control.ModifierKeys & Keys.Alt) == Keys.Alt;
+
+            if (ch == '\r' || ch == '\n')
             {
-                CommitEditAndMove(1, 0);
+                if (alt && IsEditing)
+                {
+                    return; // Handled in HandleKeyDown (Alt+Enter newline)
+                }
+                if (ctrl && IsEditing)
+                {
+                    return; // Handled in HandleKeyDown (Ctrl+Enter fill selection)
+                }
+                CommitEditAndMove(shift ? -1 : 1, 0);
             }
             else if (ch == '\t')
             {
-                if (IsEditing && EditText.StartsWith("=") && ActiveSuggestions.Count > 0)
+                if (IsEditing && EditText.StartsWith("=") && !EditText.Contains("(") && ActiveSuggestions != null && ActiveSuggestions.Count > 0)
                 {
                     EditText = "=" + ActiveSuggestions[SelectedSuggestionIndex].Name + "(";
                     EditCursorPos = EditText.Length;
@@ -3712,8 +3888,12 @@ namespace GenOffice.UI
                 }
                 else
                 {
-                    CommitEditAndMove(0, 1);
+                    CommitEditAndMove(0, shift ? -1 : 1);
                 }
+            }
+            else if (ctrl)
+            {
+                return; // Ignore control characters when Ctrl is held
             }
             else if (ch == '\b')
             {
@@ -3836,8 +4016,63 @@ namespace GenOffice.UI
                     finalVal = VietnameseAutoCorrect.CorrectText(finalVal);
                     EditText = finalVal;
                 }
-                CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
-                FormulaEngine.EvaluateSheet(CurrentSheet);
+
+                // Chế độ Máy quét Mã vạch POS / Kho (Barcode Scanner Mode)
+                if (AppSettings.Instance.CalcBarcodeScannerMode && deltaRow > 0 && !string.IsNullOrWhiteSpace(finalVal) && !finalVal.StartsWith("="))
+                {
+                    Func<uint, uint, string> readCellTxt = (rr, cc) =>
+                    {
+                        var cd = CurrentSheet.GetCell(rr, cc);
+                        if (cd == null) return "";
+                        return !string.IsNullOrEmpty(cd.EvaluatedStr) ? cd.EvaluatedStr : (cd.RawValue ?? "");
+                    };
+
+                    string code = finalVal.Trim();
+                    uint existingRow = 0;
+                    for (uint r = 1; r < SelectedRow; r++)
+                    {
+                        string prevCode = readCellTxt(r, SelectedCol).Trim();
+                        if (string.Equals(prevCode, code, StringComparison.OrdinalIgnoreCase))
+                        {
+                            existingRow = r;
+                            break;
+                        }
+                    }
+
+                    string nowStamp = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
+                    if (existingRow > 0)
+                    {
+                        // Đã có mã vạch này trong danh sách -> Tự động cộng dồn Số lượng (+1) & cập nhật giờ quét!
+                        double curQty = 0;
+                        double.TryParse(readCellTxt(existingRow, SelectedCol + 1), out curQty);
+                        CurrentSheet.SetCellText(existingRow, SelectedCol + 1, (curQty + 1).ToString());
+                        CurrentSheet.SetCellText(existingRow, SelectedCol + 2, nowStamp);
+                        CurrentSheet.SetCellText(SelectedRow, SelectedCol, "");
+                        FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                        FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                        IsEditing = false;
+                        EditText = "";
+                        EditSelLength = 0;
+                        EnsureCellVisible(existingRow, SelectedCol);
+                        return;
+                    }
+                    else
+                    {
+                        // Mã vạch mới -> Ghi mã, điền Số lượng = 1 và Thời gian quét vào 2 cột kế bên
+                        CurrentSheet.SetCellText(SelectedRow, SelectedCol, code);
+                        if (string.IsNullOrWhiteSpace(readCellTxt(SelectedRow, SelectedCol + 1)))
+                            CurrentSheet.SetCellText(SelectedRow, SelectedCol + 1, "1");
+                        if (string.IsNullOrWhiteSpace(readCellTxt(SelectedRow, SelectedCol + 2)))
+                            CurrentSheet.SetCellText(SelectedRow, SelectedCol + 2, nowStamp);
+                    }
+                }
+                else
+                {
+                    CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
+                }
+
+                FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
                 IsEditing = false;
                 EditSelLength = 0;
             }
@@ -3845,6 +4080,7 @@ namespace GenOffice.UI
             SelectedCol = (uint)Math.Max(1, (int)SelectedCol + deltaCol);
             SelEndRow = SelectedRow;
             SelEndCol = SelectedCol;
+            EnsureCellVisible(SelectedRow, SelectedCol);
         }
 
         public void CancelEdit()
@@ -3852,6 +4088,118 @@ namespace GenOffice.UI
             IsEditing = false;
             EditText = "";
             EditSelLength = 0;
+        }
+
+        private void CycleFormulaRefAtCursor()
+        {
+            if (string.IsNullOrEmpty(EditText) || !EditText.StartsWith("=")) return;
+            int pos = Math.Min(EditCursorPos, EditText.Length);
+
+            int start = pos;
+            while (start > 1)
+            {
+                char ch = EditText[start - 1];
+                if (char.IsLetterOrDigit(ch) || ch == '$') start--;
+                else break;
+            }
+            int end = pos;
+            while (end < EditText.Length)
+            {
+                char ch = EditText[end];
+                if (char.IsLetterOrDigit(ch) || ch == '$') end++;
+                else break;
+            }
+
+            if (end <= start) return;
+            string token = EditText.Substring(start, end - start);
+
+            int idx = 0;
+            bool colAbs = false;
+            if (idx < token.Length && token[idx] == '$') { colAbs = true; idx++; }
+            int colStart = idx;
+            while (idx < token.Length && char.IsLetter(token[idx])) idx++;
+            string colPart = token.Substring(colStart, idx - colStart);
+            if (string.IsNullOrEmpty(colPart) || colPart.Length > 3) return;
+
+            bool rowAbs = false;
+            if (idx < token.Length && token[idx] == '$') { rowAbs = true; idx++; }
+            int rowStart = idx;
+            while (idx < token.Length && char.IsDigit(token[idx])) idx++;
+            string rowPart = token.Substring(rowStart, idx - rowStart);
+            if (string.IsNullOrEmpty(rowPart) || idx < token.Length) return;
+
+            // Excel F4 cycle: A1 -> $A$1 -> A$1 -> $A1 -> A1
+            string newRef;
+            if (!colAbs && !rowAbs) newRef = "$" + colPart.ToUpperInvariant() + "$" + rowPart;
+            else if (colAbs && rowAbs) newRef = colPart.ToUpperInvariant() + "$" + rowPart;
+            else if (!colAbs && rowAbs) newRef = "$" + colPart.ToUpperInvariant() + rowPart;
+            else newRef = colPart.ToUpperInvariant() + rowPart;
+
+            EditText = EditText.Substring(0, start) + newRef + EditText.Substring(end);
+            EditCursorPos = start + newRef.Length;
+            EditSelLength = 0;
+        }
+
+        private void JumpToDataEdge(uint curR, uint curC, int dRow, int dCol, out uint targetR, out uint targetC)
+        {
+            targetR = curR;
+            targetC = curC;
+            if (CurrentSheet == null) return;
+
+            uint maxSheetRow = 500;
+            uint maxSheetCol = 52;
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                if (kvp.Value != null && (!string.IsNullOrEmpty(kvp.Value.RawValue) || !string.IsNullOrEmpty(kvp.Value.FormulaStr)))
+                {
+                    var pos = SparseMatrix.DecodeKey(kvp.Key);
+                    if (pos.Item1 > maxSheetRow) maxSheetRow = pos.Item1;
+                    if (pos.Item2 > maxSheetCol) maxSheetCol = pos.Item2;
+                }
+            }
+
+            Func<uint, uint, bool> hasData = (r, c) =>
+            {
+                CellData cd = CurrentSheet.GetCell(r, c);
+                return cd != null && (!string.IsNullOrEmpty(cd.RawValue) || !string.IsNullOrEmpty(cd.FormulaStr));
+            };
+
+            int nr = (int)curR + dRow;
+            int nc = (int)curC + dCol;
+            if (nr < 1 || nc < 1 || nr > (int)maxSheetRow || nc > (int)maxSheetCol)
+            {
+                targetR = (uint)Math.Max(1, Math.Min((int)maxSheetRow, nr));
+                targetC = (uint)Math.Max(1, Math.Min((int)maxSheetCol, nc));
+                return;
+            }
+
+            bool curHas = hasData(curR, curC);
+            bool nextHas = hasData((uint)nr, (uint)nc);
+
+            if (curHas && nextHas)
+            {
+                int r = nr, c = nc;
+                while (r + dRow >= 1 && r + dRow <= (int)maxSheetRow && c + dCol >= 1 && c + dCol <= (int)maxSheetCol && hasData((uint)(r + dRow), (uint)(c + dCol)))
+                {
+                    r += dRow;
+                    c += dCol;
+                }
+                targetR = (uint)r;
+                targetC = (uint)c;
+            }
+            else
+            {
+                int r = nr, c = nc;
+                while (r >= 1 && r <= (int)maxSheetRow && c >= 1 && c <= (int)maxSheetCol && !hasData((uint)r, (uint)c))
+                {
+                    if (r + dRow < 1 || r + dRow > (int)maxSheetRow || c + dCol < 1 || c + dCol > (int)maxSheetCol)
+                        break;
+                    r += dRow;
+                    c += dCol;
+                }
+                targetR = (uint)Math.Max(1, Math.Min((int)maxSheetRow, r));
+                targetC = (uint)Math.Max(1, Math.Min((int)maxSheetCol, c));
+            }
         }
 
         public void HandleKeyDown(Keys key)
@@ -3881,7 +4229,21 @@ namespace GenOffice.UI
             // F9: Calculate Now
             if (rawKey == Keys.F9)
             {
+                FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
                 CalculateNow(true);
+                return;
+            }
+
+            // Ctrl + PageUp / PageDown: Switch sheets
+            if (ctrl && (rawKey == Keys.Prior || rawKey == Keys.PageUp))
+            {
+                if (ActiveSheetIndex > 0) SwitchToSheet(ActiveSheetIndex - 1);
+                return;
+            }
+            if (ctrl && (rawKey == Keys.Next || rawKey == Keys.PageDown))
+            {
+                if (ActiveSheetIndex < Sheets.Count - 1) SwitchToSheet(ActiveSheetIndex + 1);
                 return;
             }
 
@@ -3909,6 +4271,44 @@ namespace GenOffice.UI
 
             if (IsEditing)
             {
+                // F4 in Edit Mode: Toggle absolute/relative reference ($A$1 -> A$1 -> $A1 -> A1)
+                if (rawKey == Keys.F4)
+                {
+                    CycleFormulaRefAtCursor();
+                    return;
+                }
+                // Alt + Enter in Edit Mode: Insert line break inside cell and enable WrapText
+                if (alt && rawKey == Keys.Enter)
+                {
+                    EditText = EditText.Insert(EditCursorPos, "\n");
+                    EditCursorPos++;
+                    CellData cd = CurrentSheet.GetOrCreateCell(SelectedRow, SelectedCol);
+                    if (cd.Format == null) cd.Format = new CellFormat();
+                    cd.Format.WrapText = true;
+                    return;
+                }
+                // Ctrl + Enter in Edit Mode: Fill all selected cells with current EditText
+                if (ctrl && rawKey == Keys.Enter)
+                {
+                    SaveUndoState();
+                    string finalVal = EditText;
+                    uint minR = Math.Min(SelectedRow, SelEndRow);
+                    uint maxR = Math.Max(SelectedRow, SelEndRow);
+                    uint minC = Math.Min(SelectedCol, SelEndCol);
+                    uint maxC = Math.Max(SelectedCol, SelEndCol);
+                    for (uint r = minR; r <= maxR; r++)
+                    {
+                        for (uint c = minC; c <= maxC; c++)
+                        {
+                            CurrentSheet.SetCellText(r, c, finalVal);
+                        }
+                    }
+                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    IsEditing = false;
+                    EditSelLength = 0;
+                    return;
+                }
                 if (ctrl && rawKey == Keys.A)
                 {
                     EditSelStart = 0;
@@ -3940,7 +4340,7 @@ namespace GenOffice.UI
                     string clip = Clipboard.GetText() ?? "";
                     if (!string.IsNullOrEmpty(clip))
                     {
-                        if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
+                        if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelStart <= EditText.Length && EditSelStart + EditSelLength <= EditText.Length)
                         {
                             EditText = EditText.Remove(EditSelStart, EditSelLength);
                             EditCursorPos = EditSelStart;
@@ -4066,15 +4466,29 @@ namespace GenOffice.UI
                         FormulaSuggestionsBounds = Rectangle.Empty;
                         return;
                     }
-                    CommitEditAndMove(1, 0);
+                    CommitEditAndMove(shift ? -1 : 1, 0);
                     return;
                 }
-                if (rawKey == Keys.Up && ActiveSuggestions.Count > 0)
+                if (rawKey == Keys.Tab)
+                {
+                    if (EditText.StartsWith("=") && !EditText.Contains("(") && ActiveSuggestions != null && ActiveSuggestions.Count > 0 && SelectedSuggestionIndex >= 0 && SelectedSuggestionIndex < ActiveSuggestions.Count)
+                    {
+                        EditText = "=" + ActiveSuggestions[SelectedSuggestionIndex].Name + "(";
+                        EditCursorPos = EditText.Length;
+                        EditSelStart = 0;
+                        EditSelLength = 0;
+                        FormulaSuggestionsBounds = Rectangle.Empty;
+                        return;
+                    }
+                    CommitEditAndMove(0, shift ? -1 : 1);
+                    return;
+                }
+                if (rawKey == Keys.Up && ActiveSuggestions != null && ActiveSuggestions.Count > 0)
                 {
                     if (SelectedSuggestionIndex > 0) SelectedSuggestionIndex--;
                     return;
                 }
-                if (rawKey == Keys.Down && ActiveSuggestions.Count > 0)
+                if (rawKey == Keys.Down && ActiveSuggestions != null && ActiveSuggestions.Count > 0)
                 {
                     if (SelectedSuggestionIndex < ActiveSuggestions.Count - 1) SelectedSuggestionIndex++;
                     return;
@@ -4094,10 +4508,198 @@ namespace GenOffice.UI
                     return;
                 }
 
+                // Clipboard & Flash Fill
                 if (ctrl && rawKey == Keys.C) { Copy(); return; }
                 if (ctrl && rawKey == Keys.X) { Cut(); return; }
                 if (ctrl && rawKey == Keys.V) { Paste(); return; }
                 if (ctrl && rawKey == Keys.E) { FlashFill(); return; }
+
+                // Ctrl + D: Fill Down | Ctrl + R: Fill Right (MS Excel standard)
+                if (ctrl && rawKey == Keys.D)
+                {
+                    if (SelectedRow == SelEndRow && SelectedRow > 1)
+                    {
+                        uint targetR = SelectedRow;
+                        SelectedRow = targetR - 1;
+                        SelEndRow = targetR;
+                        FillRange(0);
+                        SelectedRow = SelEndRow = targetR;
+                    }
+                    else
+                    {
+                        FillRange(0);
+                    }
+                    return;
+                }
+                if (ctrl && rawKey == Keys.R)
+                {
+                    if (SelectedCol == SelEndCol && SelectedCol > 1)
+                    {
+                        uint targetC = SelectedCol;
+                        SelectedCol = targetC - 1;
+                        SelEndCol = targetC;
+                        FillRange(1);
+                        SelectedCol = SelEndCol = targetC;
+                    }
+                    else
+                    {
+                        FillRange(1);
+                    }
+                    return;
+                }
+
+                // Ctrl + ; (Current Date) and Ctrl + Shift + ; (Current Time)
+                if (ctrl && (rawKey == Keys.OemSemicolon || rawKey == (Keys)186))
+                {
+                    if (IsSheetProtected) { ShowSheetProtectedWarning(); return; }
+                    SaveUndoState();
+                    string stamp = shift ? DateTime.Now.ToString("HH:mm:ss") : DateTime.Today.ToString("dd/MM/yyyy");
+                    CurrentSheet.SetCellText(SelectedRow, SelectedCol, stamp);
+                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    return;
+                }
+
+                // Formatting shortcuts: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+5 (Strikethrough)
+                if (ctrl && !shift && rawKey == Keys.B) { ToggleBold(); return; }
+                if (ctrl && !shift && rawKey == Keys.I) { ToggleItalic(); return; }
+                if (ctrl && !shift && rawKey == Keys.U) { ToggleUnderline(); return; }
+                if (ctrl && !shift && rawKey == Keys.D5)
+                {
+                    if (IsSheetProtected) { ShowSheetProtectedWarning(); return; }
+                    SaveUndoState();
+                    CellData firstCell = CurrentSheet.GetOrCreateCell(SelectedRow, SelectedCol);
+                    bool newStrike = !(firstCell.Format != null && firstCell.Format.Strikethrough);
+                    uint minR = Math.Min(SelectedRow, SelEndRow);
+                    uint maxR = Math.Max(SelectedRow, SelEndRow);
+                    uint minC = Math.Min(SelectedCol, SelEndCol);
+                    uint maxC = Math.Max(SelectedCol, SelEndCol);
+                    for (uint r = minR; r <= maxR; r++)
+                    {
+                        for (uint c = minC; c <= maxC; c++)
+                        {
+                            CellData cd = CurrentSheet.GetOrCreateCell(r, c);
+                            if (cd.Format == null) cd.Format = new CellFormat();
+                            cd.Format.Strikethrough = newStrike;
+                        }
+                    }
+                    return;
+                }
+
+                // Number Format shortcuts: Ctrl+Shift+1 (! Number), Ctrl+Shift+3 (# Date), Ctrl+Shift+4 ($ Currency), Ctrl+Shift+5 (% Percent), Ctrl+Shift+~ (General)
+                if (ctrl && shift && rawKey == Keys.D1) { SetNumberFormat("Comma", 2); return; }
+                if (ctrl && shift && rawKey == Keys.D3) { SetNumberFormat("Date", 0); return; }
+                if (ctrl && shift && rawKey == Keys.D4) { SetNumberFormat("Currency", 0); return; }
+                if (ctrl && shift && rawKey == Keys.D5) { SetNumberFormat("Percent", 1); return; }
+                if (ctrl && shift && rawKey == Keys.Oemtilde) { SetNumberFormat("General", 2); return; }
+
+                // Table / AutoFilter shortcuts: Ctrl+T, Ctrl+L, Ctrl+Shift+L
+                if ((ctrl && (rawKey == Keys.T || rawKey == Keys.L)) || (ctrl && shift && rawKey == Keys.L))
+                {
+                    ApplyTableStyle(5);
+                    return;
+                }
+
+                // Insert / Delete Row/Column shortcuts: Ctrl++ and Ctrl+-
+                if (ctrl && (rawKey == Keys.Oemplus || rawKey == Keys.Add))
+                {
+                    InsertRows(1);
+                    return;
+                }
+                if (ctrl && (rawKey == Keys.OemMinus || rawKey == Keys.Subtract))
+                {
+                    DeleteRows(1);
+                    return;
+                }
+
+                // Selection shortcuts: Ctrl+Space (Select Column), Shift+Space (Select Row), Ctrl+A (Select Region/Sheet)
+                if (ctrl && !shift && rawKey == Keys.Space)
+                {
+                    SelectedRow = 1;
+                    SelEndRow = 500;
+                    return;
+                }
+                if (shift && !ctrl && rawKey == Keys.Space)
+                {
+                    SelectedCol = 1;
+                    SelEndCol = 52;
+                    return;
+                }
+                if (ctrl && rawKey == Keys.A)
+                {
+                    uint minR, maxR, minC, maxC;
+                    GetContiguousDataRange(SelectedRow, SelectedCol, out minR, out maxR, out minC, out maxC);
+                    uint curMinR = Math.Min(SelectedRow, SelEndRow);
+                    uint curMaxR = Math.Max(SelectedRow, SelEndRow);
+                    uint curMinC = Math.Min(SelectedCol, SelEndCol);
+                    uint curMaxC = Math.Max(SelectedCol, SelEndCol);
+                    if ((maxR > minR || maxC > minC) && (curMinR != minR || curMaxR != maxR || curMinC != minC || curMaxC != maxC))
+                    {
+                        SelectedRow = minR;
+                        SelectedCol = minC;
+                        SelEndRow = maxR;
+                        SelEndCol = maxC;
+                    }
+                    else
+                    {
+                        SelectedRow = 1;
+                        SelectedCol = 1;
+                        SelEndRow = 500;
+                        SelEndCol = 52;
+                    }
+                    return;
+                }
+
+                // Navigation: Home, Ctrl+Home, Ctrl+End, PageUp, PageDown
+                if (rawKey == Keys.Home)
+                {
+                    if (ctrl)
+                    {
+                        if (shift) { SelEndRow = 1; SelEndCol = 1; }
+                        else { SelectedRow = SelEndRow = 1; SelectedCol = SelEndCol = 1; }
+                        EnsureCellVisible(1, 1);
+                    }
+                    else
+                    {
+                        if (shift) { SelEndCol = 1; }
+                        else { SelectedCol = SelEndCol = 1; SelEndRow = SelectedRow; }
+                        EnsureCellVisible(SelectedRow, 1);
+                    }
+                    return;
+                }
+                if (rawKey == Keys.End && ctrl)
+                {
+                    uint lastR = 1, lastC = 1;
+                    foreach (var kvp in CurrentSheet.GetAllCells())
+                    {
+                        if (kvp.Value != null && (!string.IsNullOrEmpty(kvp.Value.RawValue) || !string.IsNullOrEmpty(kvp.Value.FormulaStr)))
+                        {
+                            var pos = SparseMatrix.DecodeKey(kvp.Key);
+                            if (pos.Item1 > lastR) lastR = pos.Item1;
+                            if (pos.Item2 > lastC) lastC = pos.Item2;
+                        }
+                    }
+                    if (shift) { SelEndRow = lastR; SelEndCol = lastC; }
+                    else { SelectedRow = SelEndRow = lastR; SelectedCol = SelEndCol = lastC; }
+                    EnsureCellVisible(lastR, lastC);
+                    return;
+                }
+                if (!ctrl && (rawKey == Keys.Prior || rawKey == Keys.PageUp))
+                {
+                    uint targetR = (uint)Math.Max(1, (int)SelectedRow - 20);
+                    if (shift) SelEndRow = targetR;
+                    else SelectedRow = SelEndRow = targetR;
+                    EnsureCellVisible(targetR, SelectedCol);
+                    return;
+                }
+                if (!ctrl && (rawKey == Keys.Next || rawKey == Keys.PageDown))
+                {
+                    uint targetR = SelectedRow + 20;
+                    if (shift) SelEndRow = targetR;
+                    else SelectedRow = SelEndRow = targetR;
+                    EnsureCellVisible(targetR, SelectedCol);
+                    return;
+                }
 
                 if (rawKey == Keys.F2)
                 {
@@ -4112,7 +4714,8 @@ namespace GenOffice.UI
                     EditCursorPos = EditText.Length;
                     EditSelectionAnchor = 0;
                     EditSelStart = 0;
-                    EditSelLength = EditText.Length;
+                    EditSelLength = 0;
+                    return;
                 }
                 else if (rawKey == Keys.Delete)
                 {
@@ -4129,16 +4732,58 @@ namespace GenOffice.UI
                         return;
                     }
                     ClearSelectedCells();
-                    FormulaEngine.EvaluateSheet(CurrentSheet);
+                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    return;
                 }
-                else if (rawKey == Keys.Up && SelectedRow > 1) { CommitEditAndMove(-1, 0); }
-                else if (rawKey == Keys.Down) { CommitEditAndMove(1, 0); }
-                else if (rawKey == Keys.Left && SelectedCol > 1) { CommitEditAndMove(0, -1); }
-                else if (rawKey == Keys.Right) { CommitEditAndMove(0, 1); }
+                else if (rawKey == Keys.Enter)
+                {
+                    CommitEditAndMove(shift ? -1 : 1, 0);
+                    return;
+                }
+                else if (rawKey == Keys.Tab)
+                {
+                    CommitEditAndMove(0, shift ? -1 : 1);
+                    return;
+                }
+                else if (rawKey == Keys.Up || rawKey == Keys.Down || rawKey == Keys.Left || rawKey == Keys.Right)
+                {
+                    int dR = (rawKey == Keys.Up) ? -1 : (rawKey == Keys.Down ? 1 : 0);
+                    int dC = (rawKey == Keys.Left) ? -1 : (rawKey == Keys.Right ? 1 : 0);
+
+                    if (ctrl)
+                    {
+                        uint baseR = shift ? SelEndRow : SelectedRow;
+                        uint baseC = shift ? SelEndCol : SelectedCol;
+                        uint nextR, nextC;
+                        JumpToDataEdge(baseR, baseC, dR, dC, out nextR, out nextC);
+                        if (shift)
+                        {
+                            SelEndRow = nextR;
+                            SelEndCol = nextC;
+                        }
+                        else
+                        {
+                            SelectedRow = SelEndRow = nextR;
+                            SelectedCol = SelEndCol = nextC;
+                        }
+                        EnsureCellVisible(nextR, nextC);
+                    }
+                    else if (shift)
+                    {
+                        SelEndRow = (uint)Math.Max(1, (int)SelEndRow + dR);
+                        SelEndCol = (uint)Math.Max(1, (int)SelEndCol + dC);
+                        EnsureCellVisible(SelEndRow, SelEndCol);
+                    }
+                    else
+                    {
+                        CommitEditAndMove(dR, dC);
+                    }
+                }
             }
         }
 
-        private void DrawBorderSegment(Graphics g, int x1, int y1, int x2, int y2, int thick, Color col, bool isHorz)
+        private void DrawBorderSegment(D2DGraphics g, int x1, int y1, int x2, int y2, int thick, Color col, bool isHorz)
         {
             if (thick == 4) // Double line (Viền kép)
             {
@@ -6933,7 +7578,7 @@ namespace GenOffice.UI
             SelectedShape = newSh;
         }
 
-        public void DrawChartFloatingButtons(Graphics g, Rectangle chartRect)
+        public void DrawChartFloatingButtons(D2DGraphics g, Rectangle chartRect)
         {
             int btnSize = 22;
             int btnX = chartRect.Right + 6;
@@ -7284,7 +7929,7 @@ namespace GenOffice.UI
             };
         }
 
-        public void DrawSparklineCell(Graphics g, Rectangle cellRect, SparklineInfo spk)
+        public void DrawSparklineCell(D2DGraphics g, Rectangle cellRect, SparklineInfo spk)
         {
             if (spk == null) return;
             List<float> values = new List<float>();
@@ -7740,7 +8385,7 @@ namespace GenOffice.UI
 
         public bool ExportToPdf(string filePath, bool exportAllSheets)
         {
-            return GenOffice.Format.CalcPdfExporter.Export(this, filePath, exportAllSheets);
+            return ZenQOffice.Format.CalcPdfExporter.Export(this, filePath, exportAllSheets);
         }
 
         #region Clipboard & Paste Special

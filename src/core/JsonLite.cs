@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Trình phân tích và đóng gói JSON thuần C# siêu nhẹ, tốc độ cao, không phụ thuộc thư viện ngoài (.NET 4.0 compatible).

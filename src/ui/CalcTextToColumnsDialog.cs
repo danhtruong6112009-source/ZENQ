@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class CalcTextToColumnsDialog : Form
     {

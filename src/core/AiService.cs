@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Bản ghi tin nhắn trong lịch sử hội thoại nhiều lượt (Multi-turn Chat).

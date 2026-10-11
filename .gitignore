@@ -1,5 +1,10 @@
-﻿*.exe
-*.dll
+bin/
+obj/
+scratch/
+temp_dist/
+payload.zip
+ZenQOffice.dll
+ZenQOffice.exe
 *.obj
 *.pdb
 *.lock
@@ -8,3 +13,11 @@
 *.lib
 core-master/
 PDF_Editor-main/
+.agents/
+tests/obj/
+publish/
+win-x64/
+*.py
+*.txt
+*.log
+test_crash.cs

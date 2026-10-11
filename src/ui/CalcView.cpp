@@ -2,7 +2,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 CalcView::CalcView() {
     // Populate sample spreadsheet data
@@ -296,4 +296,4 @@ void CalcView::handleClick(int x, int y, HWND hWnd) {
     }
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

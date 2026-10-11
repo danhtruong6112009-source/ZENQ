@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice
+namespace ZenQOffice
 {
     public enum LauncherState
     {
@@ -109,7 +109,17 @@ namespace GenOffice
                     Color.FromArgb(220, 38, 38),
                     Color.FromArgb(185, 28, 28),
                     Color.FromArgb(254, 242, 242),
-                    Color.FromArgb(254, 202, 202))
+                    Color.FromArgb(254, 202, 202)),
+
+                new LauncherCardItem(
+                    OfficeAppMode.Photo,
+                    "Photo",
+                    "Thiết kế & Đồ họa",
+                    "PSD",
+                    Color.FromArgb(99, 102, 241),
+                    Color.FromArgb(79, 70, 229),
+                    Color.FromArgb(238, 242, 255),
+                    Color.FromArgb(199, 210, 254))
             };
         }
 
@@ -418,7 +428,7 @@ namespace GenOffice
             }
         }
 
-        public static bool HandleMouseDown(Point pt, RibbonBar ribbon, Action<OfficeAppMode> onOpenTab = null, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null)
+        public static bool HandleMouseDown(Point pt, RibbonBar ribbon, Action<OfficeAppMode> onOpenTab = null, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (!IsOpen) return false;
 
@@ -465,13 +475,18 @@ namespace GenOffice
                             ext = ".pdf";
                             namePrefix = "Tài liệu PDF ";
                         }
+                        else if (mode == OfficeAppMode.Photo)
+                        {
+                            ext = ".psd";
+                            namePrefix = "Thiết kế ";
+                        }
                         else
                         {
                             ext = ".docx";
                             namePrefix = "Văn bản ";
                         }
 
-                        ribbon.AddDocTab(namePrefix + idx + ext, mode, slidesView, writerView, calcView, pdfView);
+                        ribbon.AddDocTab(namePrefix + idx + ext, mode, slidesView, writerView, calcView, pdfView, photoView);
                     }
 
                     Close();
@@ -649,6 +664,11 @@ namespace GenOffice
                 baseCol = Color.FromArgb(249, 115, 22);
                 darkCol = Color.FromArgb(217, 70, 239);
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                baseCol = Color.FromArgb(99, 102, 241);
+                darkCol = Color.FromArgb(79, 70, 229);
+            }
             else // PDF
             {
                 baseCol = Color.FromArgb(220, 38, 38);
@@ -734,6 +754,21 @@ namespace GenOffice
                     g.FillPie(pieB, sInner.Left + 2f, sInner.Top + 2f, sInner.Width * 0.55f, sInner.Height * 0.55f, 0, 270);
                     g.FillRectangle(barB, sInner.Left + sInner.Width * 0.62f, sInner.Top + 3f, sInner.Width * 0.32f, 2.5f);
                     g.FillRectangle(barB, sInner.Left + sInner.Width * 0.62f, sInner.Top + 7f, sInner.Width * 0.22f, 2.5f);
+                }
+            }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                using (GraphicsPath photoP = CreateRoundedRectanglePath(inner, 2.5f))
+                {
+                    g.FillPath(Brushes.White, photoP);
+                }
+                using (Font psFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+                using (SolidBrush psTxt = new SolidBrush(Color.FromArgb(99, 102, 241)))
+                {
+                    StringFormat sf = new StringFormat();
+                    sf.Alignment = StringAlignment.Center;
+                    sf.LineAlignment = StringAlignment.Center;
+                    g.DrawString("Ps", psFont, psTxt, new RectangleF(inner.Left, inner.Top + 2f, inner.Width, inner.Height - 2f), sf);
                 }
             }
             else // PDF

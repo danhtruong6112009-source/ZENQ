@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public enum InsertShiftMode
     {

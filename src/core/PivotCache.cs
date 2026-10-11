@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// PivotCache storing multi-dimensional source data for PivotTable aggregations.

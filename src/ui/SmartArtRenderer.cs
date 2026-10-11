@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Graphics = ZenQOffice.UI.D2DGraphics;
+using GdiGraphics = System.Drawing.Graphics;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public static class SmartArtRenderer
     {
@@ -454,6 +456,24 @@ namespace GenOffice.UI
             string[] nodes = GetSmartArtNodeList(type, customText);
             Color[] colors = GetPaletteColors(colorPresetIndex, nodes.Length);
             DrawSmartArt(g, bounds, type, smartArtTitle, colors, nodes, isSelected, zoomLevel);
+        }
+
+        public static void DrawSmartArt(GdiGraphics g, Rectangle bounds, DocShapeObject shape, float zoomLevel)
+        {
+            if (g == null) return;
+            using (var d2d = new Graphics(g, bounds.Width, bounds.Height))
+            {
+                DrawSmartArt(d2d, bounds, shape, zoomLevel);
+            }
+        }
+
+        public static void DrawSmartArt(GdiGraphics g, Rectangle bounds, string smartArtType, string smartArtTitle, int colorPresetIndex, string customText, bool isSelected, float zoomLevel)
+        {
+            if (g == null) return;
+            using (var d2d = new Graphics(g, bounds.Width, bounds.Height))
+            {
+                DrawSmartArt(d2d, bounds, smartArtType, smartArtTitle, colorPresetIndex, customText, isSelected, zoomLevel);
+            }
         }
 
         public static void DrawSmartArt(Graphics g, Rectangle bounds, string smartArtType, string smartArtTitle, Color[] colors, string[] nodes, bool isSelected, float zoomLevel)
@@ -2358,7 +2378,8 @@ namespace GenOffice.UI
             int w = Math.Max(200, (int)(width * scale));
             int h = Math.Max(120, (int)(height * scale));
             Bitmap bmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            using (Graphics g = Graphics.FromImage(bmp))
+            using (var gdi = GdiGraphics.FromImage(bmp))
+            using (var g = new Graphics(gdi, w, h))
             {
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -2404,7 +2425,8 @@ namespace GenOffice.UI
             int w = Math.Max(60, (int)(width * scale));
             int h = Math.Max(40, (int)(height * scale));
             Bitmap bmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            using (Graphics g = Graphics.FromImage(bmp))
+            using (var gdi = GdiGraphics.FromImage(bmp))
+            using (var g = new Graphics(gdi, w, h))
             {
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;

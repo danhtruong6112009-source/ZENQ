@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class DocShapeTagProperties
     {

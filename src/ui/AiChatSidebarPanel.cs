@@ -6,9 +6,9 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Khung Chat Trá»£ lÃ½ AI Hiá»‡n Äáº¡i (AI Sidebar).
@@ -2865,7 +2865,7 @@ namespace GenOffice.UI
             btnDel.Click += (s, e) =>
             {
                 var res = MessageBox.Show(
-                    string.Format("Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a Ä‘oáº¡n chat \"{0}\"?", !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Äoáº¡n chat"),
+                    string.Format("Bạn có chắc chắn muốn xóa đoạn chat \"{0}\"?", !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Đoạn chat"),
                     "Xác nhận xóa đoạn chat",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question

@@ -6,7 +6,7 @@ using System.IO;
 using System.Windows.Forms;
 using System.Collections.Generic;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Bộ nạp và kết xuất Icon 3D chính thức của GenOffice từ thư mục icon/ (writer.png, calc.png, present.png, pdf.png)
@@ -26,6 +26,7 @@ namespace GenOffice.UI
                 case OfficeAppMode.Calc: return "calc.png";
                 case OfficeAppMode.Slides: return "present.png";
                 case OfficeAppMode.Pdf: return "pdf.png";
+                case OfficeAppMode.Photo: return "photo.png";
                 default: return "writer.png";
             }
         }
@@ -38,6 +39,7 @@ namespace GenOffice.UI
                 case OfficeAppMode.Calc: return "icon_calc.png";
                 case OfficeAppMode.Slides: return "icon_present.png";
                 case OfficeAppMode.Pdf: return "icon_pdf.png";
+                case OfficeAppMode.Photo: return "icon_photo.png";
                 default: return "icon_writer.png";
             }
         }

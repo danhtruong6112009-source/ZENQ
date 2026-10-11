@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class DocCellParagraph
     {

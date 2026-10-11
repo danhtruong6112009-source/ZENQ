@@ -8,9 +8,9 @@ using System.IO.Compression;
 using System.Xml;
 using System.Text;
 using System.Runtime.InteropServices;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public enum ShapeType
     {
@@ -25,6 +25,7 @@ namespace GenOffice.Core
         Line,
         Image,
         Video,
+        Audio,
         Table,
         Chart,
         Hexagon,
@@ -451,6 +452,10 @@ namespace GenOffice.Core
         public bool Underline { get; set; }
         public bool Strikethrough { get; set; }
         public bool HasTextShadow { get; set; }
+        public bool HasTextOutline { get; set; }
+        public int TextOutlineColor { get; set; }
+        public float TextOutlineWidth { get; set; }
+        public int WordArtPresetIndex { get; set; }
         public TextAlignment Alignment { get; set; }
         public VerticalTextAlignment VerticalAlignment { get; set; }
         public int TextColor { get; set; }
@@ -465,7 +470,7 @@ namespace GenOffice.Core
         public int GradientColor2 { get; set; }
         public float GradientAngle { get; set; }
         public List<GradientStop> GradientStops { get; set; }
-        public float FillOpacity { get; set; }
+        public float FillOpacity { get; set; } = 1.0f;
         public int StrokeColor { get; set; }
         public float StrokeWidth { get; set; }
         public DashStyle DashStyle { get; set; }
@@ -540,6 +545,7 @@ namespace GenOffice.Core
         {
             if (DisplayCachedImage != null)
             {
+                try { D2DGraphics.InvalidateBitmapCache(DisplayCachedImage); } catch { }
                 try { DisplayCachedImage.Dispose(); } catch { }
                 DisplayCachedImage = null;
             }
@@ -565,6 +571,8 @@ namespace GenOffice.Core
         public string AltText { get; set; }
         public float OriginalWidth { get; set; }
         public float OriginalHeight { get; set; }
+        public bool IsSvg { get; set; }
+        public bool IsGraphic { get; set; }
 
         // Table Properties
         public int TableColumns { get; set; }
@@ -671,6 +679,25 @@ namespace GenOffice.Core
         public float VideoCurrentTime { get; set; }
         public float VideoTotalTime { get; set; }
 
+        // Audio Properties
+        public string AudioPath { get; set; }
+        public bool IsAudioPlaying { get; set; }
+        public float AudioCurrentTime { get; set; }
+        public float AudioTotalTime { get; set; }
+        public float AudioTrimStart { get; set; }
+        public float AudioTrimEnd { get; set; }
+        public float AudioFadeInDuration { get; set; } // seconds, e.g. 0.00
+        public float AudioFadeOutDuration { get; set; } // seconds, e.g. 0.00
+        public VideoVolumeLevel AudioVolume { get; set; }
+        public VideoStartMode AudioStartMode { get; set; }
+        public bool AudioPlayAcrossSlides { get; set; } // Phát trên các trang chiếu
+        public bool AudioLoopUntilStopped { get; set; } // Lặp lại cho đến khi dừng
+        public bool AudioHideDuringShow { get; set; } // Ẩn khi trình chiếu
+        public bool AudioRewindAfterPlaying { get; set; } // Tua lại sau khi phát
+        public int AudioStyleIndex { get; set; } // 0: Modern Glass, 1: Classic Speaker, 2: Compact Pill, 3: Cyberpunk Glow, 4: Vinyl Record
+        public uint AudioIconColor { get; set; } // Custom icon tint (0 = default)
+        public List<float> AudioBookmarks { get; set; } // Bookmark timestamps in seconds
+
         // Interaction State
         public bool Selected { get; set; }
         public bool IsVisible { get; set; }
@@ -706,6 +733,7 @@ namespace GenOffice.Core
                 case ShapeType.Arrow: return "Mũi tên " + (index + 1);
                 case ShapeType.Callout: return "Hộp thoại " + (index + 1);
                 case ShapeType.Image: return "Hình ảnh " + (index + 1);
+                case ShapeType.Audio: return "Âm thanh " + (index + 1);
                 case ShapeType.Table: return "Bảng dữ liệu " + (index + 1);
                 default: return "Hình vẽ " + (index + 1);
             }
@@ -728,6 +756,10 @@ namespace GenOffice.Core
             Underline = false;
             Strikethrough = false;
             HasTextShadow = false;
+            HasTextOutline = false;
+            TextOutlineColor = 0x000000;
+            TextOutlineWidth = 1.5f;
+            WordArtPresetIndex = -1;
             Alignment = (Type == ShapeType.TextBox) ? TextAlignment.Left : TextAlignment.Center;
             VerticalAlignment = VerticalTextAlignment.Middle;
             TextColor = (Type == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF;
@@ -902,6 +934,10 @@ namespace GenOffice.Core
                 Underline = Underline,
                 Strikethrough = Strikethrough,
                 HasTextShadow = HasTextShadow,
+                HasTextOutline = HasTextOutline,
+                TextOutlineColor = TextOutlineColor,
+                TextOutlineWidth = TextOutlineWidth,
+                WordArtPresetIndex = WordArtPresetIndex,
                 Alignment = Alignment,
                 VerticalAlignment = VerticalAlignment,
                 TextColor = TextColor,
@@ -969,6 +1005,20 @@ namespace GenOffice.Core
                 VideoCaptionPath = VideoCaptionPath,
                 VideoCorrections = VideoCorrections,
                 VideoColorFilter = VideoColorFilter,
+                AudioPath = AudioPath,
+                AudioFadeInDuration = AudioFadeInDuration,
+                AudioFadeOutDuration = AudioFadeOutDuration,
+                AudioStartMode = AudioStartMode,
+                AudioPlayAcrossSlides = AudioPlayAcrossSlides,
+                AudioLoopUntilStopped = AudioLoopUntilStopped,
+                AudioHideDuringShow = AudioHideDuringShow,
+                AudioRewindAfterPlaying = AudioRewindAfterPlaying,
+                AudioVolume = AudioVolume,
+                AudioBookmarks = (AudioBookmarks != null) ? new List<float>(AudioBookmarks) : null,
+                AudioTrimStart = AudioTrimStart,
+                AudioTrimEnd = AudioTrimEnd,
+                AudioStyleIndex = AudioStyleIndex,
+                AudioIconColor = AudioIconColor,
                 TableColumns = TableColumns,
                 TableRows = TableRows,
                 TableData = clonedTableData,
@@ -1592,100 +1642,30 @@ namespace GenOffice.Core
             };
             MasterSlides.Add(master1);
 
-            // Slide 1: Clean Title Slide (Khung Tiêu đề & Phụ đề chuẩn PowerPoint)
+            // Slide 1: Duy nhất 1 trang trắng không chữ không hiệu ứng
             SlideNode slide1 = new SlideNode
             {
                 Title = "Slide 1",
-                Layout = SlideLayoutType.TitleSlide,
+                Layout = SlideLayoutType.Blank,
                 BgColor = 0xFFFFFF,
+                Shapes = new List<ShapeNode>(),
                 Transition = TransitionType.None,
                 TransitionDuration = 0f
             };
-
-            ShapeNode mainTitle = new ShapeNode
-            {
-                Id = "title_shape_" + DateTime.Now.Ticks,
-                Name = "Title",
-                Type = ShapeType.TextBox,
-                Transform = new Transform2D(200f, 300f, 1520f, 160f),
-                Text = "Nhấp để thêm tiêu đề",
-                FontName = "Segoe UI",
-                FontSize = 44.0f,
-                Bold = true,
-                Alignment = TextAlignment.Center,
-                TextColor = 0x111111,
-                FillColor = 0x00FFFFFF,
-                StrokeWidth = 0f,
-                PlaceholderType = "Title",
-                IsPlaceholder = true
-            };
-
-            ShapeNode subTitle = new ShapeNode
-            {
-                Id = "sub_shape_" + DateTime.Now.Ticks,
-                Name = "Subtitle",
-                Type = ShapeType.TextBox,
-                Transform = new Transform2D(280f, 490f, 1360f, 100f),
-                Text = "Nhấp để thêm phụ đề",
-                FontName = "Segoe UI",
-                FontSize = 24.0f,
-                Alignment = TextAlignment.Center,
-                TextColor = 0x666666,
-                FillColor = 0x00FFFFFF,
-                StrokeWidth = 0f,
-                PlaceholderType = "Subtitle",
-                IsPlaceholder = true
-            };
-
-            slide1.AddShape(mainTitle);
-            slide1.AddShape(subTitle);
             Slides.Add(slide1);
         }
 
-        public SlideNode AddSlide(SlideLayoutType layout = SlideLayoutType.TitleAndContent)
+        public SlideNode AddSlide(SlideLayoutType layout = SlideLayoutType.Blank)
         {
             SlideNode slide = new SlideNode
             {
                 Title = "Slide " + (Slides.Count + 1),
-                Layout = layout,
+                Layout = SlideLayoutType.Blank,
                 BgColor = 0xFFFFFF,
+                Shapes = new List<ShapeNode>(),
                 Transition = TransitionType.None,
                 TransitionDuration = 0f
             };
-
-            ShapeNode titleShape = new ShapeNode
-            {
-                Type = ShapeType.TextBox,
-                Transform = new Transform2D(100f, 80f, 1720f, 120f),
-                Text = "Tiêu Đề Slide " + (Slides.Count + 1),
-                FontName = "Segoe UI",
-                FontSize = 36.0f,
-                Bold = true,
-                TextColor = 0x111111,
-                FillColor = 0x00FFFFFF,
-                StrokeWidth = 0f,
-                PlaceholderType = "Title",
-                IsPlaceholder = true
-            };
-            slide.AddShape(titleShape);
-
-            if (layout == SlideLayoutType.TitleAndContent)
-            {
-                ShapeNode contentShape = new ShapeNode
-                {
-                    Type = ShapeType.TextBox,
-                    Transform = new Transform2D(100f, 240f, 1720f, 720f),
-                    Text = "Nhấp vào đây để thêm nội dung thuyết trình...",
-                    FontName = "Segoe UI",
-                    FontSize = 22.0f,
-                    TextColor = 0x666666,
-                    FillColor = 0x00FFFFFF,
-                    StrokeWidth = 0f,
-                    PlaceholderType = "Body",
-                    IsPlaceholder = true
-                };
-                slide.AddShape(contentShape);
-            }
 
             Slides.Add(slide);
             return slide;
@@ -1907,8 +1887,9 @@ namespace GenOffice.Core
             {
                 try
                 {
-                    // Đăng ký với GDI ở cấp tiến trình
+                    // Đăng ký với GDI và DirectWrite GPU
                     try { AddFontResourceEx(filePath, FR_PRIVATE, IntPtr.Zero); } catch { }
+                    try { ZenQOffice.UI.D2DGraphics.RegisterCustomFontFile(filePath); } catch { }
 
                     if (!_loadedFiles.Contains(filePath))
                     {
@@ -1930,7 +1911,15 @@ namespace GenOffice.Core
 
                         if (newFam == null && _pfc.Families.Length > 0)
                         {
-                            newFam = _pfc.Families[_pfc.Families.Length - 1];
+                            string baseName = Path.GetFileNameWithoutExtension(filePath);
+                            foreach (var f in _pfc.Families)
+                            {
+                                if (baseName.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0 || f.Name.IndexOf(baseName, StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    newFam = f;
+                                    break;
+                                }
+                            }
                         }
 
                         if (newFam != null)
@@ -1940,6 +1929,7 @@ namespace GenOffice.Core
                             {
                                 _customFontNames.Add(newFam.Name);
                             }
+                            try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(newFam.Name); } catch { }
                             return newFam.Name;
                         }
                     }
@@ -1982,6 +1972,9 @@ namespace GenOffice.Core
                 return _fontMap.ContainsKey(fontName);
             }
         }
+
+        public static readonly Dictionary<string, byte[]> EmbeddedFontFiles = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        public static readonly Dictionary<string, string> EmbeddedFontTypefaces = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public static void ExtractAndRegisterFonts(ZipArchive archive)
         {
@@ -2063,6 +2056,15 @@ namespace GenOffice.Core
                                 data = ms.ToArray();
                             }
 
+                            // Cache embedded font data for preservation when saving
+                            string entryFileName = Path.GetFileName(fn);
+                            EmbeddedFontFiles[entryFileName] = data;
+                            if (!string.IsNullOrEmpty(typeface))
+                            {
+                                EmbeddedFontTypefaces[entryFileName] = typeface;
+                                try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
+                            }
+
                             if (data.Length > 36)
                             {
                                 uint eotSize = BitConverter.ToUInt32(data, 0);
@@ -2075,15 +2077,24 @@ namespace GenOffice.Core
                                         bool isOtf = (offset + 4 <= data.Length && data[offset] == 0x4F && data[offset + 1] == 0x54 && data[offset + 2] == 0x54 && data[offset + 3] == 0x4F);
                                         string ext = isOtf ? ".otf" : ".ttf";
                                         string baseName = Path.GetFileNameWithoutExtension(fn);
-                                        string outPath = Path.Combine(tempDir, baseName + ext);
+                                        string safeTf = string.IsNullOrEmpty(typeface) ? baseName : string.Concat(typeface.Split(Path.GetInvalidFileNameChars())).Replace(' ', '_');
+                                        string outPath = Path.Combine(tempDir, $"{safeTf}_{baseName}_{fontSize}{ext}");
 
                                         if (!File.Exists(outPath) || new FileInfo(outPath).Length != fontSize)
                                         {
-                                            using (FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write))
+                                            try
                                             {
-                                                fs.Write(data, offset, (int)fontSize);
+                                                using (FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write))
+                                                {
+                                                    fs.Write(data, offset, (int)fontSize);
+                                                }
                                             }
+                                            catch { }
                                         }
+
+                                        // Register with Windows GDI and DirectWrite GPU for the process so DirectWrite and GDI resolve it
+                                        try { AddFontResourceEx(outPath, FR_PRIVATE, IntPtr.Zero); } catch { }
+                                        try { ZenQOffice.UI.D2DGraphics.RegisterCustomFontFile(outPath, typeface); } catch { }
 
                                         if (!_loadedFiles.Contains(outPath))
                                         {
@@ -2103,6 +2114,20 @@ namespace GenOffice.Core
                                                 }
                                             }
 
+                                            if (newFam == null && !string.IsNullOrEmpty(typeface))
+                                            {
+                                                foreach (var f in _pfc.Families)
+                                                {
+                                                    if (string.Equals(f.Name, typeface, StringComparison.OrdinalIgnoreCase) ||
+                                                        f.Name.IndexOf(typeface, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                        typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                                    {
+                                                        newFam = f;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+
                                             if (newFam != null)
                                             {
                                                 bool skipNoto = (typeface != null && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) >= 0) ||
@@ -2112,11 +2137,15 @@ namespace GenOffice.Core
                                                     if (!string.IsNullOrEmpty(typeface))
                                                     {
                                                         _fontMap[typeface] = newFam;
+                                                        if (!_customFontNames.Contains(typeface)) _customFontNames.Add(typeface);
+                                                        try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
                                                     }
                                                     if (!_fontMap.ContainsKey(newFam.Name))
                                                     {
                                                         _fontMap[newFam.Name] = newFam;
                                                     }
+                                                    if (!_customFontNames.Contains(newFam.Name)) _customFontNames.Add(newFam.Name);
+                                                    try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(newFam.Name); } catch { }
                                                 }
                                             }
                                             else if (!string.IsNullOrEmpty(typeface) && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) < 0)
@@ -2127,21 +2156,34 @@ namespace GenOffice.Core
                                                         typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
                                                     {
                                                         _fontMap[typeface] = f;
+                                                        if (!_customFontNames.Contains(typeface)) _customFontNames.Add(typeface);
+                                                        try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
                                                         break;
                                                     }
                                                 }
                                             }
                                         }
-                                        else if (!string.IsNullOrEmpty(typeface) && !_fontMap.ContainsKey(typeface) && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) < 0)
+                                        else
                                         {
-                                            foreach (var f in _pfc.Families)
+                                            // Font was already extracted; ensure mapping exists for this typeface
+                                            if (!string.IsNullOrEmpty(typeface) && !_fontMap.ContainsKey(typeface) && typeface.IndexOf("Noto Serif", StringComparison.OrdinalIgnoreCase) < 0)
                                             {
-                                                if (f.Name.IndexOf(typeface, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                    typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                                foreach (var f in _pfc.Families)
                                                 {
-                                                    _fontMap[typeface] = f;
-                                                    break;
+                                                    if (f.Name.IndexOf(typeface, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                        typeface.IndexOf(f.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                                    {
+                                                        _fontMap[typeface] = f;
+                                                        if (!_customFontNames.Contains(typeface)) _customFontNames.Add(typeface);
+                                                        try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
+                                                        break;
+                                                    }
                                                 }
+                                            }
+                                            if (!string.IsNullOrEmpty(typeface))
+                                            {
+                                                if (!_customFontNames.Contains(typeface)) _customFontNames.Add(typeface);
+                                                try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
                                             }
                                         }
                                     }
@@ -2157,19 +2199,163 @@ namespace GenOffice.Core
             }
         }
 
+        public static void ExtractAndRegisterDocxFonts(ZipArchive archive)
+        {
+            if (archive == null) return;
+            lock (_lock)
+            {
+                try
+                {
+                    Dictionary<string, string> rIdToFontKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    Dictionary<string, string> rIdToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                    ZipArchiveEntry ftEntry = archive.GetEntry("word/fontTable.xml");
+                    if (ftEntry != null)
+                    {
+                        XmlDocument ftDoc = new XmlDocument();
+                        using (Stream s = ftEntry.Open()) ftDoc.Load(s);
+                        XmlNodeList fNodes = ftDoc.SelectNodes("//*[local-name()='font']");
+                        if (fNodes != null)
+                        {
+                            foreach (XmlNode fn in fNodes)
+                            {
+                                string fontName = fn.Attributes["w:name"] != null ? fn.Attributes["w:name"].Value : "";
+                                if (string.IsNullOrEmpty(fontName)) continue;
+
+                                foreach (XmlNode emb in fn.SelectNodes(".//*[local-name()='embedRegular' or local-name()='embedBold' or local-name()='embedItalic']"))
+                                {
+                                    string rId = emb.Attributes["r:id"] != null ? emb.Attributes["r:id"].Value : "";
+                                    string key = emb.Attributes["w:fontKey"] != null ? emb.Attributes["w:fontKey"].Value : "";
+                                    if (!string.IsNullOrEmpty(rId))
+                                    {
+                                        rIdToTypeface[rId] = fontName;
+                                        if (!string.IsNullOrEmpty(key)) rIdToFontKey[rId] = key;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Dictionary<string, string> targetToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    Dictionary<string, string> targetToFontKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                    ZipArchiveEntry ftRels = archive.GetEntry("word/_rels/fontTable.xml.rels");
+                    if (ftRels != null)
+                    {
+                        XmlDocument relDoc = new XmlDocument();
+                        using (Stream rs = ftRels.Open()) relDoc.Load(rs);
+                        foreach (var kvp in rIdToTypeface)
+                        {
+                            XmlNode rel = relDoc.SelectSingleNode(string.Format("//*[local-name()='Relationship'][@Id='{0}']", kvp.Key));
+                            if (rel != null && rel.Attributes["Target"] != null)
+                            {
+                                string target = rel.Attributes["Target"].Value.Replace('\\', '/');
+                                if (!target.StartsWith("word/")) target = "word/" + target;
+                                targetToTypeface[target] = kvp.Value;
+                                if (rIdToFontKey.ContainsKey(kvp.Key)) targetToFontKey[target] = rIdToFontKey[kvp.Key];
+                            }
+                        }
+                    }
+
+                    string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_Fonts");
+                    if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        string fn = entry.FullName.Replace('\\', '/');
+                        if (fn.StartsWith("word/fonts/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            byte[] raw;
+                            using (MemoryStream ms = new MemoryStream())
+                            {
+                                using (Stream es = entry.Open()) es.CopyTo(ms);
+                                raw = ms.ToArray();
+                            }
+
+                            byte[] cleanFont = null;
+                            bool isOtf = false;
+
+                            if (fn.EndsWith(".odttf", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string key;
+                                if (!targetToFontKey.TryGetValue(fn, out key) || string.IsNullOrEmpty(key))
+                                {
+                                    key = Path.GetFileNameWithoutExtension(fn);
+                                }
+                                cleanFont = VietnameseFontToolkit.DeobfuscateOdttf(raw, key);
+                            }
+                            else if (fn.EndsWith(".fntdata", StringComparison.OrdinalIgnoreCase))
+                            {
+                                cleanFont = VietnameseFontToolkit.ExtractEotFont(raw, out isOtf);
+                            }
+                            else if (fn.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || fn.EndsWith(".otf", StringComparison.OrdinalIgnoreCase))
+                            {
+                                cleanFont = raw;
+                                isOtf = fn.EndsWith(".otf", StringComparison.OrdinalIgnoreCase);
+                            }
+
+                            if (cleanFont != null && cleanFont.Length > 0)
+                            {
+                                string subfam;
+                                string typeface = VietnameseFontToolkit.ReadFontFamilyName(cleanFont, out subfam);
+                                string mapped;
+                                if (targetToTypeface.TryGetValue(fn, out mapped) && !string.IsNullOrEmpty(mapped)) typeface = mapped;
+
+                                string safeTf = string.IsNullOrEmpty(typeface) ? "WordFont" : string.Concat(typeface.Split(Path.GetInvalidFileNameChars())).Replace(' ', '_');
+                                string ext = isOtf ? ".otf" : ".ttf";
+                                string outPath = Path.Combine(tempDir, $"{safeTf}_{cleanFont.Length}{ext}");
+
+                                if (!File.Exists(outPath) || new FileInfo(outPath).Length != cleanFont.Length)
+                                {
+                                    try { File.WriteAllBytes(outPath, cleanFont); } catch { }
+                                }
+
+                                RegisterFontFileInternal(outPath);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("DOCX FONT EXTRACT EXCEPTION: " + ex.Message);
+                }
+            }
+        }
+
         public static Font CreateFont(string fontName, float size, FontStyle style, GraphicsUnit unit = GraphicsUnit.Pixel)
         {
             if (size <= 0.5f) size = 12f;
             if (!string.IsNullOrEmpty(fontName))
             {
-                FontFamily fam;
+                FontFamily fam = null;
                 lock (_lock)
                 {
-                    if (_fontMap.TryGetValue(fontName, out fam))
+                    if (!_fontMap.TryGetValue(fontName, out fam))
+                    {
+                        foreach (var kvp in _fontMap)
+                        {
+                            if (string.Equals(kvp.Key, fontName, StringComparison.OrdinalIgnoreCase) ||
+                                kvp.Key.IndexOf(fontName, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                fontName.IndexOf(kvp.Key, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                fam = kvp.Value;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (fam != null)
                     {
                         try
                         {
-                            return new Font(fam, size, style, unit);
+                            FontStyle effStyle = style;
+                            if (!fam.IsStyleAvailable(effStyle))
+                            {
+                                if (fam.IsStyleAvailable(FontStyle.Regular)) effStyle = FontStyle.Regular;
+                                else if (fam.IsStyleAvailable(FontStyle.Bold)) effStyle = FontStyle.Bold;
+                                else if (fam.IsStyleAvailable(FontStyle.Italic)) effStyle = FontStyle.Italic;
+                            }
+                            return new Font(fam, size, effStyle, unit);
                         }
                         catch { }
                     }

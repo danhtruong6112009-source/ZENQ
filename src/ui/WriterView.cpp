@@ -3,7 +3,7 @@
 #include <sstream>
 #include <algorithm>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 WriterView::WriterView() {
     std::string sampleText = 
@@ -175,4 +175,4 @@ void WriterView::handleClick(int x, int y, HWND hWnd) {
     InvalidateRect(hWnd, NULL, TRUE);
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

@@ -2,12 +2,16 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class CustomWatermarkDialogForm : Form
     {
         public Action<string, bool, Color, bool> OnApplyTextWatermark; // text, isDiagonal, color, isSemitransparent
+        public Action<Image, float, bool> OnApplyPictureWatermark; // image, scale (0 = auto), washout
         public Action OnRemoveWatermark;
+
+        private Image SelectedPictureImage = null;
+        private string SelectedPicturePath = null;
 
         private RadioButton rbNoWatermark;
         private RadioButton rbPictureWatermark;
@@ -88,7 +92,16 @@ namespace GenOffice.UI
                     ofd.Filter = "Tệp hình ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|Tất cả tệp (*.*)|*.*";
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                     {
-                        MessageBox.Show("Đã chọn ảnh làm hình mờ: " + System.IO.Path.GetFileName(ofd.FileName), "ZENQ Watermark", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        try
+                        {
+                            SelectedPictureImage = Image.FromFile(ofd.FileName);
+                            SelectedPicturePath = ofd.FileName;
+                            btnSelectPicture.Text = System.IO.Path.GetFileName(ofd.FileName);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Không thể nạp tệp hình ảnh: " + ex.Message, "Lỗi hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
                     }
                 }
             };
@@ -312,9 +325,19 @@ namespace GenOffice.UI
             }
             else if (rbPictureWatermark != null && rbPictureWatermark.Checked)
             {
-                if (OnApplyTextWatermark != null)
+                if (SelectedPictureImage != null && OnApplyPictureWatermark != null)
                 {
-                    OnApplyTextWatermark("[HÌNH ẢNH MỜ]", true, Color.Gray, true);
+                    float scale = 0f; // Auto
+                    if (cbScale != null)
+                    {
+                        if (cbScale.SelectedIndex == 1) scale = 5.0f;
+                        else if (cbScale.SelectedIndex == 2) scale = 2.0f;
+                        else if (cbScale.SelectedIndex == 3) scale = 1.5f;
+                        else if (cbScale.SelectedIndex == 4) scale = 1.0f;
+                        else if (cbScale.SelectedIndex == 5) scale = 0.5f;
+                    }
+                    bool washout = (chkWashout != null) ? chkWashout.Checked : true;
+                    OnApplyPictureWatermark(SelectedPictureImage, scale, washout);
                 }
             }
         }

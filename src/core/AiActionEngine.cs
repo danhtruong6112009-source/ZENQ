@@ -6,9 +6,9 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public class SpellCorrectionItem
     {

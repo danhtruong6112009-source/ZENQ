@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Authentic MS PowerPoint "Set Up Show" Dialog Window

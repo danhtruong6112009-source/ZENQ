@@ -1,130 +1,80 @@
-# Project: ZenQ Calc 4-Phase Upgrade
+# Project: ZenQOffice Node Tool & Tool Controls Bar
 
 ## Architecture
-- **Host Application**: ZenQ Office (GenOffice), a C# WinForms application built with .NET Framework 4.8.
-- **Language & Compiler Strictness**: Strict **C# 5.0** compliance enforced by `csc.exe` (Microsoft (R) Visual C# Compiler version 4.8.9232.0 for C# 5). Prohibited: string interpolation `$"..."`, expression-bodied members `=>`, null-conditional `?.`, local functions, pattern matching, tuple literals, inline `out var`.
-- **Core Subsystems**:
-  1. **UI Layer** (`src/ui/`):
-     - `CalcView.cs`: Main spreadsheet canvas, grid painting, mouse/keyboard input, selection, shapes/floating objects, zoom, page breaks, spill border rendering.
-     - `CalcTableAndPivotDialogs.cs`: Dialogs for table creation, formatting, and pivot configuration.
-     - `CalcFindReplaceDialog.cs`, `CalcRemoveDuplicatesDialog.cs`, `CalcTextToColumnsDialog.cs`: Core productivity dialogs.
-     - `PivotTableFieldListControl.cs`: Interactive 4-zone drag-and-drop field list pane.
-     - `GoalSeekDialogForm.cs`, `DataTableDialogForm.cs`, `ProtectWorkbookDialogForm.cs`: Analytics and protection modals.
-     - `AppForm.cs`, `RibbonBar.cs`: Top-level ribbon dispatch, file menus, export commands.
-  2. **Core Data & Calculation Engine** (`src/core/`):
-     - `SparseMatrix.cs`: Sheet cell storage, formatting, row/col metadata, comments, merge cells, spill metadata.
-     - `FormulaEngine.cs`: Formula parser, tokenization, dependency evaluation, 52 new built-in functions, dynamic array evaluation, structured table reference resolution (`Table1[@Sales]`), iterative numerical solving.
-  3. **Format & Serialization Layer** (`src/format/`):
-     - `XlsxHandler.cs`: OpenXML spreadsheet packaging (`.xlsx`), shared strings, styles, sheets, drawings (`drawing1.xml`, `_rels`, `media`), tables (`xl/tables/table{N}.xml`), pivot caches, workbook protection.
-     - `FormatHandlers.cs`: PDF export bridge for Calc using `PdfSharp.dll`.
-     - `OdsHandler.cs`: OpenDocument Spreadsheet (`.ods`) ZIP/XML reader and writer.
-     - `XlsBiff8Handler.cs`: Genuine Excel 97-2003 (`.xls`) OLE2 Compound Document and BIFF8 binary record parser.
-     - `DelimitedAndHtmlHandlers.cs`: HTML table export (`.html`), TSV (`.tsv`), and space-delimited text (`.prn`).
-
----
+- **UI Presentation Layer (`src/ui/PhotoView.cs`, `src/ui/FluentIconRenderer.cs`)**:
+  - Left Toolbar: Index 1 (`PhotoTool.NodeTool`), 2nd tool button.
+  - Top Tool Controls Bar (`DrawTopOptionsBar`): Dynamic immediate-mode bar rendering Inkscape-standard tool buttons with Direct2D/Fluent UI glyphs and 100% Vietnamese labels.
+  - Coordinate Spinboxes: Interactive X and Y values with `+` and `-` buttons, direct typing, and unit toggle (`px` / `mm`).
+- **Vector Data & Math Layer (`src/ui/PhotoDocument.cs`, `src/ui/VectorPathModel.cs`)**:
+  - `VectorNodeType`: `Corner` (Cusp / Góc nhọn), `Smooth` (Uốn mượt), `Symmetric` (Đối xứng), `AutoSmooth` (Tự động mượt).
+  - `VectorPathNode`: Anchor point (`Pt`), `InHandle`, `OutHandle`, `NodeType`, `IsSelected`.
+  - `VectorPathModel`: Cubic Bezier math engine, handle synchronization algorithms, De Casteljau subdivision for node insertion, node removal, node joining/breaking, segment conversion (line <-> curve).
+  - Object to Path (Rect, Ellipse with $\kappa \approx 0.552285$, Star, Polygon) and Stroke to Path conversions.
+  - Deep clone in `PhotoLayer.Clone()` ensuring flawless Undo/Redo (`Ctrl+Z`, `Ctrl+Y`).
+- **Hardware Acceleration Layer (`src/ui/D2DGraphics.cs`)**:
+  - Vortice Direct2D1 hardware path geometry sink (`sink.AddBezier`) rendering Cubic Bezier curves at 60-120fps.
+- **Canvas Interaction Layer (`src/ui/PhotoView.cs`)**:
+  - Hierarchical hit-testing: Tangent Handle Knobs -> Anchor Nodes -> Segments -> Marquee Box.
+  - Multi-selection: Click, Shift+Click, rubberband drag selection.
+  - Interactive manipulation: Real-time dragging of anchor nodes and tangent handles with live deformation.
 
 ## Feature Inventory
-Every feature from the survey and user request is enumerated below with its assigned milestone:
-
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | OpenXML Drawings Parser | Parse `xl/drawings/drawing1.xml`, `xl/drawings/_rels/`, `xl/media/` in `XlsxHandler.LoadXlsx` | M1 | ORIGINAL_REQUEST §1.1 |
-| 2 | Drawings EMU Coordinate Transform | Map DrawingML EMUs (1 px = 9,525 EMUs) and twoCellAnchor / oneCellAnchor coordinates | M1 | Survey Report 2 |
-| 3 | Visual Assets Roundtrip | Restore shapes, embedded images, and charts into `CalcView.FloatingObjects` / `Shapes` without data loss | M1 | ORIGINAL_REQUEST §1.1 |
-| 4 | Native PDF Export Engine | Vector PDF generation in `FormatHandlers.cs` / `CalcView.cs` honoring orientation, paper size, margins | M1 | ORIGINAL_REQUEST §1.2 |
-| 5 | PDF Styling & Gridlines | Render cell gridlines, fonts, backgrounds, borders, and multi-page row/column pagination | M1 | ORIGINAL_REQUEST §1.2 |
-| 6 | Find & Replace Dialog | Dedicated floating dialog supporting Match Case, Match Entire Cell, Search By Rows/Cols, Formulas/Values | M1 | ORIGINAL_REQUEST §1.3 |
-| 7 | Remove Duplicates Modal | Column-selection checklist dialog identifying and purging duplicate rows in ranges | M1 | ORIGINAL_REQUEST §1.3 |
-| 8 | Text to Columns Wizard | Wizard dialog supporting Delimited (Tab, Semicolon, Comma, Space, Custom) and Fixed-width parsing | M1 | ORIGINAL_REQUEST §1.3 |
-| 9 | Formulas: Lookup & Reference | `INDEX`, `MATCH`, `XLOOKUP`, `XMATCH`, `ROW`, `COLUMN`, `ROWS`, `COLUMNS`, `INDIRECT`, `OFFSET` | M2 | ORIGINAL_REQUEST §2.1 |
-| 10 | Formulas: Logical & Error | `IFS`, `SWITCH`, `IFERROR`, `IFNA`, `XOR` | M2 | ORIGINAL_REQUEST §2.1 |
-| 11 | Formulas: Date & Time | `YEAR`, `MONTH`, `DAY`, `HOUR`, `MINUTE`, `SECOND`, `WEEKDAY`, `EDATE`, `EOMONTH`, `NETWORKDAYS`, `DATEDIF` | M2 | ORIGINAL_REQUEST §2.1 |
-| 12 | Formulas: Text | `TEXT`, `VALUE`, `FIND`, `SEARCH`, `REPLACE`, `REPT`, `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `CHAR`, `CODE`, `CLEAN` | M2 | ORIGINAL_REQUEST §2.1 |
-| 13 | Formulas: Math & Statistical | `RANDBETWEEN`, `RAND`, `CEILING`, `FLOOR`, `SIGN`, `STDEV`, `VAR`, `RANK`, `MODE` | M2 | ORIGINAL_REQUEST §2.1 |
-| 14 | Formulas: Information | `ISNUMBER`, `ISTEXT`, `ISBLANK`, `ISERROR`, `ISNA` | M2 | ORIGINAL_REQUEST §2.1 |
-| 15 | ODS Reader & Writer | Bidirectional `.ods` OpenDocument Spreadsheet conversion (sheets, values, styles, formulas) | M2 | ORIGINAL_REQUEST §2.2 |
-| 16 | XLS BIFF8 Binary Parser | Genuine OLE2 Compound File / BIFF8 binary workbook parser for legacy `.xls` files | M2 | ORIGINAL_REQUEST §2.2 |
-| 17 | Web & Delimited Formats | HTML table export (`.html`), TSV (`.tsv`), and space-delimited text (`.prn`) | M2 | ORIGINAL_REQUEST §2.2 |
-| 18 | Excel Tables (ListObject) Core | Create Table (`Ctrl+T`), zebra styling, header sorting and filtering drop-downs | M3 | ORIGINAL_REQUEST §3.1 |
-| 19 | Table Dynamic Auto-Expansion | Automatically expand table boundaries when typing in adjacent rows or columns | M3 | ORIGINAL_REQUEST §3.1 |
-| 20 | Table Total Row Aggregations | Total Row with per-column aggregations (`SUM`, `AVERAGE`, `COUNT`, `MIN`, `MAX`) | M3 | ORIGINAL_REQUEST §3.1 |
-| 21 | Structured References | Parse and evaluate structured references like `Table1[@Sales] * 1.1` and `Table1[Column]` | M3 | ORIGINAL_REQUEST §3.1 |
-| 22 | OpenXML Table Persistence | Read and write `xl/tables/table{N}.xml` and sheet `<tableParts>` in `XlsxHandler.cs` | M3 | Survey Report 3 |
-| 23 | Dynamic Array Evaluation | Engine support for 2D array returns and formula spilling into adjacent empty cells | M3 | ORIGINAL_REQUEST §3.2 |
-| 24 | Spill Collision & `#SPILL!` | Collision detection against non-empty cells with `#SPILL!` error and modern thin blue bounding border | M3 | ORIGINAL_REQUEST §3.2 |
-| 25 | Array & Scoping Functions | Implement `SORT`, `SORTBY`, `FILTER`, `UNIQUE`, `SEQUENCE`, `RANDARRAY`, `LET`, `LAMBDA` | M3 | ORIGINAL_REQUEST §3.2 |
-| 26 | PivotTable Engine & Cache | Multi-dimensional aggregation engine (Sum, Count, Average, Min, Max, % of Col/Row) with `PivotCache` | M4 | ORIGINAL_REQUEST §4.1 |
-| 27 | PivotTable Field List Pane | Interactive task pane supporting drag-and-drop across Filters, Columns, Rows, Values | M4 | ORIGINAL_REQUEST §4.1 |
-| 28 | Pivot Grouping & Linked Charts | Date/numeric grouping dialog and linked PivotCharts reflecting dynamic pivot aggregations | M4 | ORIGINAL_REQUEST §4.1 |
-| 29 | Goal Seek Iterative Solver | Secant/bisection numerical solver converging within 0.001 of target value | M4 | ORIGINAL_REQUEST §4.2 |
-| 30 | Data Tables Sensitivity Engine | 1-variable and 2-variable what-if sensitivity grids | M4 | ORIGINAL_REQUEST §4.2 |
-| 31 | Workbook Structure Protection | Password-protected workbook structure locking sheet add/delete/rename/move | M4 | ORIGINAL_REQUEST §4.3 |
-| 32 | Print Titles & Page Breaks | Print Titles (repeating header rows/cols) and manual Page Break management | M4 | ORIGINAL_REQUEST §4.3 |
-| 33 | E2E Testing Suite (Tiers 1-4) | Comprehensive opaque-box test suite covering 100% of inventoried features | M-E2E / M5 | Dual Track Protocol |
-| 34 | Adversarial Hardening (Tier 5) | White-box adversarial test cases and edge-case hardening | M5 | Dual Track Protocol |
-
----
+| 1 | Thêm điểm neo (+) | Thêm neo vào đoạn cong hoặc thẳng tại vị trí trung điểm hoặc chọn trước | M1 | ORIGINAL_REQUEST §R1 |
+| 2 | Xóa điểm neo (-) | Xóa các điểm neo được chọn và kết nối lại các nút liền kề | M1 | ORIGINAL_REQUEST §R1 |
+| 3 | Nối điểm neo | Hợp nhất các điểm neo được chọn thành một điểm duy nhất | M1 | ORIGINAL_REQUEST §R1 |
+| 4 | Tách đường | Tách đường cong tại điểm neo đã chọn thành 2 đoạn mở | M1 | ORIGINAL_REQUEST §R1 |
+| 5 | Nối điểm mút | Nối 2 điểm mút tự do bằng một đoạn nối mới | M1 | ORIGINAL_REQUEST §R1 |
+| 6 | Xóa đoạn giữa 2 neo | Xóa phân đoạn nằm giữa 2 điểm neo được chọn | M1 | ORIGINAL_REQUEST §R1 |
+| 7 | Điểm neo góc nhọn | Chuyển điểm neo sang loại Góc nhọn (Cusp), 2 tay nắm di chuyển độc lập | M1 | ORIGINAL_REQUEST §R1, R2 |
+| 8 | Điểm neo uốn mượt | Chuyển điểm neo sang Uốn mượt (Smooth), 2 tay nắm thẳng hàng 180° | M1 | ORIGINAL_REQUEST §R1, R2 |
+| 9 | Điểm neo đối xứng | Chuyển điểm neo sang Đối xứng (Symmetric), 2 tay nắm thẳng hàng và cùng độ dài | M1 | ORIGINAL_REQUEST §R1, R2 |
+| 10 | Điểm neo tự động mượt | Chuyển điểm neo sang Tự động mượt (Auto-smooth), tính toán tự động qua Catmull-Rom | M1 | ORIGINAL_REQUEST §R1, R2 |
+| 11 | Biến đoạn cong thành thẳng | Triệt tiêu tay nắm tiếp tuyến trên phân đoạn được chọn | M1 | ORIGINAL_REQUEST §R1 |
+| 12 | Biến đoạn thẳng thành cong | Khởi tạo tay nắm tiếp tuyến trên đoạn thẳng để uốn cong | M1 | ORIGINAL_REQUEST §R1 |
+| 13 | Khối thành đường (Object to Path) | Chuyển hình học nguyên thủy (hình chữ nhật, elip, sao) thành đường cong Bezier | M1 | ORIGINAL_REQUEST §R1 |
+| 14 | Viền thành đường (Stroke to Path) | Chuyển nét viền thành đường bao khép kín có thể sửa từng điểm neo | M1 | ORIGINAL_REQUEST §R1 |
+| 15 | Hộp tọa độ X và Y (+/-) | Nhập trực tiếp tọa độ điểm neo, nút +/- điều chỉnh và chọn đơn vị px/mm | M1 | ORIGINAL_REQUEST §R1 |
+| 16 | Cấu trúc dữ liệu Bezier & Node | `VectorNodeType`, `VectorPathNode` (Pt, InHandle, OutHandle) | M1 | ORIGINAL_REQUEST §R2 |
+| 17 | Động cơ nội suy Cubic Bezier | Dựng hình đường cong bậc 3 chính xác trên Direct2D và GDI+ | M1 | ORIGINAL_REQUEST §R2 |
+| 18 | Hiển thị điểm neo trên Canvas | Hình vuông nhỏ có viền rõ nét cho neo, núm tròn cho tiếp tuyến | M1 | ORIGINAL_REQUEST §R3 |
+| 19 | Đa chọn điểm neo | Chọn 1 neo, Shift đa chọn, quét khung marquee chọn hàng loạt | M1 | ORIGINAL_REQUEST §R3 |
+| 20 | Kéo rê tương tác 60fps | Nắn chỉnh hình dạng đường vẽ và góc tiếp tuyến thời gian thực mượt mà | M1 | ORIGINAL_REQUEST §R3 |
+| 21 | Phím tắt Undo/Redo | Khôi phục chính xác từng thao tác chỉnh sửa neo qua Ctrl+Z và Ctrl+Y | M1 | ORIGINAL_REQUEST §AC |
+| 22 | 100% Tiếng Việt chuẩn mực | Toàn bộ nhãn, tooltip sử dụng tiếng Việt chuyên nghiệp, không tiếng Anh trong ngoặc | M1 | ORIGINAL_REQUEST §AC |
+| 23 | Build & Đóng gói nhị phân | `dotnet build ZenQOffice.csproj` 0 lỗi và đồng bộ `ZenQOffice.exe` ra thư mục gốc | M2 | ORIGINAL_REQUEST §AC |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M-E2E | E2E Testing Track | Design test runner, test harness, and Tiers 1-4 test suites (Features 33) | none | DONE |
-| M1 | Phase 1: Data Integrity & Core Productivity | OpenXML Drawings roundtrip, PDF export, Find/Replace, Remove Duplicates, Text to Columns (Features 1-8) | none | IN_PROGRESS |
-| M2 | Phase 2: Formula Engine & File Formats | 52 new functions, ODS reader/writer, XLS BIFF8 parser, HTML/TSV/PRN export (Features 9-17) | M1 contracts | PLANNED |
-| M3 | Phase 3: Tables & Dynamic Arrays | ListObject tables, auto-expansion, Total Row, structured references, Dynamic Arrays, Spill Engine, 8 array functions (Features 18-25) | M2 formula engine | PLANNED |
-| M4 | Phase 4: PivotTables & Advanced Analytics | Pivot engine, Field List pane, Goal Seek, Data Tables, Workbook Protection, Print Titles, Page Breaks (Features 26-32) | M3 tables/arrays | PLANNED |
-| M5 | Final Acceptance & Adversarial Hardening | Pass 100% E2E test suite (Tiers 1-4) + Adversarial Coverage Hardening (Tier 5) (Features 33-34) | M-E2E, M1, M2, M3, M4 | PLANNED |
-
----
+| M1 | Triển khai Hoàn chỉnh Node Tool & Tool Controls Bar | Toàn bộ R1 (Tool Controls Bar, glyphs, 100% tiếng Việt, spinbox X/Y), R2 (VectorPathModel, Bezier cubic, node types, handles, Object/Stroke to Path), và R3 (Canvas rendering, hit-test, multi-select, drag 60fps, Undo/Redo) | none | IN_PROGRESS |
+| M2 | Kiểm thử E2E Toàn diện, Tôi luyện Đối kháng & Đóng gói Build | Kiểm thử E2E 23 tính năng, kiểm thử đối kháng độ cong Bezier & đa chọn, Forensic Auditor xác thực tính toàn vẹn, biên dịch 0 lỗi và xuất binary ra thư mục gốc | M1 | PLANNED |
 
 ## Interface Contracts
+### `VectorPathModel` ↔ `PhotoLayer`
+- `PhotoLayer.Nodes`: `List<VectorPathNode>` lưu trữ danh sách các điểm neo và tay nắm.
+- `PhotoLayer.EnsureNodesInitialized()`: Tự động khởi tạo `Nodes` từ hình khối hiện tại nếu `Nodes` rỗng.
+- `PhotoLayer.BuildGraphicsPath()`: Sinh `GraphicsPath` từ các đoạn Cubic Bezier nối các `VectorPathNode`.
+- `PhotoLayer.Clone()`: Thực hiện Deep Copy toàn bộ danh sách `Nodes` (bao gồm `InHandle`, `OutHandle`, `NodeType`, `IsSelected`).
 
-### 1. Drawings & Visual Assets (`XlsxHandler.cs` ↔ `CalcView.cs`)
-- `CalcView.FloatingObjects`: Exposes `List<DocShapeObject>` as alias to `Shapes`.
-- `XlsxHandler.LoadXlsx(Stream stream, CalcView calcView)`:
-  - Parses `xl/worksheets/_rels/sheet{N}.xml.rels` to find target `../drawings/drawing{M}.xml`.
-  - Parses `xl/drawings/drawing{M}.xml` extracting `<xdr:twoCellAnchor>` and `<xdr:oneCellAnchor>`.
-  - Resolves `r:embed` references via `xl/drawings/_rels/drawing{M}.xml.rels` to `xl/media/*`.
-  - Populates `calcView.FloatingObjects` with `DocShapeObject` having correct `ShapeType`, `Bounds` (converted from EMUs: `X = fromCol * colWidth + fromColOff / 9525`), `CachedImage`, and `ChartData`.
+### `PhotoView` ↔ `VectorPathModel`
+- `VectorPathModel.InsertNodeAt(layer, point)`: Chèn điểm neo mới vào đoạn cong gần nhất bằng De Casteljau.
+- `VectorPathModel.DeleteSelectedNodes(layer)`: Xóa các nút được đánh dấu `IsSelected = true`.
+- `VectorPathModel.JoinSelectedNodes(layer)`: Nối các nút đang chọn.
+- `VectorPathModel.BreakPathAtSelectedNodes(layer)`: Tách đường tại nút được chọn.
+- `VectorPathModel.SetSelectedNodesType(layer, VectorNodeType newType)`: Chuyển đổi loại điểm neo và đồng bộ tay nắm.
+- `VectorPathModel.ConvertSegmentToLine(layer)` / `ConvertSegmentToCurve(layer)`: Biến đổi tính chất đoạn vẽ.
+- `VectorPathModel.ObjectToPath(layer)`: Chuyển đổi khối hình học sang Bezier path.
+- `VectorPathModel.StrokeToPath(layer)`: Chuyển đổi nét viền sang Bezier path.
 
-### 2. PDF Export (`FormatHandlers.cs` ↔ `CalcView.cs` ↔ `AppForm.cs`)
-- `CalcView.ExportToPdf(string filePath)`: Returns `bool`.
-- Reads `PageSetup` (orientation, margins, paper size, gridlines, print area, print titles).
-- Uses `PdfSharp` vector graphics (`XGraphics`, `XFont`, `XPen`, `XBrush`) to render paginated spreadsheet pages into `PdfDocument`.
-- `AppForm.PerformExportPdf`: When `Ribbon.CurrentMode == OfficeAppMode.Calc`, invokes `CalcView.ExportToPdf(sfd.FileName)`.
-
-### 3. Formula Engine (`FormulaEngine.cs` ↔ `CalcView.cs`)
-- Return Type Model: Formulas evaluate to `CellData` or `ArrayValue` (2D matrix of objects).
-- Error Constants: Canonical strings `"#N/A"`, `"#VALUE!"`, `"#REF!"`, `"#DIV/0!"`, `"#NUM!"`, `"#NAME?"`, `"#SPILL!"`.
-- Structured Reference Resolution: Before token parsing, formulas containing `Table[Column]` or `Table[@Column]` are resolved to coordinate ranges `A2:A100` via active table lookup.
-
-### 4. File Format Handlers (`FormatHandlers.cs` ↔ `CalcView.cs`)
-- `OdsHandler.LoadOds(string filePath, CalcView calcView)` / `SaveOds(string filePath, CalcView calcView)`.
-- `XlsBiff8Handler.LoadXls(string filePath, CalcView calcView)`.
-- `DelimitedAndHtmlHandlers.ExportHtml(string filePath, CalcView calcView)`, `ExportTsv(string filePath, CalcView calcView)`, `ExportPrn(string filePath, CalcView calcView)`.
-
----
+### `PhotoView (Top Controls Bar)` ↔ `PhotoView (Canvas Interaction)`
+- `SelectedTool == PhotoTool.NodeTool`: Kích hoạt hiển thị nút thanh trên và chế độ tương tác canvas riêng biệt.
+- Khi giá trị X, Y trong Spinbox thay đổi -> Cập nhật vị trí tọa độ của các điểm neo đang chọn trong `layer.Nodes` và gọi `Invalidate()`.
 
 ## Code Layout
-- `src/ui/`:
-  - `CalcView.cs`: Core spreadsheet view, canvas painting, keyboard/mouse dispatch, table/spill render hooks.
-  - `CalcFindReplaceDialog.cs`: Find & Replace dialog.
-  - `CalcRemoveDuplicatesDialog.cs`: Remove Duplicates column picker dialog.
-  - `CalcTextToColumnsDialog.cs`: Text to Columns delimited & fixed-width wizard.
-  - `CalcTableAndPivotDialogs.cs`: Table and Pivot dialogs.
-  - `PivotTableFieldListControl.cs`: 4-zone drag-and-drop PivotTable task pane.
-  - `GoalSeekDialogForm.cs`: Goal Seek solver dialog.
-  - `DataTableDialogForm.cs`: 1-var and 2-var What-If Data Table dialog.
-  - `ProtectWorkbookDialogForm.cs`: Password-protected workbook structure dialog.
-- `src/core/`:
-  - `FormulaEngine.cs`: Formula tokenizer, evaluator, 52 new functions, structured references, Dynamic Arrays.
-  - `SparseMatrix.cs`: Cell storage, formatting, spill metadata (`IsSpillAnchor`, `IsSpillTarget`, `SpillWidth`, `SpillHeight`).
-  - `GoalSeekSolver.cs`: Numerical iterative root finder (Secant/bisection).
-- `src/format/`:
-  - `XlsxHandler.cs`: OpenXML XLSX packager/unpacker, drawings, tables, pivot cache, workbook protection.
-  - `FormatHandlers.cs`: PDF export for Calc via `PdfSharp`.
-  - `OdsHandler.cs`: OpenDocument Spreadsheet XML/ZIP handler.
-  - `XlsBiff8Handler.cs`: OLE2 Compound File Binary BIFF8 handler.
-  - `DelimitedAndHtmlHandlers.cs`: HTML, TSV, and PRN exporters.
-- `tests/`:
-  - `TestRunner.cs` / standalone console harness: Automated test runner executing formula tests, format roundtrip tests, table tests, and E2E scenarios.
+- `src/ui/VectorPathModel.cs`: Tệp mới chứa định nghĩa kiểu dữ liệu `VectorNodeType`, `VectorPathNode`, và các thuật toán hình học Bezier, chuyển đổi Object/Stroke to Path.
+- `src/ui/PhotoDocument.cs`: Bổ sung `Nodes` vào `PhotoLayer`, tích hợp Deep Clone cho Undo/Redo.
+- `src/ui/PhotoView.cs`: Nâng cấp `DrawTopOptionsBar` (Tool Controls Bar) và `HandleMouseDown/MouseMove/MouseUp` cho `NodeTool`.
+- `src/ui/D2DGraphics.cs`: Giữ nguyên hoặc mở rộng helper nếu cần cho kết xuất glyph.
+- `ZenQOffice.csproj`: Thêm `src/ui/VectorPathModel.cs` (nếu cần theo định dạng csproj).

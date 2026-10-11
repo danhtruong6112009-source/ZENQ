@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public enum Alignment { Left, Center, Right, Justify }
 

@@ -10,10 +10,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public class DocxMetadata
     {
@@ -59,11 +59,11 @@ namespace GenOffice.Format
         public Dictionary<int, float> ParagraphLeftIndents { get; set; }
         public Dictionary<int, float> ParagraphRightIndents { get; set; }
         public Dictionary<int, float> ParagraphHangingIndents { get; set; }
-        public List<GenOffice.UI.DocTableObject> Tables { get; set; }
+        public List<ZenQOffice.UI.DocTableObject> Tables { get; set; }
 
         public DocxMetadata()
         {
-            Tables = new List<GenOffice.UI.DocTableObject>();
+            Tables = new List<ZenQOffice.UI.DocTableObject>();
             TextContent = "";
             FormattedRuns = new List<FormattedRun>();
             HeaderText = "";
@@ -162,6 +162,8 @@ namespace GenOffice.Format
                     using (FileStream fs = new FileStream(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Read))
                     {
+                        try { SlideFontManager.ExtractAndRegisterDocxFonts(archive); } catch { }
+
                         // 1. Extract image media relationships
                         Dictionary<string, string> relsToTarget = new Dictionary<string, string>();
                         ZipArchiveEntry relsEntry = FindZipEntry(archive, "word/_rels/document.xml.rels") ?? archive.GetEntry("word/_rels/document.xml.rels");
@@ -646,11 +648,33 @@ namespace GenOffice.Format
             public float? IndentRight;
             public bool? HasBottomBorder;
             public Color? BottomBorderColor;
+            public float? CharWidthScale;
+            public float? CharSpacingPt;
 
             public DocxStyleInfo()
             {
                 FontSize = 0f;
             }
+        }
+
+        private static float ApplyOpenXmlCharacterScaling(float fontSize, float widthScale, float charSpacingPt)
+        {
+            if (fontSize <= 0f) return 11.0f;
+            float adjusted = fontSize;
+            if (widthScale > 0.1f && Math.Abs(widthScale - 1.0f) > 0.02f)
+            {
+                float scale = (widthScale < 1.0f)
+                    ? (0.20f + 0.80f * widthScale)
+                    : (1.0f + 0.50f * (widthScale - 1.0f));
+                adjusted *= Math.Max(0.65f, Math.Min(1.35f, scale));
+            }
+            if (charSpacingPt < -0.2f)
+            {
+                float spcFactor = Math.Max(0.88f, 1.0f + (charSpacingPt / Math.Max(8.0f, adjusted)) * 0.45f);
+                adjusted *= spcFactor;
+            }
+            adjusted = (float)Math.Round(adjusted * 4.0f) / 4.0f;
+            return Math.Max(7.5f, adjusted);
         }
 
         private static string ToRoman(int number)
@@ -1016,7 +1040,7 @@ namespace GenOffice.Format
 
                 Dictionary<string, DocxStyleInfo> stylesDict = new Dictionary<string, DocxStyleInfo>(StringComparer.OrdinalIgnoreCase);
                 string docDefaultFont = "Times New Roman";
-                float docDefaultFontSize = 12.0f;
+                float docDefaultFontSize = 11.0f;
 
                 if (archive != null)
                 {
@@ -1061,6 +1085,8 @@ namespace GenOffice.Format
                                 stylesDict["__docDefaults"] = defPara;
                             }
 
+                            string defaultParaStyleId = null;
+
                             // 2. Parse all <w:style> definitions
                             XmlNodeList styleNodes = sDoc.SelectNodes("//w:style", nsmgr);
                             if (styleNodes != null)
@@ -1070,6 +1096,12 @@ namespace GenOffice.Format
                                     if (sNode.Attributes["w:styleId"] == null) continue;
                                     string sId = sNode.Attributes["w:styleId"].Value;
                                     string sType = sNode.Attributes["w:type"] != null ? sNode.Attributes["w:type"].Value : "paragraph";
+
+                                    if (sType == "paragraph" && sNode.Attributes["w:default"] != null)
+                                    {
+                                        string defVal = sNode.Attributes["w:default"].Value.ToLower();
+                                        if (defVal == "1" || defVal == "true") defaultParaStyleId = sId;
+                                    }
 
                                     DocxStyleInfo sInfo = new DocxStyleInfo();
                                     sInfo.StyleId = sId;
@@ -1099,6 +1131,24 @@ namespace GenOffice.Format
                                             if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
                                             {
                                                 sInfo.FontSize = halfPts / 2.0f;
+                                            }
+                                        }
+                                        XmlNode wNode = rPr.SelectSingleNode("w:w", nsmgr);
+                                        if (wNode != null && wNode.Attributes["w:val"] != null)
+                                        {
+                                            int wPct;
+                                            if (int.TryParse(wNode.Attributes["w:val"].Value, out wPct) && wPct > 10 && wPct <= 200)
+                                            {
+                                                sInfo.CharWidthScale = wPct / 100.0f;
+                                            }
+                                        }
+                                        XmlNode spcNode = rPr.SelectSingleNode("w:spacing", nsmgr);
+                                        if (spcNode != null && spcNode.Attributes["w:val"] != null)
+                                        {
+                                            int spcTwips;
+                                            if (int.TryParse(spcNode.Attributes["w:val"].Value, out spcTwips))
+                                            {
+                                                sInfo.CharSpacingPt = spcTwips / 20.0f;
                                             }
                                         }
                                         XmlNode b = rPr.SelectSingleNode("w:b", nsmgr);
@@ -1180,10 +1230,52 @@ namespace GenOffice.Format
                                 }
                             }
 
-                            // Also resolve Normal style defaults
-                            if (stylesDict.ContainsKey("Normal"))
+                            // 2b. Resolve BasedOn style inheritance across all styles
+                            foreach (var kvp in stylesDict)
                             {
-                                DocxStyleInfo nStyle = stylesDict["Normal"];
+                                DocxStyleInfo st = kvp.Value;
+                                if (st == null || string.IsNullOrEmpty(st.BasedOn)) continue;
+                                string curBaseId = st.BasedOn;
+                                int depth = 0;
+                                while (!string.IsNullOrEmpty(curBaseId) && depth < 10)
+                                {
+                                    DocxStyleInfo baseSt;
+                                    if (!stylesDict.TryGetValue(curBaseId, out baseSt) || baseSt == null || baseSt == st) break;
+                                    if (string.IsNullOrEmpty(st.FontName) && !string.IsNullOrEmpty(baseSt.FontName)) st.FontName = baseSt.FontName;
+                                    if (st.FontSize <= 0 && baseSt.FontSize > 0) st.FontSize = baseSt.FontSize;
+                                    if (!st.Bold.HasValue && baseSt.Bold.HasValue) st.Bold = baseSt.Bold;
+                                    if (!st.Italic.HasValue && baseSt.Italic.HasValue) st.Italic = baseSt.Italic;
+                                    if (!st.Underline.HasValue && baseSt.Underline.HasValue) st.Underline = baseSt.Underline;
+                                    if (!st.Color.HasValue && baseSt.Color.HasValue) st.Color = baseSt.Color;
+                                    if (!st.CharWidthScale.HasValue && baseSt.CharWidthScale.HasValue) st.CharWidthScale = baseSt.CharWidthScale;
+                                    if (!st.CharSpacingPt.HasValue && baseSt.CharSpacingPt.HasValue) st.CharSpacingPt = baseSt.CharSpacingPt;
+                                    if (!st.Alignment.HasValue && baseSt.Alignment.HasValue) st.Alignment = baseSt.Alignment;
+                                    if (!st.LineSpacing.HasValue && baseSt.LineSpacing.HasValue) st.LineSpacing = baseSt.LineSpacing;
+                                    if (!st.SpacingBefore.HasValue && baseSt.SpacingBefore.HasValue) st.SpacingBefore = baseSt.SpacingBefore;
+                                    if (!st.SpacingAfter.HasValue && baseSt.SpacingAfter.HasValue) st.SpacingAfter = baseSt.SpacingAfter;
+                                    if (!st.IndentFirstLine.HasValue && baseSt.IndentFirstLine.HasValue) st.IndentFirstLine = baseSt.IndentFirstLine;
+                                    if (!st.IndentHanging.HasValue && baseSt.IndentHanging.HasValue) st.IndentHanging = baseSt.IndentHanging;
+                                    if (!st.IndentLeft.HasValue && baseSt.IndentLeft.HasValue) st.IndentLeft = baseSt.IndentLeft;
+                                    if (!st.IndentRight.HasValue && baseSt.IndentRight.HasValue) st.IndentRight = baseSt.IndentRight;
+                                    if (!st.HasBottomBorder.HasValue && baseSt.HasBottomBorder.HasValue)
+                                    {
+                                        st.HasBottomBorder = baseSt.HasBottomBorder;
+                                        st.BottomBorderColor = baseSt.BottomBorderColor;
+                                    }
+                                    curBaseId = baseSt.BasedOn;
+                                    depth++;
+                                }
+                            }
+
+                            // Also resolve Normal / default paragraph style defaults
+                            DocxStyleInfo nStyle = null;
+                            if (!string.IsNullOrEmpty(defaultParaStyleId) && stylesDict.ContainsKey(defaultParaStyleId))
+                                nStyle = stylesDict[defaultParaStyleId];
+                            else if (stylesDict.ContainsKey("Normal"))
+                                nStyle = stylesDict["Normal"];
+
+                            if (nStyle != null)
+                            {
                                 if (!string.IsNullOrEmpty(nStyle.FontName)) docDefaultFont = nStyle.FontName;
                                 if (nStyle.FontSize > 0) docDefaultFontSize = nStyle.FontSize;
                             }
@@ -1284,6 +1376,8 @@ namespace GenOffice.Format
             bool paraItalic = false;
             bool paraUnderline = false;
             Color paraColor = Color.Black;
+            float paraWidthScale = 1.0f;
+            float paraCharSpacingPt = 0f;
 
             // 1. Inherit from Paragraph Style (<w:pPr/w:pStyle>) if present
             DocxStyleInfo sInfo = null;
@@ -1299,6 +1393,8 @@ namespace GenOffice.Format
                     if (sInfo.Italic.HasValue) paraItalic = sInfo.Italic.Value;
                     if (sInfo.Underline.HasValue) paraUnderline = sInfo.Underline.Value;
                     if (sInfo.Color.HasValue) paraColor = sInfo.Color.Value;
+                    if (sInfo.CharWidthScale.HasValue) paraWidthScale = sInfo.CharWidthScale.Value;
+                    if (sInfo.CharSpacingPt.HasValue) paraCharSpacingPt = sInfo.CharSpacingPt.Value;
                     if (sInfo.Alignment.HasValue && paraAlignments != null && !paraAlignments.ContainsKey(paraStartIndex))
                     {
                         paraAlignments[paraStartIndex] = sInfo.Alignment.Value;
@@ -1414,8 +1510,6 @@ namespace GenOffice.Format
                 };
             }
 
-
-
             // 7. Check direct paragraph run properties in <w:pPr/w:rPr>
             XmlNode pRPr = p.SelectSingleNode("w:pPr/w:rPr", nsmgr);
             if (pRPr != null)
@@ -1444,6 +1538,20 @@ namespace GenOffice.Format
                 {
                     int halfPts;
                     if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0) paraFontSize = halfPts / 2.0f;
+                }
+                XmlNode wNode = pRPr.SelectSingleNode("w:w", nsmgr);
+                if (wNode != null && wNode.Attributes["w:val"] != null)
+                {
+                    int wPct;
+                    if (int.TryParse(wNode.Attributes["w:val"].Value, out wPct) && wPct > 10 && wPct <= 200)
+                        paraWidthScale = wPct / 100.0f;
+                }
+                XmlNode spcNode = pRPr.SelectSingleNode("w:spacing", nsmgr);
+                if (spcNode != null && spcNode.Attributes["w:val"] != null)
+                {
+                    int spcTwips;
+                    if (int.TryParse(spcNode.Attributes["w:val"].Value, out spcTwips))
+                        paraCharSpacingPt = spcTwips / 20.0f;
                 }
                 XmlNode col = pRPr.SelectSingleNode("w:color", nsmgr);
                 if (col != null && col.Attributes["w:val"] != null)
@@ -1523,6 +1631,7 @@ namespace GenOffice.Format
 
                                 string pfxFont = !string.IsNullOrEmpty(matchedLvl.FontName) ? matchedLvl.FontName : paraFont;
                                 float pfxSize = matchedLvl.FontSize > 0 ? matchedLvl.FontSize : paraFontSize;
+                                pfxSize = ApplyOpenXmlCharacterScaling(pfxSize, paraWidthScale, paraCharSpacingPt);
                                 bool pfxBold = matchedLvl.Bold.HasValue ? matchedLvl.Bold.Value : paraBold;
                                 bool pfxItalic = matchedLvl.Italic.HasValue ? matchedLvl.Italic.Value : paraItalic;
                                 Color pfxColor = matchedLvl.Color.HasValue ? matchedLvl.Color.Value : paraColor;
@@ -1596,7 +1705,7 @@ namespace GenOffice.Format
             }
 
             // 8. Iterate paragraph child nodes (Runs, Drawings, Hyperlinks, etc.)
-            float currentParaFontSize = paraFontSize;
+            float currentParaFontSize = ApplyOpenXmlCharacterScaling(paraFontSize, paraWidthScale, paraCharSpacingPt);
             string currentParaFont = paraFont;
 
             XmlNodeList children = p.SelectNodes("w:r | w:hyperlink | w:smartTag | w:drawing | w:pict | m:oMath | m:oMathPara | mc:AlternateContent | *[local-name()='AlternateContent']", nsmgr);
@@ -1645,9 +1754,11 @@ namespace GenOffice.Format
                         ExtractDrawingImage(objNode, nsmgr, archive, relsToTarget, sb, runs);
                     }
 
-                    // Extract run properties (inheriting current paragraph defaults)
-                    string fontName = currentParaFont;
-                    float fontSize = currentParaFontSize;
+                    // Extract run properties (inheriting paragraph defaults cleanly without run-to-run bleed)
+                    string fontName = paraFont;
+                    float fontSize = paraFontSize;
+                    float runWidthScale = paraWidthScale;
+                    float runCharSpacingPt = paraCharSpacingPt;
                     bool bold = paraBold;
                     bool italic = paraItalic;
                     bool underline = paraUnderline;
@@ -1656,7 +1767,7 @@ namespace GenOffice.Format
                     Color color = paraColor;
                     Color highlight = Color.Transparent;
 
-                    XmlNode rPr = r.SelectSingleNode("w:rPr", nsmgr);
+                    XmlNode rPr = r.SelectSingleNode("w:rPr", nsmgr) ?? r.SelectSingleNode(".//w:r/w:rPr", nsmgr);
                     if (rPr != null)
                     {
                         // 8.1. Check character style <w:rStyle>
@@ -1672,6 +1783,8 @@ namespace GenOffice.Format
                                 if (crStyle.Italic.HasValue) italic = crStyle.Italic.Value;
                                 if (crStyle.Underline.HasValue) underline = crStyle.Underline.Value;
                                 if (crStyle.Color.HasValue) color = crStyle.Color.Value;
+                                if (crStyle.CharWidthScale.HasValue) runWidthScale = crStyle.CharWidthScale.Value;
+                                if (crStyle.CharSpacingPt.HasValue) runCharSpacingPt = crStyle.CharSpacingPt.Value;
                             }
                         }
 
@@ -1718,21 +1831,17 @@ namespace GenOffice.Format
                                 fontName = rFonts.Attributes["w:cs"].Value;
                             else if (rFonts.Attributes["w:eastAsia"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:eastAsia"].Value))
                                 fontName = rFonts.Attributes["w:eastAsia"].Value;
-
-                            currentParaFont = fontName;
                         }
 
                         // 8.5. Font size: check both w:sz (Latin) and w:szCs (Complex Script / Vietnamese)
                         XmlNode sz = rPr.SelectSingleNode("w:sz", nsmgr);
                         XmlNode szCs = rPr.SelectSingleNode("w:szCs", nsmgr);
-                        bool hasExplicitSize = false;
                         if (sz != null && sz.Attributes["w:val"] != null)
                         {
                             int halfPts;
                             if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
                             {
                                 fontSize = halfPts / 2.0f;
-                                hasExplicitSize = true;
                             }
                         }
                         else if (szCs != null && szCs.Attributes["w:val"] != null)
@@ -1741,14 +1850,27 @@ namespace GenOffice.Format
                             if (int.TryParse(szCs.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
                             {
                                 fontSize = halfPts / 2.0f;
-                                hasExplicitSize = true;
                             }
                         }
 
-                        // Keep paragraph font size synchronized so Vietnamese unicode split runs share the same size
-                        if (hasExplicitSize)
+                        // 8.5b. Horizontal character width scale (<w:w>) and condensed character spacing (<w:spacing>)
+                        XmlNode wNode = rPr.SelectSingleNode("w:w", nsmgr);
+                        if (wNode != null && wNode.Attributes["w:val"] != null)
                         {
-                            currentParaFontSize = fontSize;
+                            int wPct;
+                            if (int.TryParse(wNode.Attributes["w:val"].Value, out wPct) && wPct > 10 && wPct <= 200)
+                            {
+                                runWidthScale = wPct / 100.0f;
+                            }
+                        }
+                        XmlNode spcNode = rPr.SelectSingleNode("w:spacing", nsmgr);
+                        if (spcNode != null && spcNode.Attributes["w:val"] != null)
+                        {
+                            int spcTwips;
+                            if (int.TryParse(spcNode.Attributes["w:val"].Value, out spcTwips))
+                            {
+                                runCharSpacingPt = spcTwips / 20.0f;
+                            }
                         }
 
                         // 8.6. Color
@@ -1801,6 +1923,8 @@ namespace GenOffice.Format
                             }
                         }
                     }
+
+                    fontSize = ApplyOpenXmlCharacterScaling(fontSize, runWidthScale, runCharSpacingPt);
 
                     // 8.8. Extract text tokens
                     XmlNodeList tList = r.SelectNodes(".//w:t | .//w:tab | .//w:br | .//w:cr | .//w:sym | .//w:noBreakHyphen", nsmgr);
@@ -4212,7 +4336,7 @@ namespace GenOffice.Format
             int rowIndex = 0;
             int numCols = 0;
 
-            GenOffice.UI.DocTableObject tableObj = new GenOffice.UI.DocTableObject();
+            ZenQOffice.UI.DocTableObject tableObj = new ZenQOffice.UI.DocTableObject();
             XmlNode tblPr = tbl.SelectSingleNode(".//w:tblPr", nsmgr) ?? tbl.SelectSingleNode(".//*[local-name()='tblPr']");
             if (tblPr != null)
             {
@@ -4317,7 +4441,7 @@ namespace GenOffice.Format
                 XmlNodeList tcList = tr.SelectNodes(".//w:tc", nsmgr);
                 if (tcList == null || tcList.Count == 0) continue;
 
-                GenOffice.UI.DocTableRow tableRow = new GenOffice.UI.DocTableRow();
+                ZenQOffice.UI.DocTableRow tableRow = new ZenQOffice.UI.DocTableRow();
                 XmlNode trPr = tr.SelectSingleNode(".//w:trPr", nsmgr) ?? tr.SelectSingleNode(".//*[local-name()='trPr']");
                 if (trPr != null)
                 {
@@ -4341,7 +4465,7 @@ namespace GenOffice.Format
                 for (int tcIdx = 0; tcIdx < tcList.Count; tcIdx++)
                 {
                     XmlNode tc = tcList[tcIdx];
-                    GenOffice.UI.DocTableCell cellObj = new GenOffice.UI.DocTableCell();
+                    ZenQOffice.UI.DocTableCell cellObj = new ZenQOffice.UI.DocTableCell();
 
                     cellObj.HasBorderTop = (rIdx == 0) ? tblHasTop : tblHasInsideH;
                     cellObj.BorderTopStyle = (rIdx == 0) ? tblTopStyle : tblIHStyle;
@@ -4466,45 +4590,6 @@ namespace GenOffice.Format
                         else cellObj.Alignment = 0;
                     }
 
-                    XmlNode firstRPr = tc.SelectSingleNode(".//w:r/w:rPr", nsmgr);
-                    if (firstRPr != null)
-                    {
-                        XmlNode bNode = firstRPr.SelectSingleNode("w:b", nsmgr);
-                        if (bNode != null)
-                        {
-                            var val = bNode.Attributes["w:val"];
-                            cellObj.Bold = (val == null || (val.Value != "0" && val.Value.ToLower() != "false" && val.Value.ToLower() != "none"));
-                        }
-                        XmlNode iNode = firstRPr.SelectSingleNode("w:i", nsmgr);
-                        if (iNode != null)
-                        {
-                            var val = iNode.Attributes["w:val"];
-                            cellObj.Italic = (val == null || (val.Value != "0" && val.Value.ToLower() != "false" && val.Value.ToLower() != "none"));
-                        }
-                        XmlNode rFonts = firstRPr.SelectSingleNode("w:rFonts", nsmgr);
-                        if (rFonts != null)
-                        {
-                            if (rFonts.Attributes["w:ascii"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:ascii"].Value))
-                                cellObj.FontName = rFonts.Attributes["w:ascii"].Value;
-                        }
-                        XmlNode sz = firstRPr.SelectSingleNode("w:sz", nsmgr);
-                        if (sz != null && sz.Attributes["w:val"] != null)
-                        {
-                            int halfPts;
-                            if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
-                                cellObj.FontSize = halfPts / 2.0f;
-                        }
-                        XmlNode col = firstRPr.SelectSingleNode("w:color", nsmgr);
-                        if (col != null && col.Attributes["w:val"] != null)
-                        {
-                            string hex = col.Attributes["w:val"].Value;
-                            if (hex.Length == 6)
-                            {
-                                try { cellObj.TextColor = ColorTranslator.FromHtml("#" + hex); } catch { }
-                            }
-                        }
-                    }
-
                     StringBuilder cellSb = new StringBuilder();
                     XmlNodeList pList = tc.SelectNodes(".//w:p", nsmgr);
                     if (pList != null)
@@ -4553,13 +4638,15 @@ namespace GenOffice.Format
                                 if (cellSb.Length > 0) cellSb.Append("\n");
                                 cellSb.Append(pStr.TrimEnd());
 
-                                // Extract paragraph formatting for this paragraph
-                                string pFont = cellObj.FontName;
-                                float pFontSize = cellObj.FontSize;
+                                // Extract paragraph formatting for this paragraph starting from document defaults
+                                string pFont = docDefaultFont;
+                                float pFontSize = docDefaultFontSize;
+                                float pWidthScale = 1.0f;
+                                float pCharSpacingPt = 0f;
                                 bool pBold = false;
                                 bool pItalic = false;
-                                Color pColor = cellObj.TextColor;
-                                int pAlign = cellObj.Alignment;
+                                Color pColor = Color.Black;
+                                int pAlign = 0;
                                 float pSpacingBefore = 0;
                                 float pSpacingAfter = 0;
                                 float pLineSpacing = 1.0f;
@@ -4579,9 +4666,12 @@ namespace GenOffice.Format
                                             if (sInfo.Bold.HasValue) pBold = sInfo.Bold.Value;
                                             if (sInfo.Italic.HasValue) pItalic = sInfo.Italic.Value;
                                             if (sInfo.Color.HasValue) pColor = sInfo.Color.Value;
+                                            if (sInfo.CharWidthScale.HasValue) pWidthScale = sInfo.CharWidthScale.Value;
+                                            if (sInfo.CharSpacingPt.HasValue) pCharSpacingPt = sInfo.CharSpacingPt.Value;
                                             if (sInfo.Alignment.HasValue) pAlign = sInfo.Alignment.Value;
                                             if (sInfo.SpacingBefore.HasValue) pSpacingBefore = sInfo.SpacingBefore.Value;
                                             if (sInfo.SpacingAfter.HasValue) pSpacingAfter = sInfo.SpacingAfter.Value;
+                                            if (sInfo.LineSpacing.HasValue) pLineSpacing = sInfo.LineSpacing.Value;
                                         }
                                     }
 
@@ -4642,6 +4732,20 @@ namespace GenOffice.Format
                                             if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
                                                 pFontSize = halfPts / 2.0f;
                                         }
+                                        XmlNode wNode = pRPr.SelectSingleNode("w:w", nsmgr);
+                                        if (wNode != null && wNode.Attributes["w:val"] != null)
+                                        {
+                                            int wPct;
+                                            if (int.TryParse(wNode.Attributes["w:val"].Value, out wPct) && wPct > 10 && wPct <= 200)
+                                                pWidthScale = wPct / 100.0f;
+                                        }
+                                        XmlNode spcNode = pRPr.SelectSingleNode("w:spacing", nsmgr);
+                                        if (spcNode != null && spcNode.Attributes["w:val"] != null)
+                                        {
+                                            int spcTwips;
+                                            if (int.TryParse(spcNode.Attributes["w:val"].Value, out spcTwips))
+                                                pCharSpacingPt = spcTwips / 20.0f;
+                                        }
                                         XmlNode rF = pRPr.SelectSingleNode("w:rFonts", nsmgr);
                                         if (rF != null)
                                         {
@@ -4652,38 +4756,105 @@ namespace GenOffice.Format
                                     }
                                 }
 
-                                // Check runs in paragraph p
+                                // Check runs in paragraph p using character-length weighting so a short bold label doesn't bleed into the entire paragraph
+                                string basePFont = pFont;
+                                float basePFontSize = pFontSize;
+                                float basePWidthScale = pWidthScale;
+                                float basePCharSpacingPt = pCharSpacingPt;
+                                bool basePBold = pBold;
+                                bool basePItalic = pItalic;
+                                Color basePColor = pColor;
+
+                                int totalChars = 0;
+                                int boldChars = 0;
+                                int italicChars = 0;
+                                int bestRunWeight = -1;
+                                string domFont = basePFont;
+                                float domFontSize = ApplyOpenXmlCharacterScaling(basePFontSize, basePWidthScale, basePCharSpacingPt);
+                                Color domColor = basePColor;
+
                                 XmlNodeList rList = p.SelectNodes(".//w:r", nsmgr);
                                 if (rList != null && rList.Count > 0)
                                 {
                                     foreach (XmlNode rNode in rList)
                                     {
+                                        int rLen = 0;
+                                        XmlNodeList rtNodes = rNode.SelectNodes(".//w:t", nsmgr);
+                                        if (rtNodes != null)
+                                        {
+                                            foreach (XmlNode rtn in rtNodes)
+                                            {
+                                                if (!string.IsNullOrWhiteSpace(rtn.InnerText))
+                                                    rLen += rtn.InnerText.Trim().Length;
+                                            }
+                                        }
+                                        if (rLen <= 0) continue;
+
+                                        string rFont = basePFont;
+                                        float rSize = basePFontSize;
+                                        float rWScale = basePWidthScale;
+                                        float rCSpacing = basePCharSpacingPt;
+                                        bool rBold = basePBold;
+                                        bool rItalic = basePItalic;
+                                        Color rColor = basePColor;
+
                                         XmlNode rPr = rNode.SelectSingleNode("w:rPr", nsmgr);
                                         if (rPr != null)
                                         {
+                                            XmlNode rStyleNode = rPr.SelectSingleNode("w:rStyle", nsmgr);
+                                            if (rStyleNode != null && rStyleNode.Attributes["w:val"] != null && stylesDict != null)
+                                            {
+                                                DocxStyleInfo crStyle;
+                                                if (stylesDict.TryGetValue(rStyleNode.Attributes["w:val"].Value, out crStyle))
+                                                {
+                                                    if (!string.IsNullOrEmpty(crStyle.FontName)) rFont = crStyle.FontName;
+                                                    if (crStyle.FontSize > 0) rSize = crStyle.FontSize;
+                                                    if (crStyle.Bold.HasValue) rBold = crStyle.Bold.Value;
+                                                    if (crStyle.Italic.HasValue) rItalic = crStyle.Italic.Value;
+                                                    if (crStyle.Color.HasValue) rColor = crStyle.Color.Value;
+                                                    if (crStyle.CharWidthScale.HasValue) rWScale = crStyle.CharWidthScale.Value;
+                                                    if (crStyle.CharSpacingPt.HasValue) rCSpacing = crStyle.CharSpacingPt.Value;
+                                                }
+                                            }
                                             XmlNode b = rPr.SelectSingleNode("w:b", nsmgr);
                                             if (b != null)
                                             {
                                                 var v = b.Attributes["w:val"];
-                                                pBold = (v == null || (v.Value != "0" && v.Value.ToLower() != "false"));
+                                                rBold = (v == null || (v.Value != "0" && v.Value.ToLower() != "false" && v.Value.ToLower() != "none"));
                                             }
                                             XmlNode i = rPr.SelectSingleNode("w:i", nsmgr);
                                             if (i != null)
                                             {
                                                 var v = i.Attributes["w:val"];
-                                                pItalic = (v == null || (v.Value != "0" && v.Value.ToLower() != "false"));
+                                                rItalic = (v == null || (v.Value != "0" && v.Value.ToLower() != "false" && v.Value.ToLower() != "none"));
                                             }
                                             XmlNode sz = rPr.SelectSingleNode("w:sz", nsmgr) ?? rPr.SelectSingleNode("w:szCs", nsmgr);
                                             if (sz != null && sz.Attributes["w:val"] != null)
                                             {
                                                 int halfPts;
                                                 if (int.TryParse(sz.Attributes["w:val"].Value, out halfPts) && halfPts > 0)
-                                                    pFontSize = halfPts / 2.0f;
+                                                    rSize = halfPts / 2.0f;
+                                            }
+                                            XmlNode wNode = rPr.SelectSingleNode("w:w", nsmgr);
+                                            if (wNode != null && wNode.Attributes["w:val"] != null)
+                                            {
+                                                int wPct;
+                                                if (int.TryParse(wNode.Attributes["w:val"].Value, out wPct) && wPct > 10 && wPct <= 200)
+                                                    rWScale = wPct / 100.0f;
+                                            }
+                                            XmlNode spcNode = rPr.SelectSingleNode("w:spacing", nsmgr);
+                                            if (spcNode != null && spcNode.Attributes["w:val"] != null)
+                                            {
+                                                int spcTwips;
+                                                if (int.TryParse(spcNode.Attributes["w:val"].Value, out spcTwips))
+                                                    rCSpacing = spcTwips / 20.0f;
                                             }
                                             XmlNode rF = rPr.SelectSingleNode("w:rFonts", nsmgr);
-                                            if (rF != null && rF.Attributes["w:ascii"] != null && !string.IsNullOrEmpty(rF.Attributes["w:ascii"].Value))
+                                            if (rF != null)
                                             {
-                                                pFont = rF.Attributes["w:ascii"].Value;
+                                                if (rF.Attributes["w:ascii"] != null && !string.IsNullOrEmpty(rF.Attributes["w:ascii"].Value)) rFont = rF.Attributes["w:ascii"].Value;
+                                                else if (rF.Attributes["w:hAnsi"] != null && !string.IsNullOrEmpty(rF.Attributes["w:hAnsi"].Value)) rFont = rF.Attributes["w:hAnsi"].Value;
+                                                else if (rF.Attributes["w:cs"] != null && !string.IsNullOrEmpty(rF.Attributes["w:cs"].Value)) rFont = rF.Attributes["w:cs"].Value;
                                             }
                                             XmlNode col = rPr.SelectSingleNode("w:color", nsmgr);
                                             if (col != null && col.Attributes["w:val"] != null)
@@ -4691,11 +4862,36 @@ namespace GenOffice.Format
                                                 string hex = col.Attributes["w:val"].Value;
                                                 if (hex.Length == 6)
                                                 {
-                                                    try { pColor = ColorTranslator.FromHtml("#" + hex); } catch { }
+                                                    try { rColor = ColorTranslator.FromHtml("#" + hex); } catch { }
                                                 }
                                             }
                                         }
+
+                                        float effRSize = ApplyOpenXmlCharacterScaling(rSize, rWScale, rCSpacing);
+                                        totalChars += rLen;
+                                        if (rBold) boldChars += rLen;
+                                        if (rItalic) italicChars += rLen;
+                                        if (rLen > bestRunWeight)
+                                        {
+                                            bestRunWeight = rLen;
+                                            domFont = rFont;
+                                            domFontSize = effRSize;
+                                            domColor = rColor;
+                                        }
                                     }
+                                }
+
+                                if (totalChars > 0)
+                                {
+                                    pFont = domFont;
+                                    pFontSize = domFontSize;
+                                    pColor = domColor;
+                                    pBold = basePBold || (boldChars * 2 > totalChars);
+                                    pItalic = basePItalic || (italicChars * 2 > totalChars);
+                                }
+                                else
+                                {
+                                    pFontSize = ApplyOpenXmlCharacterScaling(pFontSize, pWidthScale, pCharSpacingPt);
                                 }
 
                                 DocCellParagraph cellPara = new DocCellParagraph
@@ -4813,7 +5009,7 @@ namespace GenOffice.Format
             Dictionary<int, float> paraSpacingsBefore = null,
             Dictionary<int, float> paraSpacingsAfter = null,
             Dictionary<int, ParagraphBorderInfo> paraBorders = null,
-            List<GenOffice.UI.DocTableObject> tables = null,
+            List<ZenQOffice.UI.DocTableObject> tables = null,
             Dictionary<int, float> paraFirstLineIndents = null,
             Dictionary<int, float> paraLeftIndents = null,
             Dictionary<int, float> paraRightIndents = null,
@@ -4973,7 +5169,7 @@ namespace GenOffice.Format
 
                                 if (rows.Count > 0)
                                 {
-                                    GenOffice.UI.DocTableObject docTbl = (tables != null && tblIdx < tables.Count) ? tables[tblIdx] : null;
+                                    ZenQOffice.UI.DocTableObject docTbl = (tables != null && tblIdx < tables.Count) ? tables[tblIdx] : null;
                                     tblIdx++;
 
                                     string tblWVal = (docTbl != null && docTbl.WidthPt > 0) ? (docTbl.WidthPt * 20).ToString() : "0";
@@ -5025,7 +5221,7 @@ namespace GenOffice.Format
                                         for (int cIdx = 0; cIdx < row.Count; cIdx++)
                                         {
                                             string cell = row[cIdx];
-                                            GenOffice.UI.DocTableCell cObj = (docTbl != null && rIdx < docTbl.Rows.Count && cIdx < docTbl.Rows[rIdx].Cells.Count) ? docTbl.Rows[rIdx].Cells[cIdx] : null;
+                                            ZenQOffice.UI.DocTableCell cObj = (docTbl != null && rIdx < docTbl.Rows.Count && cIdx < docTbl.Rows[rIdx].Cells.Count) ? docTbl.Rows[rIdx].Cells[cIdx] : null;
 
                                             string shdHex = null;
                                             if (cObj != null && cObj.BackgroundColor != Color.Transparent && cObj.BackgroundColor != Color.Empty && cObj.BackgroundColor.A > 0)
@@ -5730,6 +5926,24 @@ namespace GenOffice.Format
                         sw.WriteLine("  <Default Extension=\"png\" ContentType=\"image/png\"/>");
                         sw.WriteLine("  <Default Extension=\"jpg\" ContentType=\"image/jpeg\"/>");
                         sw.WriteLine("  <Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>");
+                        sw.WriteLine("  <Default Extension=\"gif\" ContentType=\"image/gif\"/>");
+                        sw.WriteLine("  <Default Extension=\"svg\" ContentType=\"image/svg+xml\"/>");
+                        sw.WriteLine("  <Default Extension=\"mp4\" ContentType=\"video/mp4\"/>");
+                        sw.WriteLine("  <Default Extension=\"mov\" ContentType=\"video/quicktime\"/>");
+                        sw.WriteLine("  <Default Extension=\"wmv\" ContentType=\"video/x-ms-wmv\"/>");
+                        sw.WriteLine("  <Default Extension=\"avi\" ContentType=\"video/x-msvideo\"/>");
+                        sw.WriteLine("  <Default Extension=\"webm\" ContentType=\"video/webm\"/>");
+                        sw.WriteLine("  <Default Extension=\"mkv\" ContentType=\"video/x-matroska\"/>");
+                        sw.WriteLine("  <Default Extension=\"mp3\" ContentType=\"audio/mpeg\"/>");
+                        sw.WriteLine("  <Default Extension=\"wav\" ContentType=\"audio/wav\"/>");
+                        sw.WriteLine("  <Default Extension=\"m4a\" ContentType=\"audio/mp4\"/>");
+                        sw.WriteLine("  <Default Extension=\"wma\" ContentType=\"audio/x-ms-wma\"/>");
+                        sw.WriteLine("  <Default Extension=\"aac\" ContentType=\"audio/aac\"/>");
+                        sw.WriteLine("  <Default Extension=\"ogg\" ContentType=\"audio/ogg\"/>");
+                        if (SlideFontManager.EmbeddedFontFiles.Count > 0)
+                        {
+                            sw.WriteLine("  <Default Extension=\"fntdata\" ContentType=\"application/x-font-data\"/>");
+                        }
                         sw.WriteLine("  <Override PartName=\"/ppt/presentation.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml\"/>");
                         sw.WriteLine("  <Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml\"/>");
                         for (int lay = 1; lay <= 11; lay++)
@@ -5743,8 +5957,29 @@ namespace GenOffice.Format
                         for (int i = 0; i < pres.Slides.Count; i++)
                         {
                             sw.WriteLine(string.Format("  <Override PartName=\"/ppt/slides/slide{0}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>", i + 1));
+                            if (!string.IsNullOrEmpty(pres.Slides[i].SpeakerNotes))
+                            {
+                                sw.WriteLine(string.Format("  <Override PartName=\"/ppt/notesSlides/notesSlide{0}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml\"/>", i + 1));
+                            }
                         }
                         sw.WriteLine("</Types>");
+                    }
+
+                    // 2.1 Write embedded fonts into ppt/fonts/
+                    Dictionary<string, string> fontRels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    int fontRIdCounter = 100;
+                    foreach (var kvp in SlideFontManager.EmbeddedFontFiles)
+                    {
+                        string fontZipPath = "ppt/fonts/" + kvp.Key;
+                        var oldF = archive.GetEntry(fontZipPath);
+                        if (oldF != null) oldF.Delete();
+                        var fEntry = archive.CreateEntry(fontZipPath);
+                        using (Stream fsStream = fEntry.Open())
+                        {
+                            fsStream.Write(kvp.Value, 0, kvp.Value.Length);
+                        }
+                        string rId = "rIdFont" + (fontRIdCounter++);
+                        fontRels[kvp.Key] = rId;
                     }
 
                     // 3. Update ppt/_rels/presentation.xml.rels
@@ -5763,6 +5998,10 @@ namespace GenOffice.Format
                         for (int i = 0; i < pres.Slides.Count; i++)
                         {
                             sw.WriteLine(string.Format("  <Relationship Id=\"rIdSlide{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"slides/slide{1}.xml\"/>", i + 1, i + 1));
+                        }
+                        foreach (var kvp in fontRels)
+                        {
+                            sw.WriteLine(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/font\" Target=\"fonts/{1}\"/>", kvp.Value, kvp.Key));
                         }
                         sw.WriteLine("</Relationships>");
                     }
@@ -5786,6 +6025,20 @@ namespace GenOffice.Format
                         sw.WriteLine("  </p:sldIdLst>");
                         sw.WriteLine(string.Format("  <p:sldSz cx=\"{0}\" cy=\"{1}\" type=\"{2}\"/>", cxEmu, cyEmu, isWide ? "screen16x9" : "screen4x3"));
                         sw.WriteLine("  <p:notesSz cx=\"6858000\" cy=\"9144000\"/>");
+                        if (fontRels.Count > 0)
+                        {
+                            sw.WriteLine("  <p:embeddedFontLst>");
+                            foreach (var kvp in fontRels)
+                            {
+                                string tf = "";
+                                if (!SlideFontManager.EmbeddedFontTypefaces.TryGetValue(kvp.Key, out tf) || string.IsNullOrEmpty(tf))
+                                {
+                                    tf = Path.GetFileNameWithoutExtension(kvp.Key);
+                                }
+                                sw.WriteLine(string.Format("    <p:embeddedFont><p:font typeface=\"{0}\"/><p:regular r:id=\"{1}\"/></p:embeddedFont>", EscapeXml(tf), kvp.Value));
+                            }
+                            sw.WriteLine("  </p:embeddedFontLst>");
+                        }
                         sw.WriteLine("</p:presentation>");
                     }
 
@@ -5795,19 +6048,98 @@ namespace GenOffice.Format
                         SlideNode slide = pres.Slides[i];
                         int slideIndex = i + 1;
 
-                        // Discover images on slide and write media files
+                        // Discover images and media on slide and write media files
                         Dictionary<ShapeNode, string> shapeImgRels = new Dictionary<ShapeNode, string>();
+                        Dictionary<ShapeNode, KeyValuePair<string, string>> shapeVideoRels = new Dictionary<ShapeNode, KeyValuePair<string, string>>();
+                        Dictionary<ShapeNode, KeyValuePair<string, string>> shapeAudioRels = new Dictionary<ShapeNode, KeyValuePair<string, string>>();
                         List<KeyValuePair<string, string>> imgRelsList = new List<KeyValuePair<string, string>>();
+                        List<string> mediaRelXmlLines = new List<string>();
+                        string bgImgRelId = null;
                         int imgCounter = 1;
+                        int mediaCounter = 1;
+
+                        if (slide.BgFillType == BackgroundFillType.Picture && slide.CachedBgImage != null)
+                        {
+                            try
+                            {
+                                byte[] bgBytes = null;
+                                using (MemoryStream bgMs = new MemoryStream())
+                                {
+                                    try
+                                    {
+                                        slide.CachedBgImage.Save(bgMs, System.Drawing.Imaging.ImageFormat.Png);
+                                    }
+                                    catch
+                                    {
+                                        bgMs.SetLength(0);
+                                        using (Bitmap bmpCopy = new Bitmap(slide.CachedBgImage))
+                                        {
+                                            bmpCopy.Save(bgMs, System.Drawing.Imaging.ImageFormat.Png);
+                                        }
+                                    }
+                                    if (bgMs.Length > 0) bgBytes = bgMs.ToArray();
+                                }
+                                if (bgBytes != null && bgBytes.Length > 0)
+                                {
+                                    string bgFilename = string.Format("bg_s{0}.png", slideIndex);
+                                    string bgZipPath = "ppt/media/" + bgFilename;
+                                    var oldBg = archive.GetEntry(bgZipPath);
+                                    if (oldBg != null) oldBg.Delete();
+                                    ZipArchiveEntry bgZip = archive.CreateEntry(bgZipPath);
+                                    using (Stream bs = bgZip.Open())
+                                    {
+                                        bs.Write(bgBytes, 0, bgBytes.Length);
+                                    }
+                                    bgImgRelId = "rIdBg1";
+                                    imgRelsList.Add(new KeyValuePair<string, string>(bgImgRelId, "../media/" + bgFilename));
+                                }
+                            }
+                            catch { }
+                        }
 
                         foreach (ShapeNode shape in slide.Shapes)
                         {
-                            if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
+                            bool isVideoShape = (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath));
+                            bool isAudioShape = (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath));
+
+                            if (shape.Type == ShapeType.Image || isVideoShape || isAudioShape || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
                             {
                                 Image img = shape.CachedImage;
+                                bool disposeLoadedImg = false;
                                 if (img == null && !string.IsNullOrEmpty(shape.ImagePath) && File.Exists(shape.ImagePath))
                                 {
-                                    try { img = Image.FromFile(shape.ImagePath); } catch { }
+                                    try
+                                    {
+                                        using (Image tmpImg = Image.FromFile(shape.ImagePath))
+                                        {
+                                            img = new Bitmap(tmpImg);
+                                            disposeLoadedImg = true;
+                                        }
+                                    }
+                                    catch { }
+                                }
+                                if (img == null && isVideoShape && !string.IsNullOrEmpty(shape.VideoPath) && File.Exists(shape.VideoPath))
+                                {
+                                    try
+                                    {
+                                        img = VideoThumbnailHelper.GetVideoPosterFrame(shape.VideoPath);
+                                        shape.CachedImage = img;
+                                    }
+                                    catch { }
+                                }
+                                if (img == null && (isVideoShape || isAudioShape))
+                                {
+                                    try
+                                    {
+                                        Bitmap fallbackBmp = new Bitmap(64, 64);
+                                        using (Graphics fg = Graphics.FromImage(fallbackBmp))
+                                        {
+                                            fg.Clear(isVideoShape ? Color.Black : Color.FromArgb(240, 244, 248));
+                                        }
+                                        img = fallbackBmp;
+                                        disposeLoadedImg = true;
+                                    }
+                                    catch { }
                                 }
                                 if (img != null)
                                 {
@@ -5815,40 +6147,165 @@ namespace GenOffice.Format
                                     string imgZipPath = "ppt/media/" + imgFilename;
                                     try
                                     {
-                                        ZipArchiveEntry imgZip = archive.CreateEntry(imgZipPath);
-                                        using (Stream isStream = imgZip.Open())
+                                        byte[] pngBytes = null;
+                                        using (MemoryStream pngMs = new MemoryStream())
                                         {
-                                            img.Save(isStream, System.Drawing.Imaging.ImageFormat.Png);
+                                            try
+                                            {
+                                                img.Save(pngMs, System.Drawing.Imaging.ImageFormat.Png);
+                                            }
+                                            catch
+                                            {
+                                                pngMs.SetLength(0);
+                                                using (Bitmap bmpCopy = new Bitmap(img))
+                                                {
+                                                    bmpCopy.Save(pngMs, System.Drawing.Imaging.ImageFormat.Png);
+                                                }
+                                            }
+                                            if (pngMs.Length > 0) pngBytes = pngMs.ToArray();
                                         }
-                                        string rId = string.Format("rIdPic{0}", imgCounter);
-                                        shapeImgRels[shape] = rId;
-                                        imgRelsList.Add(new KeyValuePair<string, string>(rId, "../media/" + imgFilename));
-                                        imgCounter++;
+                                        if (pngBytes != null && pngBytes.Length > 0)
+                                        {
+                                            var oldImg = archive.GetEntry(imgZipPath);
+                                            if (oldImg != null) oldImg.Delete();
+                                            ZipArchiveEntry imgZip = archive.CreateEntry(imgZipPath);
+                                            using (Stream isStream = imgZip.Open())
+                                            {
+                                                isStream.Write(pngBytes, 0, pngBytes.Length);
+                                            }
+                                            string rId = string.Format("rIdPic{0}", imgCounter);
+                                            shapeImgRels[shape] = rId;
+                                            imgRelsList.Add(new KeyValuePair<string, string>(rId, "../media/" + imgFilename));
+                                            imgCounter++;
+                                        }
                                     }
                                     catch { }
+                                    finally
+                                    {
+                                        if (disposeLoadedImg && img != null)
+                                        {
+                                            try { img.Dispose(); } catch { }
+                                        }
+                                    }
                                 }
+                            }
+
+                            if (isVideoShape && !string.IsNullOrEmpty(shape.VideoPath) && File.Exists(shape.VideoPath))
+                            {
+                                try
+                                {
+                                    string vExt = Path.GetExtension(shape.VideoPath);
+                                    if (string.IsNullOrEmpty(vExt)) vExt = ".mp4";
+                                    string vFilename = string.Format("media_s{0}_{1}{2}", slideIndex, mediaCounter, vExt.ToLowerInvariant());
+                                    string vZipPath = "ppt/media/" + vFilename;
+                                    var oldV = archive.GetEntry(vZipPath);
+                                    if (oldV != null) oldV.Delete();
+                                    ZipArchiveEntry vZip = archive.CreateEntry(vZipPath, CompressionLevel.NoCompression);
+                                    using (FileStream vIn = new FileStream(shape.VideoPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                                    using (Stream vOut = vZip.Open())
+                                    {
+                                        vIn.CopyTo(vOut);
+                                    }
+                                    string rIdVid = string.Format("rIdVid{0}", mediaCounter);
+                                    string rIdMedia = string.Format("rIdMedia{0}", mediaCounter);
+                                    shapeVideoRels[shape] = new KeyValuePair<string, string>(rIdVid, rIdMedia);
+                                    mediaRelXmlLines.Add(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/video\" Target=\"../media/{1}\"/>", rIdVid, vFilename));
+                                    mediaRelXmlLines.Add(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.microsoft.com/office/2007/relationships/media\" Target=\"../media/{1}\"/>", rIdMedia, vFilename));
+                                    mediaCounter++;
+                                }
+                                catch { }
+                            }
+                            else if (isAudioShape && !string.IsNullOrEmpty(shape.AudioPath) && File.Exists(shape.AudioPath))
+                            {
+                                try
+                                {
+                                    string aExt = Path.GetExtension(shape.AudioPath);
+                                    if (string.IsNullOrEmpty(aExt)) aExt = ".mp3";
+                                    string aFilename = string.Format("audio_s{0}_{1}{2}", slideIndex, mediaCounter, aExt.ToLowerInvariant());
+                                    string aZipPath = "ppt/media/" + aFilename;
+                                    var oldA = archive.GetEntry(aZipPath);
+                                    if (oldA != null) oldA.Delete();
+                                    ZipArchiveEntry aZip = archive.CreateEntry(aZipPath, CompressionLevel.NoCompression);
+                                    using (FileStream aIn = new FileStream(shape.AudioPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                                    using (Stream aOut = aZip.Open())
+                                    {
+                                        aIn.CopyTo(aOut);
+                                    }
+                                    string rIdAud = string.Format("rIdAud{0}", mediaCounter);
+                                    string rIdMedia = string.Format("rIdMedia{0}", mediaCounter);
+                                    shapeAudioRels[shape] = new KeyValuePair<string, string>(rIdAud, rIdMedia);
+                                    mediaRelXmlLines.Add(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio\" Target=\"../media/{1}\"/>", rIdAud, aFilename));
+                                    mediaRelXmlLines.Add(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.microsoft.com/office/2007/relationships/media\" Target=\"../media/{1}\"/>", rIdMedia, aFilename));
+                                    mediaCounter++;
+                                }
+                                catch { }
                             }
                         }
 
+                        bool hasNotes = !string.IsNullOrEmpty(slide.SpeakerNotes);
+
                         // Write slide rels
-                        ZipArchiveEntry sRelEntry = archive.CreateEntry(string.Format("ppt/slides/_rels/slide{0}.xml.rels", slideIndex));
+                        string sRelPath = string.Format("ppt/slides/_rels/slide{0}.xml.rels", slideIndex);
+                        var oldSRel = archive.GetEntry(sRelPath);
+                        if (oldSRel != null) oldSRel.Delete();
+                        ZipArchiveEntry sRelEntry = archive.CreateEntry(sRelPath);
                         using (StreamWriter sw = new StreamWriter(sRelEntry.Open(), new UTF8Encoding(false)))
                         {
                             sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
                             sw.WriteLine("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
                             sw.WriteLine("  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/>");
+                            if (hasNotes)
+                            {
+                                sw.WriteLine(string.Format("  <Relationship Id=\"rIdNotes1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide\" Target=\"../notesSlides/notesSlide{0}.xml\"/>", slideIndex));
+                            }
                             foreach (var ir in imgRelsList)
                             {
                                 sw.WriteLine(string.Format("  <Relationship Id=\"{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"{1}\"/>", ir.Key, ir.Value));
                             }
+                            foreach (string mRelLine in mediaRelXmlLines)
+                            {
+                                sw.WriteLine(mRelLine);
+                            }
                             sw.WriteLine("</Relationships>");
                         }
 
+                        if (hasNotes)
+                        {
+                            string notesPath = string.Format("ppt/notesSlides/notesSlide{0}.xml", slideIndex);
+                            var oldNotes = archive.GetEntry(notesPath);
+                            if (oldNotes != null) oldNotes.Delete();
+                            ZipArchiveEntry notesEntry = archive.CreateEntry(notesPath);
+                            using (StreamWriter sw = new StreamWriter(notesEntry.Open(), new UTF8Encoding(false)))
+                            {
+                                sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                                sw.WriteLine("<p:notes xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">");
+                                sw.WriteLine("  <p:cSld><p:spTree>");
+                                sw.WriteLine("    <p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>");
+                                sw.WriteLine("    <p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>");
+                                sw.WriteLine("    <p:sp>");
+                                sw.WriteLine("      <p:nvSpPr><p:cNvPr id=\"2\" name=\"Notes Placeholder 1\"/><p:cNvSpPr><a:spLocks noGrp=\"1\"/></p:cNvSpPr><p:nvPr><p:ph type=\"body\" idx=\"1\"/></p:nvPr></p:nvSpPr>");
+                                sw.WriteLine("      <p:spPr/>");
+                                sw.WriteLine("      <p:txBody><a:bodyPr/><a:lstStyle/>");
+                                string[] noteLines = slide.SpeakerNotes.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+                                foreach (string nLine in noteLines)
+                                {
+                                    sw.WriteLine(string.Format("        <a:p><a:r><a:rPr lang=\"vi-VN\" sz=\"1200\"/><a:t>{0}</a:t></a:r></a:p>", EscapeXml(nLine)));
+                                }
+                                sw.WriteLine("      </p:txBody>");
+                                sw.WriteLine("    </p:sp>");
+                                sw.WriteLine("  </p:spTree></p:cSld>");
+                                sw.WriteLine("</p:notes>");
+                            }
+                        }
+
                         // Write slide XML
-                        ZipArchiveEntry slideEntry = archive.CreateEntry(string.Format("ppt/slides/slide{0}.xml", slideIndex));
+                        string sXmlPath = string.Format("ppt/slides/slide{0}.xml", slideIndex);
+                        var oldSXml = archive.GetEntry(sXmlPath);
+                        if (oldSXml != null) oldSXml.Delete();
+                        ZipArchiveEntry slideEntry = archive.CreateEntry(sXmlPath);
                         using (StreamWriter sw = new StreamWriter(slideEntry.Open(), new UTF8Encoding(false)))
                         {
-                            WriteSlideXml(sw, slide, slideIndex, exportScaleX, exportScaleY, shapeImgRels, pres);
+                            WriteSlideXml(sw, slide, slideIndex, exportScaleX, exportScaleY, shapeImgRels, pres, shapeVideoRels, shapeAudioRels, bgImgRelId);
                         }
                     }
                 }
@@ -5923,14 +6380,28 @@ namespace GenOffice.Format
             sw.WriteLine("</p:sldLayout>");
         }
 
-        private static void WriteSlideXml(StreamWriter sw, SlideNode slide, int slideIndex, float exportScaleX, float exportScaleY, Dictionary<ShapeNode, string> shapeImgRels, PresentationRoot pres)
+        private static void WriteSlideXml(
+            StreamWriter sw,
+            SlideNode slide,
+            int slideIndex,
+            float exportScaleX,
+            float exportScaleY,
+            Dictionary<ShapeNode, string> shapeImgRels,
+            PresentationRoot pres,
+            Dictionary<ShapeNode, KeyValuePair<string, string>> shapeVideoRels = null,
+            Dictionary<ShapeNode, KeyValuePair<string, string>> shapeAudioRels = null,
+            string bgImgRelId = null)
         {
             sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
             sw.WriteLine("<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">");
             sw.WriteLine("  <p:cSld>");
 
             // 1. Slide Background
-            if (slide.IsGradientBg)
+            if (!string.IsNullOrEmpty(bgImgRelId))
+            {
+                sw.WriteLine(string.Format("    <p:bg><p:bgPr><a:blipFill><a:blip r:embed=\"{0}\"/><a:stretch><a:fillRect/></a:stretch></a:blipFill></p:bgPr></p:bg>", bgImgRelId));
+            }
+            else if (slide.IsGradientBg)
             {
                 int c1 = slide.BgColor;
                 int c2 = slide.BgColor2;
@@ -5985,12 +6456,23 @@ namespace GenOffice.Format
                 long extW = Math.Max(9525L, (long)(shape.Transform.Width * exportScaleX * 9525.0f));
                 long extH = Math.Max(9525L, (long)(shape.Transform.Height * exportScaleY * 9525.0f));
 
-                // Case A: Pictures (<p:pic>)
+                // Case A: Pictures & Media (<p:pic>)
                 if (shapeImgRels.ContainsKey(shape))
                 {
                     string rId = shapeImgRels[shape];
+                    string nvPrXml = "<p:nvPr/>";
+                    if (shapeVideoRels != null && shapeVideoRels.ContainsKey(shape))
+                    {
+                        var vr = shapeVideoRels[shape];
+                        nvPrXml = string.Format("<p:nvPr><a:videoFile r:link=\"{0}\"/><p:extLst><p:ext uri=\"{{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}}\"><p14:media xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" r:embed=\"{1}\"/></p:ext></p:extLst></p:nvPr>", vr.Key, vr.Value);
+                    }
+                    else if (shapeAudioRels != null && shapeAudioRels.ContainsKey(shape))
+                    {
+                        var ar = shapeAudioRels[shape];
+                        nvPrXml = string.Format("<p:nvPr><a:audioFile r:link=\"{0}\"/><p:extLst><p:ext uri=\"{{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}}\"><p14:media xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" r:embed=\"{1}\"/></p:ext></p:extLst></p:nvPr>", ar.Key, ar.Value);
+                    }
                     sw.WriteLine("      <p:pic>");
-                    sw.WriteLine(string.Format("        <p:nvPicPr><p:cNvPr id=\"{0}\" name=\"{1}\"/><p:cNvPicPr><a:picLocks noChangeAspect=\"0\"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>", spId, EscapeXml(shapeName)));
+                    sw.WriteLine(string.Format("        <p:nvPicPr><p:cNvPr id=\"{0}\" name=\"{1}\"/><p:cNvPicPr><a:picLocks noChangeAspect=\"0\"/></p:cNvPicPr>{2}</p:nvPicPr>", spId, EscapeXml(shapeName), nvPrXml));
                     string srcRectXml = "";
                     if (shape.CropLeft > 0.0001f || shape.CropTop > 0.0001f || shape.CropRight > 0.0001f || shape.CropBottom > 0.0001f)
                     {
@@ -6864,12 +7346,13 @@ namespace GenOffice.Format
                     // Read Theme (Major/Minor Fonts)
                     string majorFont = "Calibri Light";
                     string minorFont = "Calibri";
+                    XmlDocument thDoc = null;
                     ZipArchiveEntry themeEntry = archive.GetEntry("ppt/theme/theme1.xml");
                     if (themeEntry != null)
                     {
                         try
                         {
-                            XmlDocument thDoc = new XmlDocument();
+                            thDoc = new XmlDocument();
                             using (Stream ths = themeEntry.Open()) thDoc.Load(ths);
                             XmlNode majLatin = thDoc.SelectSingleNode("//*[local-name()='fontScheme']/*[local-name()='majorFont']/*[local-name()='latin']");
                             if (majLatin != null && majLatin.Attributes["typeface"] != null && !string.IsNullOrEmpty(majLatin.Attributes["typeface"].Value))
@@ -6976,6 +7459,66 @@ namespace GenOffice.Format
                                             }
                                         }
                                     }
+
+                                    // Load Speaker Notes if linked via notesSlide relationship
+                                    XmlNode notesRel = rDoc.SelectSingleNode("//*[local-name()='Relationship'][contains(@Type, 'notesSlide')]");
+                                    if (notesRel != null && notesRel.Attributes["Target"] != null)
+                                    {
+                                        string nTarget = notesRel.Attributes["Target"].Value.Replace('\\', '/');
+                                        if (nTarget.StartsWith("../")) nTarget = "ppt/" + nTarget.Substring(3);
+                                        else if (!nTarget.StartsWith("ppt/")) nTarget = "ppt/slides/" + nTarget;
+                                        ZipArchiveEntry nEntry = archive.GetEntry(nTarget);
+                                        if (nEntry != null)
+                                        {
+                                            try
+                                            {
+                                                XmlDocument nDoc = new XmlDocument() { PreserveWhitespace = true };
+                                                using (Stream ns = nEntry.Open()) nDoc.Load(ns);
+                                                XmlNodeList nShapes = nDoc.SelectNodes("//*[local-name()='sp']");
+                                                if (nShapes != null)
+                                                {
+                                                    StringBuilder notesSb = new StringBuilder();
+                                                    foreach (XmlNode nSp in nShapes)
+                                                    {
+                                                        XmlNode phNode = nSp.SelectSingleNode(".//*[local-name()='ph']");
+                                                        string phType = (phNode != null && phNode.Attributes["type"] != null) ? phNode.Attributes["type"].Value : "";
+                                                        if (phType == "sldImg" || phType == "sldNum" || phType == "dt" || phType == "hdr" || phType == "ftr")
+                                                            continue;
+                                                        XmlNode txBody = nSp.SelectSingleNode(".//*[local-name()='txBody']");
+                                                        if (txBody != null)
+                                                        {
+                                                            XmlNodeList pNodes = txBody.SelectNodes(".//*[local-name()='p']");
+                                                            if (pNodes != null && pNodes.Count > 0)
+                                                            {
+                                                                List<string> pLines = new List<string>();
+                                                                foreach (XmlNode pNode in pNodes)
+                                                                {
+                                                                    StringBuilder pSb = new StringBuilder();
+                                                                    XmlNodeList tNodes = pNode.SelectNodes(".//*[local-name()='t']");
+                                                                    if (tNodes != null)
+                                                                    {
+                                                                        foreach (XmlNode tN in tNodes) pSb.Append(tN.InnerText);
+                                                                    }
+                                                                    pLines.Add(pSb.ToString());
+                                                                }
+                                                                string joined = string.Join("\n", pLines.ToArray()).Trim('\r', '\n');
+                                                                if (!string.IsNullOrEmpty(joined))
+                                                                {
+                                                                    if (notesSb.Length > 0) notesSb.Append("\n");
+                                                                    notesSb.Append(joined);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    if (notesSb.Length > 0)
+                                                    {
+                                                        slide.SpeakerNotes = notesSb.ToString();
+                                                    }
+                                                }
+                                            }
+                                            catch { }
+                                        }
+                                    }
                                 }
                                 catch { }
                             }
@@ -7050,7 +7593,7 @@ namespace GenOffice.Format
                             ParseSlideAnimations(sDoc, slide);
 
                             // 2e. Import Slide Background (<p:bg>)
-                            ParseSlideBackground(sDoc, layoutDoc, masterDoc, slide, archive, relEntry);
+                            ParseSlideBackground(sDoc, layoutDoc, masterDoc, slide, archive, relEntry, thDoc, pres);
 
                             pres.Slides.Add(slide);
                         }
@@ -7094,7 +7637,7 @@ namespace GenOffice.Format
             return defaultAlpha;
         }
 
-        private static void ParseSlideBackground(XmlDocument sDoc, XmlDocument layoutDoc, XmlDocument masterDoc, SlideNode slide, ZipArchive archive = null, ZipArchiveEntry relEntry = null)
+        private static void ParseSlideBackground(XmlDocument sDoc, XmlDocument layoutDoc, XmlDocument masterDoc, SlideNode slide, ZipArchive archive = null, ZipArchiveEntry relEntry = null, XmlDocument themeDoc = null, PresentationRoot pres = null)
         {
             XmlNode bgNode = sDoc != null ? sDoc.SelectSingleNode("//*[local-name()='bg']") : null;
             if (bgNode == null && layoutDoc != null) bgNode = layoutDoc.SelectSingleNode("//*[local-name()='bg']");
@@ -7134,7 +7677,10 @@ namespace GenOffice.Format
                                         {
                                             using (Stream isStream = imgZip.Open()) isStream.CopyTo(ms);
                                             ms.Position = 0;
-                                            slide.CachedBgImage = Image.FromStream(ms);
+                                            using (Image rawImg = Image.FromStream(ms))
+                                            {
+                                                slide.CachedBgImage = new Bitmap(rawImg);
+                                            }
                                             slide.BgFillType = BackgroundFillType.Picture;
                                             return;
                                         }
@@ -7142,6 +7688,87 @@ namespace GenOffice.Format
                                 }
                             }
                             catch { }
+                        }
+                    }
+                }
+
+                // Theme Background Reference (<p:bgRef>)
+                XmlNode bgRef = bgNode.SelectSingleNode(".//*[local-name()='bgRef']");
+                if (bgRef != null && themeDoc != null)
+                {
+                    int refIdx = 1;
+                    if (bgRef.Attributes["idx"] != null)
+                    {
+                        int parsedIdx;
+                        if (int.TryParse(bgRef.Attributes["idx"].Value, out parsedIdx))
+                        {
+                            refIdx = parsedIdx >= 1001 ? (parsedIdx - 1000) : parsedIdx;
+                        }
+                    }
+                    int phColorVal = ParseColorVal(bgRef, 0xFFFFFF, pres);
+
+                    XmlNode bgFillStyleLst = themeDoc.SelectSingleNode("//*[local-name()='fmtScheme']/*[local-name()='bgFillStyleLst']")
+                                          ?? themeDoc.SelectSingleNode(".//*[local-name()='bgFillStyleLst']");
+                    if (bgFillStyleLst != null && bgFillStyleLst.ChildNodes.Count > 0)
+                    {
+                        int targetIdx = Math.Clamp(refIdx - 1, 0, bgFillStyleLst.ChildNodes.Count - 1);
+                        XmlNode styleNode = bgFillStyleLst.ChildNodes[targetIdx];
+                        if (styleNode != null)
+                        {
+                            XmlNode thGradFill = styleNode.LocalName == "gradFill" ? styleNode : styleNode.SelectSingleNode(".//*[local-name()='gradFill']");
+                            XmlNode thSolidFill = styleNode.LocalName == "solidFill" ? styleNode : styleNode.SelectSingleNode(".//*[local-name()='solidFill']");
+
+                            if (thGradFill != null)
+                            {
+                                slide.IsGradientBg = true;
+                                slide.BgFillType = BackgroundFillType.Gradient;
+                                var gsList = thGradFill.SelectNodes(".//*[local-name()='gs']");
+                                List<GradientStop> stops = new List<GradientStop>();
+                                if (gsList != null && gsList.Count > 0)
+                                {
+                                    foreach (XmlNode gs in gsList)
+                                    {
+                                        int col = ParseColorVal(gs, phColorVal, pres, phColorVal);
+                                        float pos = 0f;
+                                        if (gs.Attributes["pos"] != null)
+                                        {
+                                            float pVal;
+                                            if (float.TryParse(gs.Attributes["pos"].Value, out pVal)) pos = pVal / 100000f;
+                                        }
+                                        float alpha = ParseAlphaVal(gs, 1.0f);
+                                        stops.Add(new GradientStop { Color = col, Position = pos, Transparency = 1.0f - alpha });
+                                    }
+                                }
+                                if (stops.Count >= 2)
+                                {
+                                    slide.BgColor = stops[0].Color;
+                                    slide.BgColor2 = stops[stops.Count - 1].Color;
+                                    slide.BgGradientStops = stops;
+                                }
+                                else
+                                {
+                                    slide.BgColor = phColorVal;
+                                    slide.BgColor2 = phColorVal;
+                                    slide.BgGradientStops = new List<GradientStop> { new GradientStop(phColorVal, 0f), new GradientStop(phColorVal, 1f) };
+                                }
+
+                                XmlNode lin = thGradFill.SelectSingleNode(".//*[local-name()='lin']");
+                                if (lin != null && lin.Attributes["ang"] != null)
+                                {
+                                    int angVal;
+                                    if (int.TryParse(lin.Attributes["ang"].Value, out angVal)) slide.BgGradientAngle = angVal / 60000.0f;
+                                }
+                                return;
+                            }
+                            else if (thSolidFill != null)
+                            {
+                                int col = ParseColorVal(thSolidFill, phColorVal, pres, phColorVal);
+                                slide.IsGradientBg = false;
+                                slide.BgFillType = BackgroundFillType.Solid;
+                                slide.BgColor = col;
+                                slide.BgGradientStops = new List<GradientStop> { new GradientStop(col, 0f), new GradientStop(col, 1f) };
+                                return;
+                            }
                         }
                     }
                 }
@@ -7157,7 +7784,7 @@ namespace GenOffice.Format
                     {
                         foreach (XmlNode gs in gsList)
                         {
-                            int col = ParseColorVal(gs, 0xFFFFFF);
+                            int col = ParseColorVal(gs, 0xFFFFFF, pres);
                             float pos = 0f;
                             if (gs.Attributes["pos"] != null)
                             {
@@ -7177,7 +7804,7 @@ namespace GenOffice.Format
                     }
                     else
                     {
-                        int c1 = ParseColorVal(gradFill, 0x0B0F19);
+                        int c1 = ParseColorVal(gradFill, 0x0B0F19, pres);
                         slide.BgColor = c1;
                         slide.BgColor2 = c1;
                         slide.BgGradientStops = new List<GradientStop> { new GradientStop(c1, 0f), new GradientStop(c1, 1f) };
@@ -7198,7 +7825,7 @@ namespace GenOffice.Format
                 XmlNode solidFill = bgNode.SelectSingleNode(".//*[local-name()='solidFill']");
                 if (solidFill != null)
                 {
-                    int col = ParseColorVal(solidFill, 0xFFFFFF);
+                    int col = ParseColorVal(solidFill, 0xFFFFFF, pres);
                     slide.IsGradientBg = false;
                     slide.BgFillType = BackgroundFillType.Solid;
                     slide.BgColor = col;
@@ -7206,9 +7833,16 @@ namespace GenOffice.Format
                     return;
                 }
             }
+
+            if (pres != null && pres.ThemeColors != null && pres.ThemeColors.TryGetValue("bg1", out int bg1Clr))
+            {
+                slide.BgColor = bg1Clr;
+                slide.IsGradientBg = false;
+                slide.BgFillType = BackgroundFillType.Solid;
+            }
         }
 
-        private static int ParseColorVal(XmlNode parentNode, int defaultColor = 0x000000, PresentationRoot pres = null)
+        private static int ParseColorVal(XmlNode parentNode, int defaultColor = 0x000000, PresentationRoot pres = null, int? phClr = null)
         {
             if (parentNode == null) return defaultColor;
             XmlNode srgbClr = parentNode.SelectSingleNode(".//*[local-name()='srgbClr']");
@@ -7225,7 +7859,11 @@ namespace GenOffice.Format
             {
                 string sVal = schemeClr.Attributes["val"].Value.ToLower();
                 int clr = defaultColor;
-                if (pres != null && pres.ThemeColors != null && pres.ThemeColors.TryGetValue(sVal, out int thClr))
+                if (sVal == "phclr" && phClr.HasValue)
+                {
+                    clr = phClr.Value;
+                }
+                else if (pres != null && pres.ThemeColors != null && pres.ThemeColors.TryGetValue(sVal, out int thClr))
                 {
                     clr = thClr;
                 }
@@ -7292,6 +7930,23 @@ namespace GenOffice.Format
                 }
                 return clr;
             }
+
+            XmlNode prstClr = parentNode.SelectSingleNode(".//*[local-name()='prstClr']");
+            if (prstClr != null && prstClr.Attributes["val"] != null)
+            {
+                string cName = prstClr.Attributes["val"].Value;
+                Color named = Color.FromName(cName);
+                if (named.IsKnownColor) return named.ToArgb() & 0x00FFFFFF;
+            }
+
+            XmlNode sysClr = parentNode.SelectSingleNode(".//*[local-name()='sysClr']");
+            if (sysClr != null && sysClr.Attributes["lastClr"] != null)
+            {
+                int lRgb;
+                if (int.TryParse(sysClr.Attributes["lastClr"].Value, System.Globalization.NumberStyles.HexNumber, null, out lRgb))
+                    return lRgb;
+            }
+
             return defaultColor;
         }
 
@@ -7300,66 +7955,106 @@ namespace GenOffice.Format
             pathW = 100f;
             pathH = 100f;
             if (custGeomNode == null) return null;
-            XmlNode pathNode = custGeomNode.SelectSingleNode(".//*[local-name()='path']");
-            if (pathNode == null) return null;
-
-            if (pathNode.Attributes["w"] != null) float.TryParse(pathNode.Attributes["w"].Value, out pathW);
-            if (pathNode.Attributes["h"] != null) float.TryParse(pathNode.Attributes["h"].Value, out pathH);
-            if (pathW <= 0) pathW = 100f;
-            if (pathH <= 0) pathH = 100f;
+            XmlNodeList pathNodes = custGeomNode.SelectNodes(".//*[local-name()='path']");
+            if (pathNodes == null || pathNodes.Count == 0) return null;
 
             GraphicsPath gp = new GraphicsPath();
-            PointF currentPt = PointF.Empty;
 
-            foreach (XmlNode cmd in pathNode.ChildNodes)
+            foreach (XmlNode pathNode in pathNodes)
             {
-                string ln = cmd.LocalName;
-                if (ln == "moveTo")
+                float curW = 100f, curH = 100f;
+                if (pathNode.Attributes["w"] != null) float.TryParse(pathNode.Attributes["w"].Value, out curW);
+                if (pathNode.Attributes["h"] != null) float.TryParse(pathNode.Attributes["h"].Value, out curH);
+                if (curW > pathW) pathW = curW;
+                if (curH > pathH) pathH = curH;
+
+                PointF currentPt = PointF.Empty;
+
+                foreach (XmlNode cmd in pathNode.ChildNodes)
                 {
-                    XmlNode pt = cmd.SelectSingleNode("./*[local-name()='pt']");
-                    if (pt != null && pt.Attributes["x"] != null && pt.Attributes["y"] != null)
+                    string ln = cmd.LocalName;
+                    if (ln == "moveTo")
                     {
-                        float x, y;
-                        float.TryParse(pt.Attributes["x"].Value, out x);
-                        float.TryParse(pt.Attributes["y"].Value, out y);
-                        currentPt = new PointF(x, y);
-                        gp.StartFigure();
+                        XmlNode pt = cmd.SelectSingleNode("./*[local-name()='pt']");
+                        if (pt != null && pt.Attributes["x"] != null && pt.Attributes["y"] != null)
+                        {
+                            float x = 0, y = 0;
+                            float.TryParse(pt.Attributes["x"].Value, out x);
+                            float.TryParse(pt.Attributes["y"].Value, out y);
+                            currentPt = new PointF(x, y);
+                            gp.StartFigure();
+                        }
                     }
-                }
-                else if (ln == "lnTo")
-                {
-                    XmlNode pt = cmd.SelectSingleNode("./*[local-name()='pt']");
-                    if (pt != null && pt.Attributes["x"] != null && pt.Attributes["y"] != null)
+                    else if (ln == "lnTo")
                     {
-                        float x, y;
-                        float.TryParse(pt.Attributes["x"].Value, out x);
-                        float.TryParse(pt.Attributes["y"].Value, out y);
-                        PointF newPt = new PointF(x, y);
-                        gp.AddLine(currentPt, newPt);
-                        currentPt = newPt;
+                        XmlNode pt = cmd.SelectSingleNode("./*[local-name()='pt']");
+                        if (pt != null && pt.Attributes["x"] != null && pt.Attributes["y"] != null)
+                        {
+                            float x = 0, y = 0;
+                            float.TryParse(pt.Attributes["x"].Value, out x);
+                            float.TryParse(pt.Attributes["y"].Value, out y);
+                            PointF newPt = new PointF(x, y);
+                            gp.AddLine(currentPt, newPt);
+                            currentPt = newPt;
+                        }
                     }
-                }
-                else if (ln == "cubicBezTo")
-                {
-                    XmlNodeList pts = cmd.SelectNodes("./*[local-name()='pt']");
-                    if (pts != null && pts.Count >= 3)
+                    else if (ln == "cubicBezTo")
                     {
-                        float x1 = 0, y1 = 0, x2 = 0, y2 = 0, x3 = 0, y3 = 0;
-                        float.TryParse(pts[0].Attributes["x"].Value, out x1);
-                        float.TryParse(pts[0].Attributes["y"].Value, out y1);
-                        float.TryParse(pts[1].Attributes["x"].Value, out x2);
-                        float.TryParse(pts[1].Attributes["y"].Value, out y2);
-                        float.TryParse(pts[2].Attributes["x"].Value, out x3);
-                        float.TryParse(pts[2].Attributes["y"].Value, out y3);
-                        gp.AddBezier(currentPt, new PointF(x1, y1), new PointF(x2, y2), new PointF(x3, y3));
-                        currentPt = new PointF(x3, y3);
+                        XmlNodeList pts = cmd.SelectNodes("./*[local-name()='pt']");
+                        if (pts != null && pts.Count >= 3)
+                        {
+                            float x1 = 0, y1 = 0, x2 = 0, y2 = 0, x3 = 0, y3 = 0;
+                            float.TryParse(pts[0].Attributes["x"].Value, out x1);
+                            float.TryParse(pts[0].Attributes["y"].Value, out y1);
+                            float.TryParse(pts[1].Attributes["x"].Value, out x2);
+                            float.TryParse(pts[1].Attributes["y"].Value, out y2);
+                            float.TryParse(pts[2].Attributes["x"].Value, out x3);
+                            float.TryParse(pts[2].Attributes["y"].Value, out y3);
+                            gp.AddBezier(currentPt, new PointF(x1, y1), new PointF(x2, y2), new PointF(x3, y3));
+                            currentPt = new PointF(x3, y3);
+                        }
                     }
-                }
-                else if (ln == "close")
-                {
-                    gp.CloseFigure();
+                    else if (ln == "quadBezTo")
+                    {
+                        XmlNodeList pts = cmd.SelectNodes("./*[local-name()='pt']");
+                        if (pts != null && pts.Count >= 2)
+                        {
+                            float qx1 = 0, qy1 = 0, qx2 = 0, qy2 = 0;
+                            float.TryParse(pts[0].Attributes["x"].Value, out qx1);
+                            float.TryParse(pts[0].Attributes["y"].Value, out qy1);
+                            float.TryParse(pts[1].Attributes["x"].Value, out qx2);
+                            float.TryParse(pts[1].Attributes["y"].Value, out qy2);
+                            PointF cp1 = new PointF(currentPt.X + 2f / 3f * (qx1 - currentPt.X), currentPt.Y + 2f / 3f * (qy1 - currentPt.Y));
+                            PointF cp2 = new PointF(qx2 + 2f / 3f * (qx1 - qx2), qy2 + 2f / 3f * (qy1 - qy2));
+                            PointF endPt = new PointF(qx2, qy2);
+                            gp.AddBezier(currentPt, cp1, cp2, endPt);
+                            currentPt = endPt;
+                        }
+                    }
+                    else if (ln == "arcTo")
+                    {
+                        float wR = 0, hR = 0, stAng = 0, swAng = 0;
+                        if (cmd.Attributes["wR"] != null) float.TryParse(cmd.Attributes["wR"].Value, out wR);
+                        if (cmd.Attributes["hR"] != null) float.TryParse(cmd.Attributes["hR"].Value, out hR);
+                        if (cmd.Attributes["stAng"] != null) float.TryParse(cmd.Attributes["stAng"].Value, out stAng);
+                        if (cmd.Attributes["swAng"] != null) float.TryParse(cmd.Attributes["swAng"].Value, out swAng);
+                        if (wR > 0 && hR > 0)
+                        {
+                            float startDeg = stAng / 60000.0f;
+                            float sweepDeg = swAng / 60000.0f;
+                            RectangleF arcRect = new RectangleF(currentPt.X - wR, currentPt.Y - hR, wR * 2, hR * 2);
+                            gp.AddArc(arcRect, startDeg, sweepDeg);
+                        }
+                    }
+                    else if (ln == "close")
+                    {
+                        gp.CloseFigure();
+                    }
                 }
             }
+
+            if (pathW <= 0) pathW = 100f;
+            if (pathH <= 0) pathH = 100f;
             return gp;
         }
 
@@ -7415,14 +8110,43 @@ namespace GenOffice.Format
                 if (prstGeom != null && prstGeom.Attributes["prst"] != null)
                 {
                     string pGeom = prstGeom.Attributes["prst"].Value;
-                    if (pGeom == "roundRect") shape.Type = ShapeType.RoundedRectangle;
+                    if (pGeom == "roundRect" || pGeom.StartsWith("round") || pGeom.StartsWith("snip")) shape.Type = ShapeType.RoundedRectangle;
                     else if (pGeom == "ellipse") shape.Type = ShapeType.Ellipse;
                     else if (pGeom == "triangle") shape.Type = ShapeType.Triangle;
+                    else if (pGeom == "rtTriangle") shape.Type = ShapeType.RightTriangle;
                     else if (pGeom == "diamond") shape.Type = ShapeType.Diamond;
-                    else if (pGeom == "star5") shape.Type = ShapeType.Star;
-                    else if (pGeom == "rightArrow") shape.Type = ShapeType.Arrow;
+                    else if (pGeom == "parallelogram") shape.Type = ShapeType.Parallelogram;
+                    else if (pGeom == "trapezoid") shape.Type = ShapeType.Trapezoid;
+                    else if (pGeom == "hexagon") shape.Type = ShapeType.Hexagon;
+                    else if (pGeom == "pentagon" || pGeom == "heptagon") shape.Type = ShapeType.Pentagon;
+                    else if (pGeom == "octagon" || pGeom == "decagon" || pGeom == "dodecagon") shape.Type = ShapeType.Octagon;
+                    else if (pGeom.StartsWith("star")) shape.Type = ShapeType.Star;
+                    else if (pGeom == "rightArrow") shape.Type = ShapeType.BlockArrowRight;
+                    else if (pGeom == "leftArrow") shape.Type = ShapeType.BlockArrowLeft;
+                    else if (pGeom == "upArrow") shape.Type = ShapeType.BlockArrowUp;
+                    else if (pGeom == "downArrow") shape.Type = ShapeType.BlockArrowDown;
+                    else if (pGeom.EndsWith("Arrow")) shape.Type = ShapeType.Arrow;
+                    else if (pGeom == "heart") shape.Type = ShapeType.Heart;
+                    else if (pGeom.Contains("Callout") || pGeom == "callout") shape.Type = ShapeType.Callout;
+                    else if (pGeom.StartsWith("cloud")) shape.Type = ShapeType.Cloud;
+                    else if (pGeom == "chevron" || pGeom == "homePlate") shape.Type = ShapeType.Chevron;
+                    else if (pGeom == "lightningBolt") shape.Type = ShapeType.Lightning;
+                    else if (pGeom == "sun") shape.Type = ShapeType.Sun;
+                    else if (pGeom == "moon") shape.Type = ShapeType.Moon;
+                    else if (pGeom == "smileyFace") shape.Type = ShapeType.Smiley;
+                    else if (pGeom == "donut") shape.Type = ShapeType.Donut;
+                    else if (pGeom == "mathPlus" || pGeom == "plus" || pGeom == "cross") shape.Type = ShapeType.Cross;
+                    else if (pGeom == "cube") shape.Type = ShapeType.Cube;
+                    else if (pGeom == "can") shape.Type = ShapeType.Can;
+                    else if (pGeom == "arc") shape.Type = ShapeType.Arch;
                     else if (pGeom == "line" || pGeom.Contains("Connector")) shape.Type = ShapeType.Line;
-                    else shape.Type = ShapeType.Rectangle;
+                    else
+                    {
+                        XmlNode cNvSpPr = spNode.SelectSingleNode(".//*[local-name()='cNvSpPr']");
+                        bool isTxBox = (cNvSpPr != null && cNvSpPr.Attributes["txBox"] != null &&
+                            (cNvSpPr.Attributes["txBox"].Value == "1" || cNvSpPr.Attributes["txBox"].Value.Equals("true", StringComparison.OrdinalIgnoreCase)));
+                        shape.Type = isTxBox ? ShapeType.TextBox : ShapeType.Rectangle;
+                    }
                 }
             }
 
@@ -7456,6 +8180,23 @@ namespace GenOffice.Format
                 if (long.TryParse(ext.Attributes["cx"].Value, out cxEmu)) shape.Transform.Width = (cxEmu / 9525.0f) * scaleX;
                 if (long.TryParse(ext.Attributes["cy"].Value, out cyEmu)) shape.Transform.Height = (cyEmu / 9525.0f) * scaleY;
                 hasExplicitCoords = true;
+            }
+
+            // Corner radius adjustment (<a:avLst>)
+            XmlNode avLst = spNode.SelectSingleNode(".//*[local-name()='avLst']");
+            if (avLst != null)
+            {
+                XmlNode gd = avLst.SelectSingleNode(".//*[local-name()='gd'][@name='adj']");
+                if (gd != null && gd.Attributes["fmla"] != null)
+                {
+                    string fmla = gd.Attributes["fmla"].Value;
+                    string[] parts = fmla.Split(' ');
+                    if (parts.Length == 2 && long.TryParse(parts[1], out long adjVal))
+                    {
+                        float ratio = adjVal / 100000.0f;
+                        shape.CornerRadius = Math.Min(shape.Transform.Width, shape.Transform.Height) * ratio;
+                    }
+                }
             }
 
             // Rotation and Flips from xfrm
@@ -7517,13 +8258,25 @@ namespace GenOffice.Format
                 XmlNode blip = blipFill.SelectSingleNode(".//*[local-name()='blip']");
                 if (blip != null)
                 {
-                    XmlNode alphaMod = blip.SelectSingleNode(".//*[local-name()='alphaModFix']");
+                    XmlNode alphaMod = blipFill.SelectSingleNode(".//*[local-name()='alphaModFix']");
                     if (alphaMod != null && alphaMod.Attributes["amt"] != null)
                     {
                         float amtVal;
                         if (float.TryParse(alphaMod.Attributes["amt"].Value, out amtVal))
                         {
                             shape.FillOpacity = amtVal / 100000.0f;
+                        }
+                    }
+                    else
+                    {
+                        XmlNode alphaNode = blipFill.SelectSingleNode(".//*[local-name()='alpha']");
+                        if (alphaNode != null && alphaNode.Attributes["val"] != null)
+                        {
+                            float aVal;
+                            if (float.TryParse(alphaNode.Attributes["val"].Value, out aVal))
+                            {
+                                shape.FillOpacity = aVal / 100000.0f;
+                            }
                         }
                     }
 
@@ -7552,8 +8305,34 @@ namespace GenOffice.Format
                                     {
                                         using (Stream isStream = imgZip.Open()) isStream.CopyTo(ms);
                                         ms.Position = 0;
-                                        shape.CachedImage = Image.FromStream(ms);
-                                        if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
+                                        if (target.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            byte[] svgBytes = ms.ToArray();
+                                            string svgText = Encoding.UTF8.GetString(svgBytes);
+                                            int renderW = Math.Max(1200, (int)Math.Max(shape.Transform.Width * 2, 800));
+                                            int renderH = Math.Max(1200, (int)Math.Max(shape.Transform.Height * 2, 800));
+                                            shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
+                                            shape.IsSvg = true;
+                                            shape.IsGraphic = true;
+                                            try
+                                            {
+                                                string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
+                                                if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                                                string tempSvgPath = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".svg");
+                                                File.WriteAllBytes(tempSvgPath, svgBytes);
+                                                shape.ImagePath = tempSvgPath;
+                                            }
+                                            catch { }
+                                            if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
+                                        }
+                                        else
+                                        {
+                                            using (Image rawImg = Image.FromStream(ms))
+                                            {
+                                                shape.CachedImage = new Bitmap(rawImg);
+                                            }
+                                            if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
+                                        }
                                     }
                                 }
                             }
@@ -7574,7 +8353,7 @@ namespace GenOffice.Format
                     shape.GradientStops = new List<GradientStop>();
                     foreach (XmlNode gsNode in gsList)
                     {
-                        int clr = ParseColorVal(gsNode, 0x00FFFFFF);
+                        int clr = ParseColorVal(gsNode, 0x00FFFFFF, pres);
                         float pos = 0f;
                         if (gsNode.Attributes["pos"] != null)
                         {
@@ -7611,7 +8390,7 @@ namespace GenOffice.Format
             XmlNode solidFill = spNode.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='solidFill']");
             if (solidFill != null)
             {
-                shape.FillColor = ParseColorVal(solidFill, 0x00FFFFFF);
+                shape.FillColor = ParseColorVal(solidFill, 0x00FFFFFF, pres);
                 shape.FillOpacity = ParseAlphaVal(solidFill, 1.0f);
             }
 
@@ -7637,6 +8416,17 @@ namespace GenOffice.Format
                     else
                     {
                         shape.StrokeWidth = 1.0f;
+                    }
+
+                    XmlNode prstDash = lnNode.SelectSingleNode(".//*[local-name()='prstDash']");
+                    if (prstDash != null && prstDash.Attributes["val"] != null)
+                    {
+                        string dVal = prstDash.Attributes["val"].Value.ToLowerInvariant();
+                        if (dVal == "dash" || dVal == "sysdash" || dVal == "lgdash") shape.DashStyle = DashStyle.Dash;
+                        else if (dVal == "dot" || dVal == "sysdot") shape.DashStyle = DashStyle.Dot;
+                        else if (dVal == "dashdot" || dVal == "sysdashdot" || dVal == "lgdashdot") shape.DashStyle = DashStyle.DashDot;
+                        else if (dVal == "lgdashdotdot" || dVal == "sysdashdotdot") shape.DashStyle = DashStyle.DashDotDot;
+                        else shape.DashStyle = DashStyle.Solid;
                     }
 
                     if (lnSolidFill != null)
@@ -7690,6 +8480,7 @@ namespace GenOffice.Format
                 if (outerShdw != null)
                 {
                     shape.HasShadow = true;
+                    shape.ShadowColor = ParseColorVal(outerShdw, 0x000000, pres);
                     long dist = 0, blurVal = 0, dir = 0;
                     if (outerShdw.Attributes["dist"] != null) long.TryParse(outerShdw.Attributes["dist"].Value, out dist);
                     if (outerShdw.Attributes["blurRad"] != null) long.TryParse(outerShdw.Attributes["blurRad"].Value, out blurVal);
@@ -8249,7 +9040,179 @@ namespace GenOffice.Format
                 }
             }
 
+            TryDetectAndExtractMedia(spNode, shape, archive, relEntry);
             return shape;
+        }
+
+        private static void TryDetectAndExtractMedia(XmlNode node, ShapeNode shape, ZipArchive archive, ZipArchiveEntry relEntry)
+        {
+            if (node == null || shape == null || archive == null || relEntry == null) return;
+
+            try
+            {
+                // 1. Look for explicit video/audio/media XML elements
+                XmlNode videoNode = node.SelectSingleNode(".//*[local-name()='videoFile'] | .//*[local-name()='quickTimeFile']");
+                XmlNode audioNode = node.SelectSingleNode(".//*[local-name()='audioFile'] | .//*[local-name()='audioCd']");
+                XmlNode mediaNode = node.SelectSingleNode(".//*[local-name()='media']");
+
+                List<string> candidateRelIds = new List<string>();
+
+                Action<XmlNode> addRelFromNode = (n) =>
+                {
+                    if (n == null || n.Attributes == null) return;
+                    foreach (XmlAttribute attr in n.Attributes)
+                    {
+                        if (attr.Value != null && attr.Value.StartsWith("rId") && !candidateRelIds.Contains(attr.Value))
+                        {
+                            candidateRelIds.Add(attr.Value);
+                        }
+                    }
+                };
+
+                addRelFromNode(videoNode);
+                addRelFromNode(audioNode);
+                addRelFromNode(mediaNode);
+
+                // Also check all descendant nodes within nvPr / nvPicPr / nvSpPr
+                XmlNode nvPr = node.SelectSingleNode(".//*[local-name()='nvPr'] | .//*[local-name()='nvPicPr'] | .//*[local-name()='nvSpPr']");
+                if (nvPr != null)
+                {
+                    XmlNodeList allDesc = nvPr.SelectNodes(".//*");
+                    if (allDesc != null)
+                    {
+                        foreach (XmlNode d in allDesc)
+                        {
+                            if (d.Attributes != null)
+                            {
+                                foreach (XmlAttribute a in d.Attributes)
+                                {
+                                    if (a.Value != null && a.Value.StartsWith("rId") && !candidateRelIds.Contains(a.Value))
+                                    {
+                                        candidateRelIds.Add(a.Value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (candidateRelIds.Count == 0) return;
+
+                XmlDocument rDoc = new XmlDocument();
+                using (Stream rs = relEntry.Open()) rDoc.Load(rs);
+
+                string[] videoExts = { ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm", ".flv", ".m4v", ".mpg", ".mpeg", ".3gp", ".ts" };
+                string[] audioExts = { ".mp3", ".wav", ".wma", ".m4a", ".aac", ".ogg", ".flac", ".mid", ".midi", ".aiff" };
+
+                foreach (string rId in candidateRelIds)
+                {
+                    XmlNode relNode = rDoc.SelectSingleNode(string.Format("//*[local-name()='Relationship'][@Id='{0}']", rId));
+                    if (relNode == null || relNode.Attributes["Target"] == null) continue;
+
+                    string target = relNode.Attributes["Target"].Value.Replace('\\', '/');
+                    string relType = (relNode.Attributes["Type"] != null) ? relNode.Attributes["Type"].Value : "";
+
+                    bool isVideo = false;
+                    bool isAudio = false;
+
+                    if (videoNode != null || relType.EndsWith("/video", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isVideo = true;
+                    }
+                    else if (audioNode != null || relType.EndsWith("/audio", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isAudio = true;
+                    }
+                    else
+                    {
+                        string ext = Path.GetExtension(target).ToLowerInvariant();
+                        if (Array.IndexOf(videoExts, ext) >= 0) isVideo = true;
+                        else if (Array.IndexOf(audioExts, ext) >= 0) isAudio = true;
+                    }
+
+                    if (!isVideo && !isAudio) continue;
+
+                    string mediaPath = null;
+                    if (target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mediaPath = target;
+                    }
+                    else
+                    {
+                        string zipTargetPath = target;
+                        if (zipTargetPath.StartsWith("../")) zipTargetPath = "ppt/" + zipTargetPath.Substring(3);
+                        else if (!zipTargetPath.StartsWith("ppt/")) zipTargetPath = "ppt/slides/" + zipTargetPath;
+
+                        ZipArchiveEntry mEntry = archive.GetEntry(zipTargetPath);
+                        if (mEntry == null)
+                        {
+                            foreach (var e in archive.Entries)
+                            {
+                                if (e.FullName.Equals(zipTargetPath, StringComparison.OrdinalIgnoreCase) ||
+                                    e.FullName.EndsWith(Path.GetFileName(zipTargetPath), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    mEntry = e;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (mEntry != null)
+                        {
+                            try
+                            {
+                                string mediaDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
+                                if (!Directory.Exists(mediaDir)) Directory.CreateDirectory(mediaDir);
+                                string mExt = Path.GetExtension(mEntry.FullName);
+                                string safeName = Path.GetFileNameWithoutExtension(mEntry.FullName);
+                                string destFile = Path.Combine(mediaDir, string.Format("{0}_{1}_{2:X8}{3}", safeName, mEntry.Length, mEntry.Crc32, mExt));
+                                if (!File.Exists(destFile) || new FileInfo(destFile).Length != mEntry.Length)
+                                {
+                                    using (Stream inS = mEntry.Open())
+                                    using (FileStream outS = new FileStream(destFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                    {
+                                        inS.CopyTo(outS);
+                                    }
+                                }
+                                mediaPath = destFile;
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(mediaPath))
+                    {
+                        if (isVideo)
+                        {
+                            shape.Type = ShapeType.Video;
+                            shape.VideoPath = mediaPath;
+                            shape.VideoStartMode = VideoStartMode.InClickSequence;
+                            shape.VideoVolume = VideoVolumeLevel.Medium;
+                            shape.VideoVolumeLevel = "Medium";
+                            if (shape.VideoBookmarks == null) shape.VideoBookmarks = new List<float>();
+                            if (shape.CachedImage == null && File.Exists(mediaPath))
+                            {
+                                try { shape.CachedImage = VideoThumbnailHelper.GetVideoPosterFrame(mediaPath); } catch { }
+                            }
+                            break;
+                        }
+                        else if (isAudio)
+                        {
+                            shape.Type = ShapeType.Audio;
+                            shape.AudioPath = mediaPath;
+                            shape.AudioStartMode = VideoStartMode.InClickSequence;
+                            shape.AudioVolume = VideoVolumeLevel.Medium;
+                            if (shape.AudioBookmarks == null) shape.AudioBookmarks = new List<float>();
+                            try { SlideAudioPlayerManager.Instance.InspectAudioDuration(shape); } catch { }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Media extraction error: " + ex.Message);
+            }
         }
 
         private static ShapeNode ExtractPictureNode(XmlNode picNode, ZipArchive archive, ZipArchiveEntry relEntry, float offsetX, float offsetY, float scaleX, float scaleY)
@@ -8378,13 +9341,25 @@ namespace GenOffice.Format
             XmlNode blip = picNode.SelectSingleNode(".//*[local-name()='blip']");
             if (blip != null)
             {
-                XmlNode alphaMod = blip.SelectSingleNode(".//*[local-name()='alphaModFix']");
+                XmlNode alphaMod = picNode.SelectSingleNode(".//*[local-name()='alphaModFix']");
                 if (alphaMod != null && alphaMod.Attributes["amt"] != null)
                 {
                     float amtVal;
                     if (float.TryParse(alphaMod.Attributes["amt"].Value, out amtVal))
                     {
                         picShape.FillOpacity = amtVal / 100000.0f;
+                    }
+                }
+                else
+                {
+                    XmlNode alphaNode = picNode.SelectSingleNode(".//*[local-name()='alpha']");
+                    if (alphaNode != null && alphaNode.Attributes["val"] != null)
+                    {
+                        float aVal;
+                        if (float.TryParse(alphaNode.Attributes["val"].Value, out aVal))
+                        {
+                            picShape.FillOpacity = aVal / 100000.0f;
+                        }
                     }
                 }
 
@@ -8414,7 +9389,32 @@ namespace GenOffice.Format
                                 {
                                     using (Stream isStream = imgZip.Open()) isStream.CopyTo(ms);
                                     ms.Position = 0;
-                                    picShape.CachedImage = Image.FromStream(ms);
+                                    if (target.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        byte[] svgBytes = ms.ToArray();
+                                        string svgText = Encoding.UTF8.GetString(svgBytes);
+                                        int renderW = Math.Max(1200, (int)Math.Max(picShape.Transform.Width * 2, 800));
+                                        int renderH = Math.Max(1200, (int)Math.Max(picShape.Transform.Height * 2, 800));
+                                        picShape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
+                                        picShape.IsSvg = true;
+                                        picShape.IsGraphic = true;
+                                        try
+                                        {
+                                            string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
+                                            if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                                            string tempSvgPath = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".svg");
+                                            File.WriteAllBytes(tempSvgPath, svgBytes);
+                                            picShape.ImagePath = tempSvgPath;
+                                        }
+                                        catch { }
+                                    }
+                                    else
+                                    {
+                                        using (Image rawImg = Image.FromStream(ms))
+                                        {
+                                            picShape.CachedImage = new Bitmap(rawImg);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -8423,6 +9423,7 @@ namespace GenOffice.Format
                 }
             }
 
+            TryDetectAndExtractMedia(picNode, picShape, archive, relEntry);
             return picShape;
         }
 
@@ -8435,6 +9436,8 @@ namespace GenOffice.Format
 
             float gx = 0, gy = 0, gw = 100, gh = 100;
             float cx = 0, cy = 0, cw = 100, ch = 100;
+            float gRot = 0f;
+            bool gFlipH = false, gFlipV = false;
 
             if (xfrm != null)
             {
@@ -8467,6 +9470,25 @@ namespace GenOffice.Format
                     if (long.TryParse(chExt.Attributes["cx"].Value, out cxE)) cw = cxE / 9525.0f;
                     if (long.TryParse(chExt.Attributes["cy"].Value, out cyE)) ch = cyE / 9525.0f;
                 }
+
+                if (xfrm.Attributes["rot"] != null)
+                {
+                    int rVal;
+                    if (int.TryParse(xfrm.Attributes["rot"].Value, out rVal))
+                    {
+                        gRot = rVal / 60000.0f;
+                    }
+                }
+                if (xfrm.Attributes["flipH"] != null)
+                {
+                    string fh = xfrm.Attributes["flipH"].Value;
+                    gFlipH = (fh == "1" || fh.Equals("true", StringComparison.OrdinalIgnoreCase));
+                }
+                if (xfrm.Attributes["flipV"] != null)
+                {
+                    string fv = xfrm.Attributes["flipV"].Value;
+                    gFlipV = (fv == "1" || fv.Equals("true", StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             if (cw <= 0) cw = gw;
@@ -8474,34 +9496,89 @@ namespace GenOffice.Format
 
             float sx = (gw / cw);
             float sy = (gh / ch);
-            float localOffX = parentOffX + (gx - cx * sx) * parentScaleX;
-            float localOffY = parentOffY + (gy - cy * sy) * parentScaleY;
             float localScaleX = parentScaleX * sx;
             float localScaleY = parentScaleY * sy;
 
-            // Extract child shapes, pictures, tables, and nested groups in exact document order
+            // Extract child shapes, pictures, tables, and nested groups
+            List<ShapeNode> localShapes = new List<ShapeNode>();
             foreach (XmlNode child in grpNode.ChildNodes)
             {
                 string ln = child.LocalName;
                 if (ln == "sp" || ln == "cxnSp")
                 {
-                    ShapeNode s = ExtractShapeFromSpNode(child, layoutDoc, masterDoc, pres, localOffX, localOffY, localScaleX, localScaleY, majorFont, minorFont, archive, relEntry);
-                    if (s != null) outShapes.Add(s);
+                    ShapeNode s = ExtractShapeFromSpNode(child, layoutDoc, masterDoc, pres, 0, 0, localScaleX, localScaleY, majorFont, minorFont, archive, relEntry);
+                    if (s != null) localShapes.Add(s);
                 }
                 else if (ln == "pic")
                 {
-                    ShapeNode p = ExtractPictureNode(child, archive, relEntry, localOffX, localOffY, localScaleX, localScaleY);
-                    if (p != null) outShapes.Add(p);
+                    ShapeNode p = ExtractPictureNode(child, archive, relEntry, 0, 0, localScaleX, localScaleY);
+                    if (p != null) localShapes.Add(p);
                 }
                 else if (ln == "graphicFrame")
                 {
-                    ShapeNode gf = ExtractGraphicFrameNode(child, pres, localOffX, localOffY, localScaleX, localScaleY, majorFont, minorFont, archive, relEntry);
-                    if (gf != null) outShapes.Add(gf);
+                    ShapeNode gf = ExtractGraphicFrameNode(child, pres, 0, 0, localScaleX, localScaleY, majorFont, minorFont, archive, relEntry);
+                    if (gf != null) localShapes.Add(gf);
                 }
                 else if (ln == "grpSp")
                 {
-                    ExtractGroupShapes(child, outShapes, layoutDoc, masterDoc, pres, archive, relEntry, localOffX, localOffY, localScaleX, localScaleY, majorFont, minorFont);
+                    ExtractGroupShapes(child, localShapes, layoutDoc, masterDoc, pres, archive, relEntry, 0, 0, localScaleX, localScaleY, majorFont, minorFont);
                 }
+            }
+
+            // Apply this group's position, scale, rotation, and flips
+            float gcx = gx + gw / 2.0f;
+            float gcy = gy + gh / 2.0f;
+            double rad = gRot * Math.PI / 180.0;
+            double cosR = Math.Cos(rad);
+            double sinR = Math.Sin(rad);
+
+            foreach (ShapeNode s in localShapes)
+            {
+                if (s == null || s.Transform == null) continue;
+
+                // Child center in child coordinate space
+                float childCenterX_in_child = (s.Transform.X + s.Transform.Width / 2.0f) / Math.Max(0.0001f, localScaleX);
+                float childCenterY_in_child = (s.Transform.Y + s.Transform.Height / 2.0f) / Math.Max(0.0001f, localScaleY);
+
+                float normX = (childCenterX_in_child - cx) / Math.Max(0.0001f, cw);
+                float normY = (childCenterY_in_child - cy) / Math.Max(0.0001f, ch);
+
+                if (gFlipH)
+                {
+                    normX = 1.0f - normX;
+                    s.Transform.FlipHorizontal = !s.Transform.FlipHorizontal;
+                }
+                if (gFlipV)
+                {
+                    normY = 1.0f - normY;
+                    s.Transform.FlipVertical = !s.Transform.FlipVertical;
+                }
+
+                float posX = gx + normX * gw;
+                float posY = gy + normY * gh;
+
+                float rotatedCenterX, rotatedCenterY;
+                if (Math.Abs(gRot) > 0.001f)
+                {
+                    double dx = posX - gcx;
+                    double dy = posY - gcy;
+                    rotatedCenterX = (float)(gcx + dx * cosR - dy * sinR);
+                    rotatedCenterY = (float)(gcy + dx * sinR + dy * cosR);
+                }
+                else
+                {
+                    rotatedCenterX = posX;
+                    rotatedCenterY = posY;
+                }
+
+                float finalCenterX = parentOffX + rotatedCenterX * parentScaleX;
+                float finalCenterY = parentOffY + rotatedCenterY * parentScaleY;
+
+                s.Transform.X = finalCenterX - s.Transform.Width / 2.0f;
+                s.Transform.Y = finalCenterY - s.Transform.Height / 2.0f;
+                s.Transform.Rotation += gRot;
+
+                outShapes.Add(s);
             }
         }
 
@@ -9113,6 +10190,48 @@ namespace GenOffice.Format
                         continue;
                     }
 
+                    bool isMediaTargetShape = false;
+                    foreach (ShapeNode sh in slide.Shapes)
+                    {
+                        if (sh.Id == targetShapeId)
+                        {
+                            if (sh.Type == ShapeType.Video || sh.Type == ShapeType.Audio || !string.IsNullOrEmpty(sh.VideoPath) || !string.IsNullOrEmpty(sh.AudioPath))
+                            {
+                                isMediaTargetShape = true;
+                            }
+                            if (pClass == "mediacall")
+                            {
+                                XmlNode durNode = cTn.SelectSingleNode(".//*[local-name()='cBhvr']/*[local-name()='cTn'][@dur]");
+                                if (durNode != null && durNode.Attributes["dur"] != null)
+                                {
+                                    long durVal;
+                                    if (long.TryParse(durNode.Attributes["dur"].Value, out durVal) && durVal > 0)
+                                    {
+                                        float tSec = durVal / 1000.0f;
+                                        if (sh.Type == ShapeType.Video) sh.VideoTotalTime = tSec;
+                                        else if (sh.Type == ShapeType.Audio) sh.AudioTotalTime = tSec;
+                                    }
+                                }
+                                if (nodeType == "clickEffect")
+                                {
+                                    sh.VideoStartMode = VideoStartMode.InClickSequence;
+                                    sh.AudioStartMode = VideoStartMode.InClickSequence;
+                                }
+                                else if (nodeType.IndexOf("with", StringComparison.OrdinalIgnoreCase) >= 0 || nodeType.IndexOf("after", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    sh.VideoStartMode = VideoStartMode.Automatically;
+                                    sh.AudioStartMode = VideoStartMode.Automatically;
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    if (pClass == "mediacall" || isMediaTargetShape)
+                    {
+                        continue;
+                    }
+
                     AnimationType aType = MapOpenXmlPresetToAnimationType(pClass, pId, cTn);
                     AnimationTrigger trigger = AnimationTrigger.OnClick;
                     if (nodeType.IndexOf("with", StringComparison.OrdinalIgnoreCase) >= 0) trigger = AnimationTrigger.WithPrevious;
@@ -9146,6 +10265,7 @@ namespace GenOffice.Format
                         string spid = (spTgt != null && spTgt.Attributes["spid"] != null) ? spTgt.Attributes["spid"].Value : "";
 
                         string targetShapeId = "";
+                        bool isMediaTargetShape = false;
                         if (!string.IsNullOrEmpty(spid))
                         {
                             foreach (ShapeNode sh in slide.Shapes)
@@ -9153,11 +10273,15 @@ namespace GenOffice.Format
                                 if (sh.Id == spid || sh.Name == spid || sh.Name == "Shape " + spid || (sh.Name != null && sh.Name.EndsWith(" " + spid)))
                                 {
                                     targetShapeId = sh.Id;
+                                    if (sh.Type == ShapeType.Video || sh.Type == ShapeType.Audio || !string.IsNullOrEmpty(sh.VideoPath) || !string.IsNullOrEmpty(sh.AudioPath))
+                                    {
+                                        isMediaTargetShape = true;
+                                    }
                                     break;
                                 }
                             }
                         }
-                        if (string.IsNullOrEmpty(targetShapeId))
+                        if (string.IsNullOrEmpty(targetShapeId) || isMediaTargetShape)
                         {
                             continue;
                         }
@@ -9187,6 +10311,45 @@ namespace GenOffice.Format
                     }
                 }
             }
+
+            // 3. Parse <p:video> and <p:audio> media settings (<p:cMediaNode>)
+            try
+            {
+                XmlNodeList cMediaNodes = timingNode.SelectNodes(".//*[local-name()='video' or local-name()='audio']/*[local-name()='cMediaNode']");
+                if (cMediaNodes != null)
+                {
+                    foreach (XmlNode mNode in cMediaNodes)
+                    {
+                        XmlNode spT = mNode.SelectSingleNode(".//*[local-name()='spTgt']");
+                        string spid = (spT != null && spT.Attributes["spid"] != null) ? spT.Attributes["spid"].Value : "";
+                        if (!string.IsNullOrEmpty(spid))
+                        {
+                            foreach (ShapeNode mShape in slide.Shapes)
+                            {
+                                if (mShape.Id == spid || mShape.Name == spid || mShape.Name == "Shape " + spid)
+                                {
+                                    if (mNode.Attributes["vol"] != null)
+                                    {
+                                        int v;
+                                        if (int.TryParse(mNode.Attributes["vol"].Value, out v))
+                                        {
+                                            VideoVolumeLevel vol = (v <= 0) ? VideoVolumeLevel.Mute : (v <= 33333) ? VideoVolumeLevel.Low : (v <= 66666) ? VideoVolumeLevel.Medium : VideoVolumeLevel.High;
+                                            mShape.VideoVolume = vol;
+                                            mShape.AudioVolume = vol;
+                                        }
+                                    }
+                                    if (mNode.Attributes["fullScrn"] != null && (mNode.Attributes["fullScrn"].Value == "1" || mNode.Attributes["fullScrn"].Value.Equals("true", StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        mShape.VideoPlayFullScreen = true;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         private static AnimationType MapOpenXmlPresetToAnimationType(string pClass, int pId, XmlNode cTn)
@@ -9297,7 +10460,7 @@ namespace GenOffice.Format
                     for (int i = 0; i < pres.Slides.Count; i++)
                     {
                         SlideNode slide = pres.Slides[i];
-                        sw.WriteLine(string.Format("    <p:sldId id=\"{0}\" title=\"{1}\" transition=\"{2}\">", 256 + i, EscapeXml(slide.Title), slide.Transition.ToString()));
+                        sw.WriteLine(string.Format("    <p:sldId id=\"{0}\" title=\"{1}\" transition=\"{2}\" notes=\"{3}\">", 256 + i, EscapeXml(slide.Title), slide.Transition.ToString(), EscapeXml(slide.SpeakerNotes ?? "")));
                         sw.WriteLine("      <p:spTree>");
 
                         foreach (ShapeNode shape in slide.Shapes)
@@ -9371,6 +10534,10 @@ namespace GenOffice.Format
                             string tStr = sldNode.Attributes["transition"].Value;
                             try { slide.Transition = (TransitionType)Enum.Parse(typeof(TransitionType), tStr, true); }
                             catch { }
+                        }
+                        if (sldNode.Attributes["notes"] != null)
+                        {
+                            slide.SpeakerNotes = sldNode.Attributes["notes"].Value;
                         }
 
                         XmlNodeList spNodes = sldNode.SelectNodes(".//*[local-name()='sp']");

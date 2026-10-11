@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     /// <summary>
     /// Implements export and import routines for Web (HTML) and delimited table formats (TSV, PRN).

@@ -2,9 +2,9 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class TrimVideoForm : Form
     {
@@ -17,7 +17,7 @@ namespace GenOffice.UI
         public float TrimStart { get { return (float)_numStart.Value; } }
         public float TrimEnd { get { return (float)_numEnd.Value; } }
 
-        private WmpAxControl _wmpPlayer;
+        private PictureBox _videoPreviewBox;
 
         public TrimVideoForm(ShapeNode shape)
         {
@@ -54,23 +54,20 @@ namespace GenOffice.UI
             header.Controls.Add(title);
             this.Controls.Add(header);
 
-            // Embedded Video Player Panel
+            // Embedded Video Player Panel (Native WMF Canvas Preview)
             Panel videoContainer = new Panel
             {
                 Location = new Point(20, 54),
                 Size = new Size(544, 210),
                 BackColor = Color.Black
             };
-            try
+            _videoPreviewBox = new PictureBox
             {
-                if (_shape != null && !string.IsNullOrEmpty(_shape.VideoPath) && System.IO.File.Exists(_shape.VideoPath))
-                {
-                    _wmpPlayer = new WmpAxControl();
-                    _wmpPlayer.Dock = DockStyle.Fill;
-                    videoContainer.Controls.Add(_wmpPlayer);
-                }
-            }
-            catch { }
+                Dock = DockStyle.Fill,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Black
+            };
+            videoContainer.Controls.Add(_videoPreviewBox);
             this.Controls.Add(videoContainer);
 
             // Timeline Track Visualizer
@@ -161,35 +158,17 @@ namespace GenOffice.UI
             this.CancelButton = btnCancel;
 
             this.Load += (s, e) => {
-                if (_wmpPlayer != null && _shape != null && !string.IsNullOrEmpty(_shape.VideoPath))
+                if (_shape != null && !string.IsNullOrEmpty(_shape.VideoPath))
                 {
-                    try
-                    {
-                        dynamic ocx = _wmpPlayer.PlayerOcx;
-                        if (ocx != null)
-                        {
-                            ocx.uiMode = "mini";
-                            ocx.settings.autoStart = true;
-                            ocx.URL = _shape.VideoPath;
-                            if (_shape.VideoTrimStart > 0)
-                            {
-                                ocx.controls.currentPosition = (double)_shape.VideoTrimStart;
-                            }
-                        }
-                    }
-                    catch { }
+                    SeekPlayer(_shape.VideoTrimStart > 0 ? (double)_shape.VideoTrimStart : 0.0);
                 }
             };
 
             this.FormClosing += (s, e) => {
-                if (_wmpPlayer != null)
+                if (_videoPreviewBox != null && _videoPreviewBox.Image != null && _videoPreviewBox.Image != _shape?.CachedImage)
                 {
-                    try
-                    {
-                        dynamic ocx = _wmpPlayer.PlayerOcx;
-                        if (ocx != null) ocx.controls.stop();
-                    }
-                    catch { }
+                    try { _videoPreviewBox.Image.Dispose(); } catch { }
+                    _videoPreviewBox.Image = null;
                 }
             };
 
@@ -198,17 +177,30 @@ namespace GenOffice.UI
 
         private void SeekPlayer(double sec)
         {
-            if (_wmpPlayer != null)
+            if (_shape != null && !string.IsNullOrEmpty(_shape.VideoPath) && System.IO.File.Exists(_shape.VideoPath))
             {
                 try
                 {
-                    dynamic ocx = _wmpPlayer.PlayerOcx;
-                    if (ocx != null)
+                    var frame = NativeWmfVideoDecoder.ExtractFrameAtTime(_shape.VideoPath, sec);
+                    if (frame != null)
                     {
-                        ocx.controls.currentPosition = sec;
+                        var old = _videoPreviewBox.Image;
+                        _videoPreviewBox.Image = frame;
+                        if (old != null && old != _shape.CachedImage)
+                        {
+                            try { old.Dispose(); } catch { }
+                        }
+                    }
+                    else if (_videoPreviewBox.Image == null && _shape.CachedImage != null)
+                    {
+                        _videoPreviewBox.Image = _shape.CachedImage;
                     }
                 }
                 catch { }
+            }
+            else if (_videoPreviewBox != null && _shape != null && _shape.CachedImage != null)
+            {
+                _videoPreviewBox.Image = _shape.CachedImage;
             }
         }
 

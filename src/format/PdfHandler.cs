@@ -9,9 +9,9 @@ using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Diagnostics;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public static class PdfHandler
     {

@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
-    /// Cửa sổ Cấu hình AI Copilot Đa nền tảng cho GenOffice.
+    /// Cửa sổ Cấu hình AI Copilot Đa nền tảng cho ZenQOffice.
     /// Cho phép tùy chỉnh Nhà cung cấp (Google AI Studio, Groq, OpenAI, DeepSeek, Ollama, Custom),
     /// Tên Model, Chuỗi API Key, Endpoint, và Kiểm tra kết nối trực tiếp.
     /// </summary>

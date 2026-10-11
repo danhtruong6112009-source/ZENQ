@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     /// <summary>
     /// Legacy Excel 97-2003 (.xls) BIFF8 binary workbook parser.

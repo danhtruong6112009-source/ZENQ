@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public class TextStyleBuffer
     {

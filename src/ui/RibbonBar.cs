@@ -4,13 +4,13 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
-using GenOffice;
-using GenOffice.Core;
-using GenOffice.Format;
+using ZenQOffice;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
-    public enum OfficeAppMode { Home, Writer, Calc, Slides, Pdf }
+    public enum OfficeAppMode { Home, Writer, Calc, Slides, Pdf, Photo }
 
     public class DocTab
     {
@@ -19,11 +19,14 @@ namespace GenOffice.UI
         public bool Active { get; set; }
         public bool IsModified { get; set; }
         public string AiChatSessionId { get; set; }
-        public System.Collections.Generic.List<GenOffice.Core.AiChatMessage> AiChatHistory { get; set; }
+        public System.Collections.Generic.List<ZenQOffice.Core.AiChatMessage> AiChatHistory { get; set; }
         public bool IsAiChatOpen { get; set; }
         public string DraftFile { get; set; }
         public bool NeedsLazyLoad { get; set; }
         public string FilePath { get; set; }
+
+        // State cho Photo & Design
+        public PhotoDocument PhotoData { get; set; }
 
         // State cho Slides
         public PresentationRoot PresentationData { get; set; }
@@ -31,6 +34,20 @@ namespace GenOffice.UI
         public float SlideZoomLevel { get; set; }
         public int SlideCanvasScrollX { get; set; }
         public int SlideCanvasScrollY { get; set; }
+        public float TargetCanvasScrollX { get; set; }
+        public float TargetCanvasScrollY { get; set; }
+        public bool SlideIsSidebarOpen { get; set; }
+        public SidebarPanelType SlideSidebarPanel { get; set; }
+        public bool SlideIsElementsDrawerOpen { get; set; }
+        public bool SlideIsElementsDrawerCollapsed { get; set; }
+        public int SlideElementsDrawerSelectedTab { get; set; } = 1;
+        public int SlideThumbScrollY { get; set; }
+        public float SlideTargetThumbScrollY { get; set; }
+        public int SlideBottomThumbScrollX { get; set; }
+        public float SlideTargetBottomThumbScrollX { get; set; }
+        public ImpressViewMode SlideViewMode { get; set; }
+        public List<PresentationRoot> SlideUndoStack { get; set; }
+        public List<PresentationRoot> SlideRedoStack { get; set; }
 
         // State cho Writer
         public PieceTable WriterPieceTable { get; set; }
@@ -216,6 +233,10 @@ namespace GenOffice.UI
             {
                 PdfData = new PdfDocument(title);
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                PhotoData = new PhotoDocument(1920, 1080, title);
+            }
         }
     }
 
@@ -233,12 +254,20 @@ namespace GenOffice.UI
         public int ActiveRibbonTab { get; set; }
 
         public Control Parent { get; set; }
+        public AppForm HostAppForm { get; set; }
         public float CurrentDpiScale { get; set; }
         public int RibbonTopHeight { get; set; }
+        public int _lastDocAreaX { get; set; } = 120;
+        public int _lastDocAreaW { get; set; } = 800;
 
         public Rectangle CaptionMinBounds { get; set; } = Rectangle.Empty;
         public Rectangle CaptionMaxBounds { get; set; } = Rectangle.Empty;
         public Rectangle CaptionCloseBounds { get; set; } = Rectangle.Empty;
+        public Rectangle CaptionTouchModeBounds { get; set; } = Rectangle.Empty;
+        public Rectangle CaptionPeripheralsBounds { get; set; } = Rectangle.Empty;
+        public Rectangle CaptionMobileConnectBounds { get; set; } = Rectangle.Empty;
+        public Rectangle DocTabScrollLeftBounds = Rectangle.Empty;
+        public Rectangle DocTabScrollRightBounds = Rectangle.Empty;
         public bool IsParentMaximized { get; set; }
 
         public bool OnMouseDown(MouseEventArgs e, Form parentForm = null)
@@ -272,8 +301,16 @@ namespace GenOffice.UI
 
             if (!DocTabPlusBounds.IsEmpty && DocTabPlusBounds.Contains(pt))
             {
-                Point plusCenter = new Point(DocTabPlusBounds.X + DocTabPlusBounds.Width / 2, DocTabPlusBounds.Y + DocTabPlusBounds.Height / 2);
-                NewTabRadialLauncher.Toggle(plusCenter, parentForm as AppForm);
+                AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;
+                if (app != null)
+                {
+                    if (app.BackstageView != null && app.BackstageView.IsOpen)
+                    {
+                        app.CloseBackstageView();
+                    }
+                    Point plusCenter = new Point((DocTabPlusBounds.Left + DocTabPlusBounds.Right) / 2, DocTabPlusBounds.Bottom + 4);
+                    NewTabRadialLauncher.Toggle(plusCenter, app);
+                }
                 if (parentForm != null)
                 {
                     parentForm.Invalidate();
@@ -282,6 +319,22 @@ namespace GenOffice.UI
                 {
                     Parent.Invalidate();
                 }
+                return true;
+            }
+
+            if (!DocTabScrollLeftBounds.IsEmpty && DocTabScrollLeftBounds.Contains(pt))
+            {
+                ScrollDocTabsLeft();
+                if (parentForm != null) parentForm.Invalidate();
+                if (Parent != null) Parent.Invalidate();
+                return true;
+            }
+
+            if (!DocTabScrollRightBounds.IsEmpty && DocTabScrollRightBounds.Contains(pt))
+            {
+                ScrollDocTabsRight();
+                if (parentForm != null) parentForm.Invalidate();
+                if (Parent != null) Parent.Invalidate();
                 return true;
             }
             return false;
@@ -323,6 +376,11 @@ namespace GenOffice.UI
         public float ParagraphIndentRight { get; set; }
         public string WatermarkText { get; set; }
         public bool WatermarkIsDiagonal { get; set; }
+        public Image WatermarkImage { get; set; }
+        public float WatermarkImageScale { get; set; }
+        public bool WatermarkWashout { get; set; } = true;
+        public LineNumberingMode LineNumberMode { get; set; } = LineNumberingMode.None;
+        public bool IsHyphenationEnabled { get; set; } = false;
         public Color PageBgColor { get; set; }
         public bool HasPageBorder { get; set; }
         public Color PageBorderColor { get; set; }
@@ -463,12 +521,61 @@ namespace GenOffice.UI
             return false;
         }
 
+        public int GetMaxTabScroll()
+        {
+            if (DocTabs == null || DocTabs.Count <= 1) return 0;
+            float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+            int tabWidth = (int)Math.Round(175f * dpiScale);
+            int totalDocTabsWidth = Math.Max(0, (DocTabs.Count - 1) * tabWidth);
+            int docAreaW = (_lastDocAreaW > 20) ? _lastDocAreaW : 600;
+            return Math.Max(0, totalDocTabsWidth - docAreaW);
+        }
+
+        public bool ScrollDocTabsLeft(SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
+        {
+            float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+            float step = 175f * dpiScale;
+            if (TargetTabScrollX > 0.5f || TabScrollX > 0.5f)
+            {
+                TargetTabScrollX = Math.Max(0f, TargetTabScrollX - step);
+                TabScrollX = TargetTabScrollX;
+                return true;
+            }
+            if (ActiveDocIndex > 1)
+            {
+                SwitchDocTab(ActiveDocIndex - 1, slidesView, writerView, calcView, pdfView, photoView);
+                return true;
+            }
+            return true;
+        }
+
+        public bool ScrollDocTabsRight(SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
+        {
+            float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+            int maxTabScroll = GetMaxTabScroll();
+            float step = 175f * dpiScale;
+            if (TargetTabScrollX < maxTabScroll - 0.5f || TabScrollX < maxTabScroll - 0.5f)
+            {
+                TargetTabScrollX = Math.Min((float)maxTabScroll, TargetTabScrollX + step);
+                TabScrollX = TargetTabScrollX;
+                return true;
+            }
+            if (DocTabs != null && ActiveDocIndex >= 1 && ActiveDocIndex < DocTabs.Count - 1)
+            {
+                SwitchDocTab(ActiveDocIndex + 1, slidesView, writerView, calcView, pdfView, photoView);
+                return true;
+            }
+            return true;
+        }
+
         public void EnsureActiveTabVisible(int width = 1366)
         {
             if (ActiveDocIndex <= 0) return; // Trang chính luôn cố định ở bên trái
-            int docAreaX = 120;
-            int docAreaW = Math.Max(100, width - docAreaX - 10);
-            int tabWidth = 175;
+            float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+            int tabWidth = (int)Math.Round(175f * dpiScale);
+            int docAreaW = (_lastDocAreaW > 20)
+                ? _lastDocAreaW
+                : Math.Max(100, width - (int)Math.Round(420f * dpiScale));
             int tabOffset = (ActiveDocIndex - 1) * tabWidth;
 
             if (tabOffset - TargetTabScrollX < 0)
@@ -477,11 +584,32 @@ namespace GenOffice.UI
             }
             else if (tabOffset + tabWidth - TargetTabScrollX > docAreaW)
             {
-                TargetTabScrollX = tabOffset + tabWidth - docAreaW + 36;
+                TargetTabScrollX = tabOffset + tabWidth - docAreaW;
             }
-            int totalDocTabsWidth = (DocTabs.Count - 1) * tabWidth + 36;
+            int totalDocTabsWidth = Math.Max(0, (DocTabs.Count - 1) * tabWidth);
             int maxTabScroll = Math.Max(0, totalDocTabsWidth - docAreaW);
             TargetTabScrollX = Math.Max(0, Math.Min(maxTabScroll, TargetTabScrollX));
+            TabScrollX = TargetTabScrollX;
+        }
+
+        public bool OnMouseWheel(MouseEventArgs e, int width = 1366)
+        {
+            if (StandaloneMode || DocTabs == null || DocTabs.Count <= 1) return false;
+            int ribbonTop = (RibbonTopHeight > 0) ? RibbonTopHeight : 36;
+            if (e.Y <= ribbonTop)
+            {
+                float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+                int maxTabScroll = GetMaxTabScroll();
+                if (maxTabScroll > 0)
+                {
+                    // Lăn chuột cuộn ngang mượt mà qua các tài liệu
+                    float deltaScroll = (e.Delta < 0 ? 140f : -140f) * dpiScale;
+                    TargetTabScrollX = Math.Max(0, Math.Min(maxTabScroll, TargetTabScrollX + deltaScroll));
+                    TabScrollX = TargetTabScrollX;
+                    return true;
+                }
+            }
+            return false;
         }
 
         // Tab Drag & Drop Reordering Properties (Kéo thả sắp xếp lại vị trí tab & Tự động cuộn)
@@ -493,11 +621,17 @@ namespace GenOffice.UI
 
         public bool StartTabDrag(int x, int y, int width)
         {
-            if (y > 36) return false;
-            int docAreaX = 120;
-            int captionButtonsWidth = (int)Math.Round(138f * (CurrentDpiScale > 0 ? CurrentDpiScale : 1.0f));
-            int docAreaW = Math.Max(10, width - docAreaX - captionButtonsWidth - 10);
-            Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, 36);
+            int rTop = (RibbonTopHeight > 0) ? RibbonTopHeight : 36;
+            if (y > rTop) return false;
+            if ((!DocTabScrollLeftBounds.IsEmpty && DocTabScrollLeftBounds.Contains(x, y)) ||
+                (!DocTabScrollRightBounds.IsEmpty && DocTabScrollRightBounds.Contains(x, y)) ||
+                (!DocTabPlusBounds.IsEmpty && DocTabPlusBounds.Contains(x, y)))
+            {
+                return false;
+            }
+            int docAreaX = (_lastDocAreaX > 0) ? _lastDocAreaX : 120;
+            int docAreaW = (_lastDocAreaW > 20) ? _lastDocAreaW : Math.Max(10, width - docAreaX - 224);
+            Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, rTop);
 
             if (!docClipRect.Contains(x, y)) return false;
 
@@ -508,7 +642,7 @@ namespace GenOffice.UI
                     // Đang click nút đóng tab (×), không bắt đầu kéo
                     return false;
                 }
-                if (i < DocTabBounds.Count && DocTabBounds[i].Contains(x, y))
+                if (i < DocTabBounds.Count && !DocTabBounds[i].IsEmpty && DocTabBounds[i].Contains(x, y))
                 {
                     DraggingTabIndex = i;
                     DragMouseStartX = x;
@@ -532,8 +666,9 @@ namespace GenOffice.UI
 
             if (IsDraggingTab)
             {
-                int docAreaX = 120;
-                int tabWidth = 175;
+                float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : 1.0f;
+                int docAreaX = (_lastDocAreaX > 0) ? _lastDocAreaX : (int)Math.Round(120f * dpiScale);
+                int tabWidth = (int)Math.Round(175f * dpiScale);
                 float currentTabScroll = TabScrollX;
 
                 // Tính toán chỉ số tab đích để thả vào
@@ -551,10 +686,8 @@ namespace GenOffice.UI
         public bool ProcessDragAutoScroll(int width)
         {
             if (!IsDraggingTab || DraggingTabIndex < 1) return false;
-            int docAreaX = 120;
-            int docAreaW = Math.Max(100, width - docAreaX - 10);
-            int totalDocTabsWidth = (DocTabs.Count - 1) * 175 + 36;
-            int maxTabScroll = Math.Max(0, totalDocTabsWidth - docAreaW);
+            int docAreaX = (_lastDocAreaX > 0) ? _lastDocAreaX : 120;
+            int maxTabScroll = GetMaxTabScroll();
 
             bool scrolled = false;
             if (DragCurrentMouseX < docAreaX + 60)
@@ -565,10 +698,10 @@ namespace GenOffice.UI
                 TargetTabScrollX = Math.Max(0, TargetTabScrollX - speed);
                 scrolled = true;
             }
-            else if (DragCurrentMouseX > width - 70)
+            else if (DragCurrentMouseX > docAreaX + _lastDocAreaW - 40)
             {
                 // Kéo sát mép phải -> Tự động cuộn sang phải
-                float proximity = Math.Max(1f, DragCurrentMouseX - (width - 70));
+                float proximity = Math.Max(1f, DragCurrentMouseX - (docAreaX + _lastDocAreaW - 40));
                 float speed = Math.Min(25f, proximity * 0.4f);
                 TargetTabScrollX = Math.Min(maxTabScroll, TargetTabScrollX + speed);
                 scrolled = true;
@@ -658,6 +791,21 @@ namespace GenOffice.UI
             AvailableSystemFonts.Sort(StringComparer.OrdinalIgnoreCase);
         }
 
+        public void RefreshCustomFonts()
+        {
+            try
+            {
+                foreach (string customFont in SlideFontManager.GetCustomFontNames())
+                {
+                    if (!string.IsNullOrWhiteSpace(customFont) && !AvailableSystemFonts.Contains(customFont))
+                    {
+                        AvailableSystemFonts.Insert(0, customFont);
+                    }
+                }
+            }
+            catch { }
+        }
+
         public Color PrimaryColor
         {
             get
@@ -669,6 +817,7 @@ namespace GenOffice.UI
                     case OfficeAppMode.Calc: return Color.FromArgb(33, 115, 70);
                     case OfficeAppMode.Slides: return Color.FromArgb(210, 71, 38);
                     case OfficeAppMode.Pdf: return Color.FromArgb(220, 38, 38);
+                    case OfficeAppMode.Photo: return Color.FromArgb(99, 102, 241);
                     default: return Color.FromArgb(31, 41, 55);
                 }
             }
@@ -832,18 +981,45 @@ namespace GenOffice.UI
             menu.Show(screenPt);
         }
 
-        public void SaveTabState(int index, SlidesView slidesView, WriterView writerView, CalcView calcView, PdfView pdfView = null)
+        public void SaveTabState(int index, SlidesView slidesView, WriterView writerView, CalcView calcView, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (index < 0 || index >= DocTabs.Count) return;
             DocTab tab = DocTabs[index];
             tab.ActiveRibbonTab = ActiveRibbonTab;
             if (tab.Mode == OfficeAppMode.Slides && slidesView != null)
             {
+                slidesView.HideSearchBox();
                 tab.PresentationData = slidesView.Presentation;
                 tab.ActiveSlideIndex = slidesView.ActiveSlideIndex;
                 tab.SlideZoomLevel = slidesView.ZoomLevel;
                 tab.SlideCanvasScrollX = slidesView.CanvasScrollX;
                 tab.SlideCanvasScrollY = slidesView.CanvasScrollY;
+                tab.TargetCanvasScrollX = slidesView.TargetCanvasScrollX;
+                tab.TargetCanvasScrollY = slidesView.TargetCanvasScrollY;
+                tab.SlideIsSidebarOpen = slidesView.IsSidebarOpen;
+                tab.SlideSidebarPanel = slidesView.SidebarPanel;
+                tab.SlideIsElementsDrawerOpen = slidesView.IsElementsDrawerOpen;
+                tab.SlideIsElementsDrawerCollapsed = slidesView.IsElementsDrawerCollapsed;
+                tab.SlideElementsDrawerSelectedTab = slidesView.ElementsDrawerSelectedTab;
+                tab.SlideThumbScrollY = slidesView.ThumbScrollY;
+                tab.SlideTargetThumbScrollY = slidesView.TargetThumbScrollY;
+                tab.SlideBottomThumbScrollX = slidesView.BottomThumbScrollX;
+                tab.SlideTargetBottomThumbScrollX = slidesView.TargetBottomThumbScrollX;
+                tab.SlideViewMode = slidesView.ViewMode;
+                tab.SlideUndoStack = new List<PresentationRoot>(slidesView.UndoStack);
+                tab.SlideRedoStack = new List<PresentationRoot>(slidesView.RedoStack);
+                try
+                {
+                    if (SlideAudioPlayerManager.Instance.IsPlaying)
+                    {
+                        SlideAudioPlayerManager.Instance.Stop();
+                    }
+                    if (SlideVideoPlayerManager.Instance.IsPlaying)
+                    {
+                        SlideVideoPlayerManager.Instance.Stop();
+                    }
+                }
+                catch { }
             }
             else if (tab.Mode == OfficeAppMode.Writer && writerView != null)
             {
@@ -928,9 +1104,13 @@ namespace GenOffice.UI
                 tab.PdfScrollY = pdfView.ScrollY;
                 tab.PdfSelectedTool = pdfView.SelectedTool;
             }
+            else if (tab.Mode == OfficeAppMode.Photo && photoView != null)
+            {
+                tab.PhotoData = photoView.Document;
+            }
         }
 
-        public void LoadTabState(int index, SlidesView slidesView, WriterView writerView, CalcView calcView, PdfView pdfView = null)
+        public void LoadTabState(int index, SlidesView slidesView, WriterView writerView, CalcView calcView, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (index < 0 || index >= DocTabs.Count) return;
             DocTab tab = DocTabs[index];
@@ -938,7 +1118,7 @@ namespace GenOffice.UI
 
             if (tab.Mode == OfficeAppMode.Slides)
             {
-                RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị" };
+                RibbonTabs = new string[] { "Trang đầu", "Chèn", "Vẽ", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Xem lại", "Hiển thị", "Mở rộng" };
                 ActiveRibbonTab = Math.Max(0, Math.Min(RibbonTabs.Length - 1, tab.ActiveRibbonTab));
                 if (slidesView != null)
                 {
@@ -948,6 +1128,23 @@ namespace GenOffice.UI
                     slidesView.ZoomLevel = tab.SlideZoomLevel > 0 ? tab.SlideZoomLevel : 1.0f;
                     slidesView.CanvasScrollX = tab.SlideCanvasScrollX;
                     slidesView.CanvasScrollY = tab.SlideCanvasScrollY;
+                    slidesView.TargetCanvasScrollX = tab.TargetCanvasScrollX;
+                    slidesView.TargetCanvasScrollY = tab.TargetCanvasScrollY;
+                    slidesView.SmoothCanvasScrollX = tab.SlideCanvasScrollX;
+                    slidesView.SmoothCanvasScrollY = tab.SlideCanvasScrollY;
+                    slidesView.IsSidebarOpen = tab.SlideIsSidebarOpen;
+                    slidesView.SidebarPanel = tab.SlideSidebarPanel;
+                    slidesView.IsElementsDrawerOpen = tab.SlideIsElementsDrawerOpen;
+                    slidesView.IsElementsDrawerCollapsed = tab.SlideIsElementsDrawerCollapsed;
+                    slidesView.ElementsDrawerSelectedTab = tab.SlideElementsDrawerSelectedTab > 0 ? tab.SlideElementsDrawerSelectedTab : 1;
+                    slidesView.ThumbScrollY = tab.SlideThumbScrollY;
+                    slidesView.TargetThumbScrollY = tab.SlideTargetThumbScrollY;
+                    slidesView.SmoothThumbScrollY = tab.SlideTargetThumbScrollY;
+                    slidesView.BottomThumbScrollX = tab.SlideBottomThumbScrollX;
+                    slidesView.TargetBottomThumbScrollX = tab.SlideTargetBottomThumbScrollX;
+                    slidesView.SmoothBottomThumbScrollX = tab.SlideTargetBottomThumbScrollX;
+                    slidesView.ViewMode = tab.SlideViewMode;
+                    slidesView.SetUndoRedoStacks(tab.SlideUndoStack, tab.SlideRedoStack);
                     slidesView.SelectedShapeIndex = -1;
                     if (slidesView.SelectedShapeIndices != null) slidesView.SelectedShapeIndices.Clear();
                     slidesView.EndInlineEditing();
@@ -1067,11 +1264,27 @@ namespace GenOffice.UI
                     pdfView.SelectedTool = tab.PdfSelectedTool;
                 }
             }
+            else if (tab.Mode == OfficeAppMode.Photo)
+            {
+                RibbonTabs = new string[] { "Trang đầu", "Lớp", "Bộ lọc", "Vẽ & Vector", "Văn bản", "Xuất tệp" };
+                ActiveRibbonTab = Math.Max(0, Math.Min(RibbonTabs.Length - 1, tab.ActiveRibbonTab));
+                if (photoView != null)
+                {
+                    if (tab.PhotoData == null) tab.PhotoData = new PhotoDocument(1920, 1080, tab.Title);
+                    photoView.Document = tab.PhotoData;
+                    photoView.SelectedTool = PhotoTool.Move;
+                }
+            }
+            else if (tab.Mode == OfficeAppMode.Home)
+            {
+                RibbonTabs = new string[] { "Trang chính" };
+                ActiveRibbonTab = 0;
+            }
         }
 
-        public void AddDocTab(string title, OfficeAppMode mode, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null)
+        public void AddDocTab(string title, OfficeAppMode mode, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
-            SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+            SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
 
             foreach (var tab in DocTabs) tab.Active = false;
             DocTab newTab = new DocTab(title, mode, true, false);
@@ -1079,12 +1292,17 @@ namespace GenOffice.UI
             if (mode == OfficeAppMode.Slides)
             {
                 newTab.PresentationData = new PresentationRoot();
-                SlideNode defaultSlide = new SlideNode { Layout = SlideLayoutType.TitleSlide };
-                if (slidesView != null)
+                newTab.PresentationData.Slides.Clear();
+                SlideNode blankSlide = new SlideNode
                 {
-                    slidesView.ApplySlideLayoutTemplate(defaultSlide, SlideLayoutType.TitleSlide);
-                }
-                newTab.PresentationData.Slides.Add(defaultSlide);
+                    Title = "Trang 1",
+                    Layout = SlideLayoutType.Blank,
+                    BgColor = 0xFFFFFF,
+                    Shapes = new List<ShapeNode>(),
+                    Transition = TransitionType.None,
+                    TransitionDuration = 0f
+                };
+                newTab.PresentationData.Slides.Add(blankSlide);
             }
             else if (mode == OfficeAppMode.Writer)
             {
@@ -1124,22 +1342,37 @@ namespace GenOffice.UI
                     pdfView.ScrollY = 0f;
                 }
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                newTab.PhotoData = new PhotoDocument(1920, 1080, title);
+                if (photoView != null)
+                {
+                    photoView.Document = newTab.PhotoData;
+                    photoView.SelectedTool = PhotoTool.Move;
+                }
+            }
 
             DocTabs.Add(newTab);
             ActiveDocIndex = DocTabs.Count - 1;
             CurrentMode = mode;
             EnsureActiveTabVisible();
 
-            LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+            LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
         }
 
-        public void SwitchDocTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null)
+        public void SwitchDocTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
+            AppForm app = HostAppForm ?? (Parent as AppForm);
+            if (app != null && app.BackstageView != null && app.BackstageView.IsOpen)
+            {
+                app.CloseBackstageView();
+            }
+
             if (index >= 0 && index < DocTabs.Count)
             {
                 if (index == ActiveDocIndex && DocTabs[index].Active) return;
 
-                SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+                SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
 
                 for (int i = 0; i < DocTabs.Count; i++)
                 {
@@ -1152,16 +1385,16 @@ namespace GenOffice.UI
                 if (DocTabs[index].NeedsLazyLoad)
                 {
                     DocTabs[index].NeedsLazyLoad = false;
-                    LazyLoadTab(index, slidesView, writerView, calcView, pdfView);
+                    LazyLoadTab(index, slidesView, writerView, calcView, pdfView, photoView);
                 }
                 else
                 {
-                    LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+                    LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
                 }
             }
         }
 
-        public void LazyLoadTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null)
+        public void LazyLoadTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (index < 0 || index >= DocTabs.Count) return;
             DocTab tab = DocTabs[index];
@@ -1240,7 +1473,9 @@ namespace GenOffice.UI
                     if (!string.IsNullOrEmpty(target) && System.IO.File.Exists(target))
                     {
                         slidesView.Presentation = Format.PptxHandler.LoadPptx(target);
+                        tab.PresentationData = slidesView.Presentation;
                         slidesView.ActiveSlideIndex = Math.Max(0, Math.Min(slidesView.Presentation.Slides.Count - 1, tab.ActiveSlideIndex));
+                        D2DGraphics.ClearFontCache();
                     }
                     SaveTabState(index, slidesView, writerView, calcView, pdfView);
                 }
@@ -1261,15 +1496,24 @@ namespace GenOffice.UI
                         pdfView.Document = Format.PdfHandler.LoadPdf(tab.FilePath);
                         pdfView.ActivePageIndex = Math.Max(0, Math.Min(pdfView.Document.Pages.Count - 1, tab.PdfActivePageIndex));
                     }
-                    SaveTabState(index, slidesView, writerView, calcView, pdfView);
+                    SaveTabState(index, slidesView, writerView, calcView, pdfView, photoView);
+                }
+                else if (tab.Mode == OfficeAppMode.Photo && photoView != null)
+                {
+                    if (hasFile)
+                    {
+                        photoView.Document = PhotoDocument.LoadFromFile(tab.FilePath);
+                        tab.PhotoData = photoView.Document;
+                    }
+                    SaveTabState(index, slidesView, writerView, calcView, pdfView, photoView);
                 }
             }
             catch { }
 
-            LoadTabState(index, slidesView, writerView, calcView, pdfView);
+            LoadTabState(index, slidesView, writerView, calcView, pdfView, photoView);
         }
 
-        public bool CloseDocTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null)
+        public bool CloseDocTab(int index, SlidesView slidesView = null, WriterView writerView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (index < 0 || index >= DocTabs.Count) return false;
             DocTab tab = DocTabs[index];
@@ -1302,7 +1546,7 @@ namespace GenOffice.UI
             bool wasActive = (index == ActiveDocIndex);
             if (!wasActive)
             {
-                SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+                SaveTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
             }
 
             // Clean up any autosave draft file on disk
@@ -1337,7 +1581,7 @@ namespace GenOffice.UI
             if (ActiveDocIndex >= 0 && ActiveDocIndex < DocTabs.Count)
             {
                 CurrentMode = DocTabs[ActiveDocIndex].Mode;
-                LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView);
+                LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
             }
             return true;
         }
@@ -2093,9 +2337,9 @@ namespace GenOffice.UI
                 g.DrawLine(pArrow, x + 1.5f, arrowY, x + 5.5f, arrowY);
                 // Arrowhead (filled triangle)
                 PointF[] head = new PointF[] {
-                    new PointF(x + 5.5f, arrowY),
-                    new PointF(x + 3.0f, arrowY - 2.5f),
-                    new PointF(x + 3.0f, arrowY + 2.5f)
+                    new PointF(x + 6.0f, arrowY),
+                    new PointF(x + 3.5f, arrowY - 2.5f),
+                    new PointF(x + 3.5f, arrowY + 2.5f)
                 };
                 g.FillPolygon(bArrow, head);
 
@@ -2367,6 +2611,7 @@ namespace GenOffice.UI
             else if (CurrentMode == OfficeAppMode.Calc) appName = "ZenQ Calc";
             else if (CurrentMode == OfficeAppMode.Slides) appName = "ZenQ Slides";
             else if (CurrentMode == OfficeAppMode.Pdf) appName = "ZenQ PDF";
+            else if (CurrentMode == OfficeAppMode.Photo) appName = "ZenQ Photo / Studio";
 
             int appW = 0;
             using (Font appFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
@@ -2442,7 +2687,7 @@ namespace GenOffice.UI
                 SizeF statusSz = g.MeasureString(isModified ? " • Đã sửa đổi" : " - Đã lưu", titleFont);
                 float totalW = titleSz.Width + statusSz.Width;
                 float startX = (width - totalW) / 2;
-                int maxRight = width - (int)Math.Round(138f * dpiScale) - 10;
+                int maxRight = width - (int)Math.Round(214f * dpiScale) - 10;
                 if (startX > curX && startX + totalW < maxRight)
                 {
                     float tY = (ribbonTop - titleSz.Height) / 2;
@@ -2455,21 +2700,74 @@ namespace GenOffice.UI
         private void DrawWindowCaptionButtons(Graphics g, int width, int ribbonTop, float dpiScale, bool isIsland, OfficeAppMode mode)
         {
             int btnW = (int)Math.Round(46f * dpiScale);
+            int utilBtnW = (int)Math.Round(38f * dpiScale);
             int btnH = ribbonTop;
 
             CaptionCloseBounds = new Rectangle(width - btnW, 0, btnW, btnH);
             CaptionMaxBounds = new Rectangle(width - 2 * btnW, 0, btnW, btnH);
             CaptionMinBounds = new Rectangle(width - 3 * btnW, 0, btnW, btnH);
+            CaptionTouchModeBounds = new Rectangle(CaptionMinBounds.X - utilBtnW, 0, utilBtnW, btnH);
+            CaptionPeripheralsBounds = new Rectangle(CaptionTouchModeBounds.X - utilBtnW, 0, utilBtnW, btnH);
+            CaptionMobileConnectBounds = new Rectangle(CaptionPeripheralsBounds.X - utilBtnW, 0, utilBtnW, btnH);
 
             bool isHoverClose = IsHovering(CaptionCloseBounds);
             bool isHoverMax = IsHovering(CaptionMaxBounds);
             bool isHoverMin = IsHovering(CaptionMinBounds);
+            bool isHoverTouch = IsHovering(CaptionTouchModeBounds);
+            bool isHoverPeriph = IsHovering(CaptionPeripheralsBounds);
+            bool isHoverMobile = IsHovering(CaptionMobileConnectBounds);
 
             Color wsBg = (mode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
                          ((mode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
                          Color.FromArgb(238, 238, 238));
             Color normalIconColor = Color.FromArgb(71, 85, 105);
             Color hoverIconColor = Color.FromArgb(15, 23, 42);
+
+            // 0A. Peripheral Hub Button (🔌 Thiết bị Ngoại vi, Máy chiếu, USB & Máy Scan)
+            if (isHoverPeriph || AppSettings.Instance.CalcBarcodeScannerMode)
+            {
+                Color pBg = AppSettings.Instance.CalcBarcodeScannerMode
+                    ? Color.FromArgb(220, 252, 231)
+                    : Color.FromArgb(226, 232, 240);
+                using (SolidBrush hBrush = new SolidBrush(pBg))
+                {
+                    g.FillRectangle(hBrush, CaptionPeripheralsBounds);
+                }
+            }
+            DrawVectorPeripheralCaptionIcon(g, CaptionPeripheralsBounds, isHoverPeriph, dpiScale);
+
+            // 0A2. Mobile Connect Button (📱 ZenQ Connect: Điều khiển Không dây từ Mobile)
+            bool isMobileConnected = ZenQOffice.Core.ZenQConnectServer.Instance.IsClientConnected;
+            if (isHoverMobile || isMobileConnected)
+            {
+                Color mBg = isMobileConnected
+                    ? Color.FromArgb(220, 252, 231)
+                    : Color.FromArgb(226, 232, 240);
+                using (SolidBrush hBrush = new SolidBrush(mBg))
+                {
+                    g.FillRectangle(hBrush, CaptionMobileConnectBounds);
+                }
+            }
+            DrawVectorMobileConnectCaptionIcon(g, CaptionMobileConnectBounds, isHoverMobile, isMobileConnected, dpiScale);
+
+            // 0B. Touch / Mouse Mode Toggle Button (👆 Chế độ Cảm ứng / Chuột)
+            bool touchActive = AppSettings.Instance.TouchModeEnabled;
+            if (isHoverTouch || touchActive)
+            {
+                Color tBg = touchActive ? Color.FromArgb(219, 234, 254) : Color.FromArgb(226, 232, 240);
+                using (SolidBrush hBrush = new SolidBrush(tBg))
+                {
+                    g.FillRectangle(hBrush, CaptionTouchModeBounds);
+                }
+                if (touchActive)
+                {
+                    using (Pen activeBar = new Pen(Color.FromArgb(37, 99, 235), 2.2f))
+                    {
+                        g.DrawLine(activeBar, CaptionTouchModeBounds.X + 6, CaptionTouchModeBounds.Bottom - 2, CaptionTouchModeBounds.Right - 6, CaptionTouchModeBounds.Bottom - 2);
+                    }
+                }
+            }
+            DrawVectorTouchModeCaptionIcon(g, CaptionTouchModeBounds, touchActive, isHoverTouch, dpiScale);
 
             // 1. Minimize Button
             if (isHoverMin)
@@ -2479,12 +2777,10 @@ namespace GenOffice.UI
                     g.FillRectangle(hBrush, CaptionMinBounds);
                 }
             }
-            using (Pen minPen = new Pen(isHoverMin ? hoverIconColor : normalIconColor, 1.2f))
             {
-                int lineW = (int)Math.Round(10f * dpiScale);
-                int mX = CaptionMinBounds.X + (btnW - lineW) / 2;
-                int mY = btnH / 2;
-                g.DrawLine(minPen, mX, mY, mX + lineW, mY);
+                int minSz = (int)Math.Round(14f * dpiScale);
+                Rectangle minIconRect = new Rectangle(CaptionMinBounds.X + (btnW - minSz) / 2, (btnH - minSz) / 2, minSz, minSz);
+                FluentIconRenderer.DrawGlyph(g, '\uE921', minIconRect, isHoverMin ? hoverIconColor : normalIconColor, 10.5f * dpiScale);
             }
 
             // 2. Maximize / Restore Button
@@ -2495,33 +2791,11 @@ namespace GenOffice.UI
                     g.FillRectangle(hBrush, CaptionMaxBounds);
                 }
             }
-            using (Pen maxPen = new Pen(isHoverMax ? hoverIconColor : normalIconColor, 1.2f))
             {
-                int boxSize = (int)Math.Round(10f * dpiScale);
-                int bX = CaptionMaxBounds.X + (btnW - boxSize) / 2;
-                int bY = (btnH - boxSize) / 2;
-
-                if (IsParentMaximized)
-                {
-                    // Restore icon (2 overlapping squares)
-                    int offset = (int)Math.Round(2f * dpiScale);
-                    int smallBox = boxSize - offset;
-                    // Back square (top right)
-                    g.DrawRectangle(maxPen, bX + offset, bY, smallBox, smallBox);
-                    // Front square clear background to avoid overlapping lines
-                    Color frontBg = isHoverMax ? Color.FromArgb(226, 232, 240) : (isIsland && mode != OfficeAppMode.Home ? wsBg : Color.FromArgb(248, 250, 252));
-                    using (SolidBrush clearBg = new SolidBrush(frontBg))
-                    {
-                        g.FillRectangle(clearBg, bX, bY + offset, smallBox, smallBox);
-                    }
-                    // Front square (bottom left)
-                    g.DrawRectangle(maxPen, bX, bY + offset, smallBox, smallBox);
-                }
-                else
-                {
-                    // Maximize icon (single square)
-                    g.DrawRectangle(maxPen, bX, bY, boxSize, boxSize);
-                }
+                int maxSz = (int)Math.Round(14f * dpiScale);
+                Rectangle maxIconRect = new Rectangle(CaptionMaxBounds.X + (btnW - maxSz) / 2, (btnH - maxSz) / 2, maxSz, maxSz);
+                char maxGlyph = IsParentMaximized ? '\uE923' : '\uE922';
+                FluentIconRenderer.DrawGlyph(g, maxGlyph, maxIconRect, isHoverMax ? hoverIconColor : normalIconColor, 10.5f * dpiScale);
             }
 
             // 3. Close Button
@@ -2532,56 +2806,67 @@ namespace GenOffice.UI
                     g.FillRectangle(hBrush, CaptionCloseBounds);
                 }
             }
-            using (Pen closePen = new Pen(isHoverClose ? Color.White : normalIconColor, 1.2f))
             {
-                int crossSize = (int)Math.Round(10f * dpiScale);
-                int cX = CaptionCloseBounds.X + (btnW - crossSize) / 2;
-                int cY = (btnH - crossSize) / 2;
-                g.DrawLine(closePen, cX, cY, cX + crossSize, cY + crossSize);
-                g.DrawLine(closePen, cX + crossSize, cY, cX, cY + crossSize);
+                int closeSz = (int)Math.Round(14f * dpiScale);
+                Rectangle closeIconRect = new Rectangle(CaptionCloseBounds.X + (btnW - closeSz) / 2, (btnH - closeSz) / 2, closeSz, closeSz);
+                FluentIconRenderer.DrawGlyph(g, '\uE8BB', closeIconRect, isHoverClose ? Color.White : normalIconColor, 10.5f * dpiScale);
+            }
+        }
+
+        private void DrawVectorTouchModeCaptionIcon(Graphics g, Rectangle r, bool isActive, bool isHover, float dpiScale)
+        {
+            Color c = isActive ? Color.FromArgb(37, 99, 235) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+            int iconSz = (int)Math.Round(16f * dpiScale);
+            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+            FluentIconRenderer.DrawGlyph(g, '\uE815', iconRect, c, 14f * dpiScale);
+        }
+
+        private void DrawVectorPeripheralCaptionIcon(Graphics g, Rectangle r, bool isHover, float dpiScale)
+        {
+            Color c = AppSettings.Instance.CalcBarcodeScannerMode
+                ? Color.FromArgb(5, 150, 105)
+                : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+            int iconSz = (int)Math.Round(16f * dpiScale);
+            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+            FluentIconRenderer.DrawGlyph(g, '\uE772', iconRect, c, 14f * dpiScale);
+        }
+
+        private void DrawVectorMobileConnectCaptionIcon(Graphics g, Rectangle r, bool isHover, bool isConnected, float dpiScale)
+        {
+            Color c = isConnected
+                ? Color.FromArgb(5, 150, 105)
+                : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+            int iconSz = (int)Math.Round(16f * dpiScale);
+            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+            FluentIconRenderer.DrawGlyph(g, '\uE8EA', iconRect, c, 14f * dpiScale);
+
+            if (isConnected)
+            {
+                int dotSz = (int)Math.Round(6f * dpiScale);
+                Rectangle dotRect = new Rectangle(r.Right - dotSz - 4, r.Bottom - dotSz - 4, dotSz, dotSz);
+                using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(16, 185, 129)))
+                {
+                    g.FillEllipse(dotBrush, dotRect);
+                }
             }
         }
 
         private void DrawVectorQuickSave(Graphics g, Rectangle r, bool isHover)
         {
             Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            using (Pen p = new Pen(c, 1.2f))
-            using (SolidBrush b = new SolidBrush(c))
-            {
-                int x = r.X + 4;
-                int y = r.Y + 4;
-                int w = r.Width - 8;
-                int h = r.Height - 8;
-                g.DrawRectangle(p, x, y, w, h);
-                g.FillRectangle(b, x + 3, y, w - 6, 4);
-                g.DrawRectangle(p, x + 2, y + 6, w - 4, h - 6);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE74E', r, c, 13f);
         }
 
         private void DrawVectorQuickUndo(Graphics g, Rectangle r, bool isHover)
         {
             Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            using (Pen p = new Pen(c, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                int cx = r.X + r.Width / 2;
-                int cy = r.Y + r.Height / 2;
-                g.DrawArc(p, cx - 6, cy - 4, 11, 10, 240, 220);
-                g.DrawLine(p, cx - 6, cy - 1, cx - 6, cy - 5);
-                g.DrawLine(p, cx - 6, cy - 1, cx - 2, cy - 1);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE7A7', r, c, 13f);
         }
 
         private void DrawVectorQuickRedo(Graphics g, Rectangle r, bool isHover)
         {
             Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            using (Pen p = new Pen(c, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                int cx = r.X + r.Width / 2;
-                int cy = r.Y + r.Height / 2;
-                g.DrawArc(p, cx - 5, cy - 4, 11, 10, 80, -220);
-                g.DrawLine(p, cx + 6, cy - 1, cx + 6, cy - 5);
-                g.DrawLine(p, cx + 6, cy - 1, cx + 2, cy - 1);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE7A6', r, c, 13f);
         }
 
         private void DrawVectorTabDocIcon(Graphics g, float x, float y, float size, OfficeAppMode mode, bool isActive)
@@ -2594,7 +2879,8 @@ namespace GenOffice.UI
 
             Color col = (mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
                         ((mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
-                        ((mode == OfficeAppMode.Slides) ? Color.FromArgb(234, 88, 12) : Color.FromArgb(220, 38, 38)));
+                        ((mode == OfficeAppMode.Slides) ? Color.FromArgb(234, 88, 12) :
+                        ((mode == OfficeAppMode.Photo) ? Color.FromArgb(99, 102, 241) : Color.FromArgb(220, 38, 38))));
 
             float s = size / 16f;
             using (GraphicsPath docP = new GraphicsPath())
@@ -2623,22 +2909,16 @@ namespace GenOffice.UI
 
         private void DrawVectorTabCloseCross(Graphics g, float cx, float cy, float size, Color color)
         {
-            float half = size / 2f;
-            using (Pen p = new Pen(color, 1.0f))
-            {
-                g.DrawLine(p, cx - half, cy - half, cx + half, cy + half);
-                g.DrawLine(p, cx + half, cy - half, cx - half, cy + half);
-            }
+            int sz = (int)Math.Max(10, Math.Round(size + 4f));
+            Rectangle r = new Rectangle((int)Math.Round(cx - sz / 2f), (int)Math.Round(cy - sz / 2f), sz, sz);
+            FluentIconRenderer.DrawGlyph(g, '\uE711', r, color, size + 1.5f);
         }
 
         private void DrawVectorTabPlus(Graphics g, float cx, float cy, float size, Color color)
         {
-            float half = size / 2f;
-            using (Pen p = new Pen(color, 1.0f))
-            {
-                g.DrawLine(p, cx - half, cy, cx + half, cy);
-                g.DrawLine(p, cx, cy - half, cx, cy + half);
-            }
+            int sz = (int)Math.Max(12, Math.Round(size + 4f));
+            Rectangle r = new Rectangle((int)Math.Round(cx - sz / 2f), (int)Math.Round(cy - sz / 2f), sz, sz);
+            FluentIconRenderer.DrawGlyph(g, '\uE710', r, color, size + 1.5f);
         }
 
         private Color GetWorkspaceCanvasBgColor(WriterView writerView, SlidesView slidesView, CalcView calcView, PdfView pdfView)
@@ -2651,10 +2931,308 @@ namespace GenOffice.UI
             return Color.FromArgb(238, 238, 238);
         }
 
-        public void Draw(Graphics g, int width, int height, WriterView writerView = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null)
+        public void DrawTopDocTabBar(Graphics g, int width)
+        {
+            if (width <= 0) return;
+
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+            g.PixelOffsetMode = PixelOffsetMode.Default;
+
+            float dpiScale = (g.DpiY > 0) ? (g.DpiY / 96.0f) : 1.0f;
+            CurrentDpiScale = dpiScale;
+            int ribbonTop = (int)Math.Round(36f * dpiScale);
+            RibbonTopHeight = ribbonTop;
+            int tabHeight = ribbonTop;
+            int homeTabWidth = (int)Math.Round(120f * dpiScale);
+            int captionButtonsWidth = (int)Math.Round(214f * dpiScale);
+            int docAreaX = homeTabWidth;
+            int docAreaW = Math.Max(10, width - docAreaX - captionButtonsWidth - 10);
+
+            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+            Color topChromeBg = Color.FromArgb(248, 250, 252);
+
+            // 1. Title Bar (Top 36px) - Basic Style Tab Bar Strip
+            Rectangle topBarRect = new Rectangle(0, 0, width, ribbonTop);
+            using (SolidBrush tabStripBg = new SolidBrush(topChromeBg))
+            {
+                g.FillRectangle(tabStripBg, topBarRect);
+            }
+            using (Pen btmPen = new Pen(Color.FromArgb(218, 224, 233), 1.0f))
+            {
+                g.DrawLine(btmPen, 0, ribbonTop - 0.5f, width, ribbonTop - 0.5f);
+            }
+
+            StringFormat ellipsisFormat = new StringFormat
+            {
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap,
+                LineAlignment = StringAlignment.Center
+            };
+
+            // Document Tabs Strip
+            DocTabBounds.Clear();
+            DocTabCloseBounds.Clear();
+
+            if (StandaloneMode)
+            {
+                DocTabPlusBounds = Rectangle.Empty;
+                DocTabScrollLeftBounds = Rectangle.Empty;
+                DocTabScrollRightBounds = Rectangle.Empty;
+                DrawStandaloneHeader(g, width, ribbonTop, dpiScale);
+            }
+            else
+            {
+                using (Font tabFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                using (Font tabActiveFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+                using (Pen dividerPen = new Pen(Color.FromArgb(218, 224, 233), 1.0f))
+                {
+                    // 1. PINNED HOME TAB ("Trang chính" - Cố định ở vị trí đầu tiên, ô dính liền)
+                    if (DocTabs.Count > 0 && DocTabs[0].Mode == OfficeAppMode.Home)
+                    {
+                        bool isHomeActive = (ActiveDocIndex == 0);
+                        Rectangle homeRect = new Rectangle(0, 0, homeTabWidth, tabHeight);
+                        DocTabBounds.Add(homeRect);
+                        DocTabCloseBounds.Add(Rectangle.Empty);
+                        bool isHoverHome = IsHovering(homeRect);
+
+                        if (isHomeActive)
+                        {
+                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                            {
+                                g.FillRectangle(activeBg, homeRect.X, homeRect.Y, homeRect.Width, homeRect.Height + 1);
+                            }
+                            using (Pen accentPen = new Pen(Color.FromArgb(79, 70, 229), 2.5f))
+                            {
+                                g.DrawLine(accentPen, homeRect.X, 1.25f, homeRect.Right, 1.25f);
+                            }
+                            g.DrawLine(dividerPen, homeRect.Right - 0.5f, 0, homeRect.Right - 0.5f, tabHeight);
+                        }
+                        else
+                        {
+                            using (SolidBrush idleBg = new SolidBrush(isHoverHome ? Color.FromArgb(246, 248, 252) : Color.FromArgb(238, 242, 247)))
+                            {
+                                g.FillRectangle(idleBg, homeRect);
+                            }
+                            g.DrawLine(dividerPen, homeRect.Right - 0.5f, 0, homeRect.Right - 0.5f, tabHeight);
+                            g.DrawLine(dividerPen, homeRect.X, ribbonTop - 0.5f, homeRect.Right, ribbonTop - 0.5f);
+                        }
+
+                        DrawVectorTabDocIcon(g, homeRect.X + 10, (tabHeight - 16) / 2, 16, OfficeAppMode.Home, isHomeActive);
+                        Rectangle homeTextRect = new Rectangle(homeRect.X + 28, 0, homeRect.Width - 30, tabHeight);
+                        using (SolidBrush textBrush = new SolidBrush(isHomeActive ? Color.FromArgb(15, 23, 42) : (isHoverHome ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
+                        {
+                            g.DrawString(DocTabs[0].Title, isHomeActive ? tabActiveFont : tabFont, textBrush, homeTextRect, ellipsisFormat);
+                        }
+                    }
+
+                    // 2. SCROLLABLE DOCUMENT TABS STRIP (Dạng basic ô dính liền không bo góc)
+                    int tabWidth = (int)Math.Round(175f * dpiScale);
+                    int plusBtnSize = (int)Math.Round(24f * dpiScale);
+                    int plusPad = (int)Math.Round(4f * dpiScale);
+                    int plusAreaW = plusBtnSize + plusPad * 2;
+                    int tabsOnlyWidth = Math.Max(0, (DocTabs.Count - 1) * tabWidth);
+                    bool isOverflowing = (tabsOnlyWidth + plusAreaW > docAreaW);
+
+                    int navBtnW = (int)Math.Round(24f * dpiScale);
+                    int navBtnH = (int)Math.Round(24f * dpiScale);
+                    int navY = (tabHeight - navBtnH) / 2;
+                    int plusY = (tabHeight - plusBtnSize) / 2;
+
+                    if (isOverflowing)
+                    {
+                        int rightEdge = docAreaX + docAreaW;
+                        DocTabScrollRightBounds = new Rectangle(rightEdge - navBtnW, navY, navBtnW, navBtnH);
+                        DocTabScrollLeftBounds = new Rectangle(DocTabScrollRightBounds.X - navBtnW - (int)Math.Round(2f * dpiScale), navY, navBtnW, navBtnH);
+                        // Luôn hiển thị cố định nút '+' ngay cạnh nút cuộn '<' '>' khi các tab bị khuất
+                        int pinnedPlusX = DocTabScrollLeftBounds.X - plusBtnSize - (int)Math.Round(4f * dpiScale);
+                        DocTabPlusBounds = new Rectangle(pinnedPlusX, plusY, plusBtnSize, plusBtnSize);
+                        docAreaW = Math.Max(10, DocTabPlusBounds.X - docAreaX - (int)Math.Round(4f * dpiScale));
+                    }
+                    else
+                    {
+                        DocTabScrollLeftBounds = Rectangle.Empty;
+                        DocTabScrollRightBounds = Rectangle.Empty;
+                        DocTabPlusBounds = new Rectangle(docAreaX + tabsOnlyWidth + plusPad, plusY, plusBtnSize, plusBtnSize);
+                    }
+                    _lastDocAreaX = docAreaX;
+                    _lastDocAreaW = docAreaW;
+
+                    Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, ribbonTop + 2);
+                    int maxTabScroll = isOverflowing ? Math.Max(0, tabsOnlyWidth - docAreaW) : 0;
+                    if (TargetTabScrollX > maxTabScroll) TargetTabScrollX = maxTabScroll;
+                    if (TargetTabScrollX < 0) TargetTabScrollX = 0;
+                    if (TabScrollX > maxTabScroll) TabScrollX = maxTabScroll;
+                    if (TabScrollX < 0) TabScrollX = 0;
+
+                    int currentTabScroll = (int)Math.Round(TabScrollX);
+
+                    GraphicsState gTabClip = g.Save();
+                    g.SetClip(docClipRect);
+
+                    int docTabX = docAreaX - currentTabScroll;
+                    for (int i = 1; i < DocTabs.Count; i++)
+                    {
+                        bool isActive = (i == ActiveDocIndex);
+                        Rectangle tabRect = new Rectangle(docTabX, 0, tabWidth, tabHeight);
+                        Rectangle clippedTabRect = Rectangle.Intersect(tabRect, docClipRect);
+                        DocTabBounds.Add(clippedTabRect);
+                        bool isHover = docClipRect.Contains(HoverX, HoverY) && IsHovering(clippedTabRect);
+
+                        if (IsDraggingTab && DraggingTabIndex == i)
+                        {
+                            using (Pen ghostPen = new Pen(Color.FromArgb(160, 99, 102, 241), 1.5f) { DashStyle = DashStyle.Dash })
+                            using (SolidBrush ghostBrush = new SolidBrush(Color.FromArgb(40, 99, 102, 241)))
+                            {
+                                g.FillRectangle(ghostBrush, tabRect);
+                                g.DrawRectangle(ghostPen, tabRect.X, tabRect.Y, tabRect.Width - 1, tabRect.Height - 1);
+                            }
+                            DocTabCloseBounds.Add(Rectangle.Empty);
+                        }
+                        else
+                        {
+                            if (isActive)
+                            {
+                                using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                                {
+                                    g.FillRectangle(activeBg, tabRect.X, tabRect.Y, tabRect.Width, tabRect.Height + 1);
+                                }
+                                Color accentCol = (DocTabs[i].Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
+                                                  ((DocTabs[i].Mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
+                                                  ((DocTabs[i].Mode == OfficeAppMode.Slides) ? Color.FromArgb(196, 62, 28) :
+                                                  ((DocTabs[i].Mode == OfficeAppMode.Pdf) ? Color.FromArgb(179, 11, 0) : Color.FromArgb(234, 88, 12))));
+                                using (Pen accentPen = new Pen(accentCol, 2.5f))
+                                {
+                                    g.DrawLine(accentPen, tabRect.X, 1.25f, tabRect.Right, 1.25f);
+                                }
+                                g.DrawLine(dividerPen, tabRect.Right - 0.5f, 0, tabRect.Right - 0.5f, tabHeight);
+                            }
+                            else
+                            {
+                                using (SolidBrush idleBg = new SolidBrush(isHover ? Color.FromArgb(246, 248, 252) : Color.FromArgb(238, 242, 247)))
+                                {
+                                    g.FillRectangle(idleBg, tabRect);
+                                }
+                                g.DrawLine(dividerPen, tabRect.Right - 0.5f, 0, tabRect.Right - 0.5f, tabHeight);
+                                g.DrawLine(dividerPen, tabRect.X, ribbonTop - 0.5f, tabRect.Right, ribbonTop - 0.5f);
+                            }
+
+                            DrawVectorTabDocIcon(g, tabRect.X + 10, (tabHeight - 16) / 2, 16, DocTabs[i].Mode, isActive);
+
+                            Rectangle closeRect = new Rectangle(tabRect.Right - 22, (tabHeight - 16) / 2, 16, 16);
+                            Rectangle clippedCloseRect = Rectangle.Intersect(closeRect, docClipRect);
+                            DocTabCloseBounds.Add(clippedCloseRect);
+                            bool isHoverClose = !clippedCloseRect.IsEmpty && docClipRect.Contains(HoverX, HoverY) && IsHovering(clippedCloseRect);
+
+                            if (isHoverClose)
+                            {
+                                using (SolidBrush closeBg = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                                {
+                                    FillRoundedRectangle(g, closeBg, closeRect, 3);
+                                }
+                                DrawVectorTabCloseCross(g, closeRect.X + 8, closeRect.Y + 8, 8, Color.White);
+                            }
+                            else
+                            {
+                                DrawVectorTabCloseCross(g, closeRect.X + 8, closeRect.Y + 8, 8, Color.FromArgb(148, 163, 184));
+                            }
+
+                            Rectangle textRect = new Rectangle(tabRect.X + 30, 0, tabRect.Width - 54, tabHeight);
+                            using (SolidBrush textBrush = new SolidBrush(isActive ? Color.FromArgb(15, 23, 42) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
+                            {
+                                g.DrawString(DocTabs[i].Title, isActive ? tabActiveFont : tabFont, textBrush, textRect, ellipsisFormat);
+                            }
+                        }
+
+                        docTabX += tabWidth;
+                    }
+
+                    if (IsDraggingTab && DraggingTabIndex >= 1 && DraggingTabIndex < DocTabs.Count)
+                    {
+                        DocTab draggedTab = DocTabs[DraggingTabIndex];
+                        int floatX = (int)Math.Round(DragCurrentMouseX - 80);
+                        Rectangle floatRect = new Rectangle(floatX, 1, tabWidth, tabHeight - 2);
+
+                        using (SolidBrush floatBg = new SolidBrush(Color.White))
+                        using (Pen borderPen = new Pen(Color.FromArgb(99, 102, 241), 1.5f))
+                        {
+                            g.FillRectangle(floatBg, floatRect);
+                            g.DrawRectangle(borderPen, floatRect);
+
+                            Color accentCol = (draggedTab.Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
+                                              ((draggedTab.Mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
+                                              Color.FromArgb(234, 88, 12));
+                            using (Pen accentPen = new Pen(accentCol, 2.5f))
+                            {
+                                g.DrawLine(accentPen, floatRect.X, 1.25f, floatRect.Right, 1.25f);
+                            }
+                        }
+
+                        DrawVectorTabDocIcon(g, floatRect.X + 10, (tabHeight - 16) / 2, 16, draggedTab.Mode, true);
+                        Rectangle textRect = new Rectangle(floatRect.X + 30, 0, floatRect.Width - 36, tabHeight);
+                        using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                        {
+                            g.DrawString(draggedTab.Title, tabActiveFont, textBrush, textRect, ellipsisFormat);
+                        }
+                    }
+
+                    g.Restore(gTabClip);
+
+                    // '+' New Tab button (Vẽ ngoài docClipRect để luôn hiển thị kể cả khi danh sách tab bị khuất)
+                    bool isHoverAdd = !DocTabPlusBounds.IsEmpty && IsHovering(DocTabPlusBounds);
+                    if (isHoverAdd)
+                    {
+                        int addRad = (int)Math.Max(3, Math.Round(4f * dpiScale));
+                        using (SolidBrush addBg = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                        {
+                            FillRoundedRectangle(g, addBg, DocTabPlusBounds, addRad);
+                        }
+                    }
+                    DrawVectorTabPlus(
+                        g,
+                        DocTabPlusBounds.X + DocTabPlusBounds.Width / 2f,
+                        DocTabPlusBounds.Y + DocTabPlusBounds.Height / 2f,
+                        10f * dpiScale,
+                        isHoverAdd ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+
+                    if (isOverflowing)
+                    {
+                        bool canScrollLeft = (TabScrollX > 0.5f) || (ActiveDocIndex > 1);
+                        bool canScrollRight = (TabScrollX < maxTabScroll - 0.5f) || (ActiveDocIndex < DocTabs.Count - 1);
+                        bool hoverLeft = IsHovering(DocTabScrollLeftBounds);
+                        bool hoverRight = IsHovering(DocTabScrollRightBounds);
+
+                        int rad = (int)Math.Max(3, Math.Round(4f * dpiScale));
+                        if (hoverLeft)
+                        {
+                            using (SolidBrush bLeft = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                                FillRoundedRectangle(g, bLeft, DocTabScrollLeftBounds, rad);
+                        }
+                        if (hoverRight)
+                        {
+                            using (SolidBrush bRight = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                                FillRoundedRectangle(g, bRight, DocTabScrollRightBounds, rad);
+                        }
+
+                        Color colLeft = hoverLeft ? Color.FromArgb(15, 23, 42) : (canScrollLeft ? Color.FromArgb(51, 65, 85) : Color.FromArgb(165, 178, 196));
+                        Color colRight = hoverRight ? Color.FromArgb(15, 23, 42) : (canScrollRight ? Color.FromArgb(51, 65, 85) : Color.FromArgb(165, 178, 196));
+                        int chevSz = (int)Math.Round(15f * dpiScale);
+                        Rectangle lIcon = new Rectangle(DocTabScrollLeftBounds.X + (DocTabScrollLeftBounds.Width - chevSz) / 2, DocTabScrollLeftBounds.Y + (DocTabScrollLeftBounds.Height - chevSz) / 2, chevSz, chevSz);
+                        Rectangle rIcon = new Rectangle(DocTabScrollRightBounds.X + (DocTabScrollRightBounds.Width - chevSz) / 2, DocTabScrollRightBounds.Y + (DocTabScrollRightBounds.Height - chevSz) / 2, chevSz, chevSz);
+                        FluentIconRenderer.DrawGlyph(g, '\uE76B', lIcon, colLeft, 11.5f * dpiScale);
+                        FluentIconRenderer.DrawGlyph(g, '\uE76C', rIcon, colRight, 11.5f * dpiScale);
+                    }
+                }
+            }
+
+            DrawWindowCaptionButtons(g, width, ribbonTop, dpiScale, isIsland, CurrentMode);
+        }
+
+        public void Draw(Graphics g, int width, int height, WriterView writerView = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (CurrentMode == OfficeAppMode.Slides)
             {
+                List<string> pTabs = new List<string> { "Trang đầu", "Chèn", "Vẽ", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Xem lại", "Hiển thị", "Mở rộng" };
                 if (slidesView != null && slidesView.IsRemovingBackground)
                 {
                     RibbonTabs = new string[] { "Loại bỏ nền (Background Removal)", "Trình chiếu", "Hiển thị", "Mở rộng", "Định dạng Hình ảnh" };
@@ -2662,30 +3240,46 @@ namespace GenOffice.UI
                 }
                 else if (slidesView != null && slidesView.SelectedShape != null)
                 {
-                    if (slidesView.SelectedShape.Type == ShapeType.Video || !string.IsNullOrEmpty(slidesView.SelectedShape.VideoPath))
+                    var shape = slidesView.SelectedShape;
+                    if (shape.IsSvg || shape.IsGraphic)
                     {
-                        RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng", "Định dạng Video", "Phát lại" };
+                        pTabs.Add("Định dạng Đồ họa");
+                        pTabs.Add("Định dạng Hình dạng");
                     }
-                    else if (slidesView.SelectedShape.Type == ShapeType.Table)
+                    else if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
                     {
-                        RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng", "Thiết kế Bảng" };
+                        pTabs.Add("Định dạng Video");
+                        pTabs.Add("Phát lại");
                     }
-                    else if (slidesView.SelectedShape.Type == ShapeType.Image || slidesView.SelectedShape.CachedImage != null || !string.IsNullOrEmpty(slidesView.SelectedShape.ImagePath))
+                    else if (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath))
                     {
-                        RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng", "Định dạng Hình ảnh" };
+                        pTabs.Add("Định dạng Âm thanh");
+                        pTabs.Add("Phát lại");
                     }
-                    else if (!string.IsNullOrEmpty(slidesView.SelectedShape.SmartArtType) || (slidesView.SelectedShape.Name != null && slidesView.SelectedShape.Name.StartsWith("SmartArt")))
+                    else if (shape.Type == ShapeType.Table)
                     {
-                        RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng", "Thiết kế SmartArt", "Định dạng" };
+                        pTabs.Add("Thiết kế Bảng");
+                        pTabs.Add("Bố trí Bảng");
+                    }
+                    else if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
+                    {
+                        pTabs.Add("Định dạng Hình ảnh");
+                    }
+                    else if (!string.IsNullOrEmpty(shape.SmartArtType) || (shape.Name != null && shape.Name.StartsWith("SmartArt")))
+                    {
+                        pTabs.Add("Thiết kế SmartArt");
+                        pTabs.Add("Định dạng");
                     }
                     else
                     {
-                        RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng", "Định dạng Hình dạng" };
+                        pTabs.Add("Định dạng Hình dạng");
                     }
+                    RibbonTabs = pTabs.ToArray();
+                    if (ActiveRibbonTab >= RibbonTabs.Length) ActiveRibbonTab = 0;
                 }
                 else
                 {
-                    RibbonTabs = new string[] { "Trang đầu", "Chèn", "Thiết kế", "Chuyển tiếp", "Hoạt họa", "Trình chiếu", "Hiển thị", "Mở rộng" };
+                    RibbonTabs = pTabs.ToArray();
                     if (ActiveRibbonTab >= RibbonTabs.Length) ActiveRibbonTab = 0;
                 }
             }
@@ -2735,26 +3329,21 @@ namespace GenOffice.UI
                 RibbonTabs = new string[] { "Trang đầu", "Chú thích", "Chỉnh sửa", "Trang", "Ký & Bảo mật", "Hiển thị" };
                 if (ActiveRibbonTab >= RibbonTabs.Length) ActiveRibbonTab = 0;
             }
+            else if (CurrentMode == OfficeAppMode.Photo)
+            {
+                RibbonTabs = new string[] { "Trang đầu", "Lớp", "Bộ lọc", "Vẽ & Vector", "Văn bản", "Xuất tệp" };
+                if (ActiveRibbonTab >= RibbonTabs.Length) ActiveRibbonTab = 0;
+            }
 
             if (width <= 0) return;
 
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-            g.PixelOffsetMode = PixelOffsetMode.Default;
+            DrawTopDocTabBar(g, width);
 
-            // Unified DPI calculation across 100%, 125%, 150% scales
-            float dpiScale = (g.DpiY > 0) ? (g.DpiY / 96.0f) : 1.0f;
-            CurrentDpiScale = dpiScale;
-            int ribbonTop = (int)Math.Round(36f * dpiScale);
-            RibbonTopHeight = ribbonTop;
-            int tabHeight = ribbonTop;
-            int homeTabWidth = (int)Math.Round(120f * dpiScale);
-            int captionButtonsWidth = (int)Math.Round(138f * dpiScale);
-            int docAreaX = homeTabWidth;
-            int docAreaW = Math.Max(10, width - docAreaX - captionButtonsWidth - 10);
-
+            float dpiScale = (CurrentDpiScale > 0) ? CurrentDpiScale : ((g.DpiY > 0) ? (g.DpiY / 96.0f) : 1.0f);
+            int ribbonTop = (RibbonTopHeight > 0) ? RibbonTopHeight : (int)Math.Round(36f * dpiScale);
+            int docAreaX = _lastDocAreaX;
+            int docAreaW = _lastDocAreaW;
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-            Color topChromeBg = Color.FromArgb(248, 250, 252);
             Color wsBg = (CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
                          ((CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
                          Color.FromArgb(238, 238, 238));
@@ -2764,243 +3353,9 @@ namespace GenOffice.UI
                 // In Island mode, backdrop seamlessly matches workspace - no artificial background shelf
                 using (SolidBrush chromeBg = new SolidBrush(wsBg))
                 {
-                    g.FillRectangle(chromeBg, 0, 0, width, 155);
+                    g.FillRectangle(chromeBg, 0, ribbonTop, width, 155 - ribbonTop);
                 }
             }
-            else
-            {
-                // 1. Title Bar (Top 36px) - Basic Style Tab Bar Strip
-                Rectangle topBarRect = new Rectangle(0, 0, width, ribbonTop);
-                using (SolidBrush tabStripBg = new SolidBrush(topChromeBg))
-                {
-                    g.FillRectangle(tabStripBg, topBarRect);
-                }
-                using (Pen btmPen = new Pen(Color.FromArgb(218, 224, 233), 1.0f))
-                {
-                    g.DrawLine(btmPen, 0, ribbonTop - 0.5f, width, ribbonTop - 0.5f);
-                }
-            }
-
-            // NOTE: Logo badge and "GENOFFICE" text removed per user request:
-            // "bỏ cái logo và chữ genoffice ở đó"
-
-            StringFormat ellipsisFormat = new StringFormat
-            {
-                Trimming = StringTrimming.EllipsisCharacter,
-                FormatFlags = StringFormatFlags.NoWrap,
-                LineAlignment = StringAlignment.Center
-            };
-
-            // Document Tabs Strip
-            DocTabBounds.Clear();
-            DocTabCloseBounds.Clear();
-
-            if (StandaloneMode)
-            {
-                DocTabPlusBounds = Rectangle.Empty;
-                DrawStandaloneHeader(g, width, ribbonTop, dpiScale);
-            }
-            else
-            {
-                using (Font tabFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
-                using (Font tabActiveFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-                using (Pen dividerPen = new Pen(Color.FromArgb(218, 224, 233), 1.0f))
-                {
-                // 1. PINNED HOME TAB ("Trang chính" - Cố định ở vị trí đầu tiên, ô dính liền)
-                if (DocTabs.Count > 0 && DocTabs[0].Mode == OfficeAppMode.Home)
-                {
-                    bool isHomeActive = (ActiveDocIndex == 0);
-                    Rectangle homeRect = new Rectangle(0, 0, homeTabWidth, tabHeight);
-                    DocTabBounds.Add(homeRect);
-                    DocTabCloseBounds.Add(Rectangle.Empty);
-                    bool isHoverHome = IsHovering(homeRect);
-
-                    if (isHomeActive)
-                    {
-                        // Active Home Tab: Clean rectangular cell, seamless with content below
-                        using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
-                        {
-                            g.FillRectangle(activeBg, homeRect.X, homeRect.Y, homeRect.Width, homeRect.Height + 1);
-                        }
-                        using (Pen accentPen = new Pen(Color.FromArgb(79, 70, 229), 2.5f))
-                        {
-                            g.DrawLine(accentPen, homeRect.X, 1.25f, homeRect.Right, 1.25f);
-                        }
-                        g.DrawLine(dividerPen, homeRect.Right - 0.5f, 0, homeRect.Right - 0.5f, tabHeight);
-                    }
-                    else
-                    {
-                        // Inactive Home Tab: Basic flat cell with divider line
-                        using (SolidBrush idleBg = new SolidBrush(isHoverHome ? Color.FromArgb(246, 248, 252) : Color.FromArgb(238, 242, 247)))
-                        {
-                            g.FillRectangle(idleBg, homeRect);
-                        }
-                        g.DrawLine(dividerPen, homeRect.Right - 0.5f, 0, homeRect.Right - 0.5f, tabHeight);
-                        g.DrawLine(dividerPen, homeRect.X, ribbonTop - 0.5f, homeRect.Right, ribbonTop - 0.5f);
-                    }
-
-                    DrawVectorTabDocIcon(g, homeRect.X + 10, (tabHeight - 16) / 2, 16, OfficeAppMode.Home, isHomeActive);
-                    Rectangle homeTextRect = new Rectangle(homeRect.X + 28, 0, homeRect.Width - 30, tabHeight);
-                    using (SolidBrush textBrush = new SolidBrush(isHomeActive ? Color.FromArgb(15, 23, 42) : (isHoverHome ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
-                    {
-                        g.DrawString(DocTabs[0].Title, isHomeActive ? tabActiveFont : tabFont, textBrush, homeTextRect, ellipsisFormat);
-                    }
-                }
-
-                // 2. SCROLLABLE DOCUMENT TABS STRIP (Dạng basic ô dính liền không bo góc)
-                Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, ribbonTop + 2);
-
-                int tabWidth = (int)Math.Round(175f * dpiScale);
-                int totalDocTabsWidth = (DocTabs.Count - 1) * tabWidth + 36;
-                int maxTabScroll = Math.Max(0, totalDocTabsWidth - docAreaW);
-                if (TargetTabScrollX > maxTabScroll) TargetTabScrollX = maxTabScroll;
-                if (TargetTabScrollX < 0) TargetTabScrollX = 0;
-                if (TabScrollX > maxTabScroll) TabScrollX = maxTabScroll;
-                if (TabScrollX < 0) TabScrollX = 0;
-
-                int currentTabScroll = (int)Math.Round(TabScrollX);
-
-                GraphicsState gTabClip = g.Save();
-                g.SetClip(docClipRect);
-
-                int docTabX = docAreaX - currentTabScroll;
-                for (int i = 1; i < DocTabs.Count; i++)
-                {
-                    bool isActive = (i == ActiveDocIndex);
-                    Rectangle tabRect = new Rectangle(docTabX, 0, tabWidth, tabHeight);
-                    DocTabBounds.Add(tabRect);
-                    bool isHover = docClipRect.Contains(HoverX, HoverY) && IsHovering(tabRect);
-
-                    if (IsDraggingTab && DraggingTabIndex == i)
-                    {
-                        // Ghost placeholder for dragged tab (Basic dashed rectangle)
-                        using (Pen ghostPen = new Pen(Color.FromArgb(160, 99, 102, 241), 1.5f) { DashStyle = DashStyle.Dash })
-                        using (SolidBrush ghostBrush = new SolidBrush(Color.FromArgb(40, 99, 102, 241)))
-                        {
-                            g.FillRectangle(ghostBrush, tabRect);
-                            g.DrawRectangle(ghostPen, tabRect.X, tabRect.Y, tabRect.Width - 1, tabRect.Height - 1);
-                        }
-                        DocTabCloseBounds.Add(Rectangle.Empty);
-                    }
-                    else
-                    {
-                        if (isActive)
-                        {
-                            // Active Tab: Basic rectangular cell seamlessly merging down
-                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
-                            {
-                                g.FillRectangle(activeBg, tabRect.X, tabRect.Y, tabRect.Width, tabRect.Height + 1);
-                            }
-                            Color accentCol = (DocTabs[i].Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
-                                             ((DocTabs[i].Mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
-                                             ((DocTabs[i].Mode == OfficeAppMode.Slides) ? Color.FromArgb(234, 88, 12) : Color.FromArgb(225, 29, 72)));
-                            using (Pen accentPen = new Pen(accentCol, 2.5f))
-                            {
-                                g.DrawLine(accentPen, tabRect.X, 1.25f, tabRect.Right, 1.25f);
-                            }
-                            g.DrawLine(dividerPen, tabRect.X - 0.5f, 0, tabRect.X - 0.5f, tabHeight);
-                            g.DrawLine(dividerPen, tabRect.Right - 0.5f, 0, tabRect.Right - 0.5f, tabHeight);
-                        }
-                        else
-                        {
-                            // Inactive Tab: Basic flat rectangular cell with divider
-                            using (SolidBrush idleBg = new SolidBrush(isHover ? Color.FromArgb(246, 248, 252) : Color.FromArgb(238, 242, 247)))
-                            {
-                                g.FillRectangle(idleBg, tabRect);
-                            }
-                            g.DrawLine(dividerPen, tabRect.Right - 0.5f, 0, tabRect.Right - 0.5f, tabHeight);
-                            g.DrawLine(dividerPen, tabRect.X, ribbonTop - 0.5f, tabRect.Right, ribbonTop - 0.5f);
-                        }
-
-                        DrawVectorTabDocIcon(g, tabRect.X + 10, (tabHeight - 16) / 2, 16, DocTabs[i].Mode, isActive);
-
-                        Rectangle textRect = new Rectangle(tabRect.X + 30, 0, tabRect.Width - 54, tabHeight);
-                        using (SolidBrush textBrush = new SolidBrush(isActive ? Color.FromArgb(15, 23, 42) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
-                        {
-                            g.DrawString(DocTabs[i].Title, isActive ? tabActiveFont : tabFont, textBrush, textRect, ellipsisFormat);
-                        }
-
-                        // Close button 'x': Basic, thin lines, no red effect
-                        Rectangle closeRect = new Rectangle(tabRect.Right - 22, (tabHeight - 16) / 2, 16, 16);
-                        DocTabCloseBounds.Add(closeRect);
-                        bool isHoverClose = docClipRect.Contains(HoverX, HoverY) && IsHovering(closeRect);
-                        if (isHoverClose)
-                        {
-                            using (SolidBrush closeBg = new SolidBrush(Color.FromArgb(220, 226, 235)))
-                            {
-                                g.FillRectangle(closeBg, closeRect);
-                            }
-                            DrawVectorTabCloseCross(g, closeRect.X + 8, closeRect.Y + 8, 8, Color.FromArgb(30, 41, 59));
-                        }
-                        else
-                        {
-                            DrawVectorTabCloseCross(g, closeRect.X + 8, closeRect.Y + 8, 8, isActive ? Color.FromArgb(100, 116, 139) : Color.FromArgb(148, 163, 184));
-                        }
-                    }
-
-                    docTabX += tabWidth; // Contiguous: 0px gap!
-                }
-
-                // '+' New Tab button (Basic style: clean, simple)
-                Rectangle newTabRect = new Rectangle(docTabX + 4, (tabHeight - 22) / 2, 22, 22);
-                DocTabPlusBounds = newTabRect;
-                bool isHoverAdd = docClipRect.Contains(HoverX, HoverY) && IsHovering(newTabRect);
-                if (isHoverAdd)
-                {
-                    using (SolidBrush addBg = new SolidBrush(Color.FromArgb(226, 232, 240)))
-                    {
-                        g.FillRectangle(addBg, newTabRect);
-                    }
-                }
-                DrawVectorTabPlus(g, newTabRect.X + 11, newTabRect.Y + 11, 10, isHoverAdd ? Color.FromArgb(30, 41, 59) : Color.FromArgb(100, 116, 139));
-
-                // Draw Drop Insertion Marker when dragging
-                if (IsDraggingTab && DragTargetIndex >= 1 && DragTargetIndex < DocTabs.Count)
-                {
-                    int markerX = docAreaX - currentTabScroll + (DragTargetIndex - 1) * tabWidth;
-                    if (DragTargetIndex > DraggingTabIndex) markerX += tabWidth;
-                    using (Pen markerCore = new Pen(Color.FromArgb(37, 99, 235), 2.0f))
-                    {
-                        g.DrawLine(markerCore, markerX, 0, markerX, tabHeight);
-                    }
-                }
-
-                // Draw Elevated Floating Dragged Tab
-                if (IsDraggingTab && DraggingTabIndex >= 1 && DraggingTabIndex < DocTabs.Count)
-                {
-                    DocTab draggedTab = DocTabs[DraggingTabIndex];
-                    int floatX = (int)Math.Round(DragCurrentMouseX - 80);
-                    Rectangle floatRect = new Rectangle(floatX, 1, tabWidth, tabHeight - 2);
-
-                    using (SolidBrush floatBg = new SolidBrush(Color.White))
-                    using (Pen borderPen = new Pen(Color.FromArgb(99, 102, 241), 1.5f))
-                    {
-                        g.FillRectangle(floatBg, floatRect);
-                        g.DrawRectangle(borderPen, floatRect);
-
-                        Color accentCol = (draggedTab.Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
-                                         ((draggedTab.Mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
-                                         Color.FromArgb(234, 88, 12));
-                        using (Pen accentPen = new Pen(accentCol, 2.5f))
-                        {
-                            g.DrawLine(accentPen, floatRect.X, 1.25f, floatRect.Right, 1.25f);
-                        }
-                    }
-
-                    DrawVectorTabDocIcon(g, floatRect.X + 10, (tabHeight - 16) / 2, 16, draggedTab.Mode, true);
-                    Rectangle textRect = new Rectangle(floatRect.X + 30, 0, floatRect.Width - 36, tabHeight);
-                    using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
-                    {
-                        g.DrawString(draggedTab.Title, tabActiveFont, textBrush, textRect, ellipsisFormat);
-                    }
-                }
-
-                g.Restore(gTabClip);
-                }
-            }
-
-            DrawWindowCaptionButtons(g, width, ribbonTop, dpiScale, isIsland, CurrentMode);
-
             if (!isIsland || CurrentMode == OfficeAppMode.Home)
             {
                 // 2. Ribbon Header Strip (Y: ribbonTop to ribbonTop + headerHeight)
@@ -3132,11 +3487,17 @@ namespace GenOffice.UI
                     g.DrawLine(sepPen, islandRect.X + 8, 66, islandRect.Right - 8, 66);
                 }
 
-                // Top-Left Blue "Tệp" (File) Pill Button inside Island
+                // Top-Left "Tệp" (File / Backstage) Pill Button inside Island
                 Rectangle fileBtnRect = new Rectangle(islandRect.X + 8, 42, 54, 21);
                 RibbonFileBtnBounds = fileBtnRect;
                 bool isHoverFile = IsHovering(fileBtnRect);
-                Color fileBg = isHoverFile ? Color.FromArgb(0, 105, 185) : Color.FromArgb(0, 120, 212);
+                Color baseFileColor = (CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(24, 90, 189) :
+                                      (CurrentMode == OfficeAppMode.Calc) ? Color.FromArgb(16, 124, 65) :
+                                      (CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(196, 62, 28) :
+                                      (CurrentMode == OfficeAppMode.Pdf) ? Color.FromArgb(179, 11, 0) :
+                                      (CurrentMode == OfficeAppMode.Photo) ? Color.FromArgb(99, 102, 241) :
+                                      Color.FromArgb(0, 120, 212);
+                Color fileBg = isHoverFile ? ControlPaint.Light(baseFileColor, 0.2f) : baseFileColor;
                 using (GraphicsPath fp = CreateRoundedRectanglePath(new RectangleF(fileBtnRect.X, fileBtnRect.Y, fileBtnRect.Width, fileBtnRect.Height), 4f))
                 using (SolidBrush fb = new SolidBrush(fileBg))
                 using (Font fileFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
@@ -3238,11 +3599,17 @@ namespace GenOffice.UI
                     g.FillRectangle(tabStripBg, 0, 36, width, 28);
                 }
 
-                // Standard Word-style Blue "Tệp" (File) Button on tab strip
+                // Standard Office-style "Tệp" (File / Backstage) Button on tab strip
                 Rectangle fileBtnRect = new Rectangle(8, 38, 54, 24);
                 RibbonFileBtnBounds = fileBtnRect;
                 bool isHoverFile = IsHovering(fileBtnRect);
-                Color fileBg = isHoverFile ? Color.FromArgb(0, 105, 185) : Color.FromArgb(0, 120, 212);
+                Color baseFileColor = (CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(24, 90, 189) :
+                                      (CurrentMode == OfficeAppMode.Calc) ? Color.FromArgb(16, 124, 65) :
+                                      (CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(196, 62, 28) :
+                                      (CurrentMode == OfficeAppMode.Pdf) ? Color.FromArgb(179, 11, 0) :
+                                      (CurrentMode == OfficeAppMode.Photo) ? Color.FromArgb(99, 102, 241) :
+                                      Color.FromArgb(0, 120, 212);
+                Color fileBg = isHoverFile ? ControlPaint.Light(baseFileColor, 0.2f) : baseFileColor;
                 using (GraphicsPath fp = CreateRoundedRectanglePath(new RectangleF(fileBtnRect.X, fileBtnRect.Y, fileBtnRect.Width, fileBtnRect.Height), 3f))
                 using (SolidBrush fb = new SolidBrush(fileBg))
                 using (Font fileFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
@@ -3362,6 +3729,10 @@ namespace GenOffice.UI
             {
                 DrawPdfRibbonToolbar(g, width, pdfView);
             }
+            else if (CurrentMode == OfficeAppMode.Photo)
+            {
+                DrawPhotoRibbonToolbar(g, width, photoView);
+            }
         }
 
         private void DrawWriterRibbonContent(Graphics g, int width, WriterView writerView = null)
@@ -3407,39 +3778,29 @@ namespace GenOffice.UI
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-                // ==================== Group 1: File & Clipboard (Tệp & Bảng tạm) (X: 14 to 236) ====================
-                Rectangle openBox = new Rectangle(14, 68, 36, 62);
-                DrawInteractiveButton(g, openBox, false, 4);
-                DrawOpenIconLarge(g, 14, 70);
-                g.DrawString("Mở", btnFont, Brushes.Black, 22, 107);
-
-                Rectangle saveBox = new Rectangle(52, 68, 36, 62);
-                DrawInteractiveButton(g, saveBox, false, 4);
-                DrawSaveIconLarge(g, 52, 70);
-                g.DrawString("Lưu", btnFont, Brushes.Black, 60, 107);
-
-                Rectangle pasteBox = new Rectangle(90, 68, 42, 62);
+                // ==================== Group 1: Clipboard (Bảng tạm) (X: 14 to 236) ====================
+                Rectangle pasteBox = new Rectangle(14, 68, 52, 62);
                 DrawInteractiveButton(g, pasteBox, false, 4);
-                DrawPasteIconLarge(g, 92, 70);
-                g.DrawString("Dán ▾", btnFont, Brushes.Black, 95, 107);
+                DrawPasteIconLarge(g, 22, 70);
+                g.DrawString("Dán ▾", btnFont, Brushes.Black, 22, 107);
 
-                Rectangle cutBox = new Rectangle(136, 68, 98, 20);
+                Rectangle cutBox = new Rectangle(72, 68, 162, 20);
                 DrawInteractiveButton(g, cutBox, false, 3);
-                DrawCutIcon(g, 138, 71, Color.FromArgb(51, 65, 85));
-                g.DrawString("Cắt", btnFont, Brushes.Black, 160, 70);
+                DrawCutIcon(g, 76, 71, Color.FromArgb(51, 65, 85));
+                g.DrawString("Cắt", btnFont, Brushes.Black, 102, 70);
 
-                Rectangle copyBox = new Rectangle(136, 89, 98, 20);
+                Rectangle copyBox = new Rectangle(72, 89, 162, 20);
                 DrawInteractiveButton(g, copyBox, false, 3);
-                DrawCopyIcon(g, 138, 92, Color.FromArgb(51, 65, 85));
-                g.DrawString("Sao chép", btnFont, Brushes.Black, 160, 91);
+                DrawCopyIcon(g, 76, 92, Color.FromArgb(51, 65, 85));
+                g.DrawString("Sao chép", btnFont, Brushes.Black, 102, 91);
 
-                Rectangle fmtBox = new Rectangle(136, 110, 98, 20);
+                Rectangle fmtBox = new Rectangle(72, 110, 162, 20);
                 bool isFmtActive = (writerView != null && writerView.IsFormatPainterActive) || IsFormatPainterActive;
                 DrawInteractiveButton(g, fmtBox, isFmtActive, 3);
-                DrawFormatPainterIcon(g, 138, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
-                g.DrawString("Sao chép đ.d", btnFont, isFmtActive ? Brushes.Navy : Brushes.Black, 160, 112);
+                DrawFormatPainterIcon(g, 76, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
+                g.DrawString("Sao chép định dạng", btnFont, isFmtActive ? Brushes.Navy : Brushes.Black, 102, 112);
 
-                g.DrawString("Tệp & Bảng tạm", labelFont, Brushes.Gray, 78, 137);
+                g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 90, 137);
                 g.DrawLine(Pens.LightGray, 240, 68, 240, 148);
 
                 // ==================== Group 2: Font (Phông chữ) (X: 248 to 512) ====================
@@ -4086,7 +4447,22 @@ namespace GenOffice.UI
                     }
                 }, "Phần nhanh");
                 curX += 98;
-                g.DrawString("Văn bản", labelFont, Brushes.Gray, curX - 110, 137);
+
+                DrawVectorBtn(g, curX, 68, 92, 26, (g1, x1, y1) => { // Chữ hoa Drop Cap
+                    using (Font dF = new Font("Georgia", 11.5f, FontStyle.Bold))
+                    using (SolidBrush bD = new SolidBrush(blue))
+                    using (Pen pLine = new Pen(dimLine, 1.2f))
+                    {
+                        g1.DrawString("A", dF, bD, x1, y1 - 2);
+                        g1.DrawLine(pLine, x1 + 12, y1 + 3, x1 + 18, y1 + 3);
+                        g1.DrawLine(pLine, x1 + 12, y1 + 7, x1 + 18, y1 + 7);
+                        g1.DrawLine(pLine, x1 + 12, y1 + 11, x1 + 18, y1 + 11);
+                        g1.DrawLine(pLine, x1 + 2, y1 + 15, x1 + 18, y1 + 15);
+                    }
+                }, "Drop Cap ▾");
+                curX += 98;
+
+                g.DrawString("Văn bản", labelFont, Brushes.Gray, curX - 160, 137);
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
                 curX += 10;
 
@@ -6557,9 +6933,13 @@ namespace GenOffice.UI
             mGuides.Click += delegate(object s, EventArgs e) { if (writerView != null) { writerView.UseAlignmentGuides = !writerView.UseAlignmentGuides; if (parentForm != null) parentForm.Invalidate(); } };
             menu.Items.Add(mGuides);
 
-            ToolStripMenuItem mGridlines = new ToolStripMenuItem("Hiện đường lưới (View Gridlines)");
+            ToolStripMenuItem mGridlines = new ToolStripMenuItem("Hiện đường lưới");
             mGridlines.Checked = ShowGridlines;
-            mGridlines.Click += delegate(object s, EventArgs e) { ShowGridlines = !ShowGridlines; if (parentForm != null) parentForm.Invalidate(); };
+            mGridlines.Click += delegate(object s, EventArgs e) {
+                ShowGridlines = !ShowGridlines;
+                if (writerView != null) writerView.ShowDocumentGridlines = ShowGridlines;
+                if (parentForm != null) parentForm.Invalidate();
+            };
             menu.Items.Add(mGridlines);
 
             menu.Show(screenPos);
@@ -6909,27 +7289,72 @@ namespace GenOffice.UI
             breakDlg.Show();
         }
 
-        private void ShowLineNumbersPopupMenu(Point screenPos, Form parentForm)
+        private void ShowLineNumbersPopupMenu(Point screenPos, WriterView writerView, Form parentForm)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.RenderMode = ToolStripRenderMode.System;
 
-            menu.Items.Add("Không có (None)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
-            menu.Items.Add("Liên tục (Continuous)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
-            menu.Items.Add("Bắt đầu lại ở mỗi trang (Restart Each Page)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
-            menu.Items.Add("Bắt đầu lại ở mỗi đoạn (Restart Each Section)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
+            LineNumberingMode curMode = (writerView != null) ? writerView.LineNumberMode : this.LineNumberMode;
+
+            ToolStripMenuItem mNone = new ToolStripMenuItem("Không có (None)", null, delegate(object s, EventArgs e)
+            {
+                this.LineNumberMode = LineNumberingMode.None;
+                if (writerView != null) writerView.LineNumberMode = LineNumberingMode.None;
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = (curMode == LineNumberingMode.None) };
+
+            ToolStripMenuItem mContinuous = new ToolStripMenuItem("Liên tục (Continuous)", null, delegate(object s, EventArgs e)
+            {
+                this.LineNumberMode = LineNumberingMode.Continuous;
+                if (writerView != null) writerView.LineNumberMode = LineNumberingMode.Continuous;
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = (curMode == LineNumberingMode.Continuous) };
+
+            ToolStripMenuItem mPage = new ToolStripMenuItem("Bắt đầu lại ở mỗi trang (Restart Each Page)", null, delegate(object s, EventArgs e)
+            {
+                this.LineNumberMode = LineNumberingMode.RestartEachPage;
+                if (writerView != null) writerView.LineNumberMode = LineNumberingMode.RestartEachPage;
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = (curMode == LineNumberingMode.RestartEachPage) };
+
+            ToolStripMenuItem mSection = new ToolStripMenuItem("Bắt đầu lại ở mỗi đoạn (Restart Each Section)", null, delegate(object s, EventArgs e)
+            {
+                this.LineNumberMode = LineNumberingMode.RestartEachSection;
+                if (writerView != null) writerView.LineNumberMode = LineNumberingMode.RestartEachSection;
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = (curMode == LineNumberingMode.RestartEachSection) };
+
+            menu.Items.Add(mNone);
+            menu.Items.Add(mContinuous);
+            menu.Items.Add(mPage);
+            menu.Items.Add(mSection);
 
             menu.Show(screenPos);
         }
 
-        private void ShowHyphenationPopupMenu(Point screenPos, Form parentForm)
+        private void ShowHyphenationPopupMenu(Point screenPos, WriterView writerView, Form parentForm)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.RenderMode = ToolStripRenderMode.System;
 
-            menu.Items.Add("Không (None)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
-            menu.Items.Add("Tự động (Automatic)", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
-            menu.Items.Add("Thủ công (Manual)...", null, delegate(object s, EventArgs e) { if (parentForm != null) parentForm.Invalidate(); });
+            bool isHyphen = (writerView != null) ? writerView.IsHyphenationEnabled : this.IsHyphenationEnabled;
+
+            ToolStripMenuItem mNone = new ToolStripMenuItem("Không (None)", null, delegate(object s, EventArgs e)
+            {
+                this.IsHyphenationEnabled = false;
+                if (writerView != null) { writerView.IsHyphenationEnabled = false; writerView.Invalidate(); }
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = !isHyphen };
+
+            ToolStripMenuItem mAuto = new ToolStripMenuItem("Tự động (Automatic)", null, delegate(object s, EventArgs e)
+            {
+                this.IsHyphenationEnabled = true;
+                if (writerView != null) { writerView.IsHyphenationEnabled = true; writerView.Invalidate(); }
+                if (parentForm != null) parentForm.Invalidate();
+            }) { Checked = isHyphen };
+
+            menu.Items.Add(mNone);
+            menu.Items.Add(mAuto);
 
             menu.Show(screenPos);
         }
@@ -7958,6 +8383,14 @@ namespace GenOffice.UI
                 curX += 70;
 
                 g.DrawString("Bảo vệ", labelFont, Brushes.Gray, curX - 58, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 14;
+
+                // Group 6: Font & Tiếng Việt (Font & Vietnamese Toolkit)
+                DrawVectorToolBtnLarge(g, curX, 68, 96, 60, (g1, x1, y1) => DrawFontToolkitRibbonIcon(g1, x1, y1), "Font & Tiếng Việt");
+                curX += 98;
+
+                g.DrawString("Công cụ Font", labelFont, Brushes.Gray, curX - 86, 137);
             }
         }
         #endregion
@@ -8834,6 +9267,25 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawFontToolkitRibbonIcon(Graphics g, int x, int y)
+        {
+            using (Font f = new Font("Segoe UI", 11.5f, FontStyle.Bold))
+            using (SolidBrush b = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            {
+                g.DrawString("A", f, b, x - 2, y - 4);
+            }
+            using (Font fSub = new Font("Segoe UI", 8.0f, FontStyle.Bold))
+            using (SolidBrush bSub = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            {
+                g.DrawString("ă", fSub, bSub, x + 8, y + 1);
+            }
+            using (Pen pen = new Pen(Color.FromArgb(16, 185, 129), 1.6f))
+            {
+                g.DrawLine(pen, x + 7, y + 15, x + 10, y + 18);
+                g.DrawLine(pen, x + 10, y + 18, x + 16, y + 12);
+            }
+        }
+
         private void DrawBorderWidthRibbonIcon(Graphics g, int x, int y)
         {
             using (Pen p1 = new Pen(Color.Black, 1.0f))
@@ -9476,7 +9928,7 @@ namespace GenOffice.UI
             if (x >= 68 && x <= 120)
             {
                 ActiveDrawTool = 6;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Hand; parentForm.Invalidate(); }
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetEraserCursor(); parentForm.Invalidate(); }
                 return true;
             }
 
@@ -9484,31 +9936,36 @@ namespace GenOffice.UI
             if (x >= 134 && x <= 184)
             {
                 ActiveDrawTool = 1;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.Black); parentForm.Invalidate(); }
                 return true;
             }
             if (x >= 186 && x <= 234)
             {
                 ActiveDrawTool = 2;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.FromArgb(220, 38, 38)); parentForm.Invalidate(); }
                 return true;
             }
             if (x >= 236 && x <= 284)
             {
                 ActiveDrawTool = 3;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.FromArgb(37, 99, 235)); parentForm.Invalidate(); }
                 return true;
             }
             if (x >= 286 && x <= 342)
             {
                 ActiveDrawTool = 4;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                CustomPenIsHighlighter = true;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(Color.FromArgb(250, 204, 21)); parentForm.Invalidate(); }
                 return true;
             }
             if (x >= 344 && x <= 400)
             {
                 ActiveDrawTool = 5;
-                if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                CustomPenIsHighlighter = true;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(Color.FromArgb(34, 197, 94)); parentForm.Invalidate(); }
                 return true;
             }
             // Bút màu (Custom Pen): [402, 454]
@@ -9522,14 +9979,14 @@ namespace GenOffice.UI
                     {
                         CustomPenColor = c;
                         ActiveDrawTool = 7;
-                        if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                        if (parentForm != null) { parentForm.Cursor = CustomPenIsHighlighter ? OfficeDrawingCursorHelper.GetHighlighterCursor(c) : OfficeDrawingCursorHelper.GetPenCursor(c); parentForm.Invalidate(); }
                     };
                     colDlg.Show();
                 }
                 else
                 {
                     ActiveDrawTool = 7;
-                    if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                    if (parentForm != null) { parentForm.Cursor = CustomPenIsHighlighter ? OfficeDrawingCursorHelper.GetHighlighterCursor(CustomPenColor) : OfficeDrawingCursorHelper.GetPenCursor(CustomPenColor); parentForm.Invalidate(); }
                 }
                 return true;
             }
@@ -9549,7 +10006,7 @@ namespace GenOffice.UI
                         CustomPenIsHighlighter = false;
                         CustomPenWidth = 2.5f;
                         ActiveDrawTool = 7;
-                        if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                        if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(c); parentForm.Invalidate(); }
                     };
                     colDlg.Show();
                 };
@@ -9562,7 +10019,7 @@ namespace GenOffice.UI
                         CustomPenIsHighlighter = true;
                         CustomPenWidth = 18.0f;
                         ActiveDrawTool = 7;
-                        if (parentForm != null) { parentForm.Cursor = Cursors.Cross; parentForm.Invalidate(); }
+                        if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(c); parentForm.Invalidate(); }
                     };
                     colDlg.Show();
                 };
@@ -9934,11 +10391,11 @@ namespace GenOffice.UI
             if (x >= 224 && x <= 304)
             {
                 ContextMenuStrip cms = new ContextMenuStrip();
-                cms.Items.Add("📂 Sử dụng danh sách có sẵn (Excel / CSV)...", null, (s, e) =>
+                cms.Items.Add("📂 Sử dụng danh sách có sẵn...", null, (s, e) =>
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
-                        ofd.Title = "Chọn danh sách người nhận (Excel / CSV / TXT)";
+                        ofd.Title = "Chọn danh sách người nhận";
                         ofd.Filter = "Tệp bảng tính & dữ liệu (*.xlsx;*.csv;*.txt)|*.xlsx;*.csv;*.txt|Tất cả tệp (*.*)|*.*";
                         if (ofd.ShowDialog(parentForm) == DialogResult.OK)
                         {
@@ -10103,7 +10560,7 @@ namespace GenOffice.UI
                 {
                     sel = writerView.PieceTable.GetText();
                 }
-                GenOffice.Core.SpeechHelper.ToggleSpeech(sel);
+                ZenQOffice.Core.SpeechHelper.ToggleSpeech(sel);
                 return true;
             }
             if (x >= 300 && x <= 358)
@@ -10199,7 +10656,29 @@ namespace GenOffice.UI
                 return true;
             }
 
+            // Group 6: Font & Tiếng Việt
+            if (x >= 970 && x <= 1076)
+            {
+                OpenVietnameseFontToolkit(parentForm);
+                return true;
+            }
+
             return false;
+        }
+
+        public void OpenVietnameseFontToolkit(Form parentForm)
+        {
+            string curDocPath = null;
+            AppForm appForm = (parentForm as AppForm) ?? HostAppForm ?? (Parent as AppForm);
+            if (appForm != null && appForm.Ribbon != null && appForm.Ribbon.ActiveDocIndex >= 0 && appForm.Ribbon.ActiveDocIndex < appForm.Ribbon.DocTabs.Count)
+            {
+                curDocPath = appForm.Ribbon.DocTabs[appForm.Ribbon.ActiveDocIndex].FilePath;
+            }
+            using (var dlg = new VietnameseFontToolkitForm(curDocPath))
+            {
+                dlg.ShowDialog(parentForm);
+            }
+            if (parentForm != null) parentForm.Invalidate();
         }
 
         private bool HandleTabTableDesignClick(int x, int y, WriterView writerView, Form parentForm)
@@ -10365,8 +10844,8 @@ namespace GenOffice.UI
                 propMenu.Items.Add(alignItem);
 
                 ToolStripMenuItem fitItem = new ToolStripMenuItem("Kích thước bảng (Size)");
-                fitItem.DropDownItems.Add("Tự khớp theo nội dung (AutoFit to Content)", null, (s, e) => { writerView.AutoFitTableToContents(); if (parentForm != null) parentForm.Invalidate(); });
-                fitItem.DropDownItems.Add("Tự khớp theo trang giấy (AutoFit to Window)", null, (s, e) => { writerView.AutoFitTableToWindow(); if (parentForm != null) parentForm.Invalidate(); });
+                fitItem.DropDownItems.Add("Tự khớp theo nội dung", null, (s, e) => { writerView.AutoFitTableToContents(); if (parentForm != null) parentForm.Invalidate(); });
+                fitItem.DropDownItems.Add("Tự khớp theo trang giấy", null, (s, e) => { writerView.AutoFitTableToWindow(); if (parentForm != null) parentForm.Invalidate(); });
                 fitItem.DropDownItems.Add("Chia đều độ rộng các cột", null, (s, e) => { writerView.DistributeTableColumns(); if (parentForm != null) parentForm.Invalidate(); });
                 fitItem.DropDownItems.Add("Chia đều chiều cao các hàng", null, (s, e) => { writerView.DistributeTableRows(); if (parentForm != null) parentForm.Invalidate(); });
                 propMenu.Items.Add(fitItem);
@@ -10378,7 +10857,7 @@ namespace GenOffice.UI
                 propMenu.Items.Add(padItem);
 
                 propMenu.Items.Add(new ToolStripSeparator());
-                propMenu.Items.Add("Bật/tắt đường lưới bảng (View Gridlines)", null, (s, e) => { writerView.ToggleTableGridlines(); if (parentForm != null) parentForm.Invalidate(); });
+                propMenu.Items.Add("Bật/tắt đường lưới bảng", null, (s, e) => { writerView.ToggleTableGridlines(); if (parentForm != null) parentForm.Invalidate(); });
                 propMenu.Items.Add("Bật/tắt lặp hàng tiêu đề (Repeat Header Row)", null, (s, e) => { writerView.ToggleRepeatHeaderRows(); if (parentForm != null) parentForm.Invalidate(); });
 
                 propMenu.Show(parentForm, x, 130);
@@ -10446,8 +10925,8 @@ namespace GenOffice.UI
             if (x >= 714 && x <= 776)
             {
                 ContextMenuStrip fitMenu = new ContextMenuStrip();
-                fitMenu.Items.Add("↔ Tự khớp nội dung (AutoFit to Content)", null, (s, e) => { writerView.AutoFitTableToContents(); if (parentForm != null) parentForm.Invalidate(); });
-                fitMenu.Items.Add("⟷ Tự khớp độ rộng cửa sổ (AutoFit to Window)", null, (s, e) => { writerView.AutoFitTableToWindow(); if (parentForm != null) parentForm.Invalidate(); });
+                fitMenu.Items.Add("↔ Tự khớp nội dung", null, (s, e) => { writerView.AutoFitTableToContents(); if (parentForm != null) parentForm.Invalidate(); });
+                fitMenu.Items.Add("⟷ Tự khớp độ rộng cửa sổ", null, (s, e) => { writerView.AutoFitTableToWindow(); if (parentForm != null) parentForm.Invalidate(); });
                 fitMenu.Show(parentForm, x, 130);
                 return true;
             }
@@ -10726,45 +11205,33 @@ namespace GenOffice.UI
             {
                 CalcSelectionFormat summary = (calcView != null) ? calcView.GetSelectionFormat() : new CalcSelectionFormat();
 
-                // ==================== Group 1: Tệp & Bảng tạm (X: 14..240) ====================
-                // 1. Mở (Open)
-                Rectangle openBox = new Rectangle(14, 68, 36, 62);
-                DrawInteractiveButton(g, openBox, false, 4);
-                DrawOpenIconLarge(g, 14, 70);
-                g.DrawString("Mở", btnFont, Brushes.Black, 22, 107);
-
-                // 2. Lưu (Save)
-                Rectangle saveBox = new Rectangle(52, 68, 36, 62);
-                DrawInteractiveButton(g, saveBox, false, 4);
-                DrawSaveIconLarge(g, 52, 70);
-                g.DrawString("Lưu", btnFont, Brushes.Black, 60, 107);
-
-                // 3. Dán (Paste)
-                Rectangle pasteBox = new Rectangle(90, 68, 42, 62);
+                // ==================== Group 1: Bảng tạm (X: 14..240) ====================
+                // 1. Dán (Paste)
+                Rectangle pasteBox = new Rectangle(14, 68, 52, 62);
                 DrawInteractiveButton(g, pasteBox, false, 4);
-                DrawPasteIconLarge(g, 92, 70);
-                g.DrawString("Dán", btnFont, Brushes.Black, 95, 107);
-                DrawDropdownChevron(g, 118, 112, Color.FromArgb(100, 116, 139));
+                DrawPasteIconLarge(g, 22, 70);
+                g.DrawString("Dán", btnFont, Brushes.Black, 24, 107);
+                DrawDropdownChevron(g, 48, 112, Color.FromArgb(100, 116, 139));
 
-                // 4. Cắt, Sao chép, Chép ĐĐ
-                Rectangle cutBox = new Rectangle(136, 68, 98, 20);
+                // 2. Cắt, Sao chép, Chép ĐĐ
+                Rectangle cutBox = new Rectangle(72, 68, 162, 20);
                 DrawInteractiveButton(g, cutBox, false, 3);
-                DrawCutIcon(g, 138, 71, Color.FromArgb(51, 65, 85));
-                g.DrawString("Cắt", btnFont, Brushes.Black, 160, 70);
+                DrawCutIcon(g, 76, 71, Color.FromArgb(51, 65, 85));
+                g.DrawString("Cắt", btnFont, Brushes.Black, 102, 70);
 
-                Rectangle copyBox = new Rectangle(136, 89, 98, 20);
+                Rectangle copyBox = new Rectangle(72, 89, 162, 20);
                 DrawInteractiveButton(g, copyBox, false, 3);
-                DrawCopyIcon(g, 138, 92, Color.FromArgb(51, 65, 85));
-                g.DrawString("Sao chép", btnFont, Brushes.Black, 160, 91);
+                DrawCopyIcon(g, 76, 92, Color.FromArgb(51, 65, 85));
+                g.DrawString("Sao chép", btnFont, Brushes.Black, 102, 91);
                 DrawDropdownChevron(g, 218, 97, Color.FromArgb(100, 116, 139));
 
-                Rectangle fmtBox = new Rectangle(136, 110, 98, 20);
+                Rectangle fmtBox = new Rectangle(72, 110, 162, 20);
                 bool isFmtActive = calcView != null && calcView.IsFormatPainterActive;
                 DrawInteractiveButton(g, fmtBox, isFmtActive, 3);
-                DrawFormatPainterIcon(g, 138, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
-                g.DrawString("Chép ĐD", btnFont, isFmtActive ? Brushes.Navy : Brushes.Black, 160, 112);
+                DrawFormatPainterIcon(g, 76, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
+                g.DrawString("Sao chép định dạng", btnFont, isFmtActive ? Brushes.Navy : Brushes.Black, 102, 112);
 
-                g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 78, 137);
+                g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 90, 137);
                 DrawGroupLauncherIcon(g, 224, 136);
                 g.DrawLine(Pens.LightGray, 240, 68, 240, 148);
 
@@ -10805,7 +11272,6 @@ namespace GenOffice.UI
                 Rectangle uRect = new Rectangle(296, 96, 28, 24);
                 DrawInteractiveButton(g, uRect, summary.Underline, 2);
                 DrawLucideUnderline(g, 298, 98, Color.FromArgb(38, 38, 42));
-                DrawDropdownChevron(g, 314, 107, Color.FromArgb(100, 116, 139));
 
                 Rectangle bdrRect = new Rectangle(326, 96, 28, 24);
                 DrawInteractiveButton(g, bdrRect, false, 2);
@@ -10887,7 +11353,7 @@ namespace GenOffice.UI
                 g.FillRectangle(Brushes.White, numCombo);
                 g.DrawRectangle(pBorder, numCombo);
                 DrawInteractiveButton(g, numCombo, false, 2);
-                string nFmtDisp = !string.IsNullOrEmpty(summary.NumberFormat) ? (summary.NumberFormat == "General" ? "Chung (General)" : summary.NumberFormat) : "Chung (General)";
+                string nFmtDisp = !string.IsNullOrEmpty(summary.NumberFormat) ? (summary.NumberFormat == "General" ? "Chung" : summary.NumberFormat) : "Chung";
                 g.DrawString(nFmtDisp, btnFont, Brushes.Black, 670, 71);
                 DrawDropdownChevron(g, 772, 78, Color.FromArgb(100, 116, 139));
 
@@ -12732,17 +13198,33 @@ namespace GenOffice.UI
             }
             if (curTab == "Trang đầu") { DrawPowerPointTabHome(g, width, slidesView); return; }
             if (curTab == "Chèn") { DrawPowerPointTabInsert(g, width, slidesView); return; }
+            if (curTab == "Vẽ") { DrawPowerPointTabDraw(g, width, slidesView); return; }
             if (curTab == "Thiết kế") { DrawPowerPointTabDesign(g, width, slidesView); return; }
             if (curTab == "Chuyển tiếp") { DrawPowerPointTabTransitions(g, width, slidesView); return; }
             if (curTab == "Hoạt họa") { DrawPowerPointTabAnimations(g, width, slidesView); return; }
             if (curTab == "Trình chiếu") { DrawPowerPointTabSlideShow(g, width, slidesView); return; }
+            if (curTab == "Xem lại") { DrawPowerPointTabReview(g, width, slidesView); return; }
             if (curTab == "Hiển thị") { DrawPowerPointTabView(g, width, slidesView); return; }
 
             if (slidesView != null && slidesView.SelectedShape != null)
             {
+                if (curTab == "Định dạng Đồ họa") { DrawPowerPointTabGraphicsFormat(g, width, slidesView); return; }
                 if (curTab == "Định dạng Video") { DrawPowerPointTabVideoFormat(g, width, slidesView); return; }
-                if (curTab == "Phát lại") { DrawPowerPointTabVideoPlayback(g, width, slidesView); return; }
+                if (curTab == "Định dạng Âm thanh") { DrawPowerPointTabAudioFormat(g, width, slidesView); return; }
+                if (curTab == "Phát lại")
+                {
+                    if (slidesView.SelectedShape.Type == ShapeType.Audio || !string.IsNullOrEmpty(slidesView.SelectedShape.AudioPath))
+                    {
+                        DrawPowerPointTabAudioPlayback(g, width, slidesView);
+                    }
+                    else
+                    {
+                        DrawPowerPointTabVideoPlayback(g, width, slidesView);
+                    }
+                    return;
+                }
                 if (curTab == "Thiết kế Bảng") { DrawPowerPointTabTableDesign(g, width, slidesView); return; }
+                if (curTab == "Bố trí Bảng") { DrawTabTableLayout(g, width, null); return; }
                 if (curTab == "Định dạng Hình ảnh") { DrawPowerPointTabPictureFormat(g, width, slidesView); return; }
                 if (curTab == "Thiết kế SmartArt" || curTab == "Định dạng Hình dạng" || curTab == "Định dạng") { DrawPowerPointTabShapeFormat(g, width, slidesView); return; }
             }
@@ -13332,38 +13814,28 @@ namespace GenOffice.UI
                 Color disabledCol = Color.FromArgb(160, 165, 175);
                 using (SolidBrush disabledBrush = new SolidBrush(disabledCol))
                 {
-                    // ==================== Group 1: Open, Save & Clipboard (X: 14 to 204) ====================
-                    Rectangle openBox = new Rectangle(14, 68, 36, 62);
-                    DrawInteractiveButton(g, openBox, false, 4);
-                    DrawOpenIconLarge(g, 14, 70);
-                    g.DrawString("Mở", btnFont, darkBrush, 22, 107);
-
-                    Rectangle saveBox = new Rectangle(52, 68, 36, 62);
-                    DrawInteractiveButton(g, saveBox, false, 4);
-                    DrawSaveIconLarge(g, 52, 70);
-                    g.DrawString("Lưu", btnFont, darkBrush, 60, 107);
-
-                    Rectangle pasteBox = new Rectangle(90, 68, 42, 62);
+                    // ==================== Group 1: Clipboard (Bảng tạm) (X: 14 to 204) ====================
+                    Rectangle pasteBox = new Rectangle(14, 68, 52, 62);
                     DrawInteractiveButton(g, pasteBox, false, 4);
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Paste, new Rectangle(90, 70, 42, 34), 30, neutralIcon, pptAccent);
-                    g.DrawString("Dán ▾", btnFont, darkBrush, 95, 107);
+                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Paste, new Rectangle(14, 70, 52, 34), 30, neutralIcon, pptAccent);
+                    g.DrawString("Dán ▾", btnFont, darkBrush, 22, 107);
 
-                    Rectangle cutBox = new Rectangle(136, 68, 64, 20);
+                    Rectangle cutBox = new Rectangle(72, 68, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, cutBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Cut, 139, 70, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Cắt", btnFont, hasSelection ? darkBrush : disabledBrush, 158, 70);
+                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Cut, 76, 70, 16, 16, hasSelection ? neutralIcon : disabledCol);
+                    g.DrawString("Cắt", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 70);
 
-                    Rectangle copyBox = new Rectangle(136, 89, 64, 20);
+                    Rectangle copyBox = new Rectangle(72, 89, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, copyBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Copy, 139, 91, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Chép", btnFont, hasSelection ? darkBrush : disabledBrush, 158, 91);
+                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Copy, 76, 91, 16, 16, hasSelection ? neutralIcon : disabledCol);
+                    g.DrawString("Chép", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 91);
 
-                    Rectangle fmtBox = new Rectangle(136, 110, 64, 20);
+                    Rectangle fmtBox = new Rectangle(72, 110, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, fmtBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.FormatPainter, 139, 112, 16, 16, hasSelection ? neutralIcon : disabledCol, hasSelection ? pptAccent : disabledCol);
-                    g.DrawString("Chổi", btnFont, hasSelection ? darkBrush : disabledBrush, 158, 112);
+                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.FormatPainter, 76, 112, 16, 16, hasSelection ? neutralIcon : disabledCol, hasSelection ? pptAccent : disabledCol);
+                    g.DrawString("Chổi", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 112);
 
-                    g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 82, 137);
+                    g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 72, 137);
                     BtnSlidesClipboardLauncherBounds = new Rectangle(188, 134, 14, 14);
                     DrawInteractiveButton(g, BtnSlidesClipboardLauncherBounds, false, 2);
                     DrawDialogLauncherIcon(g, BtnSlidesClipboardLauncherBounds.X + 3, BtnSlidesClipboardLauncherBounds.Y + 3);
@@ -13413,15 +13885,15 @@ namespace GenOffice.UI
 
                     Rectangle aIncBox = new Rectangle(556, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, aIncBox, false, 2);
-                    DrawLucideAIncrease(g, 559, 70, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideAIncrease(g, 557, 70, hasSelection ? neutralIcon : disabledCol);
 
                     Rectangle aDecBox = new Rectangle(582, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, aDecBox, false, 2);
-                    DrawLucideADecrease(g, 585, 70, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideADecrease(g, 583, 70, hasSelection ? neutralIcon : disabledCol);
 
                     Rectangle clearFmtBox = new Rectangle(608, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, clearFmtBox, false, 2);
-                    DrawLucideClearFormatting(g, 611, 70);
+                    DrawLucideClearFormatting(g, 609, 70);
 
                     // Font style buttons row 2 (Y: 96) - Authentic Office 365 Typography Toolbar
                     bool isB = hasSelection ? slidesView.SelectedShape.Bold : IsBold;
@@ -13980,18 +14452,6 @@ namespace GenOffice.UI
                 DrawPptShapesGroupVector(g, curX, 70, 56, 24);
                 g.DrawString("Hình khối ▾", btnFont, darkBrush, new RectangleF(shpBox.X - 2, 96, shpBox.Width + 4, 26), sfCenter);
                 curX += 60;
-
-                Rectangle iconBox = new Rectangle(curX, 68, 58, 56);
-                DrawInteractiveButton(g, iconBox, false, 4);
-                DrawPptIconsVector(g, curX, 70, 58, 24);
-                g.DrawString("Biểu tượng", btnFont, darkBrush, new RectangleF(iconBox.X - 2, 96, iconBox.Width + 4, 26), sfCenter);
-                curX += 62;
-
-                Rectangle modelBox = new Rectangle(curX, 68, 64, 56);
-                DrawInteractiveButton(g, modelBox, false, 4);
-                DrawPpt3DModelVector(g, curX, 70, 64, 24);
-                g.DrawString("Mô hình 3D", btnFont, darkBrush, new RectangleF(modelBox.X - 2, 96, modelBox.Width + 4, 26), sfCenter);
-                curX += 68;
 
                 Rectangle saBox = new Rectangle(curX, 68, 56, 56);
                 DrawInteractiveButton(g, saBox, false, 4);
@@ -14967,7 +15427,7 @@ namespace GenOffice.UI
                 DrawInteractiveButton(g, cboMonRect, false, 3);
                 string monText = (slidesView != null && slidesView.SelectedMonitorIndex > 0)
                     ? string.Format("Màn hình {0}", slidesView.SelectedMonitorIndex)
-                    : "Tự động (Auto)";
+                    : "Tự động";
                 g.DrawString(monText, labelFont, Brushes.Black, cboMonRect.X + 6, cboMonRect.Y + 3);
                 g.DrawString("▾", smallFont, Brushes.DimGray, cboMonRect.Right - 14, cboMonRect.Y + 4);
 
@@ -14978,6 +15438,20 @@ namespace GenOffice.UI
                 curX += 215;
                 // Group 3 Title & Separator
                 g.DrawString("Màn hình", groupFont, Brushes.Gray, new RectangleF(g3Start, 137, curX - g3Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+
+                curX += 10;
+                // ==================== GROUP 4: Di động & Laser (Mobile Connect) ====================
+                int g4Start = curX;
+                Rectangle btnMobile = new Rectangle(curX, 68, 88, 62);
+                DrawInteractiveButton(g, btnMobile, false, 4);
+                FluentIconRenderer.DrawGlyph(g, '\uE8EA', new Rectangle(btnMobile.X + 29, 70, 30, 26), Color.FromArgb(37, 99, 235), 20f);
+                g.DrawString("Di động & Laser", boldFont, Brushes.Black, new RectangleF(btnMobile.X, 99, btnMobile.Width, 16), sfCenter);
+                bool isConn = ZenQOffice.Core.ZenQConnectServer.Instance.IsClientConnected;
+                g.DrawString(isConn ? "● Đã kết nối" : "ZenQ Connect", smallFont, isConn ? Brushes.Green : Brushes.DimGray, new RectangleF(btnMobile.X, 114, btnMobile.Width, 14), sfCenter);
+                curX += 92;
+
+                g.DrawString("Điều khiển Từ xa", groupFont, Brushes.Gray, new RectangleF(g4Start, 137, curX - g4Start, 14), sfCenter);
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
             }
         }
@@ -15904,6 +16378,175 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawPowerPointTabDraw(Graphics g, int width, SlidesView slidesView)
+        {
+            DrawTabVe(g, width, null);
+        }
+
+        private void DrawPowerPointTabReview(Graphics g, int width, SlidesView slidesView)
+        {
+            DrawTabXemLai(g, width, null);
+        }
+
+        private void DrawPowerPointTabGraphicsFormat(Graphics g, int width, SlidesView slidesView)
+        {
+            if (slidesView == null || slidesView.SelectedShape == null) return;
+            ShapeNode shape = slidesView.SelectedShape;
+
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (Font btnFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (Font boldFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+            using (Font miniFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (Font valFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (SolidBrush darkBrush = new SolidBrush(Color.FromArgb(31, 41, 55)))
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+                Color neutralIcon = Color.FromArgb(55, 65, 81);
+                Color pptAccent = Color.FromArgb(210, 71, 38);
+
+                int curX = 14;
+
+                // ==================== Group 1: Thay đổi Đồ họa (Change Graphic) ====================
+                int g1Start = curX;
+                Rectangle chgGraphicBtn = new Rectangle(curX, 68, 76, 54);
+                DrawInteractiveButton(g, chgGraphicBtn, false, 4);
+                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Icons, new Rectangle(chgGraphicBtn.X, 70, chgGraphicBtn.Width, 24), 22, neutralIcon, pptAccent);
+                g.DrawString("Đổi đồ họa ▾", btnFont, darkBrush, new RectangleF(chgGraphicBtn.X - 2, 98, chgGraphicBtn.Width + 4, 22), sfCenter);
+                curX += 80;
+
+                Rectangle convBtn = new Rectangle(curX, 68, 94, 54);
+                DrawInteractiveButton(g, convBtn, false, 4);
+                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Shapes, new Rectangle(convBtn.X, 70, convBtn.Width, 24), 22, neutralIcon, pptAccent);
+                g.DrawString("Rã thành Hình", btnFont, darkBrush, new RectangleF(convBtn.X - 2, 98, convBtn.Width + 4, 22), sfCenter);
+                curX += 98;
+
+                g.DrawString("Thay đổi", labelFont, Brushes.Gray, new RectangleF(g1Start, 137, curX - g1Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== Group 2: Kiểu Đồ họa (Graphic Styles) ====================
+                int g2Start = curX;
+                Color[] styleColors = new Color[] {
+                    Color.FromArgb(37, 99, 235),
+                    Color.FromArgb(220, 38, 38),
+                    Color.FromArgb(16, 185, 129),
+                    Color.FromArgb(245, 158, 11),
+                    Color.FromArgb(107, 114, 128)
+                };
+                for (int i = 0; i < styleColors.Length; i++)
+                {
+                    Rectangle styleBox = new Rectangle(curX + i * 36, 68, 32, 54);
+                    DrawInteractiveButton(g, styleBox, false, 4);
+                    using (SolidBrush fillB = new SolidBrush(styleColors[i]))
+                    {
+                        g.FillEllipse(fillB, styleBox.X + 6, styleBox.Y + 8, 20, 20);
+                    }
+                    using (Pen p = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                    {
+                        g.DrawEllipse(p, styleBox.X + 6, styleBox.Y + 8, 20, 20);
+                    }
+                    g.DrawString("Kiểu " + (i + 1), labelFont, darkBrush, new RectangleF(styleBox.X - 2, styleBox.Y + 34, styleBox.Width + 4, 16), sfCenter);
+                }
+                curX += styleColors.Length * 36 + 4;
+
+                // Mini stack: Tô màu đồ họa ▾, Viền đồ họa ▾, Hiệu ứng ▾
+                Rectangle fillBtn = new Rectangle(curX, 68, 120, 24);
+                DrawInteractiveButton(g, fillBtn, false, 3);
+                DrawPaletteVector(g, fillBtn.X + 6, fillBtn.Y + 5, 14, 14, Color.FromArgb(37, 99, 235));
+                g.DrawString("Tô màu Đồ họa ▾", btnFont, darkBrush, fillBtn.X + 24, fillBtn.Y + 3);
+
+                Rectangle outlineBtn = new Rectangle(curX, 94, 120, 24);
+                DrawInteractiveButton(g, outlineBtn, false, 3);
+                DrawBorderVector(g, outlineBtn.X + 6, outlineBtn.Y + 5, 14, 14, Color.FromArgb(210, 71, 38));
+                g.DrawString("Viền Đồ họa ▾", btnFont, darkBrush, outlineBtn.X + 24, outlineBtn.Y + 3);
+
+                Rectangle fxBtn = new Rectangle(curX, 120, 120, 24);
+                DrawInteractiveButton(g, fxBtn, false, 3);
+                DrawSparkleVector(g, fxBtn.X + 6, fxBtn.Y + 5, 11, Color.FromArgb(245, 158, 11));
+                g.DrawString("Hiệu ứng ▾", btnFont, darkBrush, fxBtn.X + 24, fxBtn.Y + 3);
+                curX += 124;
+
+                g.DrawString("Kiểu Đồ họa", labelFont, Brushes.Gray, new RectangleF(g2Start, 137, curX - g2Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== Group 3: Sắp xếp (Arrange) ====================
+                int g3Start = curX;
+                Rectangle bFwd = new Rectangle(curX, 68, 96, 18);
+                DrawInteractiveButton(g, bFwd, false, 2);
+                DrawLayerFwdVector(g, bFwd.X + 4, bFwd.Y + 3, Color.FromArgb(37, 99, 235));
+                g.DrawString("Đưa lên trên ▾", miniFont, darkBrush, bFwd.X + 18, bFwd.Y + 1);
+
+                Rectangle sBwd = new Rectangle(curX, 88, 96, 18);
+                DrawInteractiveButton(g, sBwd, false, 2);
+                DrawLayerBwdVector(g, sBwd.X + 4, sBwd.Y + 3, Color.FromArgb(75, 85, 99));
+                g.DrawString("Đưa ra sau ▾", miniFont, darkBrush, sBwd.X + 18, sBwd.Y + 1);
+
+                Rectangle selPane = new Rectangle(curX, 108, 96, 18);
+                DrawInteractiveButton(g, selPane, false, 2);
+                DrawSelectionPaneVector(g, selPane.X + 4, selPane.Y + 3, Color.FromArgb(16, 185, 129));
+                g.DrawString("Ngăn Lựa chọn", miniFont, darkBrush, selPane.X + 18, selPane.Y + 1);
+
+                Rectangle alignBox = new Rectangle(curX + 100, 68, 88, 18);
+                DrawInteractiveButton(g, alignBox, false, 2);
+                DrawAlignVector(g, alignBox.X + 4, alignBox.Y + 4, 12, 10, 0, Color.FromArgb(37, 99, 235));
+                g.DrawString("Căn chỉnh ▾", miniFont, darkBrush, alignBox.X + 18, alignBox.Y + 1);
+
+                Rectangle grpBox = new Rectangle(curX + 100, 88, 88, 18);
+                DrawInteractiveButton(g, grpBox, false, 2);
+                DrawGroupVector(g, grpBox.X + 4, grpBox.Y + 3, Color.FromArgb(75, 85, 99));
+                g.DrawString("Nhóm ▾", miniFont, darkBrush, grpBox.X + 18, grpBox.Y + 1);
+
+                Rectangle rotBox = new Rectangle(curX + 100, 108, 88, 18);
+                DrawInteractiveButton(g, rotBox, false, 2);
+                DrawRotateVector(g, rotBox.X + 4, rotBox.Y + 3, Color.FromArgb(234, 179, 8));
+                g.DrawString("Xoay ▾", miniFont, darkBrush, rotBox.X + 18, rotBox.Y + 1);
+                curX += 194;
+
+                g.DrawString("Sắp xếp", labelFont, Brushes.Gray, new RectangleF(g3Start, 137, curX - g3Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== Group 4: Kích thước & Cắt (Size & Crop) ====================
+                int g4Start = curX;
+                Rectangle cropBtn = new Rectangle(curX, 68, 64, 54);
+                DrawInteractiveButton(g, cropBtn, false, 4);
+                DrawCropVector(g, cropBtn.X + 20, cropBtn.Y + 6, 20, Color.FromArgb(37, 99, 235));
+                g.DrawString("Cắt ▾", btnFont, darkBrush, new RectangleF(cropBtn.X - 2, 98, cropBtn.Width + 4, 22), sfCenter);
+                curX += 68;
+
+                Rectangle hLabel = new Rectangle(curX, 68, 124, 25);
+                DrawInteractiveButton(g, hLabel, false, 3);
+                g.DrawString("↕ Cao:", btnFont, Brushes.DimGray, hLabel.X + 4, hLabel.Y + 4);
+                string hStr = (shape.Transform.Height * 0.0264583f).ToString("0.00") + " cm";
+                g.DrawString(hStr, valFont, Brushes.Navy, hLabel.X + 42, hLabel.Y + 3);
+                Rectangle hUp = new Rectangle(hLabel.Right - 20, hLabel.Y + 1, 18, 11);
+                Rectangle hDn = new Rectangle(hLabel.Right - 20, hLabel.Y + 12, 18, 11);
+                DrawInteractiveButton(g, hUp, false, 1);
+                DrawInteractiveButton(g, hDn, false, 1);
+                g.DrawString("▲", labelFont, Brushes.Black, hUp.X + 3, hUp.Y - 2);
+                g.DrawString("▼", labelFont, Brushes.Black, hDn.X + 3, hDn.Y - 2);
+
+                Rectangle wLabel = new Rectangle(curX, 96, 124, 25);
+                DrawInteractiveButton(g, wLabel, false, 3);
+                g.DrawString("↔ Rộng:", btnFont, Brushes.DimGray, wLabel.X + 4, wLabel.Y + 4);
+                string wStr = (shape.Transform.Width * 0.0264583f).ToString("0.00") + " cm";
+                g.DrawString(wStr, valFont, Brushes.Navy, wLabel.X + 42, wLabel.Y + 3);
+                Rectangle wUp = new Rectangle(wLabel.Right - 20, wLabel.Y + 1, 18, 11);
+                Rectangle wDn = new Rectangle(wLabel.Right - 20, wLabel.Y + 12, 18, 11);
+                DrawInteractiveButton(g, wUp, false, 1);
+                DrawInteractiveButton(g, wDn, false, 1);
+                g.DrawString("▲", labelFont, Brushes.Black, wUp.X + 3, wUp.Y - 2);
+                g.DrawString("▼", labelFont, Brushes.Black, wDn.X + 3, wDn.Y - 2);
+                curX += 130;
+
+                g.DrawString("Kích thước", labelFont, Brushes.Gray, new RectangleF(g4Start, 137, curX - g4Start, 14), sfCenter);
+            }
+        }
+
         private void DrawPowerPointTabShapeFormat(Graphics g, int width, SlidesView slidesView)
         {
             if (slidesView == null || slidesView.SelectedShape == null) return;
@@ -16477,6 +17120,312 @@ namespace GenOffice.UI
             }
         }
 
+        private void DrawPowerPointTabAudioFormat(Graphics g, int width, SlidesView slidesView)
+        {
+            using (Font btnFont = new Font("Segoe UI", 9f))
+            using (Font labelFont = new Font("Segoe UI", 8.25f))
+            using (Font boldFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            using (Font miniFont = new Font("Segoe UI", 7.5f))
+            using (Font valFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            {
+                ShapeNode shape = (slidesView != null) ? slidesView.SelectedShape : null;
+                if (shape == null) return;
+
+                int curX = 14;
+
+                // ==================== 1. Nhóm Xem trước (Preview) ====================
+                Rectangle playBox = new Rectangle(curX, 68, 48, 54);
+                DrawInteractiveButton(g, playBox, false, 3);
+                using (SolidBrush playBrush = new SolidBrush(Color.FromArgb(16, 185, 129)))
+                {
+                    if (shape.IsAudioPlaying)
+                    {
+                        g.FillRectangle(playBrush, playBox.X + 16, playBox.Y + 10, 5, 20);
+                        g.FillRectangle(playBrush, playBox.X + 27, playBox.Y + 10, 5, 20);
+                    }
+                    else
+                    {
+                        g.FillPolygon(playBrush, new PointF[] {
+                            new PointF(playBox.X + 16, playBox.Y + 8),
+                            new PointF(playBox.X + 34, playBox.Y + 19),
+                            new PointF(playBox.X + 16, playBox.Y + 30)
+                        });
+                    }
+                }
+                g.DrawString(shape.IsAudioPlaying ? "Dừng" : "Phát", btnFont, Brushes.Black, playBox.X + (shape.IsAudioPlaying ? 8 : 10), playBox.Y + 33);
+                g.DrawString("Xem trước", labelFont, Brushes.Gray, curX - 2, 137);
+                curX += 54;
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 2. Nhóm Điều chỉnh (Adjust) ====================
+                // Row 1: Màu sắc Loa ▾ & Đổi Âm thanh ▾
+                Rectangle colBox = new Rectangle(curX, 68, 108, 24);
+                DrawInteractiveButton(g, colBox, false, 3);
+                DrawColorWashVector(g, colBox.X + 6, colBox.Y + 4, 15, Color.FromArgb(168, 85, 247));
+                g.DrawString("Màu sắc Loa ▾", btnFont, Brushes.Black, colBox.X + 24, colBox.Y + 2);
+
+                Rectangle changeBox = new Rectangle(curX + 112, 68, 126, 24);
+                DrawInteractiveButton(g, changeBox, false, 3);
+                DrawAudioVector(g, changeBox.X + 6, changeBox.Y + 4, 15, 15, Color.FromArgb(37, 99, 235));
+                g.DrawString("Đổi Tệp Âm thanh...", miniFont, Brushes.Black, changeBox.X + 24, changeBox.Y + 4);
+
+                // Row 2: Hiệu chỉnh ▾ & Đặt lại Thiết kế ▾
+                Rectangle corrBox = new Rectangle(curX, 96, 108, 24);
+                DrawInteractiveButton(g, corrBox, false, 3);
+                DrawSunVector(g, corrBox.X + 14, corrBox.Y + 12, 15, Color.FromArgb(234, 179, 8));
+                g.DrawString("Hiệu chỉnh ▾", btnFont, Brushes.Black, corrBox.X + 26, corrBox.Y + 2);
+
+                Rectangle resetBox = new Rectangle(curX + 112, 96, 126, 24);
+                DrawInteractiveButton(g, resetBox, false, 3);
+                DrawResetVector(g, resetBox.X + 12, resetBox.Y + 12, 6, Color.FromArgb(220, 38, 38));
+                g.DrawString("Đặt lại Thiết kế", btnFont, Brushes.Black, resetBox.X + 24, resetBox.Y + 2);
+
+                curX += 242;
+                g.DrawString("Điều chỉnh", labelFont, Brushes.Gray, curX - 146, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 3. Nhóm Kiểu Âm thanh (Audio Styles) ====================
+                int activeStyle = shape.AudioStyleIndex;
+                for (int i = 0; i < 5; i++)
+                {
+                    Rectangle cardR = new Rectangle(curX + i * 42, 68, 38, 54);
+                    bool isSelected = (activeStyle == i);
+                    DrawAudioStyleThumbnail(g, cardR, i, isSelected);
+                }
+                curX += 5 * 42 + 6;
+
+                // 2 Quick style menus
+                Rectangle aBorderBox = new Rectangle(curX, 74, 116, 22);
+                DrawInteractiveButton(g, aBorderBox, false, 2);
+                DrawBorderVector(g, aBorderBox.X + 4, aBorderBox.Y + 4, 13, 13, Color.FromArgb(16, 185, 129));
+                g.DrawString("Viền Biểu tượng ▾", miniFont, Brushes.Black, aBorderBox.X + 20, aBorderBox.Y + 3);
+
+                Rectangle aEffectBox = new Rectangle(curX, 100, 116, 22);
+                DrawInteractiveButton(g, aEffectBox, false, 2);
+                DrawSparkleVector(g, aEffectBox.X + 4, aEffectBox.Y + 4, 13, Color.FromArgb(234, 88, 12));
+                g.DrawString("Hiệu ứng Biểu tượng ▾", miniFont, Brushes.Black, aEffectBox.X + 20, aEffectBox.Y + 3);
+
+                curX += 122;
+                g.DrawString("Kiểu Âm thanh", labelFont, Brushes.Gray, curX - 170, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 4. Nhóm Sắp xếp (Arrange) ====================
+                Rectangle fwdBox = new Rectangle(curX, 68, 88, 18);
+                DrawInteractiveButton(g, fwdBox, false, 2);
+                g.DrawString("Lên trước ▾", miniFont, Brushes.Black, fwdBox.X + 6, fwdBox.Y + 1);
+
+                Rectangle bwdBox = new Rectangle(curX, 88, 88, 18);
+                DrawInteractiveButton(g, bwdBox, false, 2);
+                g.DrawString("Về sau ▾", miniFont, Brushes.Black, bwdBox.X + 6, bwdBox.Y + 1);
+
+                Rectangle algnBox = new Rectangle(curX, 108, 88, 18);
+                DrawInteractiveButton(g, algnBox, false, 2);
+                g.DrawString("Căn chỉnh ▾", miniFont, Brushes.Black, algnBox.X + 6, algnBox.Y + 1);
+
+                curX += 94;
+                g.DrawString("Sắp xếp", labelFont, Brushes.Gray, curX - 60, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 5. Nhóm Kích cỡ (Size) ====================
+                Rectangle hBox = new Rectangle(curX, 72, 80, 24);
+                DrawInteractiveButton(g, hBox, false, 2);
+                g.DrawString("Cao: " + Math.Round(shape.Transform.Height, 0) + " px", miniFont, Brushes.Black, hBox.X + 4, hBox.Y + 4);
+
+                Rectangle wBox = new Rectangle(curX, 98, 80, 24);
+                DrawInteractiveButton(g, wBox, false, 2);
+                g.DrawString("Rộng: " + Math.Round(shape.Transform.Width, 0) + " px", miniFont, Brushes.Black, wBox.X + 4, wBox.Y + 4);
+
+                curX += 86;
+                g.DrawString("Kích cỡ", labelFont, Brushes.Gray, curX - 54, 137);
+            }
+        }
+
+        private void DrawPowerPointTabAudioPlayback(Graphics g, int width, SlidesView slidesView)
+        {
+            using (Font btnFont = new Font("Segoe UI", 9f))
+            using (Font labelFont = new Font("Segoe UI", 8.25f))
+            using (Font boldFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            using (Font miniFont = new Font("Segoe UI", 7.5f))
+            using (Font valFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            {
+                ShapeNode shape = (slidesView != null) ? slidesView.SelectedShape : null;
+                if (shape == null) return;
+
+                int curX = 14;
+
+                // ==================== 1. Nhóm Xem trước (Preview) ====================
+                Rectangle playBox = new Rectangle(curX, 68, 48, 54);
+                DrawInteractiveButton(g, playBox, false, 3);
+                using (SolidBrush playBrush = new SolidBrush(Color.FromArgb(16, 185, 129)))
+                {
+                    if (shape.IsAudioPlaying)
+                    {
+                        g.FillRectangle(playBrush, playBox.X + 16, playBox.Y + 10, 5, 20);
+                        g.FillRectangle(playBrush, playBox.X + 27, playBox.Y + 10, 5, 20);
+                    }
+                    else
+                    {
+                        g.FillPolygon(playBrush, new PointF[] {
+                            new PointF(playBox.X + 16, playBox.Y + 8),
+                            new PointF(playBox.X + 34, playBox.Y + 19),
+                            new PointF(playBox.X + 16, playBox.Y + 30)
+                        });
+                    }
+                }
+                g.DrawString(shape.IsAudioPlaying ? "Dừng" : "Phát", btnFont, Brushes.Black, playBox.X + (shape.IsAudioPlaying ? 8 : 10), playBox.Y + 33);
+                g.DrawString("Xem trước", labelFont, Brushes.Gray, curX - 2, 137);
+                curX += 54;
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 2. Nhóm Dấu trang (Bookmarks) ====================
+                Rectangle addBm = new Rectangle(curX, 68, 116, 24);
+                DrawInteractiveButton(g, addBm, false, 3);
+                DrawBookmarkVector(g, addBm.X + 6, addBm.Y + 4, 15, true);
+                g.DrawString("Thêm Dấu trang", btnFont, Brushes.Black, addBm.X + 24, addBm.Y + 2);
+
+                Rectangle remBm = new Rectangle(curX, 96, 116, 24);
+                DrawInteractiveButton(g, remBm, false, 3);
+                DrawBookmarkVector(g, remBm.X + 6, remBm.Y + 4, 15, false);
+                g.DrawString("Xóa Dấu trang", btnFont, Brushes.Black, remBm.X + 24, remBm.Y + 2);
+
+                curX += 122;
+                g.DrawString("Dấu trang", labelFont, Brushes.Gray, curX - 86, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 3. Nhóm Chỉnh sửa (Editing) ====================
+                Rectangle trimBox = new Rectangle(curX, 68, 64, 54);
+                DrawInteractiveButton(g, trimBox, false, 3);
+                DrawTrimVideoVector(g, trimBox.X + 20, trimBox.Y + 6, 24, Color.FromArgb(37, 99, 235));
+                g.DrawString("Cắt Âm thanh", miniFont, Brushes.Black, trimBox.X + 2, trimBox.Y + 34);
+                curX += 68;
+
+                // Fade In / Out Duration
+                Rectangle fiLabel = new Rectangle(curX, 68, 134, 25);
+                DrawInteractiveButton(g, fiLabel, false, 3);
+                g.DrawString("Mờ dần vào:", miniFont, Brushes.DimGray, fiLabel.X + 4, fiLabel.Y + 5);
+                string fiStr = shape.AudioFadeInDuration.ToString("00.00");
+                g.DrawString(fiStr, valFont, Brushes.Navy, fiLabel.X + 70, fiLabel.Y + 3);
+                Rectangle fiUp = new Rectangle(fiLabel.Right - 20, fiLabel.Y + 1, 18, 11);
+                Rectangle fiDn = new Rectangle(fiLabel.Right - 20, fiLabel.Y + 13, 18, 11);
+                DrawInteractiveButton(g, fiUp, false, 2);
+                DrawInteractiveButton(g, fiDn, false, 2);
+                g.DrawString("▲", miniFont, Brushes.Black, fiUp.X + 3, fiUp.Y - 2);
+                g.DrawString("▼", miniFont, Brushes.Black, fiDn.X + 3, fiDn.Y - 2);
+
+                Rectangle foLabel = new Rectangle(curX, 96, 134, 25);
+                DrawInteractiveButton(g, foLabel, false, 3);
+                g.DrawString("Mờ dần ra:", miniFont, Brushes.DimGray, foLabel.X + 4, foLabel.Y + 5);
+                string foStr = shape.AudioFadeOutDuration.ToString("00.00");
+                g.DrawString(foStr, valFont, Brushes.Navy, foLabel.X + 70, foLabel.Y + 3);
+                Rectangle foUp = new Rectangle(foLabel.Right - 20, foLabel.Y + 1, 18, 11);
+                Rectangle foDn = new Rectangle(foLabel.Right - 20, foLabel.Y + 13, 18, 11);
+                DrawInteractiveButton(g, foUp, false, 2);
+                DrawInteractiveButton(g, foDn, false, 2);
+                g.DrawString("▲", miniFont, Brushes.Black, foUp.X + 3, foUp.Y - 2);
+                g.DrawString("▼", miniFont, Brushes.Black, foDn.X + 3, foDn.Y - 2);
+
+                curX += 140;
+                g.DrawString("Chỉnh sửa", labelFont, Brushes.Gray, curX - 110, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 4. Nhóm Tùy chọn Âm thanh (Audio Options) ====================
+                // Row 1: Âm lượng & Bắt đầu
+                Rectangle volBox = new Rectangle(curX, 68, 86, 24);
+                DrawInteractiveButton(g, volBox, false, 3);
+                DrawVolumeVector(g, volBox.X + 6, volBox.Y + 4, 15, Color.FromArgb(37, 99, 235));
+                g.DrawString("Âm lượng ▾", miniFont, Brushes.Black, volBox.X + 22, volBox.Y + 4);
+
+                Rectangle startBox = new Rectangle(curX + 92, 68, 186, 24);
+                DrawInteractiveButton(g, startBox, false, 3);
+                g.DrawString("Bắt đầu:", miniFont, Brushes.DimGray, startBox.X + 4, startBox.Y + 4);
+                string startText = (shape.AudioStartMode == VideoStartMode.Automatically) ? "Tự động" :
+                                   (shape.AudioStartMode == VideoStartMode.WhenClickedOn) ? "Khi nhấp vào" : "Theo trình tự nhấp";
+                g.DrawString(startText, miniFont, Brushes.Navy, startBox.X + 50, startBox.Y + 4);
+                g.DrawString("▾", miniFont, Brushes.Gray, startBox.Right - 14, startBox.Y + 4);
+
+                // Row 2 & 3: 4 Checkboxes chuẩn PowerPoint
+                DrawPowerPointCheckBox(g, curX, 97, 134, 18, shape.AudioPlayAcrossSlides, "Phát trên các slide");
+                DrawPowerPointCheckBox(g, curX + 140, 97, 138, 18, shape.AudioHideDuringShow, "Ẩn khi trình chiếu");
+                DrawPowerPointCheckBox(g, curX, 118, 134, 18, shape.AudioLoopUntilStopped, "Lặp lại cho đến dừng");
+                DrawPowerPointCheckBox(g, curX + 140, 118, 138, 18, shape.AudioRewindAfterPlaying, "Tua lại sau khi phát");
+
+                curX += 284;
+                g.DrawString("Tùy chọn Âm thanh", labelFont, Brushes.Gray, curX - 180, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== 5. Nhóm Phát trong Nền (Play in Background) ====================
+                Rectangle bgPlayBox = new Rectangle(curX, 68, 92, 54);
+                DrawInteractiveButton(g, bgPlayBox, shape.AudioPlayAcrossSlides && shape.AudioHideDuringShow, 3);
+                DrawAudioVector(g, bgPlayBox.X + 36, bgPlayBox.Y + 6, 20, 20, Color.FromArgb(16, 185, 129));
+                g.DrawString("Phát trong Nền", miniFont, Brushes.Black, bgPlayBox.X + 8, bgPlayBox.Y + 34);
+
+                Rectangle noBgPlayBox = new Rectangle(curX + 96, 68, 92, 54);
+                DrawInteractiveButton(g, noBgPlayBox, false, 3);
+                DrawResetVector(g, noBgPlayBox.X + 46, noBgPlayBox.Y + 16, 6, Color.FromArgb(100, 116, 139));
+                g.DrawString("Không phát nền", miniFont, Brushes.Black, noBgPlayBox.X + 8, noBgPlayBox.Y + 34);
+
+                curX += 194;
+                g.DrawString("Phát trong Nền", labelFont, Brushes.Gray, curX - 120, 137);
+            }
+        }
+
+        private void DrawAudioStyleThumbnail(Graphics g, Rectangle r, int styleIdx, bool isSelected)
+        {
+            DrawInteractiveButton(g, r, isSelected, 3);
+            Rectangle inner = new Rectangle(r.X + 3, r.Y + 3, r.Width - 6, r.Height - 6);
+
+            Color topC, botC, bordC;
+            switch (styleIdx)
+            {
+                case 1:
+                    topC = Color.FromArgb(248, 250, 252);
+                    botC = Color.FromArgb(226, 232, 240);
+                    bordC = Color.FromArgb(148, 163, 184);
+                    break;
+                case 2:
+                    topC = Color.FromArgb(30, 27, 75);
+                    botC = Color.FromArgb(15, 23, 42);
+                    bordC = Color.FromArgb(99, 102, 241);
+                    break;
+                case 3:
+                    topC = Color.FromArgb(24, 10, 40);
+                    botC = Color.FromArgb(10, 10, 25);
+                    bordC = Color.FromArgb(236, 72, 153);
+                    break;
+                case 4:
+                    topC = Color.FromArgb(17, 24, 39);
+                    botC = Color.FromArgb(3, 7, 18);
+                    bordC = Color.FromArgb(234, 179, 8);
+                    break;
+                default:
+                    topC = Color.FromArgb(30, 41, 59);
+                    botC = Color.FromArgb(15, 23, 42);
+                    bordC = Color.FromArgb(56, 189, 248);
+                    break;
+            }
+
+            using (LinearGradientBrush lgb = new LinearGradientBrush(inner, topC, botC, 45f))
+            {
+                g.FillRectangle(lgb, inner);
+            }
+            using (Pen p = new Pen(bordC, isSelected ? 2f : 1f))
+            {
+                g.DrawRectangle(p, inner);
+            }
+
+            // Draw small speaker icon
+            Color spkCol = (styleIdx == 1) ? Color.FromArgb(30, 41, 59) : Color.White;
+            DrawAudioVector(g, inner.X + (inner.Width - 14) / 2, inner.Y + (inner.Height - 14) / 2, 14, 14, spkCol);
+        }
+
         private void DrawPowerPointCheckBox(Graphics g, int x, int y, int width, int height, bool isChecked, string text)
         {
             Rectangle boxRect = new Rectangle(x + 2, y + 2, 13, 13);
@@ -16745,7 +17694,7 @@ namespace GenOffice.UI
             }
         }
 
-        public bool HandleClick(int x, int y, WriterView writerView = null, Form parentForm = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null)
+        public bool HandleClick(int x, int y, WriterView writerView = null, Form parentForm = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             UpdateHover(x, y);
             if (ActiveOpenMenu != null && !ActiveDropdownBounds.Contains(x, y))
@@ -16760,7 +17709,10 @@ namespace GenOffice.UI
             {
                 if ((!CaptionCloseBounds.IsEmpty && CaptionCloseBounds.Contains(x, y)) ||
                     (!CaptionMaxBounds.IsEmpty && CaptionMaxBounds.Contains(x, y)) ||
-                    (!CaptionMinBounds.IsEmpty && CaptionMinBounds.Contains(x, y)))
+                    (!CaptionMinBounds.IsEmpty && CaptionMinBounds.Contains(x, y)) ||
+                    (!CaptionTouchModeBounds.IsEmpty && CaptionTouchModeBounds.Contains(x, y)) ||
+                    (!CaptionPeripheralsBounds.IsEmpty && CaptionPeripheralsBounds.Contains(x, y)) ||
+                    (!CaptionMobileConnectBounds.IsEmpty && CaptionMobileConnectBounds.Contains(x, y)))
                 {
                     return true;
                 }
@@ -16786,26 +17738,49 @@ namespace GenOffice.UI
                     return true;
                 }
 
-                int formW = (parentForm != null) ? parentForm.ClientSize.Width : ((Parent != null) ? Parent.ClientSize.Width : 1366);
-                int docAreaX = 120;
-                int captionButtonsWidth = (int)Math.Round(138f * (CurrentDpiScale > 0 ? CurrentDpiScale : 1.0f));
-                int docAreaW = Math.Max(10, formW - docAreaX - captionButtonsWidth - 10);
-                Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, maxTopY);
-
-                // 1. Check Home Tab (Luôn cố định ở vị trí đầu tiên index 0)
-                if (DocTabBounds.Count > 0 && DocTabBounds[0].Contains(x, y))
+                // 0. Check Document Tab Scroll Left / Right Arrows (< / >)
+                if (!DocTabScrollLeftBounds.IsEmpty && DocTabScrollLeftBounds.Contains(x, y))
                 {
-                    SwitchDocTab(0, slidesView, writerView, calcView, pdfView);
+                    ScrollDocTabsLeft(slidesView, writerView, calcView, pdfView, photoView);
+                    if (parentForm != null) parentForm.Invalidate();
+                    if (Parent != null) Parent.Invalidate();
+                    return true;
+                }
+                if (!DocTabScrollRightBounds.IsEmpty && DocTabScrollRightBounds.Contains(x, y))
+                {
+                    ScrollDocTabsRight(slidesView, writerView, calcView, pdfView, photoView);
                     if (parentForm != null) parentForm.Invalidate();
                     if (Parent != null) Parent.Invalidate();
                     return true;
                 }
 
-                // 2. Check Add Tab Button (Nằm trong vùng cuộn tài liệu)
-                if (!DocTabPlusBounds.IsEmpty && docClipRect.Contains(x, y) && DocTabPlusBounds.Contains(x, y))
+                int formW = (parentForm != null) ? parentForm.ClientSize.Width : ((Parent != null) ? Parent.ClientSize.Width : 1366);
+                int docAreaX = (_lastDocAreaX > 0) ? _lastDocAreaX : 120;
+                int docAreaW = (_lastDocAreaW > 20) ? _lastDocAreaW : Math.Max(10, formW - docAreaX - (int)Math.Round(214f * (CurrentDpiScale > 0 ? CurrentDpiScale : 1.0f)) - 10);
+                Rectangle docClipRect = new Rectangle(docAreaX, 0, docAreaW, maxTopY);
+
+                // 1. Check Home Tab (Luôn cố định ở vị trí đầu tiên index 0)
+                if (DocTabBounds.Count > 0 && DocTabBounds[0].Contains(x, y))
                 {
-                    Point plusCenter = new Point(DocTabPlusBounds.X + DocTabPlusBounds.Width / 2, DocTabPlusBounds.Y + DocTabPlusBounds.Height / 2);
-                    NewTabRadialLauncher.Toggle(plusCenter, parentForm as AppForm);
+                    SwitchDocTab(0, slidesView, writerView, calcView, pdfView, photoView);
+                    if (parentForm != null) parentForm.Invalidate();
+                    if (Parent != null) Parent.Invalidate();
+                    return true;
+                }
+
+                // 2. Check Add Tab Button (Luôn nhận click kể cả khi ghim ngoài docClipRect)
+                if (!DocTabPlusBounds.IsEmpty && DocTabPlusBounds.Contains(x, y))
+                {
+                    AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;
+                    if (app != null)
+                    {
+                        if (app.BackstageView != null && app.BackstageView.IsOpen)
+                        {
+                            app.CloseBackstageView();
+                        }
+                        Point plusCenter = new Point((DocTabPlusBounds.Left + DocTabPlusBounds.Right) / 2, DocTabPlusBounds.Bottom + 4);
+                        NewTabRadialLauncher.Toggle(plusCenter, app);
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     if (Parent != null) Parent.Invalidate();
                     return true;
@@ -16819,16 +17794,16 @@ namespace GenOffice.UI
                         // Close Button
                         if (i < DocTabCloseBounds.Count && !DocTabCloseBounds[i].IsEmpty && DocTabCloseBounds[i].Contains(x, y))
                         {
-                            CloseDocTab(i, slidesView, writerView, calcView, pdfView);
+                            CloseDocTab(i, slidesView, writerView, calcView, pdfView, photoView);
                             if (parentForm != null) parentForm.Invalidate();
                             if (Parent != null) Parent.Invalidate();
                             return true;
                         }
 
                         // Switch Tab
-                        if (i < DocTabBounds.Count && DocTabBounds[i].Contains(x, y))
+                        if (i < DocTabBounds.Count && !DocTabBounds[i].IsEmpty && DocTabBounds[i].Contains(x, y))
                         {
-                            SwitchDocTab(i, slidesView, writerView, calcView, pdfView);
+                            SwitchDocTab(i, slidesView, writerView, calcView, pdfView, photoView);
                             if (parentForm != null) parentForm.Invalidate();
                             if (Parent != null) Parent.Invalidate();
                             return true;
@@ -16850,40 +17825,13 @@ namespace GenOffice.UI
                     return true;
                 }
 
-                // 2. Kiểm tra click nút "Tệp" xanh dương (Quay về Trang chính / Backstage & Nhập Xuất)
+                // 2. Kiểm tra click nút "Tệp" (Mở Office Backstage View)
                 if (!RibbonFileBtnBounds.IsEmpty && RibbonFileBtnBounds.Contains(x, y))
                 {
                     AppForm appForm = parentForm as AppForm;
                     if (appForm != null)
                     {
-                        ContextMenuStrip fileMenu = new ContextMenuStrip();
-                        fileMenu.RenderMode = ToolStripRenderMode.System;
-                        fileMenu.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-
-                        fileMenu.Items.Add("🏠 Trang chủ / Quản lý tài liệu", null, (s, e) => {
-                            SwitchDocTab(0, slidesView, writerView, calcView, pdfView);
-                            if (parentForm != null) parentForm.Invalidate();
-                        });
-                        fileMenu.Items.Add(new ToolStripSeparator());
-
-                        fileMenu.Items.Add("📂 Mở tệp / Nhập dữ liệu... (Ctrl+O)", null, (s, e) => appForm.PerformQuickOpen());
-                        fileMenu.Items.Add("💾 Lưu (Ctrl+S)", null, (s, e) => appForm.PerformQuickSave());
-                        fileMenu.Items.Add("💾 Lưu với tên khác (Save As)...", null, (s, e) => appForm.PerformSaveAs());
-                        fileMenu.Items.Add(new ToolStripSeparator());
-
-                        fileMenu.Items.Add("📤 Xuất sang tệp PDF chuẩn Adobe (Export to PDF)...", null, (s, e) => appForm.PerformExportPdf());
-                        fileMenu.Items.Add("📤 Xuất sang các định dạng khác (Word, HTML, RTF, TXT)...", null, (s, e) => appForm.PerformSaveAs());
-                        fileMenu.Items.Add(new ToolStripSeparator());
-
-                        fileMenu.Items.Add("📄 Tạo tệp mới (Ctrl+N)", null, (s, e) => {
-                            string arg = "-" + CurrentMode.ToString().ToLowerInvariant();
-                            try { System.Diagnostics.Process.Start(Application.ExecutablePath, arg); } catch { }
-                        });
-                        fileMenu.Items.Add("🖨️ In tài liệu (Print)... (Ctrl+P)", null, (s, e) => appForm.PerformPrint());
-                        fileMenu.Items.Add(new ToolStripSeparator());
-
-                        fileMenu.Items.Add("❌ Đóng (Alt+F4)", null, (s, e) => appForm.Close());
-                        fileMenu.Show(parentForm, RibbonFileBtnBounds.Left, RibbonFileBtnBounds.Bottom + 2);
+                        appForm.OpenBackstageView();
                         return true;
                     }
 
@@ -16939,56 +17887,11 @@ namespace GenOffice.UI
                 {
                     if (writerView != null)
                     {
-                        // 📂 Big Open Button Click (Support DOCX, ODT, RTF, HTML, TXT)
-                        if (x >= 14 && x <= 50 && y >= 68 && y <= 130)
-                        {
-                            using (OpenFileDialog ofd = new OpenFileDialog())
-                            {
-                                ofd.Title = "Mở tài liệu ZenQ Writer (Chuẩn Microsoft Word OpenXML .docx)";
-                                ofd.Filter = "Tài liệu Word (*.docx)|*.docx|Văn bản OpenOffice Writer (*.odt)|*.odt|Tệp Rich Text (*.rtf)|*.rtf|Trang Web HTML (*.html)|*.html|Tệp Văn bản (*.txt)|*.txt|Tất cả tệp (*.*)|*.*";
-                                if (ofd.ShowDialog(parentForm) == DialogResult.OK)
-                                {
-                                    writerView.LoadDocumentFile(ofd.FileName, this);
-                                    string fileName = System.IO.Path.GetFileName(ofd.FileName);
-                                    DocTabs[ActiveDocIndex].Title = fileName;
-                                    DocTabs[ActiveDocIndex].FilePath = ofd.FileName;
-                                    DocTabs[ActiveDocIndex].IsModified = false;
-                                    if (parentForm != null) parentForm.Invalidate();
-                                    MessageBox.Show("Đã mở tài liệu '" + fileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                }
-                            }
-                            return true;
-                        }
-
-                        // 💾 Big Save Button Click (Support DOCX, ODT, RTF, HTML, TXT)
-                        if (x >= 52 && x <= 88 && y >= 68 && y <= 130)
-                        {
-                            using (SaveFileDialog sfd = new SaveFileDialog())
-                            {
-                                sfd.Title = "Lưu tài liệu ZenQ Writer (Chuẩn Microsoft Word OpenXML .docx)";
-                                sfd.Filter = "Tài liệu Word (*.docx)|*.docx|Văn bản OpenOffice Writer (*.odt)|*.odt|Tệp Rich Text (*.rtf)|*.rtf|Trang Web HTML (*.html)|*.html|Tệp Văn bản (*.txt)|*.txt|Tất cả tệp (*.*)|*.*";
-                                sfd.DefaultExt = "docx";
-                                sfd.FileName = DocTabs[ActiveDocIndex].Title.Replace(" *", "");
-
-                                if (sfd.ShowDialog(parentForm) == DialogResult.OK)
-                                {
-                                    writerView.SaveDocumentFile(sfd.FileName, this);
-                                    string fileName = System.IO.Path.GetFileName(sfd.FileName);
-                                    DocTabs[ActiveDocIndex].Title = fileName;
-                                    DocTabs[ActiveDocIndex].FilePath = sfd.FileName;
-                                    DocTabs[ActiveDocIndex].IsModified = false;
-                                    if (parentForm != null) parentForm.Invalidate();
-                                    MessageBox.Show("Đã lưu tài liệu '" + fileName + "' thành công (Chuẩn OpenXML DOCX tương thích 100% với MS Word)!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                }
-                            }
-                            return true;
-                        }
-
                         // Clipboard Buttons
-                        if (x >= 90 && x <= 132 && y >= 68 && y <= 130) { writerView.Paste(); return true; }
-                        if (x >= 136 && x <= 244 && y >= 68 && y <= 88) { writerView.Cut(); return true; }
-                        if (x >= 136 && x <= 244 && y >= 89 && y <= 109) { writerView.Copy(); return true; }
-                        if (x >= 136 && x <= 244 && y >= 110 && y <= 130)
+                        if (x >= 14 && x <= 68 && y >= 68 && y <= 130) { writerView.Paste(); return true; }
+                        if (x >= 72 && x <= 238 && y >= 68 && y <= 88) { writerView.Cut(); return true; }
+                        if (x >= 72 && x <= 238 && y >= 89 && y <= 109) { writerView.Copy(); return true; }
+                        if (x >= 72 && x <= 238 && y >= 110 && y <= 130)
                         {
                             writerView.ToggleFormatPainter(false, this);
                             IsFormatPainterActive = writerView.IsFormatPainterActive;
@@ -17049,9 +17952,26 @@ namespace GenOffice.UI
                         // Aa▾ Case Conversion Button (X: 466 to 488)
                         if (x >= 466 && x <= 488 && y >= 68 && y <= 92)
                         {
-                            writerView.ChangeCaseCycle();
-                            writerView.UpdateRibbonState(this);
-                            if (parentForm != null) parentForm.Invalidate();
+                            ContextMenuStrip caseMenu = new ContextMenuStrip();
+                            caseMenu.RenderMode = ToolStripRenderMode.System;
+                            string[] caseLabels = new string[] {
+                                "Chữ đầu câu hoa (Sentence case)",
+                                "chữ thường (lowercase)",
+                                "CHỮ HOA (UPPERCASE)",
+                                "Viết Hoa Từng Từ (Capitalize Each Word)",
+                                "đỔI kIỂU hOA tHƯỜNG (tOGGLE cASE)"
+                            };
+                            for (int mi = 0; mi < caseLabels.Length; mi++)
+                            {
+                                int mode = mi;
+                                caseMenu.Items.Add(caseLabels[mi], null, (s, e) => {
+                                    writerView.ApplyCase(mode);
+                                    writerView.UpdateRibbonState(this);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                            }
+                            Point pt = parentForm != null ? parentForm.PointToScreen(new Point(466, 92)) : new Point(466, 92);
+                            ShowRibbonDropdown(caseMenu, parentForm, pt, new Rectangle(466, 68, 22, 24));
                             return true;
                         }
 
@@ -17667,14 +18587,14 @@ namespace GenOffice.UI
                             if (parentForm != null) parentForm.Invalidate();
                             return true;
                         }
-                        // 7. Nhóm Văn bản (X: 858..1016)
-                        if (x >= 858 && x <= 1016)
+                        // 7. Nhóm Văn bản (X: 858..1118)
+                        if (x >= 858 && x <= 1118)
                         {
                             if (x <= 918 && y >= 68 && y <= 128) // TextBox Shape
                             {
                                 writerView.InsertTextBoxShape();
                             }
-                            else if (x >= 924)
+                            else if (x >= 924 && x <= 1016)
                             {
                                 if (y >= 68 && y <= 88) // WordArt
                                 {
@@ -17700,15 +18620,42 @@ namespace GenOffice.UI
                                     qpMenu.Show(menuPt);
                                 }
                             }
+                            else if (x >= 1022 && x <= 1118 && y >= 68 && y <= 128) // Drop Cap ▾
+                            {
+                                ContextMenuStrip dcMenu = new ContextMenuStrip();
+                                dcMenu.Items.Add("Không có (None)", null, (s1, e1) => {
+                                    writerView.ToggleDropCap(0);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                                dcMenu.Items.Add("Chìm trong văn bản (Dropped - 3 dòng)", null, (s1, e1) => {
+                                    writerView.ToggleDropCap(3, false);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                                dcMenu.Items.Add("Ngoài lề trang (In Margin - 3 dòng)", null, (s1, e1) => {
+                                    writerView.ToggleDropCap(3, true);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                                dcMenu.Items.Add(new ToolStripSeparator());
+                                dcMenu.Items.Add("Tùy chọn: Chìm 2 dòng", null, (s1, e1) => {
+                                    writerView.ToggleDropCap(2, false);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                                dcMenu.Items.Add("Tùy chọn: Chìm 4 dòng", null, (s1, e1) => {
+                                    writerView.ToggleDropCap(4, false);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                });
+                                Point menuPt = parentForm != null ? parentForm.PointToScreen(new Point(1022, 130)) : new Point(1022, 130);
+                                dcMenu.Show(menuPt);
+                            }
                             if (parentForm != null) parentForm.Invalidate();
                             return true;
                         }
-                        // 8. Nhóm Ký hiệu (X: 1026..1131)
-                        if (x >= 1026 && x <= 1131)
+                        // 8. Nhóm Ký hiệu (X: 1124..1235)
+                        if (x >= 1124 && x <= 1235)
                         {
                             if (y >= 68 && y <= 98) // Phương trình Equation
                             {
-                                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1026, 132)) : new Point(1026, 132);
+                                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1124, 132)) : new Point(1124, 132);
                                 QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(pt);
                                 eqDlg.OnEquationSelected = (latex) =>
                                 {
@@ -17719,7 +18666,7 @@ namespace GenOffice.UI
                             }
                             else if (y >= 98 && y <= 128) // Symbol
                             {
-                                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1026, 132)) : new Point(1026, 132);
+                                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1124, 132)) : new Point(1124, 132);
                                 QuickSymbolDropDownForm symDlg = new QuickSymbolDropDownForm(pt);
                                 symDlg.OnSymbolSelected = (sym) =>
                                 {
@@ -18040,11 +18987,35 @@ namespace GenOffice.UI
                                 {
                                     WatermarkText = txt;
                                     WatermarkIsDiagonal = isDiag;
+                                    WatermarkImage = null;
+                                    if (writerView != null)
+                                    {
+                                        writerView.WatermarkImage = null;
+                                    }
+                                    if (parentForm != null && !parentForm.IsDisposed) parentForm.Invalidate();
+                                };
+                                custDlg.OnApplyPictureWatermark = (img, scale, washout) =>
+                                {
+                                    WatermarkText = "";
+                                    WatermarkImage = img;
+                                    WatermarkImageScale = scale;
+                                    WatermarkWashout = washout;
+                                    if (writerView != null)
+                                    {
+                                        writerView.WatermarkImage = img;
+                                        writerView.WatermarkImageScale = scale;
+                                        writerView.WatermarkWashout = washout;
+                                    }
                                     if (parentForm != null && !parentForm.IsDisposed) parentForm.Invalidate();
                                 };
                                 custDlg.OnRemoveWatermark = () =>
                                 {
                                     WatermarkText = "";
+                                    WatermarkImage = null;
+                                    if (writerView != null)
+                                    {
+                                        writerView.WatermarkImage = null;
+                                    }
                                     if (parentForm != null && !parentForm.IsDisposed) parentForm.Invalidate();
                                 };
                                 custDlg.ShowDialog(parentForm);
@@ -18054,6 +19025,11 @@ namespace GenOffice.UI
                         wmDlg.OnRemoveWatermarkClicked = () =>
                         {
                             WatermarkText = "";
+                            WatermarkImage = null;
+                            if (writerView != null)
+                            {
+                                writerView.WatermarkImage = null;
+                            }
                             if (parentForm != null && !parentForm.IsDisposed) parentForm.Invalidate();
                         };
                         if (parentForm != null && !parentForm.IsDisposed) wmDlg.Show(parentForm); else wmDlg.Show();
@@ -18203,14 +19179,14 @@ namespace GenOffice.UI
                     if (BtnLineNumbersBounds.Contains(x, y))
                     {
                         Point pt = parentForm != null ? parentForm.PointToScreen(new Point(BtnLineNumbersBounds.X, BtnLineNumbersBounds.Bottom)) : new Point(BtnLineNumbersBounds.X, 110);
-                        ShowLineNumbersPopupMenu(pt, parentForm);
+                        ShowLineNumbersPopupMenu(pt, writerView, parentForm);
                         return true;
                     }
 
                     if (BtnHyphenationBounds.Contains(x, y))
                     {
                         Point pt = parentForm != null ? parentForm.PointToScreen(new Point(BtnHyphenationBounds.X, BtnHyphenationBounds.Bottom)) : new Point(BtnHyphenationBounds.X, 130);
-                        ShowHyphenationPopupMenu(pt, parentForm);
+                        ShowHyphenationPopupMenu(pt, writerView, parentForm);
                         return true;
                     }
 
@@ -18537,6 +19513,7 @@ namespace GenOffice.UI
                         else if (x >= 486 && x <= 604 && y > 96 && y <= 128) // Đường lưới (Gridlines)
                         {
                             ShowGridlines = !ShowGridlines;
+                            if (writerView != null) writerView.ShowDocumentGridlines = ShowGridlines;
                         }
                         else if (x >= 608 && x <= 676) // Ngăn điều hướng (Navigation Pane)
                         {
@@ -18802,7 +19779,7 @@ namespace GenOffice.UI
                         // 3. Nhóm Tiếp cận (Alt Text) (X: 660 -> 742)
                         if (x >= 660 && x <= 742)
                         {
-                            MessageBox.Show("Mô tả văn bản thay thế (Alt Text) cho ảnh:\n" + (string.IsNullOrEmpty(sh.AltText) ? "[Chưa có chú thích]" : sh.AltText), "ZENQ OFFICE Định dạng Hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            MessageBox.Show("Mô tả văn bản thay thế cho ảnh:\n" + (string.IsNullOrEmpty(sh.AltText) ? "[Chưa có chú thích]" : sh.AltText), "ZENQ OFFICE Định dạng Hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return true;
                         }
 
@@ -19215,6 +20192,10 @@ namespace GenOffice.UI
             {
                 return HandlePdfRibbonClick(x, y, pdfView, parentForm);
             }
+            else if (y > 64 && y <= 155 && CurrentMode == OfficeAppMode.Photo && photoView != null)
+            {
+                return HandlePhotoRibbonClick(x, y, photoView, parentForm);
+            }
             return false;
         }
 
@@ -19372,7 +20353,7 @@ namespace GenOffice.UI
                 if (lIdx >= 0 && lIdx < sampleLayouts.Length)
                 {
                     Rectangle curBounds = new Rectangle(sh.PageX, sh.PageY, Math.Max(100, sh.BaseWidth + sh.WidthDelta), Math.Max(60, sh.BaseHeight + sh.HeightDelta));
-                    var model = GenOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
+                    var model = ZenQOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
                     model.SwitchLayout(sampleLayouts[lIdx], sh, curBounds);
                     writerView.SyncShapeTagInDocument(sh);
                     writerView.SaveUndoState();
@@ -19387,7 +20368,7 @@ namespace GenOffice.UI
                     if (saDlg.ShowDialog(parentForm) == DialogResult.OK && !string.IsNullOrEmpty(saDlg.SelectedSmartArtType))
                     {
                         Rectangle curBounds = new Rectangle(sh.PageX, sh.PageY, Math.Max(100, sh.BaseWidth + sh.WidthDelta), Math.Max(60, sh.BaseHeight + sh.HeightDelta));
-                        var model = GenOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
+                        var model = ZenQOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
                         model.Title = saDlg.SelectedSmartArtName;
                         model.SwitchLayout(saDlg.SelectedSmartArtType, sh, curBounds);
                         writerView.SyncShapeTagInDocument(sh);
@@ -19409,7 +20390,7 @@ namespace GenOffice.UI
                     if (colors != null && colors.Length > 0)
                     {
                         Rectangle curBounds = new Rectangle(sh.PageX, sh.PageY, Math.Max(100, sh.BaseWidth + sh.WidthDelta), Math.Max(60, sh.BaseHeight + sh.HeightDelta));
-                        var model = GenOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
+                        var model = ZenQOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
                         model.ApplyPalette(colors, isOutline, sh, curBounds);
                         writerView.SyncShapeTagInDocument(sh);
                         writerView.SaveUndoState();
@@ -19425,7 +20406,7 @@ namespace GenOffice.UI
                 if (stIdx >= 0 && stIdx < 5)
                 {
                     Rectangle curBounds = new Rectangle(sh.PageX, sh.PageY, Math.Max(100, sh.BaseWidth + sh.WidthDelta), Math.Max(60, sh.BaseHeight + sh.HeightDelta));
-                    var model = GenOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
+                    var model = ZenQOffice.Format.OpenXmlSmartArtModel.FromDocShapeObject(sh);
                     model.ApplyVisualStyle(stIdx, sh, curBounds);
                     if (stIdx == 0) { sh.HasShadow = false; sh.OutlineWidth = 1.0f; }
                     else if (stIdx == 1) { sh.HasShadow = false; sh.OutlineWidth = 1.2f; }
@@ -19863,23 +20844,9 @@ namespace GenOffice.UI
         {
             if (ActiveRibbonTab == 0) // Trang đầu (Home)
             {
-                // ==================== Group 1: Tệp & Bảng tạm (X: 14 to 234) ====================
-                // Mở (Open) (X: 14..50, Y: 68..130)
-                if (x >= 14 && x <= 50 && y >= 68 && y <= 130)
-                {
-                    AppForm appForm = parentForm as AppForm;
-                    if (appForm != null) appForm.PerformQuickOpen();
-                    return true;
-                }
-                // Lưu (Save) (X: 52..88, Y: 68..130)
-                else if (x >= 52 && x <= 88 && y >= 68 && y <= 130)
-                {
-                    AppForm appForm = parentForm as AppForm;
-                    if (appForm != null) appForm.PerformQuickSave();
-                    return true;
-                }
-                // Dán Paste (X: 90..132, Y: 68..130)
-                else if (x >= 90 && x <= 132 && y >= 68 && y <= 130)
+                // ==================== Group 1: Bảng tạm (X: 14 to 238) ====================
+                // Dán Paste (X: 14..68, Y: 68..130)
+                if (x >= 14 && x <= 68 && y >= 68 && y <= 130)
                 {
                     if (Clipboard.ContainsText())
                     {
@@ -19890,8 +20857,8 @@ namespace GenOffice.UI
                     }
                     return true;
                 }
-                // Cắt Cut (X: 136..234, Y: 68..88)
-                else if (x >= 136 && x <= 234 && y >= 68 && y <= 88)
+                // Cắt Cut (X: 72..238, Y: 68..88)
+                else if (x >= 72 && x <= 238 && y >= 68 && y <= 88)
                 {
                     CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
                     if (cd != null && !string.IsNullOrEmpty(cd.RawValue))
@@ -19904,8 +20871,8 @@ namespace GenOffice.UI
                     }
                     return true;
                 }
-                // Sao chép Copy (X: 136..234, Y: 89..109)
-                else if (x >= 136 && x <= 234 && y >= 89 && y <= 109)
+                // Sao chép Copy (X: 72..238, Y: 89..109)
+                else if (x >= 72 && x <= 238 && y >= 89 && y <= 109)
                 {
                     CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
                     if (cd != null && !string.IsNullOrEmpty(cd.EvaluatedStr ?? cd.RawValue))
@@ -19914,8 +20881,8 @@ namespace GenOffice.UI
                     }
                     return true;
                 }
-                // Sao chép định dạng Format Painter (X: 136..234, Y: 110..130)
-                else if (x >= 136 && x <= 234 && y >= 110 && y <= 130)
+                // Sao chép định dạng Format Painter (X: 72..238, Y: 110..130)
+                else if (x >= 72 && x <= 238 && y >= 110 && y <= 130)
                 {
                     if (calcView.IsFormatPainterActive)
                     {
@@ -20182,11 +21149,11 @@ namespace GenOffice.UI
                 else if (x >= 666 && x <= 788 && y >= 68 && y <= 92)
                 {
                     ContextMenuStrip nMenu = new ContextMenuStrip();
-                    nMenu.Items.Add("Chung (General)", null, (s, e) => { calcView.SetNumberFormat("General"); if (parentForm != null) parentForm.Invalidate(); });
-                    nMenu.Items.Add("Số (Number: 1,234.00)", null, (s, e) => { calcView.SetNumberFormat("Number", 2); if (parentForm != null) parentForm.Invalidate(); });
-                    nMenu.Items.Add("Tiền tệ (Currency: $1,234.00)", null, (s, e) => { calcView.SetNumberFormat("Currency", 2); if (parentForm != null) parentForm.Invalidate(); });
-                    nMenu.Items.Add("Phần trăm (Percent: 12.34%)", null, (s, e) => { calcView.SetNumberFormat("Percent", 2); if (parentForm != null) parentForm.Invalidate(); });
-                    nMenu.Items.Add("Dấu phẩy (Comma: 1,234)", null, (s, e) => { calcView.SetNumberFormat("Comma", 0); if (parentForm != null) parentForm.Invalidate(); });
+                    nMenu.Items.Add("Chung", null, (s, e) => { calcView.SetNumberFormat("General"); if (parentForm != null) parentForm.Invalidate(); });
+                    nMenu.Items.Add("Số thập phân", null, (s, e) => { calcView.SetNumberFormat("Number", 2); if (parentForm != null) parentForm.Invalidate(); });
+                    nMenu.Items.Add("Tiền tệ", null, (s, e) => { calcView.SetNumberFormat("Currency", 2); if (parentForm != null) parentForm.Invalidate(); });
+                    nMenu.Items.Add("Phần trăm", null, (s, e) => { calcView.SetNumberFormat("Percent", 2); if (parentForm != null) parentForm.Invalidate(); });
+                    nMenu.Items.Add("Phân tách hàng nghìn", null, (s, e) => { calcView.SetNumberFormat("Comma", 0); if (parentForm != null) parentForm.Invalidate(); });
                     Point pt = parentForm != null ? parentForm.PointToScreen(new Point(666, 94)) : new Point(666, 94);
                     nMenu.Show(pt);
                     return true;
@@ -20335,8 +21302,8 @@ namespace GenOffice.UI
                     ContextMenuStrip fmtMenu = new ContextMenuStrip();
                     fmtMenu.ShowImageMargin = true;
                     fmtMenu.ImageScalingSize = new Size(16, 16);
-                    fmtMenu.Items.Add("Tự động căn chỉnh độ cao hàng (AutoFit Row Height)", CreateCellFormatIcon(0), (s, e) => { calcView.AutoFitSelectedRows(); if (parentForm != null) parentForm.Invalidate(); });
-                    fmtMenu.Items.Add("Tự động căn chỉnh độ rộng cột (AutoFit Column Width)", CreateCellFormatIcon(1), (s, e) => { calcView.AutoFitSelectedCols(); if (parentForm != null) parentForm.Invalidate(); });
+                    fmtMenu.Items.Add("Tự động căn chỉnh độ cao hàng", CreateCellFormatIcon(0), (s, e) => { calcView.AutoFitSelectedRows(); if (parentForm != null) parentForm.Invalidate(); });
+                    fmtMenu.Items.Add("Tự động căn chỉnh độ rộng cột", CreateCellFormatIcon(1), (s, e) => { calcView.AutoFitSelectedCols(); if (parentForm != null) parentForm.Invalidate(); });
                     fmtMenu.Items.Add(new ToolStripSeparator());
                     fmtMenu.Items.Add("Đặt độ cao hàng (Set Row Height: 25px)...", CreateCellFormatIcon(2), (s, e) => { calcView.SetSelectedRowsHeight(25); if (parentForm != null) parentForm.Invalidate(); });
                     fmtMenu.Items.Add("Đặt độ rộng cột (Set Column Width: 120px)...", CreateCellFormatIcon(3), (s, e) => { calcView.SetSelectedColsWidth(120); if (parentForm != null) parentForm.Invalidate(); });
@@ -20600,7 +21567,7 @@ namespace GenOffice.UI
                             hfDlg.ShowDialog(parentForm);
                         }
                     });
-                    txtMenu.Items.Add("Chữ nghệ thuật (WordArt)", null, (s, e) => { calcView.InsertWordArt(parentForm); });
+                    txtMenu.Items.Add("Chữ nghệ thuật", null, (s, e) => { calcView.InsertWordArt(parentForm); });
                     Point pt = parentForm != null ? parentForm.PointToScreen(new Point(814, 124)) : new Point(814, 124);
                     txtMenu.Show(pt);
                     return true;
@@ -20662,7 +21629,7 @@ namespace GenOffice.UI
                 if (x >= 14 && x <= 64 && y >= 68 && y <= 124)
                 {
                     ContextMenuStrip thMenu = new ContextMenuStrip();
-                    thMenu.Items.Add("Office Chuẩn (Default Green)", null, (s, e) => { calcView.ApplyTheme(0); if (parentForm != null) parentForm.Invalidate(); });
+                    thMenu.Items.Add("Office Chuẩn", null, (s, e) => { calcView.ApplyTheme(0); if (parentForm != null) parentForm.Invalidate(); });
                     thMenu.Items.Add("Xanh Đại Dương (Ocean Blue)", null, (s, e) => { calcView.ApplyTheme(1); if (parentForm != null) parentForm.Invalidate(); });
                     thMenu.Items.Add("Lục Bảo (Emerald)", null, (s, e) => { calcView.ApplyTheme(2); if (parentForm != null) parentForm.Invalidate(); });
                     thMenu.Items.Add("Hoàng Gia (Royal Purple)", null, (s, e) => { calcView.ApplyTheme(3); if (parentForm != null) parentForm.Invalidate(); });
@@ -21250,6 +22217,11 @@ namespace GenOffice.UI
                     }
                 });
 
+                fontMenu.Items.Add(new ToolStripSeparator());
+                fontMenu.Items.Add("🇻🇳 Sửa lỗi Tiếng Việt & Trích xuất Font...", null, (s, e) => {
+                    OpenVietnameseFontToolkit(parentForm);
+                });
+
                 fontMenu.Show(parentForm ?? Form.ActiveForm, new Point(x, y));
                 return true;
             }
@@ -21279,6 +22251,406 @@ namespace GenOffice.UI
                         if (parentForm != null) parentForm.Invalidate();
                     }
                 }
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool HandlePowerPointTabDrawClick(int x, int y, SlidesView slidesView, Form parentForm)
+        {
+            if (slidesView == null) return false;
+
+            // Group 1: Công cụ (Tools)
+            if (x >= 14 && x <= 66)
+            {
+                ActiveDrawTool = 0;
+                if (parentForm != null) { parentForm.Cursor = Cursors.Default; parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 68 && x <= 120)
+            {
+                ActiveDrawTool = 6;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetEraserCursor(); parentForm.Invalidate(); }
+                return true;
+            }
+
+            // Group 2: Bút vẽ (Pens)
+            if (x >= 134 && x <= 184)
+            {
+                ActiveDrawTool = 1;
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.Black); parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 186 && x <= 234)
+            {
+                ActiveDrawTool = 2;
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.FromArgb(220, 38, 38)); parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 236 && x <= 284)
+            {
+                ActiveDrawTool = 3;
+                CustomPenIsHighlighter = false;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(Color.FromArgb(37, 99, 235)); parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 286 && x <= 342)
+            {
+                ActiveDrawTool = 4;
+                CustomPenIsHighlighter = true;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(Color.FromArgb(250, 204, 21)); parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 344 && x <= 400)
+            {
+                ActiveDrawTool = 5;
+                CustomPenIsHighlighter = true;
+                if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(Color.FromArgb(34, 197, 94)); parentForm.Invalidate(); }
+                return true;
+            }
+            if (x >= 402 && x <= 454)
+            {
+                ActiveDrawTool = 7;
+                using (ColorDialog cd = new ColorDialog())
+                {
+                    cd.Color = CustomPenColor;
+                    if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                    {
+                        CustomPenColor = cd.Color;
+                        if (parentForm != null)
+                        {
+                            parentForm.Cursor = CustomPenIsHighlighter
+                                ? OfficeDrawingCursorHelper.GetHighlighterCursor(cd.Color)
+                                : OfficeDrawingCursorHelper.GetPenCursor(cd.Color);
+                            parentForm.Invalidate();
+                        }
+                    }
+                }
+                return true;
+            }
+            if (x >= 456 && x <= 512)
+            {
+                ContextMenuStrip penMenu = new ContextMenuStrip();
+                penMenu.Items.Add("🖊️ Thêm Bút thường...", null, (s, e) => {
+                    using (ColorDialog cd = new ColorDialog()) {
+                        if (cd.ShowDialog(parentForm) == DialogResult.OK) {
+                            CustomPenColor = cd.Color;
+                            CustomPenIsHighlighter = false;
+                            ActiveDrawTool = 7;
+                            if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetPenCursor(cd.Color); parentForm.Invalidate(); }
+                        }
+                    }
+                });
+                penMenu.Items.Add("🖍️ Thêm Bút dạ quang...", null, (s, e) => {
+                    using (ColorDialog cd = new ColorDialog()) {
+                        if (cd.ShowDialog(parentForm) == DialogResult.OK) {
+                            CustomPenColor = cd.Color;
+                            CustomPenIsHighlighter = true;
+                            ActiveDrawTool = 7;
+                            if (parentForm != null) { parentForm.Cursor = OfficeDrawingCursorHelper.GetHighlighterCursor(cd.Color); parentForm.Invalidate(); }
+                        }
+                    }
+                });
+                penMenu.Show(parentForm ?? Form.ActiveForm, new Point(x, y));
+                return true;
+            }
+            return false;
+        }
+
+        private bool HandlePowerPointTabReviewClick(int x, int y, SlidesView slidesView, Form parentForm)
+        {
+            if (slidesView == null) return false;
+
+            // Group 1: Kiểm tra
+            if (x >= 14 && x <= 78) // Chính tả
+            {
+                MessageBox.Show(parentForm, "Kiểm tra chính tả hoàn tất! Không phát hiện lỗi chính tả trên trang slide hiện tại.", "Soát lỗi chính tả", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return true;
+            }
+            if (x >= 80 && x <= 154) // Đồng nghĩa
+            {
+                string selWord = slidesView.SelectedShape?.Text ?? "";
+                using (ThesaurusDialogForm tDlg = new ThesaurusDialogForm(selWord, null))
+                {
+                    tDlg.ShowDialog(parentForm);
+                }
+                return true;
+            }
+            if (x >= 156 && x <= 224) // Đếm từ
+            {
+                int slideCount = slidesView.Presentation?.Slides.Count ?? 1;
+                int wordCount = 0;
+                int charCount = 0;
+                if (slidesView.Presentation != null)
+                {
+                    foreach (var sl in slidesView.Presentation.Slides)
+                    {
+                        foreach (var sh in sl.Shapes)
+                        {
+                            if (!string.IsNullOrEmpty(sh.Text))
+                            {
+                                charCount += sh.Text.Length;
+                                wordCount += sh.Text.Split(new char[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length;
+                            }
+                        }
+                    }
+                }
+                using (WordCountForm wcDlg = new WordCountForm(slideCount, wordCount, charCount, charCount, slideCount, slideCount))
+                {
+                    wcDlg.ShowDialog(parentForm);
+                }
+                return true;
+            }
+            // Group 2: Ngôn ngữ
+            if (x >= 238 && x <= 298) // Đọc to
+            {
+                string textToRead = slidesView.SelectedShape?.Text ?? "";
+                if (!string.IsNullOrEmpty(textToRead))
+                {
+                    ZenQOffice.Core.SpeechHelper.ToggleSpeech(textToRead);
+                }
+                return true;
+            }
+            if (x >= 300 && x <= 358) // Dịch
+            {
+                string textToTr = slidesView.SelectedShape?.Text ?? "";
+                using (TranslationDialogForm dlg = new TranslationDialogForm(textToTr, null))
+                {
+                    dlg.ShowDialog(parentForm);
+                }
+                return true;
+            }
+
+            // Group 6: Font & Tiếng Việt
+            if (x >= 970 && x <= 1076)
+            {
+                OpenVietnameseFontToolkit(parentForm);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool HandlePowerPointTabGraphicsFormatClick(int x, int y, SlidesView slidesView, Form parentForm)
+        {
+            if (slidesView == null || slidesView.SelectedShape == null) return false;
+            ShapeNode shape = slidesView.SelectedShape;
+
+            // Group 1: Thay đổi Đồ họa (Change Graphic)
+            if (x >= 14 && x <= 90 && y >= 68 && y <= 122)
+            {
+                ContextMenuStrip chgMenu = new ContextMenuStrip();
+                chgMenu.RenderMode = ToolStripRenderMode.System;
+                chgMenu.Items.Add("📁 Từ tệp (File)...", null, (s, e) =>
+                {
+                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    {
+                        ofd.Filter = "Tệp Đồ họa (*.svg;*.png;*.jpg;*.jpeg;*.emf)|*.svg;*.png;*.jpg;*.jpeg;*.emf|Tất cả tệp (*.*)|*.*";
+                        ofd.Title = "Chọn tệp đồ họa mới";
+                        if (ofd.ShowDialog(parentForm) == DialogResult.OK)
+                        {
+                            slidesView.SaveUndoState();
+                            try
+                            {
+                                if (ofd.FileName.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    shape.ImagePath = ofd.FileName;
+                                    shape.IsSvg = true;
+                                    shape.IsGraphic = true;
+                                    shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(ofd.FileName, 800, 800);
+                                }
+                                else
+                                {
+                                    shape.ImagePath = ofd.FileName;
+                                    shape.CachedImage = Image.FromFile(ofd.FileName);
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show("Không thể nạp tệp: " + ex.Message, "Lỗi Nạp Tệp", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                    }
+                });
+                chgMenu.Items.Add("🎨 Từ kho Đồ họa & Biểu tượng...", null, (s, e) =>
+                {
+                    slidesView.OpenGraphicsDrawer();
+                    if (parentForm != null) parentForm.Invalidate();
+                });
+                chgMenu.Items.Add("📋 Từ Bảng tạm (Clipboard)", null, (s, e) =>
+                {
+                    if (Clipboard.ContainsImage())
+                    {
+                        slidesView.SaveUndoState();
+                        shape.CachedImage = Clipboard.GetImage();
+                        if (parentForm != null) parentForm.Invalidate();
+                    }
+                });
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(14, 124)) : new Point(14, 124);
+                chgMenu.Show(pt);
+                return true;
+            }
+            if (x >= 94 && x <= 188 && y >= 68 && y <= 122)
+            {
+                slidesView.SaveUndoState();
+                shape.IsGraphic = false;
+                shape.IsSvg = false;
+                if (shape.Type == ShapeType.Image) shape.Type = ShapeType.Rectangle;
+                MessageBox.Show(parentForm, "Đã chuyển đổi đồ họa sang hình khối vector độc lập có thể tùy biến đường viền và tô màu toàn diện!", "Chuyển Đổi Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+
+            // Group 2: Kiểu Đồ họa
+            Color[] styleColors = new Color[] {
+                Color.FromArgb(37, 99, 235),
+                Color.FromArgb(220, 38, 38),
+                Color.FromArgb(16, 185, 129),
+                Color.FromArgb(245, 158, 11),
+                Color.FromArgb(107, 114, 128)
+            };
+            for (int i = 0; i < styleColors.Length; i++)
+            {
+                int bx = 196 + i * 36;
+                if (x >= bx && x <= bx + 32 && y >= 68 && y <= 122)
+                {
+                    slidesView.SaveUndoState();
+                    shape.FillColor = styleColors[i].ToArgb();
+                    shape.StrokeColor = Color.White.ToArgb();
+                    shape.StrokeWidth = 1.5f;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+            }
+
+            if (x >= 380 && x <= 500 && y >= 68 && y <= 92)
+            {
+                using (ColorDialog cd = new ColorDialog())
+                {
+                    cd.Color = Color.FromArgb(shape.FillColor);
+                    if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                    {
+                        slidesView.SaveUndoState();
+                        shape.FillColor = cd.Color.ToArgb();
+                        if (parentForm != null) parentForm.Invalidate();
+                    }
+                }
+                return true;
+            }
+            if (x >= 380 && x <= 500 && y >= 94 && y <= 118)
+            {
+                using (ColorDialog cd = new ColorDialog())
+                {
+                    cd.Color = Color.FromArgb(shape.StrokeColor);
+                    if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                    {
+                        slidesView.SaveUndoState();
+                        shape.StrokeColor = cd.Color.ToArgb();
+                        if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2f;
+                        if (parentForm != null) parentForm.Invalidate();
+                    }
+                }
+                return true;
+            }
+            if (x >= 380 && x <= 500 && y >= 120 && y <= 144)
+            {
+                ContextMenuStrip fxMenu = new ContextMenuStrip();
+                fxMenu.RenderMode = ToolStripRenderMode.System;
+                fxMenu.Items.Add("🌟 Đổ bóng nhẹ", null, (s, e) => { slidesView.SaveUndoState(); shape.HasShadow = true; if (parentForm != null) parentForm.Invalidate(); });
+                fxMenu.Items.Add("✨ Phát sáng viền", null, (s, e) => { slidesView.SaveUndoState(); shape.StrokeWidth = 4f; shape.StrokeColor = Color.FromArgb(250, 204, 21).ToArgb(); if (parentForm != null) parentForm.Invalidate(); });
+                fxMenu.Items.Add("❌ Tắt hiệu ứng", null, (s, e) => { slidesView.SaveUndoState(); shape.HasShadow = false; if (parentForm != null) parentForm.Invalidate(); });
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(380, 144)) : new Point(380, 144);
+                fxMenu.Show(pt);
+                return true;
+            }
+
+            // Group 3: Sắp xếp (Arrange)
+            if (x >= 512 && x <= 608 && y >= 68 && y <= 86)
+            {
+                if (slidesView.ActiveSlide != null && slidesView.SelectedShapeIndex < slidesView.ActiveSlide.Shapes.Count - 1)
+                {
+                    slidesView.SaveUndoState();
+                    int idx = slidesView.SelectedShapeIndex;
+                    ShapeNode s1 = slidesView.ActiveSlide.Shapes[idx];
+                    slidesView.ActiveSlide.Shapes[idx] = slidesView.ActiveSlide.Shapes[idx + 1];
+                    slidesView.ActiveSlide.Shapes[idx + 1] = s1;
+                    slidesView.SelectedShapeIndex = idx + 1;
+                }
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= 512 && x <= 608 && y >= 88 && y <= 106)
+            {
+                if (slidesView.ActiveSlide != null && slidesView.SelectedShapeIndex > 0)
+                {
+                    slidesView.SaveUndoState();
+                    int idx = slidesView.SelectedShapeIndex;
+                    ShapeNode s1 = slidesView.ActiveSlide.Shapes[idx];
+                    slidesView.ActiveSlide.Shapes[idx] = slidesView.ActiveSlide.Shapes[idx - 1];
+                    slidesView.ActiveSlide.Shapes[idx - 1] = s1;
+                    slidesView.SelectedShapeIndex = idx - 1;
+                }
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= 512 && x <= 608 && y >= 108 && y <= 126)
+            {
+                slidesView.SidebarPanel = SidebarPanelType.SelectionPane;
+                slidesView.IsSidebarOpen = true;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= 612 && x <= 700 && y >= 68 && y <= 86)
+            {
+                ContextMenuStrip alignMenu = new ContextMenuStrip();
+                alignMenu.RenderMode = ToolStripRenderMode.System;
+                alignMenu.Items.Add("Căn Trái", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = 0; if (parentForm != null) parentForm.Invalidate(); });
+                alignMenu.Items.Add("Căn Giữa ngang", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = (slidesView.Presentation.CanvasWidth - shape.Transform.Width) / 2f; if (parentForm != null) parentForm.Invalidate(); });
+                alignMenu.Items.Add("Căn Phải", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = slidesView.Presentation.CanvasWidth - shape.Transform.Width; if (parentForm != null) parentForm.Invalidate(); });
+                alignMenu.Items.Add(new ToolStripSeparator());
+                alignMenu.Items.Add("Căn Trên", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = 0; if (parentForm != null) parentForm.Invalidate(); });
+                alignMenu.Items.Add("Căn Giữa dọc", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = (slidesView.Presentation.CanvasHeight - shape.Transform.Height) / 2f; if (parentForm != null) parentForm.Invalidate(); });
+                alignMenu.Items.Add("Căn Dưới", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = slidesView.Presentation.CanvasHeight - shape.Transform.Height; if (parentForm != null) parentForm.Invalidate(); });
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(612, 86)) : new Point(612, 86);
+                alignMenu.Show(pt);
+                return true;
+            }
+            if (x >= 612 && x <= 700 && y >= 108 && y <= 126)
+            {
+                ContextMenuStrip rotMenu = new ContextMenuStrip();
+                rotMenu.RenderMode = ToolStripRenderMode.System;
+                rotMenu.Items.Add("Xoay phải 90°", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Rotation = (shape.Transform.Rotation + 90f) % 360f; if (parentForm != null) parentForm.Invalidate(); });
+                rotMenu.Items.Add("Xoay trái 90°", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Rotation = (shape.Transform.Rotation + 270f) % 360f; if (parentForm != null) parentForm.Invalidate(); });
+                rotMenu.Items.Add("Lật dọc", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.FlipVertical = !shape.Transform.FlipVertical; if (parentForm != null) parentForm.Invalidate(); });
+                rotMenu.Items.Add("Lật ngang", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.FlipHorizontal = !shape.Transform.FlipHorizontal; if (parentForm != null) parentForm.Invalidate(); });
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(612, 126)) : new Point(612, 126);
+                rotMenu.Show(pt);
+                return true;
+            }
+
+            // Group 4: Kích thước & Cắt
+            if (x >= 708 && x <= 772 && y >= 68 && y <= 122)
+            {
+                slidesView.ToggleCropMode();
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= 776 && x <= 906 && y >= 68 && y <= 92)
+            {
+                slidesView.SaveUndoState();
+                shape.Transform.Height = Math.Max(20f, shape.Transform.Height + 25f);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= 776 && x <= 906 && y >= 94 && y <= 118)
+            {
+                slidesView.SaveUndoState();
+                shape.Transform.Width = Math.Max(20f, shape.Transform.Width + 25f);
+                if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
 
@@ -21358,8 +22730,20 @@ namespace GenOffice.UI
             {
                 return HandlePowerPointTabExtensionsClick(x, y, slidesView, parentForm);
             }
+            if (curTab == "Vẽ")
+            {
+                return HandlePowerPointTabDrawClick(x, y, slidesView, parentForm);
+            }
+            if (curTab == "Xem lại")
+            {
+                return HandlePowerPointTabReviewClick(x, y, slidesView, parentForm);
+            }
+            if (curTab == "Định dạng Đồ họa")
+            {
+                return HandlePowerPointTabGraphicsFormatClick(x, y, slidesView, parentForm);
+            }
 
-            if (ActiveRibbonTab == 0) // Trang đầu (Home)
+            if (curTab == "Trang đầu" || (ActiveRibbonTab == 0 && string.IsNullOrEmpty(curTab))) // Trang đầu (Home)
             {
                 // Dialog Launchers
                 if (BtnSlidesClipboardLauncherBounds.Contains(x, y))
@@ -21428,75 +22812,15 @@ namespace GenOffice.UI
                     return true;
                 }
 
-                // Mở tệp PPTX
-                if (x >= 12 && x <= 50 && y >= 68 && y <= 130)
-                {
-                    using (OpenFileDialog ofd = new OpenFileDialog())
-                    {
-                        ofd.Filter = "Tệp Trình Chiếu PowerPoint (*.pptx;*.xml)|*.pptx;*.xml|Tất cả tệp (*.*)|*.*";
-                        ofd.Title = "Mở Bản Trình Chiếu PowerPoint";
-                        if (ofd.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            try
-                            {
-                                slidesView.Presentation = GenOffice.Format.PptxHandler.LoadPptx(ofd.FileName);
-                                slidesView.ActiveSlideIndex = 0;
-                                slidesView.SelectedShapeIndex = -1;
-                                slidesView.CanvasScrollX = 0;
-                                slidesView.CanvasScrollY = 0;
-                                slidesView.ZoomLevel = 1.0f;
-                                if (ActiveDocIndex >= 0 && ActiveDocIndex < DocTabs.Count)
-                                {
-                                    DocTabs[ActiveDocIndex].Title = System.IO.Path.GetFileName(ofd.FileName);
-                                }
-                                MessageBox.Show("Đã mở tệp PowerPoint thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show("Lỗi khi mở tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            }
-                        }
-                    }
-                    if (parentForm != null) parentForm.Invalidate();
-                    return true;
-                }
-                // Lưu tệp PPTX
-                else if (x >= 52 && x <= 90 && y >= 68 && y <= 130)
-                {
-                    using (SaveFileDialog sfd = new SaveFileDialog())
-                    {
-                        sfd.Filter = "Tệp Trình Chiếu PowerPoint (*.pptx)|*.pptx|Tệp XML Presentation (*.xml)|*.xml";
-                        sfd.Title = "Lưu Bản Trình Chiếu Microsoft PowerPoint 2016-365";
-                        if (sfd.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            try
-                            {
-                                GenOffice.Format.PptxHandler.SavePptx(sfd.FileName, slidesView.Presentation);
-                                if (ActiveDocIndex >= 0 && ActiveDocIndex < DocTabs.Count)
-                                {
-                                    DocTabs[ActiveDocIndex].Title = System.IO.Path.GetFileName(sfd.FileName);
-                                    DocTabs[ActiveDocIndex].IsModified = false;
-                                }
-                                MessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show("Lỗi khi lưu tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            }
-                        }
-                    }
-                    if (parentForm != null) parentForm.Invalidate();
-                    return true;
-                }
-                // Dán (Paste)
-                else if (x >= 92 && x <= 134 && y >= 68 && y <= 130)
+                // Dán (Paste) (X: 14..68, Y: 68..130)
+                if (x >= 14 && x <= 68 && y >= 68 && y <= 130)
                 {
                     slidesView.Paste();
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                // Cắt (Cut)
-                else if (x >= 136 && x <= 204 && y >= 68 && y <= 88)
+                // Cắt (Cut) (X: 72..204, Y: 68..88)
+                else if (x >= 72 && x <= 204 && y >= 68 && y <= 88)
                 {
                     if (slidesView.SelectedShape != null)
                     {
@@ -21505,8 +22829,8 @@ namespace GenOffice.UI
                     }
                     return true;
                 }
-                // Chép (Copy)
-                else if (x >= 136 && x <= 204 && y >= 89 && y <= 109)
+                // Chép (Copy) (X: 72..204, Y: 89..109)
+                else if (x >= 72 && x <= 204 && y >= 89 && y <= 109)
                 {
                     if (slidesView.SelectedShape != null)
                     {
@@ -21862,28 +23186,56 @@ namespace GenOffice.UI
                 // Căn trái Align Left (X: 648..672, Y: 96..120)
                 else if (x >= 648 && x <= 672 && y >= 96 && y <= 120)
                 {
-                    if (slidesView.SelectedShape != null) slidesView.SelectedShape.Alignment = TextAlignment.Left;
+                    if (slidesView.SelectedShape != null)
+                    {
+                        slidesView.SelectedShape.Alignment = TextAlignment.Left;
+                        if (slidesView.SelectedShape.TextRuns != null)
+                        {
+                            foreach (var r in slidesView.SelectedShape.TextRuns) r.ParaAlignment = TextAlignment.Left;
+                        }
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
                 // Căn giữa Align Center (X: 674..698, Y: 96..120)
                 else if (x >= 674 && x <= 698 && y >= 96 && y <= 120)
                 {
-                    if (slidesView.SelectedShape != null) slidesView.SelectedShape.Alignment = TextAlignment.Center;
+                    if (slidesView.SelectedShape != null)
+                    {
+                        slidesView.SelectedShape.Alignment = TextAlignment.Center;
+                        if (slidesView.SelectedShape.TextRuns != null)
+                        {
+                            foreach (var r in slidesView.SelectedShape.TextRuns) r.ParaAlignment = TextAlignment.Center;
+                        }
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
                 // Căn phải Align Right (X: 700..724, Y: 96..120)
                 else if (x >= 700 && x <= 724 && y >= 96 && y <= 120)
                 {
-                    if (slidesView.SelectedShape != null) slidesView.SelectedShape.Alignment = TextAlignment.Right;
+                    if (slidesView.SelectedShape != null)
+                    {
+                        slidesView.SelectedShape.Alignment = TextAlignment.Right;
+                        if (slidesView.SelectedShape.TextRuns != null)
+                        {
+                            foreach (var r in slidesView.SelectedShape.TextRuns) r.ParaAlignment = TextAlignment.Right;
+                        }
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
                 // Căn đều hai lề Justify (X: 726..750, Y: 96..120)
                 else if (x >= 726 && x <= 750 && y >= 96 && y <= 120)
                 {
-                    if (slidesView.SelectedShape != null) slidesView.SelectedShape.Alignment = TextAlignment.Justify;
+                    if (slidesView.SelectedShape != null)
+                    {
+                        slidesView.SelectedShape.Alignment = TextAlignment.Justify;
+                        if (slidesView.SelectedShape.TextRuns != null)
+                        {
+                            foreach (var r in slidesView.SelectedShape.TextRuns) r.ParaAlignment = TextAlignment.Justify;
+                        }
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
@@ -22102,7 +23454,7 @@ namespace GenOffice.UI
                     return true;
                 }
             }
-            else if (ActiveRibbonTab == 1) // Chèn (Insert)
+            else if (curTab == "Chèn" || (ActiveRibbonTab == 1 && string.IsNullOrEmpty(curTab))) // Chèn (Insert)
             {
                 // ==================== Group 1: Trang chiếu (Slides) (X: 14..72, Y: 68..124) ====================
                 if (x >= 14 && x <= 72 && y >= 68 && y <= 124)
@@ -22164,28 +23516,30 @@ namespace GenOffice.UI
                             try
                             {
                                 Image loadedImg = Image.FromFile(ofd.FileName);
-                                float maxW = 500f;
-                                float maxH = 350f;
-                                float imgW = loadedImg.Width;
-                                float imgH = loadedImg.Height;
+                                float origW = Math.Max(1f, (float)loadedImg.Width);
+                                float origH = Math.Max(1f, (float)loadedImg.Height);
+                                float canvasW = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasWidth : 1920f;
+                                float canvasH = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasHeight : 1080f;
 
-                                if (imgW > maxW)
-                                {
-                                    imgH = (maxW / imgW) * imgH;
-                                    imgW = maxW;
-                                }
-                                if (imgH > maxH)
-                                {
-                                    imgW = (maxH / imgH) * imgW;
-                                    imgH = maxH;
-                                }
+                                float maxW = canvasW * 0.70f;
+                                float maxH = canvasH * 0.70f;
+                                float scaleFactor = Math.Min(maxW / origW, maxH / origH);
+                                if (scaleFactor > 1.0f && origW > 120f && origH > 120f) scaleFactor = 1.0f;
+
+                                float fitW = (float)Math.Round(origW * scaleFactor);
+                                float fitH = (float)Math.Round(origH * scaleFactor);
+                                float posX = (canvasW - fitW) / 2f;
+                                float posY = (canvasH - fitH) / 2f;
 
                                 ShapeNode imgShape = new ShapeNode
                                 {
+                                    Name = "Hình ảnh " + (slidesView.ActiveSlide.Shapes.Count + 1),
                                     Type = ShapeType.Image,
                                     ImagePath = ofd.FileName,
                                     CachedImage = loadedImg,
-                                    Transform = new Transform2D(150f, 100f, imgW, imgH),
+                                    Transform = new Transform2D(posX, posY, fitW, fitH),
+                                    OriginalWidth = origW,
+                                    OriginalHeight = origH,
                                     Text = "",
                                     FillColor = 0x00FFFFFF,
                                     StrokeWidth = 0f
@@ -22193,6 +23547,9 @@ namespace GenOffice.UI
                                 slidesView.SaveUndoState();
                                 slidesView.ActiveSlide.AddShape(imgShape);
                                 slidesView.SelectedShapeIndex = slidesView.ActiveSlide.Shapes.Count - 1;
+                                slidesView.SelectedShapeIndices.Clear();
+                                slidesView.SelectedShapeIndices.Add(slidesView.SelectedShapeIndex);
+                                if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
                             }
                             catch (Exception ex)
                             {
@@ -22215,28 +23572,30 @@ namespace GenOffice.UI
                                 snipDlg.CapturedBitmap.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
 
                                 Image loadedImg = (Image)snipDlg.CapturedBitmap.Clone();
-                                float maxW = 500f;
-                                float maxH = 350f;
-                                float imgW = loadedImg.Width;
-                                float imgH = loadedImg.Height;
+                                float origW = Math.Max(1f, (float)loadedImg.Width);
+                                float origH = Math.Max(1f, (float)loadedImg.Height);
+                                float canvasW = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasWidth : 1920f;
+                                float canvasH = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasHeight : 1080f;
 
-                                if (imgW > maxW)
-                                {
-                                    imgH = (maxW / imgW) * imgH;
-                                    imgW = maxW;
-                                }
-                                if (imgH > maxH)
-                                {
-                                    imgH = (maxH / imgH) * imgW;
-                                    imgH = maxH;
-                                }
+                                float maxW = canvasW * 0.70f;
+                                float maxH = canvasH * 0.70f;
+                                float scaleFactor = Math.Min(maxW / origW, maxH / origH);
+                                if (scaleFactor > 1.0f && origW > 120f && origH > 120f) scaleFactor = 1.0f;
+
+                                float fitW = (float)Math.Round(origW * scaleFactor);
+                                float fitH = (float)Math.Round(origH * scaleFactor);
+                                float posX = (canvasW - fitW) / 2f;
+                                float posY = (canvasH - fitH) / 2f;
 
                                 ShapeNode imgShape = new ShapeNode
                                 {
+                                    Name = "Ảnh chụp " + (slidesView.ActiveSlide.Shapes.Count + 1),
                                     Type = ShapeType.Image,
                                     ImagePath = tempPath,
                                     CachedImage = loadedImg,
-                                    Transform = new Transform2D(150f, 100f, imgW, imgH),
+                                    Transform = new Transform2D(posX, posY, fitW, fitH),
+                                    OriginalWidth = origW,
+                                    OriginalHeight = origH,
                                     Text = "",
                                     FillColor = 0x00FFFFFF,
                                     StrokeWidth = 0f
@@ -22244,6 +23603,9 @@ namespace GenOffice.UI
                                 slidesView.SaveUndoState();
                                 slidesView.ActiveSlide.AddShape(imgShape);
                                 slidesView.SelectedShapeIndex = slidesView.ActiveSlide.Shapes.Count - 1;
+                                slidesView.SelectedShapeIndices.Clear();
+                                slidesView.SelectedShapeIndices.Add(slidesView.SelectedShapeIndex);
+                                if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
                             }
                             catch (Exception ex)
                             {
@@ -22266,12 +23628,30 @@ namespace GenOffice.UI
                             {
                                 slidesView.AddSlide();
                                 Image loadedImg = Image.FromFile(fn);
+                                float origW = Math.Max(1f, (float)loadedImg.Width);
+                                float origH = Math.Max(1f, (float)loadedImg.Height);
+                                float canvasW = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasWidth : 1920f;
+                                float canvasH = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasHeight : 1080f;
+
+                                float maxW = canvasW * 0.75f;
+                                float maxH = canvasH * 0.75f;
+                                float scaleFactor = Math.Min(maxW / origW, maxH / origH);
+                                if (scaleFactor > 1.0f && origW > 120f && origH > 120f) scaleFactor = 1.0f;
+
+                                float fitW = (float)Math.Round(origW * scaleFactor);
+                                float fitH = (float)Math.Round(origH * scaleFactor);
+                                float posX = (canvasW - fitW) / 2f;
+                                float posY = (canvasH - fitH) / 2f;
+
                                 ShapeNode imgShape = new ShapeNode
                                 {
+                                    Name = "Ảnh Album " + (slidesView.ActiveSlide.Shapes.Count + 1),
                                     Type = ShapeType.Image,
                                     ImagePath = fn,
                                     CachedImage = loadedImg,
-                                    Transform = new Transform2D(100f, 60f, 600f, 400f),
+                                    Transform = new Transform2D(posX, posY, fitW, fitH),
+                                    OriginalWidth = origW,
+                                    OriginalHeight = origH,
                                     Text = "",
                                     FillColor = 0x00FFFFFF,
                                     StrokeWidth = 0f
@@ -22283,7 +23663,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                // ==================== Group 4: Minh họa (Illustrations) (X: 296..602) ====================
+                // ==================== Group 4: Minh họa (Illustrations) ====================
                 else if (x >= 296 && x <= 352 && y >= 68 && y <= 124) // Hình khối ▾
                 {
                     Point ptShape = parentForm != null ? parentForm.PointToScreen(new Point(296, 130)) : new Point(296, 130);
@@ -22298,19 +23678,7 @@ namespace GenOffice.UI
                     popup.Show();
                     return true;
                 }
-                else if (x >= 354 && x <= 414 && y >= 68 && y <= 124) // Biểu tượng (Vector icons)
-                {
-                    slidesView.StartShapeDrawMode(ShapeType.Star);
-                    if (parentForm != null) parentForm.Invalidate();
-                    return true;
-                }
-                else if (x >= 416 && x <= 480 && y >= 68 && y <= 124) // Mô hình 3D
-                {
-                    slidesView.StartShapeDrawMode(ShapeType.Cube);
-                    if (parentForm != null) parentForm.Invalidate();
-                    return true;
-                }
-                else if (x >= 482 && x <= 542 && y >= 68 && y <= 124) // SmartArt
+                else if (x >= 356 && x <= 412 && y >= 68 && y <= 124) // SmartArt
                 {
                     using (SmartArtGalleryForm saDlg = new SmartArtGalleryForm())
                     {
@@ -22322,7 +23690,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 544 && x <= 604 && y >= 68 && y <= 124) // Biểu đồ ▾
+                else if (x >= 416 && x <= 472 && y >= 68 && y <= 124) // Biểu đồ ▾
                 {
                     using (InsertChartForm chartDlg = new InsertChartForm())
                     {
@@ -22335,32 +23703,39 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 5: Liên kết & Nhận xét (Links & Comments) ====================
-                else if (x >= 612 && x <= 670 && y >= 68 && y <= 124) // Liên kết ▾
+                else if (x >= 484 && x <= 540 && y >= 68 && y <= 124) // Liên kết ▾
                 {
-                    slidesView.InsertHyperlink("https://zenqoffice.vn");
+                    string curText = (slidesView.SelectedShape != null && !string.IsNullOrEmpty(slidesView.SelectedShape.Text)) ? slidesView.SelectedShape.Text : "";
+                    using (InsertHyperlinkForm lnkDlg = new InsertHyperlinkForm(curText))
+                    {
+                        if (lnkDlg.ShowDialog(parentForm) == DialogResult.OK)
+                        {
+                            slidesView.InsertHyperlink(lnkDlg.TargetUrl, lnkDlg.DisplayText);
+                        }
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 672 && x <= 730 && y >= 68 && y <= 124) // Bình luận
+                else if (x >= 544 && x <= 600 && y >= 68 && y <= 124) // Bình luận
                 {
                     slidesView.InsertComment("Ghi chú: Cần hoàn thiện nội dung trang này.");
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
                 // ==================== Group 6: Văn bản (Text) ====================
-                else if (x >= 742 && x <= 796 && y >= 68 && y <= 124) // Hộp chữ
+                else if (x >= 612 && x <= 664 && y >= 68 && y <= 124) // Hộp chữ
                 {
                     slidesView.StartShapeDrawMode(ShapeType.TextBox);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 798 && x <= 856 && y >= 68 && y <= 124) // Đầu & Chân
+                else if (x >= 668 && x <= 726 && y >= 68 && y <= 124) // Đầu & Chân
                 {
                     slidesView.InsertHeaderFooter();
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 860 && x <= 916 && y >= 68 && y <= 124) // WordArt ▾
+                else if (x >= 730 && x <= 786 && y >= 68 && y <= 124) // WordArt ▾
                 {
                     using (WordArtGalleryForm waDlg = new WordArtGalleryForm())
                     {
@@ -22373,9 +23748,9 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 7: Ký hiệu (Symbols) ====================
-                else if (x >= 928 && x <= 986 && y >= 68 && y <= 124) // Công thức ▾
+                else if (x >= 798 && x <= 856 && y >= 68 && y <= 124) // Công thức ▾
                 {
-                    Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(928, 130)) : new Point(928, 130);
+                    Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(798, 130)) : new Point(798, 130);
                     QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
                     eqDlg.OnEquationSelected = (formula) =>
                     {
@@ -22400,9 +23775,9 @@ namespace GenOffice.UI
                     eqDlg.Show();
                     return true;
                 }
-                else if (x >= 990 && x <= 1046 && y >= 68 && y <= 124) // Ký hiệu ▾
+                else if (x >= 860 && x <= 914 && y >= 68 && y <= 124) // Ký hiệu ▾
                 {
-                    Point symPt = parentForm != null ? parentForm.PointToScreen(new Point(990, 130)) : new Point(990, 130);
+                    Point symPt = parentForm != null ? parentForm.PointToScreen(new Point(860, 130)) : new Point(860, 130);
                     QuickSymbolDropDownForm symDlg = new QuickSymbolDropDownForm(symPt);
                     symDlg.OnSymbolSelected = (sym) =>
                     {
@@ -22425,7 +23800,7 @@ namespace GenOffice.UI
                     return true;
                 }
                 // ==================== Group 8: Phương tiện (Media) ====================
-                else if (x >= 1056 && x <= 1112 && y >= 68 && y <= 124) // Video ▾
+                else if (x >= 926 && x <= 980 && y >= 68 && y <= 124) // Video ▾
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
@@ -22442,7 +23817,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 1114 && x <= 1176 && y >= 68 && y <= 124) // Âm thanh ▾
+                else if (x >= 984 && x <= 1044 && y >= 68 && y <= 124) // Âm thanh ▾
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
@@ -22459,7 +23834,7 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 1178 && x <= 1252 && y >= 68 && y <= 124) // Ghi màn hình
+                else if (x >= 1048 && x <= 1122 && y >= 68 && y <= 124) // Ghi màn hình
                 {
                     slidesView.InsertVideo();
                     if (parentForm != null) parentForm.Invalidate();
@@ -22468,7 +23843,7 @@ namespace GenOffice.UI
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
-            else if (ActiveRibbonTab == 2) // Thiết kế (Design)
+            else if (curTab == "Thiết kế" || (ActiveRibbonTab == 2 && string.IsNullOrEmpty(curTab))) // Thiết kế (Design)
             {
                 int width = (parentForm != null) ? parentForm.ClientSize.Width : 1200;
                 if (slidesView.Presentation != null)
@@ -22559,7 +23934,7 @@ namespace GenOffice.UI
                     }
                 }
             }
-            else if (ActiveRibbonTab == 3) // Chuyển tiếp (Transitions)
+            else if (curTab == "Chuyển tiếp" || (ActiveRibbonTab == 3 && string.IsNullOrEmpty(curTab))) // Chuyển tiếp (Transitions)
             {
                 // ⭐ Xem trước Preview
                 if (x >= 12 && x <= 72 && y >= 68 && y <= 130)
@@ -22685,7 +24060,7 @@ namespace GenOffice.UI
                     return true;
                 }
             }
-            else if (ActiveRibbonTab == 4) // Hoạt họa (Animations)
+            else if (curTab == "Hoạt họa" || (ActiveRibbonTab == 4 && string.IsNullOrEmpty(curTab))) // Hoạt họa (Animations)
             {
                 bool hasSelectedShape = (slidesView != null && (slidesView.SelectedShape != null || (slidesView.SelectedShapeIndices != null && slidesView.SelectedShapeIndices.Count > 0)));
                 bool hasAnimations = (slidesView != null && slidesView.ActiveSlide != null && slidesView.ActiveSlide.Animations.Count > 0);
@@ -22989,7 +24364,7 @@ namespace GenOffice.UI
                     return true;
                 }
             }
-            else if (ActiveRibbonTab == 5) // Trình chiếu (Slide Show)
+            else if (curTab == "Trình chiếu" || (ActiveRibbonTab == 5 && string.IsNullOrEmpty(curTab))) // Trình chiếu (Slide Show)
             {
                 AppForm af = parentForm as AppForm;
 
@@ -23118,7 +24493,7 @@ namespace GenOffice.UI
                 else if (x >= 840 && x <= 980 && y >= 68 && y <= 92)
                 {
                     ContextMenuStrip monMenu = new ContextMenuStrip();
-                    ToolStripMenuItem mAuto = new ToolStripMenuItem("Tự động (Automatic)");
+                    ToolStripMenuItem mAuto = new ToolStripMenuItem("Tự động");
                     mAuto.Click += (s, e) => {
                         slidesView.SelectedMonitorIndex = 0;
                         if (parentForm != null) parentForm.Invalidate();
@@ -23147,8 +24522,14 @@ namespace GenOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
+                // 11. Mobile Connect & Laser Button (X: 990..1080, Y: 68..130)
+                else if (x >= 990 && x <= 1080 && y >= 68 && y <= 130)
+                {
+                    if (af != null) af.OpenMobileConnectDialog();
+                    return true;
+                }
             }
-            else if (ActiveRibbonTab == 6) // Hiển thị (View)
+            else if (curTab == "Hiển thị" || (ActiveRibbonTab == 6 && string.IsNullOrEmpty(curTab))) // Hiển thị (View)
             {
                 int vIdx = (x - 12) / 82;
                 if (vIdx >= 0 && vIdx <= 4)
@@ -23158,11 +24539,72 @@ namespace GenOffice.UI
                     return true;
                 }
             }
-            else if ((curTab == "Định dạng Hình dạng" || curTab == "Định dạng Hình ảnh" || curTab == "Thiết kế Bảng" || curTab == "Định dạng Video" || curTab == "Thiết kế SmartArt" || curTab == "Định dạng" || (ActiveRibbonTab >= 7 && slidesView != null && slidesView.SelectedShape != null)) && slidesView != null && slidesView.SelectedShape != null) // Định dạng Video, Thiết kế Bảng hoặc Định dạng Hình dạng
+            else if ((curTab == "Định dạng Hình dạng" || curTab == "Định dạng Hình ảnh" || curTab == "Thiết kế Bảng" || curTab == "Định dạng Video" || curTab == "Định dạng Âm thanh" || curTab == "Thiết kế SmartArt" || curTab == "Định dạng" || (ActiveRibbonTab >= 7 && slidesView != null && slidesView.SelectedShape != null)) && slidesView != null && slidesView.SelectedShape != null) // Định dạng Video, Thiết kế Bảng hoặc Định dạng Hình dạng
             {
                 ShapeNode shape = slidesView.SelectedShape;
 
-                if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
+                if (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath))
+                {
+                    // 1. Nhóm Xem trước (Preview): Phát (X: 12..60, Y: 68..122)
+                    if (x >= 12 && x <= 60 && y >= 68 && y <= 122)
+                    {
+                        slidesView.PlayAudioPreview(shape, parentForm);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // 2. Nhóm Điều chỉnh: Màu sắc Loa ▾ (X: 74..182, Y: 68..92)
+                    else if (x >= 74 && x <= 182 && y >= 68 && y <= 92)
+                    {
+                        ContextMenuStrip colMenu = new ContextMenuStrip();
+                        colMenu.RenderMode = ToolStripRenderMode.System;
+                        colMenu.Items.Add("Mặc định", null, (s, e) => { shape.AudioIconColor = 0; if (parentForm != null) parentForm.Invalidate(); });
+                        colMenu.Items.Add("🔵 Xanh Dương (Blue)", null, (s, e) => { shape.AudioIconColor = 0x38BDF8; if (parentForm != null) parentForm.Invalidate(); });
+                        colMenu.Items.Add("🟢 Xanh Lá (Emerald)", null, (s, e) => { shape.AudioIconColor = 0x10B981; if (parentForm != null) parentForm.Invalidate(); });
+                        colMenu.Items.Add("🟣 Tím (Purple)", null, (s, e) => { shape.AudioIconColor = 0xA855F7; if (parentForm != null) parentForm.Invalidate(); });
+                        colMenu.Items.Add("🟡 Vàng Kim (Gold)", null, (s, e) => { shape.AudioIconColor = 0xEAB308; if (parentForm != null) parentForm.Invalidate(); });
+                        colMenu.Items.Add("🔴 Đỏ (Coral Red)", null, (s, e) => { shape.AudioIconColor = 0xEF4444; if (parentForm != null) parentForm.Invalidate(); });
+                        Point pt = parentForm != null ? parentForm.PointToScreen(new Point(74, 92)) : new Point(74, 92);
+                        colMenu.Show(pt);
+                        return true;
+                    }
+                    // Đổi Tệp Âm thanh... (X: 186..312, Y: 68..92)
+                    else if (x >= 186 && x <= 312 && y >= 68 && y <= 92)
+                    {
+                        using (OpenFileDialog ofd = new OpenFileDialog())
+                        {
+                            ofd.Filter = "Tệp Âm thanh (*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac)|*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac|Tất cả tệp (*.*)|*.*";
+                            ofd.Title = "Chọn tệp âm thanh thay thế";
+                            if (ofd.ShowDialog() == DialogResult.OK)
+                            {
+                                shape.AudioPath = ofd.FileName;
+                                shape.Name = "🔊 " + System.IO.Path.GetFileName(ofd.FileName);
+                                SlideAudioPlayerManager.Instance.InspectAudioDuration(shape);
+                                if (parentForm != null) parentForm.Invalidate();
+                            }
+                        }
+                        return true;
+                    }
+                    // Đặt lại Thiết kế (X: 186..312, Y: 96..120)
+                    else if (x >= 186 && x <= 312 && y >= 96 && y <= 120)
+                    {
+                        shape.AudioStyleIndex = 0;
+                        shape.AudioIconColor = 0;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // 3. Kiểu Âm thanh (5 Cards: X: 326..326+5*42, Y: 68..122)
+                    else if (x >= 326 && x <= 326 + 5 * 42 && y >= 68 && y <= 122)
+                    {
+                        int sIdx = (x - 326) / 42;
+                        if (sIdx >= 0 && sIdx < 5)
+                        {
+                            shape.AudioStyleIndex = sIdx;
+                            if (parentForm != null) parentForm.Invalidate();
+                            return true;
+                        }
+                    }
+                }
+                else if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
                 {
                     // 1. Nhóm Xem trước (Preview): Phát (X: 12..60, Y: 68..122)
                     if (x >= 12 && x <= 60 && y >= 68 && y <= 122)
@@ -23304,7 +24746,7 @@ namespace GenOffice.UI
                     // 4. Khả năng truy cập: Văn bản Thay thế (X: 744..808, Y: 68..122)
                     else if (x >= 744 && x <= 808 && y >= 68 && y <= 122)
                     {
-                        MessageBox.Show("Văn bản thay thế (Alt Text) giúp người dùng khiếm thị hiểu được nội dung video này.", "Văn bản Thay thế (Alt Text)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("Văn bản thay thế giúp người dùng khiếm thị hiểu được nội dung video này.", "Văn bản thay thế", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                     // 5. Nhóm Sắp xếp: Đưa lên trên (X: 822..918, Y: 68..86)
@@ -23814,7 +25256,7 @@ namespace GenOffice.UI
                         string currentAlt = string.IsNullOrEmpty(shape.AltText) ? shape.Name : shape.AltText;
                         using (Form altDlg = new Form())
                         {
-                            altDlg.Text = "Văn bản thay thế (Alt Text)";
+                            altDlg.Text = "Văn bản thay thế";
                             altDlg.Size = new Size(380, 200);
                             altDlg.StartPosition = FormStartPosition.CenterParent;
                             altDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -23822,7 +25264,7 @@ namespace GenOffice.UI
                             altDlg.MinimizeBox = false;
                             altDlg.Font = new Font("Segoe UI", 9f);
 
-                            Label lbl = new Label { Text = "Mô tả / Tiêu đề văn bản thay thế (Alt Text) cho hình ảnh:", Location = new Point(16, 16), AutoSize = true };
+                            Label lbl = new Label { Text = "Mô tả tiêu đề văn bản thay thế cho hình ảnh:", Location = new Point(16, 16), AutoSize = true };
                             TextBox txt = new TextBox { Text = currentAlt, Location = new Point(18, 42), Width = 328, Height = 56, Multiline = true };
                             Button btnOk = new Button { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(170, 115), Width = 80, Height = 28 };
                             Button btnCancel = new Button { Text = "Hủy bỏ", DialogResult = DialogResult.Cancel, Location = new Point(262, 115), Width = 80, Height = 28 };
@@ -23934,7 +25376,7 @@ namespace GenOffice.UI
                             rectsGroup.DropDownItems.Add("Chữ nhật bo góc (Rounded Rectangle)", null, (s, e) => { slidesView.SetCropShape("RoundedRectangle"); if (parentForm != null) parentForm.Invalidate(); });
                             cropToShapeItem.DropDownItems.Add(rectsGroup);
 
-                            ToolStripMenuItem basicGroup = new ToolStripMenuItem("Hình cơ bản (Basic Shapes)");
+                            ToolStripMenuItem basicGroup = new ToolStripMenuItem("Hình cơ bản");
                             basicGroup.DropDownItems.Add("Hình Elip / Tròn (Ellipse)", null, (s, e) => { slidesView.SetCropShape("Ellipse"); if (parentForm != null) parentForm.Invalidate(); });
                             basicGroup.DropDownItems.Add("Tam giác đều (Triangle)", null, (s, e) => { slidesView.SetCropShape("Triangle"); if (parentForm != null) parentForm.Invalidate(); });
                             basicGroup.DropDownItems.Add("Tam giác vuông (Right Triangle)", null, (s, e) => { slidesView.SetCropShape("RightTriangle"); if (parentForm != null) parentForm.Invalidate(); });
@@ -24123,7 +25565,7 @@ namespace GenOffice.UI
                     changeMenu.Items.Add(luxuryMenu);
 
                     // 3. Hình Khối Cơ Bản
-                    ToolStripMenuItem basicMenu = new ToolStripMenuItem("🔷 Hình Khối Cơ Bản (Basic Shapes)");
+                    ToolStripMenuItem basicMenu = new ToolStripMenuItem("🔷 Hình khối cơ bản");
                     ShapeType[] basicTypes = new ShapeType[] { ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Triangle, ShapeType.RightTriangle, ShapeType.Diamond, ShapeType.Parallelogram, ShapeType.Trapezoid, ShapeType.Cross, ShapeType.Donut, ShapeType.Cube, ShapeType.Can, ShapeType.TextBox };
                     string[] basicNames = new string[] { "Hình chữ nhật", "Hình chữ nhật bo tròn", "Hình tròn / Elip", "Hình tam giác", "Tam giác vuông", "Hình thoi", "Hình bình hành", "Hình thang", "Dấu chữ thập", "Vành khuyên Donut", "Khối lập phương 3D", "Hình trụ Can", "Hộp văn bản" };
                     for (int i = 0; i < basicTypes.Length; i++)
@@ -24640,6 +26082,147 @@ namespace GenOffice.UI
                 }
             }
         }
+        else if ((curTab == "Phát lại" || (ActiveRibbonTab >= 8 && curTab != "Định dạng Hình dạng" && curTab != "Định dạng Hình ảnh" && curTab != "Thiết kế Bảng")) && slidesView != null && slidesView.SelectedShape != null && (slidesView.SelectedShape.Type == ShapeType.Audio || !string.IsNullOrEmpty(slidesView.SelectedShape.AudioPath)))
+        {
+            ShapeNode shape = slidesView.SelectedShape;
+            // 1. Nhóm Xem trước (Preview): Phát (X: 12..60, Y: 68..122)
+            if (x >= 12 && x <= 60 && y >= 68 && y <= 122)
+            {
+                slidesView.PlayAudioPreview(shape, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // 2. Nhóm Dấu trang: Thêm Dấu trang (X: 74..186, Y: 68..92)
+            else if (x >= 74 && x <= 186 && y >= 68 && y <= 92)
+            {
+                slidesView.AddAudioBookmark(shape, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Nhóm Dấu trang: Xóa Dấu trang (X: 74..186, Y: 96..120)
+            else if (x >= 74 && x <= 186 && y >= 96 && y <= 120)
+            {
+                slidesView.RemoveAudioBookmark(shape, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // 3. Nhóm Chỉnh sửa: Cắt Âm thanh (X: 200..264, Y: 68..122)
+            else if (x >= 200 && x <= 264 && y >= 68 && y <= 122)
+            {
+                slidesView.ShowTrimAudioDialog(shape, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Mờ dần vào ▲ / ▼ (X: 270..404, Y: 68..93)
+            else if (x >= 270 && x <= 404 && y >= 68 && y <= 93)
+            {
+                bool isUp = (y <= 80);
+                slidesView.SaveUndoState();
+                shape.AudioFadeInDuration = (float)Math.Max(0.0, Math.Round(shape.AudioFadeInDuration + (isUp ? 0.25 : -0.25), 2));
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Mờ dần ra ▲ / ▼ (X: 270..404, Y: 96..121)
+            else if (x >= 270 && x <= 404 && y >= 96 && y <= 121)
+            {
+                bool isUp = (y <= 108);
+                slidesView.SaveUndoState();
+                shape.AudioFadeOutDuration = (float)Math.Max(0.0, Math.Round(shape.AudioFadeOutDuration + (isUp ? 0.25 : -0.25), 2));
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // 4. Nhóm Tùy chọn Âm thanh: Âm lượng ▾ (X: 418..504, Y: 68..92)
+            else if (x >= 418 && x <= 504 && y >= 68 && y <= 92)
+            {
+                ContextMenuStrip menu = new ContextMenuStrip();
+                ToolStripMenuItem miMute = new ToolStripMenuItem("Tắt tiếng (Mute)");
+                ToolStripMenuItem miLow = new ToolStripMenuItem("Nhỏ (Low - 25%)");
+                ToolStripMenuItem miMed = new ToolStripMenuItem("Trung bình (Medium - 60%)");
+                ToolStripMenuItem miHigh = new ToolStripMenuItem("Lớn (High - 100%)");
+
+                miMute.Checked = (shape.AudioVolume == VideoVolumeLevel.Mute);
+                miLow.Checked = (shape.AudioVolume == VideoVolumeLevel.Low);
+                miMed.Checked = (shape.AudioVolume == VideoVolumeLevel.Medium);
+                miHigh.Checked = (shape.AudioVolume == VideoVolumeLevel.High);
+
+                miMute.Click += (s, ev) => { SlideAudioPlayerManager.Instance.SetVolume(shape, VideoVolumeLevel.Mute); if (parentForm != null) parentForm.Invalidate(); };
+                miLow.Click += (s, ev) => { SlideAudioPlayerManager.Instance.SetVolume(shape, VideoVolumeLevel.Low); if (parentForm != null) parentForm.Invalidate(); };
+                miMed.Click += (s, ev) => { SlideAudioPlayerManager.Instance.SetVolume(shape, VideoVolumeLevel.Medium); if (parentForm != null) parentForm.Invalidate(); };
+                miHigh.Click += (s, ev) => { SlideAudioPlayerManager.Instance.SetVolume(shape, VideoVolumeLevel.High); if (parentForm != null) parentForm.Invalidate(); };
+
+                menu.Items.AddRange(new ToolStripItem[] { miMute, miLow, miMed, miHigh });
+                if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                return true;
+            }
+            // Bắt đầu: [ ... ▾ ] (X: 510..696, Y: 68..92)
+            else if (x >= 510 && x <= 696 && y >= 68 && y <= 92)
+            {
+                ContextMenuStrip menu = new ContextMenuStrip();
+                ToolStripMenuItem miClickSeq = new ToolStripMenuItem("Theo trình tự nhấp (In Click Sequence)");
+                ToolStripMenuItem miAuto = new ToolStripMenuItem("Tự động");
+                ToolStripMenuItem miWhenClicked = new ToolStripMenuItem("Khi nhấp vào (When Clicked On)");
+
+                miClickSeq.Checked = (shape.AudioStartMode == VideoStartMode.InClickSequence);
+                miAuto.Checked = (shape.AudioStartMode == VideoStartMode.Automatically);
+                miWhenClicked.Checked = (shape.AudioStartMode == VideoStartMode.WhenClickedOn);
+
+                miClickSeq.Click += (s, ev) => { slidesView.SaveUndoState(); shape.AudioStartMode = VideoStartMode.InClickSequence; if (parentForm != null) parentForm.Invalidate(); };
+                miAuto.Click += (s, ev) => { slidesView.SaveUndoState(); shape.AudioStartMode = VideoStartMode.Automatically; if (parentForm != null) parentForm.Invalidate(); };
+                miWhenClicked.Click += (s, ev) => { slidesView.SaveUndoState(); shape.AudioStartMode = VideoStartMode.WhenClickedOn; if (parentForm != null) parentForm.Invalidate(); };
+
+                menu.Items.AddRange(new ToolStripItem[] { miClickSeq, miAuto, miWhenClicked });
+                if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                return true;
+            }
+            // Checkbox 1: Phát trên các slide (X: 418..552, Y: 97..115)
+            else if (x >= 418 && x <= 552 && y >= 97 && y <= 115)
+            {
+                slidesView.SaveUndoState();
+                shape.AudioPlayAcrossSlides = !shape.AudioPlayAcrossSlides;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Checkbox 2: Ẩn khi trình chiếu (X: 558..696, Y: 97..115)
+            else if (x >= 558 && x <= 696 && y >= 97 && y <= 115)
+            {
+                slidesView.SaveUndoState();
+                shape.AudioHideDuringShow = !shape.AudioHideDuringShow;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Checkbox 3: Lặp lại cho đến dừng (X: 418..552, Y: 118..136)
+            else if (x >= 418 && x <= 552 && y >= 118 && y <= 136)
+            {
+                slidesView.SaveUndoState();
+                shape.AudioLoopUntilStopped = !shape.AudioLoopUntilStopped;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Checkbox 4: Tua lại sau khi phát (X: 558..696, Y: 118..136)
+            else if (x >= 558 && x <= 696 && y >= 118 && y <= 136)
+            {
+                slidesView.SaveUndoState();
+                shape.AudioRewindAfterPlaying = !shape.AudioRewindAfterPlaying;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // 5. Nhóm Phát trong Nền: Phát trong Nền (X: 706..798, Y: 68..122)
+            else if (x >= 706 && x <= 798 && y >= 68 && y <= 122)
+            {
+                slidesView.SaveUndoState();
+                SlideAudioPlayerManager.Instance.SetPlayInBackground(shape, true, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            // Không phát nền (X: 802..894, Y: 68..122)
+            else if (x >= 802 && x <= 894 && y >= 68 && y <= 122)
+            {
+                slidesView.SaveUndoState();
+                SlideAudioPlayerManager.Instance.SetPlayInBackground(shape, false, parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+        }
         else if ((curTab == "Phát lại" || (ActiveRibbonTab >= 8 && curTab != "Định dạng Hình dạng" && curTab != "Định dạng Hình ảnh" && curTab != "Thiết kế Bảng")) && slidesView != null && slidesView.SelectedShape != null && (slidesView.SelectedShape.Type == ShapeType.Video || !string.IsNullOrEmpty(slidesView.SelectedShape.VideoPath)))
         {
             ShapeNode shape = slidesView.SelectedShape;
@@ -24717,7 +26300,7 @@ namespace GenOffice.UI
                 {
                     ContextMenuStrip menu = new ContextMenuStrip();
                     ToolStripMenuItem miClickSeq = new ToolStripMenuItem("Theo trình tự nhấp (In Click Sequence)");
-                    ToolStripMenuItem miAuto = new ToolStripMenuItem("Tự động (Automatically)");
+                    ToolStripMenuItem miAuto = new ToolStripMenuItem("Tự động");
                     ToolStripMenuItem miWhenClicked = new ToolStripMenuItem("Khi nhấp vào (When Clicked On)");
 
                     miClickSeq.Checked = (shape.VideoStartMode == VideoStartMode.InClickSequence);
@@ -24960,7 +26543,7 @@ namespace GenOffice.UI
             Rectangle zResetBtn = new Rectangle(curX, 120, 70, 24);
             DrawInteractiveButton(g, zResetBtn, false, 3);
             string zPct = (int)(pdfView.ZoomLevel * 100) + "%";
-            g.DrawString("100% (" + zPct + ")", btnFont, Brushes.DarkBlue, zResetBtn.X + 4, zResetBtn.Y + 3);
+            g.DrawString(zPct, btnFont, Brushes.DarkBlue, zResetBtn.X + 4, zResetBtn.Y + 3);
 
             curX += 76;
 
@@ -25676,7 +27259,7 @@ namespace GenOffice.UI
                             DocTabs[ActiveDocIndex].Title = System.IO.Path.GetFileName(sfd.FileName);
                             DocTabs[ActiveDocIndex].IsModified = false;
                             if (parentForm != null) parentForm.Invalidate();
-                            MessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công (Chuẩn PDF 1.7 tương thích 100% với Adobe Acrobat & Chrome)!", "ZenQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            MessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công!", "Tài liệu PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                 }
@@ -27089,5 +28672,1217 @@ namespace GenOffice.UI
         }
         return bmp;
     }
+
+        #region Photo & Studio Ribbon Toolbar Implementation
+        private void DrawPhotoRibbonToolbar(Graphics g, int width, PhotoView photoView)
+        {
+            if (photoView == null) return;
+            switch (ActiveRibbonTab)
+            {
+                case 0: DrawPhotoTabTrangDau(g, width, photoView); break;
+                case 1: DrawPhotoTabLop(g, width, photoView); break;
+                case 2: DrawPhotoTabBoLoc(g, width, photoView); break;
+                case 3: DrawPhotoTabVeVector(g, width, photoView); break;
+                case 4: DrawPhotoTabVanBan(g, width, photoView); break;
+                case 5: DrawPhotoTabXuatTep(g, width, photoView); break;
+                default: DrawPhotoTabTrangDau(g, width, photoView); break;
+            }
+        }
+
+        private void DrawPhotoTabTrangDau(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241); // Indigo Studio
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Nhóm Lịch sử (Undo/Redo)
+                DrawVectorToolBtnLarge(g, curX, 68, 42, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE7A7', new Rectangle(x1 - 2, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Hoàn tác");
+                curX += 44;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 42, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE7A6', new Rectangle(x1 - 2, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Làm lại");
+                curX += 46;
+
+                g.DrawString("Lịch sử", labelFont, Brushes.Gray, curX - 60, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Nhóm Công cụ Đồ họa (Tools)
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Move ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8B0', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Di chuyển", photoView.SelectedTool == PhotoTool.Move);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Marquee ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uEF20', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Vùng chọn", photoView.SelectedTool == PhotoTool.Marquee);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Brush ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uED63', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Cọ vẽ", photoView.SelectedTool == PhotoTool.Brush);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.NodeTool ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE75C', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Tẩy xóa", photoView.SelectedTool == PhotoTool.NodeTool);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Bucket ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE790', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Đổ màu", photoView.SelectedTool == PhotoTool.Bucket);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Eyedropper ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uEF3C', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Hút màu", photoView.SelectedTool == PhotoTool.Eyedropper);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Hand ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE927', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Bàn tay", photoView.SelectedTool == PhotoTool.Hand);
+                curX += 50;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                    Color c = photoView.SelectedTool == PhotoTool.Crop ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE7A8', new Rectangle(x1 + 1, y1, 20, 20), c, 18f);
+                }, "Cắt xén", photoView.SelectedTool == PhotoTool.Crop);
+                curX += 52;
+
+                g.DrawString("Công cụ chính", labelFont, Brushes.Gray, curX - 190, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Nhóm Thu phóng & Khung vẽ (Canvas & Zoom)
+                DrawVectorToolBtnLarge(g, curX, 68, 46, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE71E', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "100%");
+                curX += 48;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 50, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE740', new Rectangle(x1 + 2, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Vừa màn");
+                curX += 52;
+
+                DrawVectorBtn(g, curX, 68, 52, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8A3', new Rectangle(x1 - 1, y1, 14, 14), Color.FromArgb(71, 85, 105), 12f);
+                }, "Phóng to");
+
+                DrawVectorBtn(g, curX, 98, 52, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE71F', new Rectangle(x1 - 1, y1, 14, 14), Color.FromArgb(71, 85, 105), 12f);
+                }, "Thu nhỏ");
+                curX += 56;
+
+                g.DrawString("Thu phóng (" + (int)(photoView.Zoom * 100) + "%)", labelFont, Brushes.Gray, curX - 85, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 4. Nhóm Cọ vẽ nhanh (Brush size)
+                DrawVectorBtn(g, curX, 68, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uED63', new Rectangle(x1, y1 + 1, 14, 14), photoView.BrushSize == 8f ? primary : Color.FromArgb(71, 85, 105), 11f);
+                }, "Nhỏ 8px", photoView.BrushSize == 8f);
+
+                DrawVectorBtn(g, curX, 98, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uED63', new Rectangle(x1, y1 + 1, 14, 14), photoView.BrushSize == 18f ? primary : Color.FromArgb(71, 85, 105), 11f);
+                }, "Vừa 18px", photoView.BrushSize == 18f);
+                curX += 68;
+
+                DrawVectorBtn(g, curX, 68, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uED63', new Rectangle(x1, y1 + 1, 14, 14), photoView.BrushSize == 36f ? primary : Color.FromArgb(71, 85, 105), 11f);
+                }, "Lớn 36px", photoView.BrushSize == 36f);
+
+                DrawVectorBtn(g, curX, 98, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uED63', new Rectangle(x1, y1 + 1, 14, 14), photoView.BrushSize == 64f ? primary : Color.FromArgb(71, 85, 105), 11f);
+                }, "Đại 64px", photoView.BrushSize == 64f);
+                curX += 68;
+
+                g.DrawString("Kích thước Cọ", labelFont, Brushes.Gray, curX - 90, 137);
+            }
+        }
+
+        private void DrawPhotoTabLop(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241);
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Thêm Lớp Mới
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEB9F', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "Lớp ảnh");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uF158', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "Lớp hình");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8D2', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "Lớp chữ");
+                curX += 58;
+
+                g.DrawString("Tạo Lớp Mới", labelFont, Brushes.Gray, curX - 100, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Thao tác Lớp
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8C8', new Rectangle(x1, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Nhân đôi");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE74D', new Rectangle(x1, y1, 20, 20), Color.FromArgb(239, 68, 68), 18f);
+                }, "Xóa lớp");
+                curX += 58;
+
+                DrawVectorBtn(g, curX, 68, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE74A', new Rectangle(x1 + 1, y1, 14, 14), Color.FromArgb(71, 85, 105), 12f);
+                }, "Lên trên");
+
+                DrawVectorBtn(g, curX, 98, 64, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE74B', new Rectangle(x1 + 1, y1, 14, 14), Color.FromArgb(71, 85, 105), 12f);
+                }, "Xuống dưới");
+                curX += 68;
+
+                g.DrawString("Thứ tự & Quản lý", labelFont, Brushes.Gray, curX - 110, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Hòa trộn Lớp
+                string currentBlend = photoView.Document?.ActiveLayer?.BlendMode.ToString() ?? "Normal";
+                DrawVectorToolBtnLarge(g, curX, 68, 72, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE790', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, currentBlend + " ▾");
+                curX += 76;
+
+                g.DrawString("Hòa trộn", labelFont, Brushes.Gray, curX - 55, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 4. Độ mờ đục (Opacity)
+                float curOp = photoView.Document?.ActiveLayer?.Opacity ?? 1.0f;
+                DrawVectorBtn(g, curX, 68, 54, 26, (g1, x1, y1) => { }, "100%", curOp >= 0.99f);
+                DrawVectorBtn(g, curX, 98, 54, 26, (g1, x1, y1) => { }, "75%", Math.Abs(curOp - 0.75f) < 0.05f);
+                curX += 58;
+
+                DrawVectorBtn(g, curX, 68, 54, 26, (g1, x1, y1) => { }, "50%", Math.Abs(curOp - 0.5f) < 0.05f);
+                DrawVectorBtn(g, curX, 98, 54, 26, (g1, x1, y1) => { }, "25%", Math.Abs(curOp - 0.25f) < 0.05f);
+                curX += 58;
+
+                g.DrawString("Độ mờ đục", labelFont, Brushes.Gray, curX - 80, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 5. Trạng thái hiển thị
+                bool isVisible = photoView.Document?.ActiveLayer?.IsVisible ?? true;
+                DrawVectorToolBtnLarge(g, curX, 68, 64, 60, (g1, x1, y1) => {
+                    char eyeG = isVisible ? '\uE7B3' : '\uED1A';
+                    Color eyeC = isVisible ? primary : Color.Gray;
+                    FluentIconRenderer.DrawGlyph(g1, eyeG, new Rectangle(x1, y1, 20, 20), eyeC, 18f);
+                }, isVisible ? "Đang hiện" : "Đang ẩn", isVisible);
+                curX += 68;
+
+                g.DrawString("Hiển thị", labelFont, Brushes.Gray, curX - 50, 137);
+            }
+        }
+
+        private void DrawPhotoTabBoLoc(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241);
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Nhóm Điều chỉnh Ánh sáng
+                DrawVectorBtn(g, curX, 68, 66, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE706', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(245, 158, 11), 12f);
+                }, "Sáng +");
+
+                DrawVectorBtn(g, curX, 98, 66, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE708', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(100, 116, 139), 12f);
+                }, "Sáng -");
+                curX += 70;
+
+                DrawVectorBtn(g, curX, 68, 76, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE793', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 12f);
+                }, "T.Phản +");
+
+                DrawVectorBtn(g, curX, 98, 76, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE793', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(148, 163, 184), 12f);
+                }, "T.Phản -");
+                curX += 80;
+
+                g.DrawString("Độ sáng / Tương phản", labelFont, Brushes.Gray, curX - 110, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Bộ lọc Nghệ thuật
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE793', new Rectangle(x1, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Đen trắng");
+                curX += 62;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE781', new Rectangle(x1, y1, 20, 20), Color.FromArgb(180, 83, 9), 18f);
+                }, "Cổ điển");
+                curX += 62;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE711', new Rectangle(x1, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Đảo màu");
+                curX += 62;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEA3A', new Rectangle(x1, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Tối góc");
+                curX += 62;
+
+                g.DrawString("Hiệu ứng Màu sắc", labelFont, Brushes.Gray, curX - 160, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Cắt & Biến đổi
+                DrawVectorToolBtnLarge(g, curX, 68, 68, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE7A8', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "Áp dụng Cắt");
+                curX += 72;
+
+                g.DrawString("Cắt Canvas", labelFont, Brushes.Gray, curX - 55, 137);
+            }
+        }
+
+        private void DrawPhotoTabVeVector(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241);
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Các hình Vector
+                var shapes = new[]
+                {
+                    (VectorShapeType.Rectangle, "Chữ nhật"),
+                    (VectorShapeType.RoundedRect, "Bo góc"),
+                    (VectorShapeType.Ellipse, "Tròn/Elip"),
+                    (VectorShapeType.Star, "Ngôi sao"),
+                    (VectorShapeType.Polygon, "Đa giác"),
+                    (VectorShapeType.Arrow, "Mũi tên"),
+                    (VectorShapeType.Heart, "Trái tim"),
+                    (VectorShapeType.Line, "Đoạn thẳng")
+                };
+
+                foreach (var sh in shapes)
+                {
+                    bool isAct = (photoView.ActiveShapeType == sh.Item1 && photoView.SelectedTool == PhotoTool.Shape);
+                    DrawVectorToolBtnLarge(g, curX, 68, 48, 60, (g1, x1, y1) => {
+                        char shGlyph = sh.Item1 switch
+                        {
+                            VectorShapeType.Rectangle => '\uE922',
+                            VectorShapeType.RoundedRect => '\uE91B',
+                            VectorShapeType.Ellipse => '\uEA3A',
+                            VectorShapeType.Star => '\uE734',
+                            VectorShapeType.Polygon => '\uF158',
+                            VectorShapeType.Arrow => '\uE72A',
+                            VectorShapeType.Heart => '\uEB51',
+                            VectorShapeType.Line => '\uE921',
+                            _ => '\uE922'
+                        };
+                        Color shCol = isAct ? primary : Color.FromArgb(71, 85, 105);
+                        FluentIconRenderer.DrawGlyph(g1, shGlyph, new Rectangle(x1, y1, 20, 20), shCol, 17f);
+                    }, sh.Item2, isAct);
+                    curX += 50;
+                }
+
+                g.DrawString("Hình dạng Vector", labelFont, Brushes.Gray, curX - 250, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Viền Vector
+                DrawVectorBtn(g, curX, 68, 62, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE921', new Rectangle(x1, y1 + 1, 14, 14), photoView.ShapeStrokeColor, 12f);
+                }, "1px viền", photoView.ShapeStrokeWidth == 1f);
+
+                DrawVectorBtn(g, curX, 98, 62, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE921', new Rectangle(x1, y1 + 1, 14, 14), photoView.ShapeStrokeColor, 12f);
+                }, "2px viền", photoView.ShapeStrokeWidth == 2f);
+                curX += 66;
+
+                DrawVectorBtn(g, curX, 68, 62, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE921', new Rectangle(x1, y1 + 1, 14, 14), photoView.ShapeStrokeColor, 12f);
+                }, "4px viền", photoView.ShapeStrokeWidth == 4f);
+
+                DrawVectorBtn(g, curX, 98, 62, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE921', new Rectangle(x1, y1 + 1, 14, 14), photoView.ShapeStrokeColor, 12f);
+                }, "8px viền", photoView.ShapeStrokeWidth == 8f);
+                curX += 66;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE922', new Rectangle(x1, y1, 20, 15), Color.FromArgb(71, 85, 105), 15f);
+                    using (SolidBrush cb = new SolidBrush(photoView.ShapeStrokeColor))
+                        g1.FillRectangle(cb, x1 + 1, y1 + 17, 18, 4);
+                    using (Pen cp = new Pen(Color.FromArgb(180, 180, 180), 0.8f))
+                        g1.DrawRectangle(cp, x1 + 1, y1 + 17, 18, 4);
+                }, "Màu viền ▾");
+                curX += 62;
+
+                g.DrawString("Đường viền", labelFont, Brushes.Gray, curX - 110, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Màu tô (Fill)
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE790', new Rectangle(x1, y1, 20, 15), Color.FromArgb(71, 85, 105), 15f);
+                    using (SolidBrush cb = new SolidBrush(photoView.ShapeFillColor))
+                        g1.FillRectangle(cb, x1 + 1, y1 + 17, 18, 4);
+                    using (Pen cp = new Pen(Color.FromArgb(180, 180, 180), 0.8f))
+                        g1.DrawRectangle(cp, x1 + 1, y1 + 17, 18, 4);
+                }, "Màu tô ▾");
+                curX += 62;
+
+                g.DrawString("Màu sắc", labelFont, Brushes.Gray, curX - 45, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 4. Bo góc (Radius)
+                DrawVectorBtn(g, curX, 68, 60, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE91B', new Rectangle(x1, y1 + 1, 14, 14), primary, 11f);
+                }, "8px bo", photoView.ShapeCornerRadius == 8f);
+                DrawVectorBtn(g, curX, 98, 60, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE91B', new Rectangle(x1, y1 + 1, 14, 14), primary, 11f);
+                }, "16px bo", photoView.ShapeCornerRadius == 16f);
+                curX += 64;
+
+                DrawVectorBtn(g, curX, 68, 60, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE91B', new Rectangle(x1, y1 + 1, 14, 14), primary, 11f);
+                }, "24px bo", photoView.ShapeCornerRadius == 24f);
+                DrawVectorBtn(g, curX, 98, 60, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE91B', new Rectangle(x1, y1 + 1, 14, 14), primary, 11f);
+                }, "32px bo", photoView.ShapeCornerRadius == 32f);
+                curX += 64;
+
+                g.DrawString("Góc bo", labelFont, Brushes.Gray, curX - 70, 137);
+            }
+        }
+
+        private void DrawPhotoTabVanBan(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241);
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Thêm Chữ Mới
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8D2', new Rectangle(x1, y1, 20, 20), primary, 18f);
+                }, "Thêm chữ", photoView.SelectedTool == PhotoTool.Text);
+                curX += 62;
+
+                g.DrawString("Soạn thảo", labelFont, Brushes.Gray, curX - 50, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Phông chữ
+                DrawVectorBtn(g, curX, 68, 110, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8D2', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, photoView.ActiveFontName + " ▾");
+                DrawVectorBtn(g, curX, 98, 110, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8E8', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, "Cỡ: " + (int)photoView.ActiveFontSize + "pt ▾");
+                curX += 114;
+
+                g.DrawString("Phông & Cỡ chữ", labelFont, Brushes.Gray, curX - 90, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Kiểu chữ
+                DrawVectorBtn(g, curX, 68, 58, 26, (g1, x1, y1) => {
+                    Color bCol = photoView.ActiveFontBold ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8DD', new Rectangle(x1, y1 + 1, 14, 14), bCol, 12f);
+                }, "Đậm", photoView.ActiveFontBold);
+
+                DrawVectorBtn(g, curX, 98, 58, 26, (g1, x1, y1) => {
+                    Color iCol = photoView.ActiveFontItalic ? primary : Color.FromArgb(71, 85, 105);
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8DB', new Rectangle(x1, y1 + 1, 14, 14), iCol, 12f);
+                }, "Nghiêng", photoView.ActiveFontItalic);
+                curX += 64;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 62, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE8D3', new Rectangle(x1, y1, 20, 15), Color.FromArgb(71, 85, 105), 15f);
+                    using (SolidBrush cb = new SolidBrush(photoView.ForegroundColor))
+                        g1.FillRectangle(cb, x1 + 1, y1 + 17, 18, 4);
+                    using (Pen cp = new Pen(Color.FromArgb(180, 180, 180), 0.8f))
+                        g1.DrawRectangle(cp, x1 + 1, y1 + 17, 18, 4);
+                }, "Màu chữ ▾");
+                curX += 66;
+
+                g.DrawString("Định dạng", labelFont, Brushes.Gray, curX - 70, 137);
+            }
+        }
+
+        private void DrawPhotoTabXuatTep(Graphics g, int width, PhotoView photoView)
+        {
+            int curX = 14;
+            Color primary = Color.FromArgb(99, 102, 241);
+            using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            {
+                // 1. Nhóm Dự án PSD
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE78C', new Rectangle(x1, y1, 20, 20), Color.FromArgb(14, 165, 233), 18f);
+                }, "Lưu PSD");
+                curX += 62;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 58, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE838', new Rectangle(x1, y1, 20, 20), Color.FromArgb(71, 85, 105), 18f);
+                }, "Mở tệp");
+                curX += 62;
+
+                g.DrawString("Tệp & Dự án", labelFont, Brushes.Gray, curX - 80, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 2. Nhóm Xuất Ảnh Nhanh
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEDE1', new Rectangle(x1, y1, 20, 20), Color.DodgerBlue, 18f);
+                }, "Xuất PNG");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEDE1', new Rectangle(x1, y1, 20, 20), Color.OrangeRed, 18f);
+                }, "Xuất JPG");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEDE1', new Rectangle(x1, y1, 20, 20), Color.ForestGreen, 18f);
+                }, "Xuất BMP");
+                curX += 58;
+
+                DrawVectorToolBtnLarge(g, curX, 68, 54, 60, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uEDE1', new Rectangle(x1, y1, 20, 20), Color.Purple, 18f);
+                }, "Xuất TIFF");
+                curX += 58;
+
+                g.DrawString("Xuất Hình ảnh", labelFont, Brushes.Gray, curX - 160, 137);
+                g.DrawLine(Pens.LightGray, curX + 2, 68, curX + 2, 148);
+                curX += 12;
+
+                // 3. Khung vẽ mới (Presets)
+                DrawVectorBtn(g, curX, 68, 126, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE740', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, "1920x1080 (FHD)");
+                DrawVectorBtn(g, curX, 98, 126, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE740', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, "1080x1080 (Vuông)");
+                curX += 130;
+
+                DrawVectorBtn(g, curX, 68, 126, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE740', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, "1280x720 (HD)");
+                DrawVectorBtn(g, curX, 98, 126, 26, (g1, x1, y1) => {
+                    FluentIconRenderer.DrawGlyph(g1, '\uE740', new Rectangle(x1, y1 + 1, 14, 14), Color.FromArgb(71, 85, 105), 11f);
+                }, "3840x2160 (4K)");
+                curX += 130;
+
+                g.DrawString("Đổi Khung hình", labelFont, Brushes.Gray, curX - 140, 137);
+            }
+        }
+
+        public bool HandlePhotoRibbonClick(int x, int y, PhotoView photoView, Form parentForm)
+        {
+            if (photoView == null) return false;
+
+            // Xử lý chung các tabs
+            switch (ActiveRibbonTab)
+            {
+                case 0: // Tab 0: Trang đầu
+                    // Undo (X: 14..56, Y: 68..128)
+                    if (x >= 14 && x <= 56 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.Undo();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Redo (X: 58..100, Y: 68..128)
+                    else if (x >= 58 && x <= 100 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.Redo();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Move Tool (X: 112..160, Y: 68..128)
+                    else if (x >= 112 && x <= 160 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Move;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Marquee Tool (X: 162..210, Y: 68..128)
+                    else if (x >= 162 && x <= 210 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Marquee;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Brush Tool (X: 212..260, Y: 68..128)
+                    else if (x >= 212 && x <= 260 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Brush;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Eraser Tool (X: 262..310, Y: 68..128)
+                    else if (x >= 262 && x <= 310 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.NodeTool;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Bucket Tool (X: 312..360, Y: 68..128)
+                    else if (x >= 312 && x <= 360 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Bucket;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Eyedropper Tool (X: 362..410, Y: 68..128)
+                    else if (x >= 362 && x <= 410 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Eyedropper;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Hand Tool (X: 412..460, Y: 68..128)
+                    else if (x >= 412 && x <= 460 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Hand;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Crop Tool (X: 462..510, Y: 68..128)
+                    else if (x >= 462 && x <= 510 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Crop;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Zoom 100% (X: 522..570, Y: 68..128)
+                    else if (x >= 522 && x <= 570 && y >= 68 && y <= 128)
+                    {
+                        photoView.Zoom = 1.0f;
+                        if (parentForm != null) { photoView.CenterCanvas(parentForm.ClientSize.Width, parentForm.ClientSize.Height); parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Fit Screen (X: 572..620, Y: 68..128)
+                    else if (x >= 572 && x <= 620 && y >= 68 && y <= 128)
+                    {
+                        if (parentForm != null) { photoView.CenterCanvas(parentForm.ClientSize.Width, parentForm.ClientSize.Height); parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Zoom In + (X: 624..676, Y: 68..94)
+                    else if (x >= 624 && x <= 676 && y >= 68 && y <= 94)
+                    {
+                        photoView.Zoom = Math.Min(10.0f, photoView.Zoom * 1.25f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Zoom Out - (X: 624..676, Y: 98..124)
+                    else if (x >= 624 && x <= 676 && y >= 98 && y <= 124)
+                    {
+                        photoView.Zoom = Math.Max(0.1f, photoView.Zoom / 1.25f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Brush 8px (X: 688..752, Y: 68..94)
+                    else if (x >= 688 && x <= 752 && y >= 68 && y <= 94)
+                    {
+                        photoView.BrushSize = 8f;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Brush 18px (X: 688..752, Y: 98..124)
+                    else if (x >= 688 && x <= 752 && y >= 98 && y <= 124)
+                    {
+                        photoView.BrushSize = 18f;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Brush 36px (X: 756..820, Y: 68..94)
+                    else if (x >= 756 && x <= 820 && y >= 68 && y <= 94)
+                    {
+                        photoView.BrushSize = 36f;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Brush 64px (X: 756..820, Y: 98..124)
+                    else if (x >= 756 && x <= 820 && y >= 98 && y <= 124)
+                    {
+                        photoView.BrushSize = 64f;
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    break;
+
+                case 1: // Tab 1: Lớp
+                    // Lớp ảnh (X: 14..68, Y: 68..128)
+                    if (x >= 14 && x <= 68 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.AddRasterLayer();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Lớp hình (X: 72..126, Y: 68..128)
+                    else if (x >= 72 && x <= 126 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.AddVectorShape(photoView.ActiveShapeType, new RectangleF(100, 100, 320, 220), photoView.ShapeFillColor, photoView.ShapeStrokeColor, photoView.ShapeStrokeWidth);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Lớp chữ (X: 130..184, Y: 68..128)
+                    else if (x >= 130 && x <= 184 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.AddText("ZenQ Studio Text", 120, 120, photoView.ActiveFontSize, photoView.ForegroundColor);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Nhân đôi (X: 196..250, Y: 68..128)
+                    else if (x >= 196 && x <= 250 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.DuplicateActiveLayer();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Xóa lớp (X: 254..308, Y: 68..128)
+                    else if (x >= 254 && x <= 308 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.DeleteActiveLayer();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Lên trên (X: 312..376, Y: 68..94)
+                    else if (x >= 312 && x <= 376 && y >= 68 && y <= 94)
+                    {
+                        photoView.Document?.MoveLayerUp();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Xuống dưới (X: 312..376, Y: 98..124)
+                    else if (x >= 312 && x <= 376 && y >= 98 && y <= 124)
+                    {
+                        photoView.Document?.MoveLayerDown();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Hòa trộn ▾ (X: 388..460, Y: 68..128)
+                    else if (x >= 388 && x <= 460 && y >= 68 && y <= 128)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        foreach (LayerBlendMode bm in Enum.GetValues(typeof(LayerBlendMode)))
+                        {
+                            var mode = bm;
+                            var item = new ToolStripMenuItem(mode.ToString());
+                            item.Checked = (photoView.Document?.ActiveLayer?.BlendMode == mode);
+                            item.Click += (s, e) => {
+                                if (photoView.Document?.ActiveLayer != null)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.BlendMode = mode;
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            };
+                            menu.Items.Add(item);
+                        }
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+                    // Opacity 100% (X: 472..526, Y: 68..94)
+                    else if (x >= 472 && x <= 526 && y >= 68 && y <= 94)
+                    {
+                        if (photoView.Document?.ActiveLayer != null) { photoView.Document.SaveUndoSnapshot(); photoView.Document.ActiveLayer.Opacity = 1.0f; if (parentForm != null) parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Opacity 75% (X: 472..526, Y: 98..124)
+                    else if (x >= 472 && x <= 526 && y >= 98 && y <= 124)
+                    {
+                        if (photoView.Document?.ActiveLayer != null) { photoView.Document.SaveUndoSnapshot(); photoView.Document.ActiveLayer.Opacity = 0.75f; if (parentForm != null) parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Opacity 50% (X: 530..584, Y: 68..94)
+                    else if (x >= 530 && x <= 584 && y >= 68 && y <= 94)
+                    {
+                        if (photoView.Document?.ActiveLayer != null) { photoView.Document.SaveUndoSnapshot(); photoView.Document.ActiveLayer.Opacity = 0.50f; if (parentForm != null) parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Opacity 25% (X: 530..584, Y: 98..124)
+                    else if (x >= 530 && x <= 584 && y >= 98 && y <= 124)
+                    {
+                        if (photoView.Document?.ActiveLayer != null) { photoView.Document.SaveUndoSnapshot(); photoView.Document.ActiveLayer.Opacity = 0.25f; if (parentForm != null) parentForm.Invalidate(); }
+                        return true;
+                    }
+                    // Ẩn/Hiện lớp (X: 596..660, Y: 68..128)
+                    else if (x >= 596 && x <= 660 && y >= 68 && y <= 128)
+                    {
+                        if (photoView.Document?.ActiveLayer != null)
+                        {
+                            photoView.Document.SaveUndoSnapshot();
+                            photoView.Document.ActiveLayer.IsVisible = !photoView.Document.ActiveLayer.IsVisible;
+                            if (parentForm != null) parentForm.Invalidate();
+                        }
+                        return true;
+                    }
+                    break;
+
+                case 2: // Tab 2: Bộ lọc
+                    // Sáng + (X: 14..80, Y: 68..94)
+                    if (x >= 14 && x <= 80 && y >= 68 && y <= 94)
+                    {
+                        photoView.Document?.ApplyBrightnessContrast(0.08f, 1.0f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Sáng - (X: 14..80, Y: 98..124)
+                    else if (x >= 14 && x <= 80 && y >= 98 && y <= 124)
+                    {
+                        photoView.Document?.ApplyBrightnessContrast(-0.08f, 1.0f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Tương phản + (X: 84..160, Y: 68..94)
+                    else if (x >= 84 && x <= 160 && y >= 68 && y <= 94)
+                    {
+                        photoView.Document?.ApplyBrightnessContrast(0.0f, 1.15f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Tương phản - (X: 84..160, Y: 98..124)
+                    else if (x >= 84 && x <= 160 && y >= 98 && y <= 124)
+                    {
+                        photoView.Document?.ApplyBrightnessContrast(0.0f, 0.85f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Đen trắng (X: 172..230, Y: 68..128)
+                    else if (x >= 172 && x <= 230 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.ApplyGrayscale();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Cổ điển / Sepia (X: 234..292, Y: 68..128)
+                    else if (x >= 234 && x <= 292 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.ApplySepia();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Đảo màu (X: 296..354, Y: 68..128)
+                    else if (x >= 296 && x <= 354 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.ApplyInvert();
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Tối góc / Vignette (X: 358..416, Y: 68..128)
+                    else if (x >= 358 && x <= 416 && y >= 68 && y <= 128)
+                    {
+                        photoView.Document?.ApplyVignette(0.5f);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Áp dụng Cắt (X: 428..496, Y: 68..128)
+                    else if (x >= 428 && x <= 496 && y >= 68 && y <= 128)
+                    {
+                        if (photoView.IsCropping && photoView.CropRect.Width > 10 && photoView.CropRect.Height > 10)
+                        {
+                            photoView.Document?.CropCanvas(Rectangle.Round(photoView.CropRect));
+                            photoView.IsCropping = false;
+                            photoView.CropRect = RectangleF.Empty;
+                            if (parentForm != null) { photoView.CenterCanvas(parentForm.ClientSize.Width, parentForm.ClientSize.Height); parentForm.Invalidate(); }
+                        }
+                        else
+                        {
+                            MessageBox.Show("Vui lòng kéo khung cắt xén trên màn hình trước khi nhấn áp dụng.", "Cắt Canvas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        return true;
+                    }
+                    break;
+
+                case 3: // Tab 3: Vẽ & Vector
+                    // Các hình vector: Chữ nhật, Bo góc, Elip, Sao, Đa giác, Mũi tên, Trái tim, Đường thẳng
+                    if (y >= 68 && y <= 128)
+                    {
+                        int shIdx = (x - 14) / 50;
+                        if (shIdx >= 0 && shIdx < 8)
+                        {
+                            VectorShapeType[] arr = new VectorShapeType[] {
+                                VectorShapeType.Rectangle, VectorShapeType.RoundedRect, VectorShapeType.Ellipse,
+                                VectorShapeType.Star, VectorShapeType.Polygon, VectorShapeType.Arrow,
+                                VectorShapeType.Heart, VectorShapeType.Line
+                            };
+                            photoView.ActiveShapeType = arr[shIdx];
+                            photoView.SelectedTool = PhotoTool.Shape;
+                            if (parentForm != null) parentForm.Invalidate();
+                            return true;
+                        }
+                    }
+
+                    // Độ dày viền: 1px, 2px (X: 426..488), 4px, 8px (X: 492..554)
+                    if (x >= 426 && x <= 488 && y >= 68 && y <= 94) { photoView.ShapeStrokeWidth = 1f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 426 && x <= 488 && y >= 98 && y <= 124) { photoView.ShapeStrokeWidth = 2f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 492 && x <= 554 && y >= 68 && y <= 94) { photoView.ShapeStrokeWidth = 4f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 492 && x <= 554 && y >= 98 && y <= 124) { photoView.ShapeStrokeWidth = 8f; if (parentForm != null) parentForm.Invalidate(); return true; }
+
+                    // Màu viền ▾ (X: 558..616, Y: 68..128)
+                    if (x >= 558 && x <= 616 && y >= 68 && y <= 128)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        Color[] colors = new Color[] { Color.FromArgb(99, 102, 241), Color.FromArgb(37, 99, 235), Color.FromArgb(239, 68, 68), Color.FromArgb(16, 185, 129), Color.FromArgb(245, 158, 11), Color.Black, Color.White };
+                        string[] names = new string[] { "Tím Indigo", "Xanh dương", "Đỏ tươi", "Xanh lá", "Cam vàng", "Đen", "Trắng" };
+                        for (int i = 0; i < colors.Length; i++)
+                        {
+                            var c = colors[i];
+                            var item = new ToolStripMenuItem(names[i]);
+                            item.Click += (s, e) => {
+                                photoView.ShapeStrokeColor = c;
+                                if (photoView.Document?.ActiveLayer?.Type == LayerType.VectorShape)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.StrokeColor = c;
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            menu.Items.Add(item);
+                        }
+                        var customItem = new ToolStripMenuItem("Bảng màu chi tiết...");
+                        customItem.Click += (s, e) => {
+                            using (var dlg = new PhotoColorPickerDialogForm(photoView.ShapeStrokeColor))
+                            {
+                                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                                {
+                                    photoView.ShapeStrokeColor = dlg.SelectedColor;
+                                    if (photoView.Document?.ActiveLayer?.Type == LayerType.VectorShape)
+                                    {
+                                        photoView.Document.SaveUndoSnapshot();
+                                        photoView.Document.ActiveLayer.StrokeColor = dlg.SelectedColor;
+                                    }
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            }
+                        };
+                        menu.Items.Add(new ToolStripSeparator());
+                        menu.Items.Add(customItem);
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+
+                    // Màu tô ▾ (X: 632..690, Y: 68..128)
+                    if (x >= 632 && x <= 690 && y >= 68 && y <= 128)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        Color[] colors = new Color[] { Color.FromArgb(238, 242, 255), Color.FromArgb(59, 130, 246), Color.FromArgb(239, 68, 68), Color.FromArgb(16, 185, 129), Color.FromArgb(245, 158, 11), Color.White, Color.Transparent };
+                        string[] names = new string[] { "Tím nhạt Indigo", "Xanh dương", "Đỏ tươi", "Xanh lá", "Cam vàng", "Trắng", "Trong suốt (Không tô)" };
+                        for (int i = 0; i < colors.Length; i++)
+                        {
+                            var c = colors[i];
+                            var item = new ToolStripMenuItem(names[i]);
+                            item.Click += (s, e) => {
+                                photoView.ShapeFillColor = c;
+                                if (photoView.Document?.ActiveLayer?.Type == LayerType.VectorShape)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.FillColor = c;
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            menu.Items.Add(item);
+                        }
+                        var customItem = new ToolStripMenuItem("Bảng màu chi tiết...");
+                        customItem.Click += (s, e) => {
+                            using (var dlg = new PhotoColorPickerDialogForm(photoView.ShapeFillColor))
+                            {
+                                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                                {
+                                    photoView.ShapeFillColor = dlg.SelectedColor;
+                                    if (photoView.Document?.ActiveLayer?.Type == LayerType.VectorShape)
+                                    {
+                                        photoView.Document.SaveUndoSnapshot();
+                                        photoView.Document.ActiveLayer.FillColor = dlg.SelectedColor;
+                                    }
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            }
+                        };
+                        menu.Items.Add(new ToolStripSeparator());
+                        menu.Items.Add(customItem);
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+
+                    // Bo góc 8, 16, 24, 32px (X: 706..830)
+                    if (x >= 706 && x <= 766 && y >= 68 && y <= 94) { photoView.ShapeCornerRadius = 8f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 706 && x <= 766 && y >= 98 && y <= 124) { photoView.ShapeCornerRadius = 16f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 770 && x <= 830 && y >= 68 && y <= 94) { photoView.ShapeCornerRadius = 24f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    if (x >= 770 && x <= 830 && y >= 98 && y <= 124) { photoView.ShapeCornerRadius = 32f; if (parentForm != null) parentForm.Invalidate(); return true; }
+                    break;
+
+                case 4: // Tab 4: Văn bản
+                    // Thêm chữ (X: 14..72, Y: 68..128)
+                    if (x >= 14 && x <= 72 && y >= 68 && y <= 128)
+                    {
+                        photoView.SelectedTool = PhotoTool.Text;
+                        photoView.Document?.AddText("ZenQ Studio Text", 150, 150, photoView.ActiveFontSize, photoView.ForegroundColor);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Chọn Phông chữ (X: 88..198, Y: 68..94)
+                    else if (x >= 88 && x <= 198 && y >= 68 && y <= 94)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        string[] fonts = new string[] { "Segoe UI", "Arial", "Times New Roman", "Roboto", "Montserrat", "Courier New", "Georgia" };
+                        foreach (var fn in fonts)
+                        {
+                            var fName = fn;
+                            var item = new ToolStripMenuItem(fName);
+                            item.Checked = (photoView.ActiveFontName == fName);
+                            item.Click += (s, e) => {
+                                photoView.ActiveFontName = fName;
+                                if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.FontName = fName;
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            menu.Items.Add(item);
+                        }
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+                    // Chọn Cỡ chữ (X: 88..198, Y: 98..124)
+                    else if (x >= 88 && x <= 198 && y >= 98 && y <= 124)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        int[] sizes = new int[] { 18, 24, 32, 42, 54, 72, 96 };
+                        foreach (var sz in sizes)
+                        {
+                            var sVal = sz;
+                            var item = new ToolStripMenuItem(sVal + " pt");
+                            item.Checked = ((int)photoView.ActiveFontSize == sVal);
+                            item.Click += (s, e) => {
+                                photoView.ActiveFontSize = sVal;
+                                if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.FontSize = sVal;
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            menu.Items.Add(item);
+                        }
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+                    // Đậm [B] (X: 214..272, Y: 68..94)
+                    else if (x >= 214 && x <= 272 && y >= 68 && y <= 94)
+                    {
+                        photoView.ActiveFontBold = !photoView.ActiveFontBold;
+                        if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                        {
+                            photoView.Document.SaveUndoSnapshot();
+                            FontStyle st = FontStyle.Regular;
+                            if (photoView.ActiveFontBold) st |= FontStyle.Bold;
+                            if (photoView.ActiveFontItalic) st |= FontStyle.Italic;
+                            photoView.Document.ActiveLayer.FontStyle = st;
+                        }
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Nghiêng [I] (X: 214..272, Y: 98..124)
+                    else if (x >= 214 && x <= 272 && y >= 98 && y <= 124)
+                    {
+                        photoView.ActiveFontItalic = !photoView.ActiveFontItalic;
+                        if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                        {
+                            photoView.Document.SaveUndoSnapshot();
+                            FontStyle st = FontStyle.Regular;
+                            if (photoView.ActiveFontBold) st |= FontStyle.Bold;
+                            if (photoView.ActiveFontItalic) st |= FontStyle.Italic;
+                            photoView.Document.ActiveLayer.FontStyle = st;
+                        }
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+                    // Màu chữ ▾ (X: 278..342, Y: 68..128)
+                    else if (x >= 278 && x <= 342 && y >= 68 && y <= 128)
+                    {
+                        ContextMenuStrip menu = new ContextMenuStrip();
+                        Color[] colors = new Color[] { Color.FromArgb(30, 41, 59), Color.FromArgb(99, 102, 241), Color.FromArgb(37, 99, 235), Color.FromArgb(239, 68, 68), Color.FromArgb(16, 185, 129), Color.FromArgb(245, 158, 11), Color.White };
+                        string[] names = new string[] { "Đen xám", "Tím Indigo", "Xanh dương", "Đỏ tươi", "Xanh lá", "Cam vàng", "Trắng" };
+                        for (int i = 0; i < colors.Length; i++)
+                        {
+                            var c = colors[i];
+                            var item = new ToolStripMenuItem(names[i]);
+                            item.Click += (s, e) => {
+                                photoView.ForegroundColor = c;
+                                if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                                {
+                                    photoView.Document.SaveUndoSnapshot();
+                                    photoView.Document.ActiveLayer.TextColor = c;
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            menu.Items.Add(item);
+                        }
+                        var customItem = new ToolStripMenuItem("Bảng màu chi tiết...");
+                        customItem.Click += (s, e) => {
+                            using (var dlg = new PhotoColorPickerDialogForm(photoView.ForegroundColor))
+                            {
+                                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                                {
+                                    photoView.ForegroundColor = dlg.SelectedColor;
+                                    if (photoView.Document?.ActiveLayer?.Type == LayerType.Text)
+                                    {
+                                        photoView.Document.SaveUndoSnapshot();
+                                        photoView.Document.ActiveLayer.TextColor = dlg.SelectedColor;
+                                    }
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            }
+                        };
+                        menu.Items.Add(new ToolStripSeparator());
+                        menu.Items.Add(customItem);
+                        if (parentForm != null) menu.Show(parentForm, new Point(x, y + 10));
+                        return true;
+                    }
+                    break;
+
+                case 5: // Tab 5: Xuất tệp
+                    // Lưu PSD (X: 14..72, Y: 68..128)
+                    if (x >= 14 && x <= 72 && y >= 68 && y <= 128)
+                    {
+                        using (SaveFileDialog sfd = new SaveFileDialog())
+                        {
+                            sfd.Filter = "Tệp Photoshop (*.psd)|*.psd";
+                            sfd.FileName = photoView.Document?.Title ?? "ThietKe1.psd";
+                            if (sfd.ShowDialog(parentForm) == DialogResult.OK)
+                            {
+                                bool ok = photoView.Document != null && photoView.Document.SaveToFile(sfd.FileName);
+                                if (ok) MessageBox.Show("Đã lưu tệp PSD thành công!", "Thiết kế & Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                else MessageBox.Show("Lỗi khi lưu tệp PSD.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        return true;
+                    }
+                    // Mở tệp (X: 76..134, Y: 68..128)
+                    else if (x >= 76 && x <= 134 && y >= 68 && y <= 128)
+                    {
+                        using (OpenFileDialog ofd = new OpenFileDialog())
+                        {
+                            ofd.Filter = "Tất cả ảnh và PSD (*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff)|*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff|Tệp Photoshop (*.psd)|*.psd|Hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.tiff|Tất cả tệp (*.*)|*.*";
+                            if (ofd.ShowDialog(parentForm) == DialogResult.OK)
+                            {
+                                var loaded = PhotoDocument.LoadFromFile(ofd.FileName);
+                                if (loaded != null)
+                                {
+                                    photoView.Document = loaded;
+                                    if (parentForm != null) { photoView.CenterCanvas(parentForm.ClientSize.Width, parentForm.ClientSize.Height); parentForm.Invalidate(); }
+                                    MessageBox.Show("Mở tệp thành công! Đã nạp " + loaded.Layers.Count + " lớp đồ họa.", "ZenQ Photo Studio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                }
+                                else MessageBox.Show("Không thể đọc tệp hình ảnh / PSD này.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        return true;
+                    }
+                    // Xuất PNG (X: 150..208, Y: 68..128)
+                    else if (x >= 150 && x <= 208 && y >= 68 && y <= 128)
+                    {
+                        ExportPhotoAs(photoView, parentForm, "Portable Network Graphics (*.png)|*.png", ".png");
+                        return true;
+                    }
+                    // Xuất JPG (X: 212..270, Y: 68..128)
+                    else if (x >= 212 && x <= 270 && y >= 68 && y <= 128)
+                    {
+                        ExportPhotoAs(photoView, parentForm, "JPEG Image (*.jpg)|*.jpg", ".jpg");
+                        return true;
+                    }
+                    // Xuất BMP (X: 274..332, Y: 68..128)
+                    else if (x >= 274 && x <= 332 && y >= 68 && y <= 128)
+                    {
+                        ExportPhotoAs(photoView, parentForm, "Bitmap Image (*.bmp)|*.bmp", ".bmp");
+                        return true;
+                    }
+                    // Xuất TIFF (X: 336..394, Y: 68..128)
+                    else if (x >= 336 && x <= 394 && y >= 68 && y <= 128)
+                    {
+                        ExportPhotoAs(photoView, parentForm, "TIFF Image (*.tiff)|*.tiff", ".tiff");
+                        return true;
+                    }
+                    // Đổi kích thước: 1920x1080 (X: 410..536, Y: 68..94)
+                    else if (x >= 410 && x <= 536 && y >= 68 && y <= 94)
+                    {
+                        ChangeCanvasSize(photoView, parentForm, 1920, 1080);
+                        return true;
+                    }
+                    // Đổi kích thước: 1080x1080 (X: 410..536, Y: 98..124)
+                    else if (x >= 410 && x <= 536 && y >= 98 && y <= 124)
+                    {
+                        ChangeCanvasSize(photoView, parentForm, 1080, 1080);
+                        return true;
+                    }
+                    // Đổi kích thước: 1280x720 (X: 540..666, Y: 68..94)
+                    else if (x >= 540 && x <= 666 && y >= 68 && y <= 94)
+                    {
+                        ChangeCanvasSize(photoView, parentForm, 1280, 720);
+                        return true;
+                    }
+                    // Đổi kích thước: 3840x2160 (X: 540..666, Y: 98..124)
+                    else if (x >= 540 && x <= 666 && y >= 98 && y <= 124)
+                    {
+                        ChangeCanvasSize(photoView, parentForm, 3840, 2160);
+                        return true;
+                    }
+                    break;
+            }
+
+            return false;
+        }
+
+        private void ExportPhotoAs(PhotoView photoView, Form parentForm, string filter, string defExt)
+        {
+            if (photoView?.Document == null) return;
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = filter;
+                string baseName = System.IO.Path.GetFileNameWithoutExtension(photoView.Document.Title ?? "ThietKe1");
+                sfd.FileName = baseName + defExt;
+                if (sfd.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    bool ok = photoView.Document.SaveToFile(sfd.FileName);
+                    if (ok) MessageBox.Show("Đã xuất hình ảnh thành công!", "ZenQ Photo Studio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    else MessageBox.Show("Lỗi khi xuất hình ảnh.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void ChangeCanvasSize(PhotoView photoView, Form parentForm, int w, int h)
+        {
+            if (photoView?.Document == null) return;
+            photoView.Document.SaveUndoSnapshot();
+            photoView.Document.Width = w;
+            photoView.Document.Height = h;
+            if (parentForm != null)
+            {
+                photoView.CenterCanvas(parentForm.ClientSize.Width, parentForm.ClientSize.Height);
+                parentForm.Invalidate();
+            }
+        }
+        #endregion
 }
 }

@@ -5,10 +5,10 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     /// <summary>
     /// OpenDocument Spreadsheet (.ods) reader and writer compatible with LibreOffice Calc and Microsoft Excel.

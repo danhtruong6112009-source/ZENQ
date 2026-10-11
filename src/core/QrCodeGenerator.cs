@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Trình tạo mã QR nội bộ độc lập không phụ thuộc thư viện ngoài.

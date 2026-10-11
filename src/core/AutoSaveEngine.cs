@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public static class AutoSaveEngine
     {

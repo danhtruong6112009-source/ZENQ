@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="render_visual_verification.cs" />
+    <Compile Include="verify_connect_full.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="ZenQOffice">
-      <HintPath>..\bin\Debug\net10.0-windows\ZenQOffice.dll</HintPath>
+      <HintPath>..\bin\Release\net10.0-windows\ZenQOffice.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

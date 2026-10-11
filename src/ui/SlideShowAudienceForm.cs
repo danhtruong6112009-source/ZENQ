@@ -3,9 +3,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Cửa sổ toàn màn hình cho màn hình phụ (Khán giả / Máy chiếu) trong chế độ 2 màn hình (Dual Screen)
@@ -96,21 +96,24 @@ namespace GenOffice.UI
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            Invalidate();
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-            // AntiAlias for smooth sub-pixel text during slide animations / transitions.
-            // ClearTypeGridFit would snap glyphs to integer pixels, causing jitter when shapes move.
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-            if (_slidesView != null)
+            if (_slidesView == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(e.Graphics, ClientSize.Width, ClientSize.Height))
             {
-                _slidesView.DrawFullscreenPresenter(g, ClientSize.Width, ClientSize.Height, false);
+                _slidesView.DrawFullscreenPresenter(d2d, ClientSize.Width, ClientSize.Height, false);
             }
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            // Opaque Direct2D rendering
         }
 
         protected override void OnMouseDown(MouseEventArgs e)

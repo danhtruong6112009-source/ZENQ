@@ -6,7 +6,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public class OnlineGraphicsCategory
     {
@@ -38,6 +38,39 @@ namespace GenOffice.Core
 
         public static event Action<OnlineGraphicsResponse> OnCatalogUpdated;
         public static event Action OnImageDownloaded;
+        
+        public static void TriggerImageDownloaded()
+        {
+            OnImageDownloaded?.Invoke();
+        }
+
+        private static OnlineGraphicsResponse NormalizeCatalogCategories(OnlineGraphicsResponse cat)
+        {
+            if (cat == null || cat.categories == null) return cat;
+            foreach (var c in cat.categories)
+            {
+                if (c == null || string.IsNullOrEmpty(c.name)) continue;
+                string n = c.name.Trim();
+                if (n.IndexOf("phức tạp", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    n.IndexOf("Scenes", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    c.name = "Minh họa Hoạt cảnh & Nhân vật";
+                }
+                else if (n.IndexOf("unDraw", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    c.name = "Minh họa Chủ đề & Sự vật";
+                }
+                else if (n.IndexOf("Color Emojis", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    c.name = "Biểu tượng Đa sắc (Fluent)";
+                }
+                else if (n.IndexOf("Flags", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    c.name = "Quốc kỳ các nước";
+                }
+            }
+            return cat;
+        }
 
         public static OnlineGraphicsResponse GetCatalogCached()
         {
@@ -51,28 +84,38 @@ namespace GenOffice.Core
                     var cat = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (cat != null && cat.categories != null && cat.categories.Count > 0)
                     {
-                        _catalog = cat;
+                        _catalog = NormalizeCatalogCategories(cat);
                         return _catalog;
                     }
                 }
 
-                // Fallback cục bộ từ thư mục ứng dụng
+                // Fallback cục bộ từ thư mục ứng dụng và repository
                 string appDir = AppDomain.CurrentDomain.BaseDirectory;
-                string localDataFile = Path.Combine(appDir, "data", "graphics.json");
-                if (File.Exists(localDataFile))
+                string[] candidatePaths = new[]
                 {
-                    string json = File.ReadAllText(localDataFile);
-                    var cat = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    if (cat != null && cat.categories != null && cat.categories.Count > 0)
+                    Path.Combine(appDir, "data", "graphics.json"),
+                    Path.Combine(appDir, "..", "..", "..", "data", "graphics.json"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "genofficepy", "data", "graphics.json"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "zenq-graphics-api", "data", "graphics.json")
+                };
+
+                foreach (string candidate in candidatePaths)
+                {
+                    if (File.Exists(candidate))
                     {
-                        _catalog = cat;
-                        try
+                        string json = File.ReadAllText(candidate);
+                        var cat = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (cat != null && cat.categories != null && cat.categories.Count > 0)
                         {
-                            if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
-                            File.WriteAllText(_catalogCacheFile, json);
+                            _catalog = NormalizeCatalogCategories(cat);
+                            try
+                            {
+                                if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
+                                File.WriteAllText(_catalogCacheFile, json);
+                            }
+                            catch { }
+                            return _catalog;
                         }
-                        catch { }
-                        return _catalog;
                     }
                 }
             }
@@ -90,13 +133,28 @@ namespace GenOffice.Core
                     if (!Directory.Exists(_cacheDir))
                         Directory.CreateDirectory(_cacheDir);
 
-                    string json = await _httpClient.GetStringAsync(apiUrl).ConfigureAwait(false);
-                    var newCatalog = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    if (newCatalog != null && newCatalog.categories != null)
+                    string json = null;
+                    string cacheBuster = "?_t=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                    try
                     {
-                        _catalog = newCatalog;
-                        try { File.WriteAllText(_catalogCacheFile, json); } catch { }
-                        OnCatalogUpdated?.Invoke(_catalog);
+                        json = await _httpClient.GetStringAsync(apiUrl + cacheBuster).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Fallback to GitHub raw repository
+                        string githubRawUrl = "https://raw.githubusercontent.com/thedanh6112009-collab/zenq-graphics-api/main/data/graphics.json" + cacheBuster;
+                        json = await _httpClient.GetStringAsync(githubRawUrl).ConfigureAwait(false);
+                    }
+
+                    if (!string.IsNullOrEmpty(json))
+                    {
+                        var newCatalog = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (newCatalog != null && newCatalog.categories != null && newCatalog.categories.Count > 0)
+                        {
+                            _catalog = NormalizeCatalogCategories(newCatalog);
+                            try { File.WriteAllText(_catalogCacheFile, json); } catch { }
+                            OnCatalogUpdated?.Invoke(_catalog);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -115,10 +173,26 @@ namespace GenOffice.Core
                 if (!Directory.Exists(_cacheDir))
                     Directory.CreateDirectory(_cacheDir);
 
-                string json = await _httpClient.GetStringAsync(apiUrl).ConfigureAwait(false);
-                _catalog = JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                try { File.WriteAllText(_catalogCacheFile, json); } catch { }
-                return _catalog;
+                string json = null;
+                string cacheBuster = "?_t=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                try
+                {
+                    json = await _httpClient.GetStringAsync(apiUrl + cacheBuster).ConfigureAwait(false);
+                }
+                catch
+                {
+                    string githubRawUrl = "https://raw.githubusercontent.com/thedanh6112009-collab/zenq-graphics-api/main/data/graphics.json" + cacheBuster;
+                    json = await _httpClient.GetStringAsync(githubRawUrl).ConfigureAwait(false);
+                }
+
+                if (!string.IsNullOrEmpty(json))
+                {
+                    _catalog = NormalizeCatalogCategories(JsonSerializer.Deserialize<OnlineGraphicsResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+                    try { File.WriteAllText(_catalogCacheFile, json); } catch { }
+                    return _catalog;
+                }
+
+                return GetCatalogCached();
             }
             catch (Exception ex)
             {
@@ -149,6 +223,25 @@ namespace GenOffice.Core
                     catch { }
                 }
 
+                // Check direct local repo file first for instant zero-latency loading
+                try
+                {
+                    Uri parsedUri = new Uri(url);
+                    string relPath = parsedUri.AbsolutePath.TrimStart('/');
+                    string localRepoFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "zenq-graphics-api", "public", relPath.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(localRepoFile))
+                    {
+                        if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
+                        File.Copy(localRepoFile, localPath, true);
+                        if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string svgContent = File.ReadAllText(localPath);
+                            return SvgRasterizer.RenderSvgToBitmap(svgContent, targetSize, targetSize);
+                        }
+                    }
+                }
+                catch { }
+
                 // If not cached, trigger non-blocking download
                 lock (_downloadingImages)
                 {
@@ -161,9 +254,24 @@ namespace GenOffice.Core
                     try
                     {
                         if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
-                        byte[] data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
-                        File.WriteAllBytes(localPath, data);
-                        OnImageDownloaded?.Invoke();
+
+                        byte[] data = null;
+                        try
+                        {
+                            data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            // Fallback to GitHub Raw
+                            string githubRawUrl = url.Replace("https://zenq-graphics-api-online.vercel.app/", "https://raw.githubusercontent.com/thedanh6112009-collab/zenq-graphics-api/main/public/");
+                            data = await _httpClient.GetByteArrayAsync(githubRawUrl).ConfigureAwait(false);
+                        }
+
+                        if (data != null && data.Length > 0)
+                        {
+                            File.WriteAllBytes(localPath, data);
+                            OnImageDownloaded?.Invoke();
+                        }
                     }
                     catch { }
                     finally
@@ -205,8 +313,39 @@ namespace GenOffice.Core
                     catch { /* Corrupted, redownload */ }
                 }
 
-                byte[] data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
-                File.WriteAllBytes(localPath, data);
+                // Check local repo file first
+                try
+                {
+                    Uri parsedUri = new Uri(url);
+                    string relPath = parsedUri.AbsolutePath.TrimStart('/');
+                    string localRepoFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "zenq-graphics-api", "public", relPath.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(localRepoFile))
+                    {
+                        File.Copy(localRepoFile, localPath, true);
+                        if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string svgContent = File.ReadAllText(localPath);
+                            return SvgRasterizer.RenderSvgToBitmap(svgContent, 1600, 1600);
+                        }
+                    }
+                }
+                catch { }
+
+                byte[] data = null;
+                try
+                {
+                    data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+                }
+                catch
+                {
+                    string githubRawUrl = url.Replace("https://zenq-graphics-api-online.vercel.app/", "https://raw.githubusercontent.com/thedanh6112009-collab/zenq-graphics-api/main/public/");
+                    data = await _httpClient.GetByteArrayAsync(githubRawUrl).ConfigureAwait(false);
+                }
+
+                if (data != null && data.Length > 0)
+                {
+                    File.WriteAllBytes(localPath, data);
+                }
 
                 if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                 {

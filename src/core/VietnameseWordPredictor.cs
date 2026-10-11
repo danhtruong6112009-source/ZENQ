@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Bộ máy gợi ý từ ngữ thông minh (IntelliSense Word / Phrase Predictor)

@@ -1,9 +1,9 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class SlideParagraphDialogForm : Form
     {
@@ -65,20 +65,20 @@ namespace GenOffice.UI
             Font = new Font("Segoe UI", 9f);
 
             // Group 1: General (Chung - Căn chỉnh)
-            GroupBox grpGeneral = new GroupBox { Text = "Chung (General)", Location = new Point(14, 12), Size = new Size(475, 75) };
+            GroupBox grpGeneral = new GroupBox { Text = "Căn chỉnh chung", Location = new Point(14, 12), Size = new Size(475, 75) };
             
             Label lblAlign = new Label { Text = "Căn chỉnh:", Location = new Point(16, 26), AutoSize = true };
             cboAlignment = new ComboBox { Location = new Point(90, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboAlignment.Items.AddRange(new object[] { "Trái (Left)", "Giữa (Center)", "Phải (Right)", "Đều 2 bên (Justified)" });
+            cboAlignment.Items.AddRange(new object[] { "Căn trái", "Căn giữa", "Căn phải", "Căn đều hai bên" });
             cboAlignment.SelectedIndex = AlignmentResult == TextAlignment.Center ? 1 : (AlignmentResult == TextAlignment.Right ? 2 : (AlignmentResult == TextAlignment.Justify ? 3 : 0));
             cboAlignment.SelectedIndexChanged += (s, e) => {
                 AlignmentResult = cboAlignment.SelectedIndex == 1 ? TextAlignment.Center : (cboAlignment.SelectedIndex == 2 ? TextAlignment.Right : (cboAlignment.SelectedIndex == 3 ? TextAlignment.Justify : TextAlignment.Left));
                 UpdatePreview();
             };
 
-            Label lblVert = new Label { Text = "Căn dọc:", Location = new Point(245, 26), AutoSize = true };
+            Label lblVert = new Label { Text = "Dọc:", Location = new Point(245, 26), AutoSize = true };
             cboVerticalAlignment = new ComboBox { Location = new Point(310, 23), Size = new Size(140, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboVerticalAlignment.Items.AddRange(new object[] { "Trên cùng (Top)", "Ở giữa (Middle)", "Dưới cùng (Bottom)" });
+            cboVerticalAlignment.Items.AddRange(new object[] { "Trên cùng", "Ở giữa", "Dưới cùng" });
             cboVerticalAlignment.SelectedIndex = VerticalAlignmentResult == VerticalTextAlignment.Middle ? 1 : (VerticalAlignmentResult == VerticalTextAlignment.Bottom ? 2 : 0);
             cboVerticalAlignment.SelectedIndexChanged += (s, e) => {
                 VerticalAlignmentResult = cboVerticalAlignment.SelectedIndex == 1 ? VerticalTextAlignment.Middle : (cboVerticalAlignment.SelectedIndex == 2 ? VerticalTextAlignment.Bottom : VerticalTextAlignment.Top);
@@ -89,7 +89,7 @@ namespace GenOffice.UI
             Controls.Add(grpGeneral);
 
             // Group 2: Indentation (Thụt lề)
-            GroupBox grpIndent = new GroupBox { Text = "Thụt lề (Indentation)", Location = new Point(14, 95), Size = new Size(475, 75) };
+            GroupBox grpIndent = new GroupBox { Text = "Thụt lề", Location = new Point(14, 95), Size = new Size(475, 75) };
             
             Label lblIndL = new Label { Text = "Bên trái (pt):", Location = new Point(16, 28), AutoSize = true };
             numIndentLeft = new NumericUpDown { Location = new Point(100, 26), Size = new Size(90, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 200, Value = (decimal)MarginLeftResult };
@@ -103,7 +103,7 @@ namespace GenOffice.UI
             Controls.Add(grpIndent);
 
             // Group 3: Spacing (Giãn cách)
-            GroupBox grpSpacing = new GroupBox { Text = "Giãn cách (Spacing)", Location = new Point(14, 180), Size = new Size(475, 120) };
+            GroupBox grpSpacing = new GroupBox { Text = "Giãn cách", Location = new Point(14, 180), Size = new Size(475, 120) };
 
             Label lblSpcBef = new Label { Text = "Trước đoạn (pt):", Location = new Point(16, 26), AutoSize = true };
             numSpaceBefore = new NumericUpDown { Location = new Point(125, 23), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)SpaceBeforeResult };
@@ -115,7 +115,7 @@ namespace GenOffice.UI
 
             Label lblLnSpc = new Label { Text = "Cách dòng:", Location = new Point(245, 26), AutoSize = true };
             cboLineSpacing = new ComboBox { Location = new Point(325, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboLineSpacing.Items.AddRange(new object[] { "Đơn (1.0 line)", "1.5 dòng", "Đôi (2.0 lines)", "Nhiều dòng (Multiple)" });
+            cboLineSpacing.Items.AddRange(new object[] { "Dòng đơn", "1.5 dòng", "Dòng đôi", "Nhiều dòng" });
 
             Label lblAt = new Label { Text = "Bằng:", Location = new Point(245, 65), AutoSize = true };
             numLineSpacingAt = new NumericUpDown { Location = new Point(325, 62), Size = new Size(80, 24), DecimalPlaces = 2, Minimum = 0.5m, Maximum = 5m, Increment = 0.1m, Value = 1.2m };
@@ -141,13 +141,13 @@ namespace GenOffice.UI
             Controls.Add(grpSpacing);
 
             // Group 4: Preview (Xem trước)
-            GroupBox grpPreview = new GroupBox { Text = "Xem trước (Preview)", Location = new Point(14, 310), Size = new Size(475, 115) };
+            GroupBox grpPreview = new GroupBox { Text = "Xem trước", Location = new Point(14, 310), Size = new Size(475, 115) };
             pnlPreview = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8) };
             
             lblPreviewP1 = new Label {
                 Dock = DockStyle.Top,
                 Height = 45,
-                Text = "Đoạn văn mẫu thứ nhất minh họa căn chỉnh lề, khoảng cách dòng và thụt lề chuẩn PowerPoint.",
+                Text = "Đoạn văn mẫu thứ nhất minh họa căn chỉnh lề, khoảng cách dòng và thụt lề chuẩn bản trình chiếu.",
                 Font = new Font("Segoe UI", 9f)
             };
             lblPreviewP2 = new Label {

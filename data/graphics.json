@@ -1,6 +1,6 @@
 {
   "version": "2.2",
-  "total": 197,
+  "total": 356,
   "categories": [
     {
       "name": "Mây & Khí quyển",
@@ -1250,6 +1250,1005 @@
           "id": "artistic_floral_flower_vintage_rose",
           "name": "Hoa hồng cổ điển",
           "url": "https://zenq-graphics-api-online.vercel.app/artistic_floral/flower-vintage-rose.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Việt Nam & Văn hóa",
+      "items": [
+        {
+          "id": "vietnam_vn_flag",
+          "name": "Cờ đỏ sao vàng Việt Nam",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_flag.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_flag_circle",
+          "name": "Huy hiệu cờ Việt Nam 3D",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_flag_circle.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_map",
+          "name": "Bản đồ Việt Nam hình chữ S",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_map.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_non_la",
+          "name": "Nón lá bài thơ Việt Nam",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_non_la.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_trong_dong",
+          "name": "Trống đồng Đông Sơn cổ đại",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_trong_dong.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_flag_ribbon",
+          "name": "Dải cờ lụa đỏ sao vàng góc chéo",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_flag_ribbon.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_bunting_flags",
+          "name": "Dây cờ phướn đỏ sao vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_bunting_flags.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_compass_rose",
+          "name": "La bàn hàng hải cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_compass_rose.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_lotus",
+          "name": "Hoa sen hồng Việt Nam",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_lotus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_bunting_triangles",
+          "name": "Dây cờ tam giác lễ hội đỏ vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_bunting_triangles.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_pagoda",
+          "name": "Chùa Một Cột truyền thống",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_pagoda.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_farmer",
+          "name": "Bác nông dân gặt lúa quê hương",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_farmer.svg",
+          "type": "svg"
+        },
+        {
+          "id": "vietnam_vn_banh_chung",
+          "name": "Bánh chưng xanh Tết cổ truyền",
+          "url": "https://zenq-graphics-api-online.vercel.app/vietnam/vn_banh_chung.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Âm nhạc & Giai điệu",
+      "items": [
+        {
+          "id": "music_music_treble_clef",
+          "name": "Khóa Sol cổ điển chuẩn mực",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_treble_clef.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_double_eighth",
+          "name": "Cặp nốt móc đơn",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_double_eighth.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_badge_round",
+          "name": "Icon nốt nhạc nền đĩa tròn",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_badge_round.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_sparkle_notes",
+          "name": "Cụm nốt nhạc lấp lánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_sparkle_notes.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_bass_clef",
+          "name": "Khóa Fa trầm cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_bass_clef.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_rainbow_trail",
+          "name": "Dải nốt nhạc bay đa sắc",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_rainbow_trail.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music",
+          "name": "Nốt nhạc đơn",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_2",
+          "name": "Nốt nhạc đôi",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music-2.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_3",
+          "name": "Nốt nhạc cách điệu",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music-3.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_4",
+          "name": "Ký hiệu âm nhạc",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music-4.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_disc",
+          "name": "Đĩa than phát nhạc",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/disc.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_disc_2",
+          "name": "Đĩa CD xoay",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/disc-2.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_disc_3",
+          "name": "Đĩa hát Vinyl",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/disc-3.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_radio",
+          "name": "Máy Radio bắt sóng",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/radio.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_mic",
+          "name": "Microphone thu âm",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/mic.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_volume_2",
+          "name": "Âm lượng sống động",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/volume-2.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_speaker",
+          "name": "Loa thùng công suất",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/speaker.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_guitar",
+          "name": "Cần đàn Guitar",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/guitar.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_drum",
+          "name": "Dàn trống gõ",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/drum.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_audio_lines",
+          "name": "Dải tần số âm thanh",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/audio-lines.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_audio_waveform",
+          "name": "Sóng âm Waveform",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/audio-waveform.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_cassette_tape",
+          "name": "Băng từ Cassette",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/cassette-tape.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_dotted_treble",
+          "name": "Khóa Sol hạt ngọc lấp lánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_dotted_treble.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_pastel_melody",
+          "name": "Nốt nhạc phấn màu Pastel",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_pastel_melody.svg",
+          "type": "svg"
+        },
+        {
+          "id": "music_music_sheet_corner",
+          "name": "Góc khuông nhạc cổ điển",
+          "url": "https://zenq-graphics-api-online.vercel.app/music/music_sheet_corner.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Nhạc cụ & Âm thanh",
+      "items": [
+        {
+          "id": "audio_audio_soundwave",
+          "name": "Dải sóng âm thanh Soundwave",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_soundwave.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_headphones",
+          "name": "Tai nghe chụp tai Studio",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_headphones.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_piano_keys",
+          "name": "Bàn phím đàn Grand Piano",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_piano_keys.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_guitar_acoustic",
+          "name": "Đàn Guitar thùng gỗ Acoustic",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_guitar_acoustic.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_drum_set",
+          "name": "Dàn trống biểu diễn nhạc Rock",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_drum_set.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_microphone_vintage",
+          "name": "Microphone kim loại cổ điển Retro",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_microphone_vintage.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_girl_headphones",
+          "name": "Cô gái thư giãn nghe nhạc",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_girl_headphones.svg",
+          "type": "svg"
+        },
+        {
+          "id": "audio_audio_studio_room",
+          "name": "Phòng thu âm & Ban nhạc",
+          "url": "https://zenq-graphics-api-online.vercel.app/audio/audio_studio_room.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Giáo dục & Học tập",
+      "items": [
+        {
+          "id": "education_edu_grad_cap",
+          "name": "Mũ tốt nghiệp cử nhân",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/edu_grad_cap.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_edu_open_book",
+          "name": "Quyển sách tri thức mở",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/edu_open_book.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_edu_trophy",
+          "name": "Cúp vàng vinh danh hạng nhất",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/edu_trophy.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_graduation_cap",
+          "name": "Mũ tốt nghiệp",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/graduation-cap.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_book",
+          "name": "Quyển sách",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/book.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_book_open",
+          "name": "Sách mở trang",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/book-open.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_book_open_check",
+          "name": "Sách hoàn thành",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/book-open-check.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_library",
+          "name": "Thư viện trường",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/library.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_pencil",
+          "name": "Bút chì phác thảo",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/pencil.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_pen",
+          "name": "Bút mực",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/pen.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_pen_tool",
+          "name": "Bút vẽ Vector",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/pen-tool.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_highlighter",
+          "name": "Bút dạ quang nhớ dòng",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/highlighter.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_eraser",
+          "name": "Gôm tẩy chì",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/eraser.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_ruler",
+          "name": "Thước kẻ học trò",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/ruler.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_school",
+          "name": "Ngôi trường học",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/school.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_award",
+          "name": "Bằng khen danh dự",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/award.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_medal",
+          "name": "Huy chương vinh danh",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/medal.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_trophy",
+          "name": "Chiếc cúp vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/trophy.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_microscope",
+          "name": "Kính hiển vi",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/microscope.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_test_tube",
+          "name": "Ống nghiệm",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/test-tube.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_flask_conical",
+          "name": "Bình tam giác thí nghiệm",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/flask-conical.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_flask_round",
+          "name": "Bình cầu hóa học",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/flask-round.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_globe",
+          "name": "Quả địa cầu học tập",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/globe.svg",
+          "type": "svg"
+        },
+        {
+          "id": "education_backpack",
+          "name": "Ba lô đến trường",
+          "url": "https://zenq-graphics-api-online.vercel.app/education/backpack.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Kinh doanh & Khởi nghiệp",
+      "items": [
+        {
+          "id": "business_biz_chart_up",
+          "name": "Biểu đồ tăng trưởng đột phá",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/biz_chart_up.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_biz_rocket",
+          "name": "Tên lửa cất cánh Startup",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/biz_rocket.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_biz_lightbulb_idea",
+          "name": "Bóng đèn ý tưởng sáng tạo",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/biz_lightbulb_idea.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_trending_up",
+          "name": "Tăng trưởng vọt",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/trending-up.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_dollar_sign",
+          "name": "Đồng tiền Đô la",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/dollar-sign.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_coins",
+          "name": "Chồng tiền vàng",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/coins.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_wallet",
+          "name": "Ví tiền tài chính",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/wallet.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_credit_card",
+          "name": "Thẻ tín dụng",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/credit-card.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_banknote",
+          "name": "Tờ tiền giấy",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/banknote.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_briefcase",
+          "name": "Cặp tài liệu doanh nghiệp",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/briefcase.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_building",
+          "name": "Tòa cao ốc văn phòng",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/building.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_landmark",
+          "name": "Ngân hàng quốc gia",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/landmark.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_scale",
+          "name": "Cán cân công lý",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/scale.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_handshake",
+          "name": "Hợp tác thành công",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/handshake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_target",
+          "name": "Mục tiêu chiến lược",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/target.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_rocket",
+          "name": "Tên lửa bứt phá",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/rocket.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_lightbulb",
+          "name": "Ý tưởng sáng chế",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/lightbulb.svg",
+          "type": "svg"
+        },
+        {
+          "id": "business_receipt",
+          "name": "Hóa đơn thanh toán",
+          "url": "https://zenq-graphics-api-online.vercel.app/business/receipt.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Khoa học & Công nghệ",
+      "items": [
+        {
+          "id": "tech_tech_robot_ai",
+          "name": "Robot trí tuệ nhân tạo AI",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/tech_robot_ai.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_tech_cpu_chip",
+          "name": "Vi xử lý bán dẫn CPU",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/tech_cpu_chip.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_cpu",
+          "name": "Chip vi xử lý CPU",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/cpu.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_bot",
+          "name": "Trí tuệ nhân tạo Bot AI",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/bot.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_brain",
+          "name": "Tư duy nơ-ron",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/brain.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_code",
+          "name": "Mã nguồn lập trình",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/code.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_terminal",
+          "name": "Dòng lệnh Terminal",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/terminal.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_database",
+          "name": "Cơ sở dữ liệu",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/database.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_server",
+          "name": "Máy chủ đám mây",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/server.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_hard_drive",
+          "name": "Ổ cứng lưu trữ",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/hard-drive.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_laptop",
+          "name": "Máy tính xách tay",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/laptop.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_smartphone",
+          "name": "Điện thoại thông minh",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/smartphone.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_tablet",
+          "name": "Máy tính bảng",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/tablet.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_monitor",
+          "name": "Màn hình Retina",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/monitor.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_wifi",
+          "name": "Sóng mạng không dây",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/wifi.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_bluetooth",
+          "name": "Kết nối Bluetooth",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/bluetooth.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_satellite",
+          "name": "Vệ tinh không gian",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/satellite.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_satellite_dish",
+          "name": "Chảo vệ tinh",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/satellite-dish.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_qr_code",
+          "name": "Mã quét QR",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/qr-code.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_shield_check",
+          "name": "Bảo mật an toàn",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/shield-check.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_circuit_board",
+          "name": "Bo mạch điện tử",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/circuit-board.svg",
+          "type": "svg"
+        },
+        {
+          "id": "tech_zap",
+          "name": "Năng lượng điện cao áp",
+          "url": "https://zenq-graphics-api-online.vercel.app/tech/zap.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Ẩm thực & Thức uống",
+      "items": [
+        {
+          "id": "food_food_vietnamese_coffee",
+          "name": "Cà phê phin sữa đá Việt Nam",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/food_vietnamese_coffee.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_food_banh_mi",
+          "name": "Bánh mì kẹp giòn rụm Việt Nam",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/food_banh_mi.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_coffee",
+          "name": "Tách cà phê nóng",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/coffee.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_cup_soda",
+          "name": "Cốc nước giải khát",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/cup-soda.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_wine",
+          "name": "Ly rượu vang",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/wine.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_beer",
+          "name": "Cốc bia tươi",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/beer.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_cake",
+          "name": "Bánh ngọt sinh nhật",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/cake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_pizza",
+          "name": "Miếng Pizza",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/pizza.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_sandwich",
+          "name": "Bánh mì Sandwich kẹp",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/sandwich.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_cookie",
+          "name": "Bánh quy sô-cô-la",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/cookie.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_apple",
+          "name": "Quả táo tươi",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/apple.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_cherry",
+          "name": "Quả cherry mọng",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/cherry.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_banana",
+          "name": "Nải chuối chín",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/banana.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_croissant",
+          "name": "Bánh sừng bò bơ",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/croissant.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_utensils",
+          "name": "Bộ dao nĩa",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/utensils.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_utensils_crossed",
+          "name": "Thìa nĩa đan chéo",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/utensils-crossed.svg",
+          "type": "svg"
+        },
+        {
+          "id": "food_chef_hat",
+          "name": "Nón đầu bếp",
+          "url": "https://zenq-graphics-api-online.vercel.app/food/chef-hat.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Mạng xã hội & Biểu tượng cảm xúc",
+      "items": [
+        {
+          "id": "social_social_heart",
+          "name": "Trái tim yêu thích đỏ thắm",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/social_heart.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_social_crown_gold",
+          "name": "Vương miện hoàng gia vàng óng",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/social_crown_gold.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_heart",
+          "name": "Trái tim yêu thích",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/heart.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_heart_handshake",
+          "name": "Gắn kết yêu thương",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/heart-handshake.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_thumbs_up",
+          "name": "Ngón tay Like tuyệt vời",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/thumbs-up.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_thumbs_down",
+          "name": "Ngón tay không thích",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/thumbs-down.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_star",
+          "name": "Ngôi sao 5 cánh",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/star.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_star_half",
+          "name": "Nửa sao đánh giá",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/star-half.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_message_circle",
+          "name": "Bong bóng tin nhắn",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/message-circle.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_message_square",
+          "name": "Khung chat trò chuyện",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/message-square.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_messages_square",
+          "name": "Nhiều cuộc trò chuyện",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/messages-square.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_send",
+          "name": "Gửi tin nhắn đi",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/send.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_share_2",
+          "name": "Chia sẻ mạng xã hội",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/share-2.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_bell",
+          "name": "Chuông thông báo",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/bell.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_bell_ring",
+          "name": "Chuông đang reo",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/bell-ring.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_bookmark",
+          "name": "Lưu bài viết",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/bookmark.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_sparkles",
+          "name": "Ánh sáng diệu kỳ",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/sparkles.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_flame",
+          "name": "Ngọn lửa xu hướng Hot",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/flame.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_crown",
+          "name": "Vương miện VIP",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/crown.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_gift",
+          "name": "Hộp quà bất ngờ",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/gift.svg",
+          "type": "svg"
+        },
+        {
+          "id": "social_badge_check",
+          "name": "Huy hiệu xác minh tích xanh",
+          "url": "https://zenq-graphics-api-online.vercel.app/social/badge-check.svg",
+          "type": "svg"
+        }
+      ]
+    },
+    {
+      "name": "Y tế, Sức khỏe & Thể thao",
+      "items": [
+        {
+          "id": "health_activity",
+          "name": "Biểu đồ nhịp tim",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/activity.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_heart_pulse",
+          "name": "Tim đập khỏe mạnh",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/heart-pulse.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_stethoscope",
+          "name": "Ống nghe y tế",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/stethoscope.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_pill",
+          "name": "Viên thuốc con nhộng",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/pill.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_cross",
+          "name": "Dấu thập y tế",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/cross.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_ambulance",
+          "name": "Xe cấp cứu y tế",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/ambulance.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_thermometer",
+          "name": "Nhiệt kế thủy ngân",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/thermometer.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_syringe",
+          "name": "Ống tiêm vắc-xin",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/syringe.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_shield_plus",
+          "name": "Bảo vệ sức khỏe",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/shield-plus.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_dumbbell",
+          "name": "Tạ tập Gym thể hình",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/dumbbell.svg",
+          "type": "svg"
+        },
+        {
+          "id": "health_bike",
+          "name": "Xe đạp rèn luyện",
+          "url": "https://zenq-graphics-api-online.vercel.app/health/bike.svg",
           "type": "svg"
         }
       ]

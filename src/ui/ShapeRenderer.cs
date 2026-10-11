@@ -4,7 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public static class ShapeRenderer
     {
@@ -814,7 +814,7 @@ namespace GenOffice.UI
             return pts;
         }
 
-        public static void DrawShape(Graphics g, DocShapeObject shape, Rectangle bounds, RibbonBar ribbon, float zoomLevel)
+        public static void DrawShape(D2DGraphics g, DocShapeObject shape, Rectangle bounds, RibbonBar ribbon, float zoomLevel)
         {
             if (bounds.Width <= 0 || bounds.Height <= 0) return;
             if (shape != null) shape.ApplyCachedTagMetadata();
@@ -1792,7 +1792,7 @@ namespace GenOffice.UI
             }
         }
 
-        public static void DrawLayoutOptionsPopup(Graphics g, DocShapeObject shape, Rectangle bounds, float zoomLevel)
+        public static void DrawLayoutOptionsPopup(D2DGraphics g, DocShapeObject shape, Rectangle bounds, float zoomLevel)
         {
             if (shape == null || !shape.ShowLayoutOptions) return;
 
@@ -1860,7 +1860,7 @@ namespace GenOffice.UI
             }
         }
 
-        public static void DrawVectorWrapCard(Graphics g, int wrapMode, Rectangle box, bool isSelected)
+        public static void DrawVectorWrapCard(D2DGraphics g, int wrapMode, Rectangle box, bool isSelected)
         {
             if (isSelected)
             {
@@ -1952,7 +1952,7 @@ namespace GenOffice.UI
             }
         }
 
-        public static void DrawVectorRadioButton(Graphics g, int x, int y, bool isChecked, string label, Font font)
+        public static void DrawVectorRadioButton(D2DGraphics g, int x, int y, bool isChecked, string label, Font font)
         {
             Rectangle rCircle = new Rectangle(x, y + 2, 12, 12);
             using (Pen rPen = new Pen(isChecked ? Color.FromArgb(0, 120, 215) : Color.FromArgb(140, 145, 150), 1.2f))
@@ -1969,7 +1969,7 @@ namespace GenOffice.UI
             g.DrawString(label, font, isChecked ? new SolidBrush(Color.FromArgb(20, 20, 20)) : new SolidBrush(Color.FromArgb(70, 70, 70)), x + 16, y);
         }
 
-        public static void DrawVectorInfoIcon(Graphics g, int x, int y)
+        public static void DrawVectorInfoIcon(D2DGraphics g, int x, int y)
         {
             Rectangle infoCircle = new Rectangle(x, y, 11, 11);
             using (Pen infoPen = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
@@ -1980,14 +1980,11 @@ namespace GenOffice.UI
             }
         }
 
-        public static void DrawVectorArch(Graphics g, Pen archPen, float x, float y, float w, float h)
+        public static void DrawVectorArch(D2DGraphics g, Pen archPen, float x, float y, float w, float h)
         {
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                path.AddArc(x, y, w, h, 180, 180);
-                path.AddLine(x, y + h / 2, x + w, y + h / 2);
-                g.DrawPath(archPen, path);
-            }
+            if (g == null || archPen == null) return;
+            g.DrawArc(archPen, x, y, w, h, 180, 180);
+            g.DrawLine(archPen, x, y + h / 2, x + w, y + h / 2);
         }
 
         public struct ShapeLineInfo
@@ -2001,7 +1998,7 @@ namespace GenOffice.UI
             public float Height;
         }
 
-        public static System.Collections.Generic.List<ShapeLineInfo> LayoutShapeText(Graphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel)
+        public static System.Collections.Generic.List<ShapeLineInfo> LayoutShapeText(D2DGraphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel)
         {
             var lines = new System.Collections.Generic.List<ShapeLineInfo>();
             if (string.IsNullOrEmpty(shape.TextContent)) return lines;
@@ -2138,7 +2135,7 @@ namespace GenOffice.UI
             return lines;
         }
 
-        public static PointF GetShapeCursorCoordinates(Graphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel)
+        public static PointF GetShapeCursorCoordinates(D2DGraphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel)
         {
             if (string.IsNullOrEmpty(shape.TextContent))
             {
@@ -2281,7 +2278,7 @@ namespace GenOffice.UI
             }
         }
 
-        public static int GetCharIndexFromPoint(Graphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel, int clickX, int clickY)
+        public static int GetCharIndexFromPoint(D2DGraphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel, int clickX, int clickY)
         {
             if (string.IsNullOrEmpty(shape.TextContent)) return 0;
             var lines = LayoutShapeText(g, shape, textBounds, font, zoomLevel);

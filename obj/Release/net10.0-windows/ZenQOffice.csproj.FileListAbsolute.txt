@@ -18,3 +18,10 @@ C:\Users\Danh\Desktop\genofficepy\obj\Release\net10.0-windows\refint\ZenQOffice.
 C:\Users\Danh\Desktop\genofficepy\obj\Release\net10.0-windows\ZenQOffice.pdb
 C:\Users\Danh\Desktop\genofficepy\obj\Release\net10.0-windows\ZenQOffice.genruntimeconfig.cache
 C:\Users\Danh\Desktop\genofficepy\obj\Release\net10.0-windows\ref\ZenQOffice.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\SharpGen.Runtime.COM.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\SharpGen.Runtime.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\Vortice.Direct2D1.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\Vortice.DirectX.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\Vortice.DXGI.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\Vortice.Mathematics.dll
+C:\Users\Danh\Desktop\genofficepy\bin\Release\net10.0-windows\data\graphics.json

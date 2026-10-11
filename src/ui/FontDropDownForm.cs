@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class FontDropDownForm : Form
     {
@@ -45,8 +45,8 @@ namespace GenOffice.UI
             DoubleBuffered = true;
 
             int desiredW = 260;
-            // 42px search header + 4px pad + 9 items of 32px + 4px pad = 338px
-            int desiredH = 42 + 4 + (9 * 32) + 4;
+            // 42px search header + 4px pad + 9 items of 32px + 4px pad + 32px footer = 370px
+            int desiredH = 42 + 4 + (9 * 32) + 4 + 32;
 
             Rectangle wa = Screen.GetWorkingArea(screenLocation);
             int targetX = screenLocation.X;
@@ -274,7 +274,50 @@ namespace GenOffice.UI
 
             Deactivate += (s, e) => Close();
 
+            // ==================== 3. Vietnamese Toolkit Footer (32px) ====================
+            Panel bottomPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 32,
+                BackColor = Color.FromArgb(248, 250, 252),
+                Cursor = Cursors.Hand
+            };
+            bool isBottomHover = false;
+            bottomPanel.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                using (Pen sepPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                {
+                    g.DrawLine(sepPen, 0, 0, bottomPanel.Width, 0);
+                }
+                if (isBottomHover)
+                {
+                    using (SolidBrush hovB = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                    {
+                        g.FillRectangle(hovB, 0, 1, bottomPanel.Width, bottomPanel.Height - 1);
+                    }
+                }
+                using (Font ftFont = new Font("Segoe UI", 8.25f, FontStyle.Regular))
+                using (SolidBrush txtB = new SolidBrush(isBottomHover ? _accentColor : Color.FromArgb(71, 85, 105)))
+                {
+                    g.DrawString("🇻🇳 Trích xuất & Sửa lỗi Tiếng Việt...", ftFont, txtB, new PointF(10, 8));
+                }
+            };
+            bottomPanel.MouseEnter += (s, e) => { isBottomHover = true; bottomPanel.Invalidate(); };
+            bottomPanel.MouseLeave += (s, e) => { isBottomHover = false; bottomPanel.Invalidate(); };
+            bottomPanel.Click += (s, e) =>
+            {
+                Close();
+                using (var toolkit = new VietnameseFontToolkitForm())
+                {
+                    toolkit.ShowDialog();
+                }
+            };
+
             Controls.Add(listControl);
+            Controls.Add(bottomPanel);
             Controls.Add(topPanel);
         }
 

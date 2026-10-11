@@ -5,9 +5,9 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class SmartGuideLine
     {
@@ -30,7 +30,38 @@ namespace GenOffice.UI
 
     public class SlidesView
     {
-        public PresentationRoot Presentation { get; set; }
+        private PresentationRoot _presentation;
+        public PresentationRoot Presentation
+        {
+            get => _presentation;
+            set
+            {
+                if (_presentation != value)
+                {
+                    _presentation = value;
+                    InvalidateAllThumbnails();
+                }
+            }
+        }
+
+        public void InvalidateAllThumbnails()
+        {
+            if (_presentation != null && _presentation.Slides != null)
+            {
+                foreach (var s in _presentation.Slides)
+                {
+                    if (s != null)
+                    {
+                        s.IsThumbnailDirty = true;
+                        if (s.ThumbnailCache != null)
+                        {
+                            try { s.ThumbnailCache.Dispose(); } catch { }
+                            s.ThumbnailCache = null;
+                        }
+                    }
+                }
+            }
+        }
         private int _activeSlideIndex;
         public int ActiveSlideIndex
         {
@@ -39,12 +70,18 @@ namespace GenOffice.UI
             {
                 if (_activeSlideIndex != value)
                 {
-                    if (SlideVideoPlayerManager.Instance.IsPlaying)
+                    if (SlideVideoPlayerManager.Instance.ActiveShape != null || SlideVideoPlayerManager.Instance.IsPlaying)
                     {
                         SlideVideoPlayerManager.Instance.Stop();
                     }
+                    _playedMediaShapesInPresentation.Clear();
+                    IsEditingSpeakerNotes = false;
+                    IsSelectingSpeakerNotes = false;
+                    SpeakerNotesSelectionLength = 0;
+                    NotesScrollY = 0;
                     _activeSlideIndex = value;
                     EnsureSlideVisibleInThumbnails(_activeSlideIndex);
+                    EnsureSlideVisibleInBottomStrip(_activeSlideIndex);
                 }
             }
         }
@@ -56,7 +93,22 @@ namespace GenOffice.UI
         public bool IsSidebarOpen { get; set; }
 
         public bool IsPresenting { get; set; }
-        public float ZoomLevel { get; set; }
+        private float _zoomLevel = 1.0f;
+        public float ZoomLevel
+        {
+            get { return _zoomLevel; }
+            set
+            {
+                if (Math.Abs(_zoomLevel - value) > 0.001f)
+                {
+                    _zoomLevel = value;
+                    if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying)
+                    {
+                        SlideVideoPlayerManager.Instance.Stop();
+                    }
+                }
+            }
+        }
 
         public event Action<bool> RequestStartSlideShow;
         public event Action RequestStopSlideShow;
@@ -64,6 +116,10 @@ namespace GenOffice.UI
         // Infinite Workspace & Zoom Pan Offsets
         public int CanvasScrollX { get; set; }
         public int CanvasScrollY { get; set; }
+        public float SmoothCanvasScrollX { get; set; } = 0f;
+        public float TargetCanvasScrollX { get; set; } = 0f;
+        public float SmoothCanvasScrollY { get; set; } = 0f;
+        public float TargetCanvasScrollY { get; set; } = 0f;
         public bool IsPanningCanvas { get; set; }
         public Point PanStartMouse { get; set; }
         public Point PanStartScroll { get; set; }
@@ -80,6 +136,8 @@ namespace GenOffice.UI
 
         // Scroll Offsets for Sidebars
         public int ThumbScrollY { get; set; }
+        public float SmoothThumbScrollY { get; set; } = 0f;
+        public float TargetThumbScrollY { get; set; } = 0f;
         public int LastThumbViewportHeight { get; set; } = 500;
         public Rectangle ThumbScrollBarTrackRect = Rectangle.Empty;
         public Rectangle ThumbScrollBarThumbRect = Rectangle.Empty;
@@ -91,6 +149,27 @@ namespace GenOffice.UI
         private bool _isHoverThumbScrollBar = false;
         private bool _isHoverThumbScrollBarThumb = false;
         public int SidebarScrollY { get; set; }
+
+        // PowerPoint Audio Shape Hover & Floating Playback Bar State
+        public ShapeNode HoveredAudioShape { get; set; } = null;
+        public Point HoveredAudioMousePos { get; set; } = Point.Empty;
+        public bool IsHoveringAudioScrubber { get; set; } = false;
+        public float HoveredAudioScrubberTime { get; set; } = 0f;
+        public bool IsDraggingAudioScrubber { get; set; } = false;
+        public int HoveredAudioButton { get; set; } = -1; // 0=Play/Pause, 1=Rewind, 2=FastForward, 3=Scrubber, 4=Volume
+        public RectangleF LastAudioPlaybackBarBounds { get; set; } = RectangleF.Empty;
+
+        // PowerPoint Video Shape Hover & Floating Playback Bar State
+        public ShapeNode HoveredVideoShape { get; set; } = null;
+        public int HoveredVideoButton { get; set; } = -1; // 0=Play/Pause, 1=Scrubber, 2=Volume
+        public bool IsHoveringVideoScrubber { get; set; } = false;
+        public float HoveredVideoScrubberTime { get; set; } = 0f;
+        public bool IsDraggingVideoScrubber { get; set; } = false;
+        public RectangleF LastVideoPlaybackBarBounds { get; set; } = RectangleF.Empty;
+        public Point HoveredVideoMousePos { get; set; } = Point.Empty;
+        public DateTime LastVideoHoverTime { get; set; } = DateTime.MinValue;
+        private HashSet<ShapeNode> _playedMediaShapesInPresentation = new HashSet<ShapeNode>();
+        public int LastViewportWidth { get; set; } = 1920;
 
         // Shape Drawing & Creation State
         public bool IsDrawingShapeMode { get; set; }
@@ -204,6 +283,16 @@ namespace GenOffice.UI
         private readonly List<PresentationRoot> _redoStack = new List<PresentationRoot>();
         private const int MaxUndoHistory = 50;
 
+        public List<PresentationRoot> UndoStack => _undoStack;
+        public List<PresentationRoot> RedoStack => _redoStack;
+        public void SetUndoRedoStacks(List<PresentationRoot> undo, List<PresentationRoot> redo)
+        {
+            _undoStack.Clear();
+            if (undo != null) _undoStack.AddRange(undo);
+            _redoStack.Clear();
+            if (redo != null) _redoStack.AddRange(redo);
+        }
+
         // Animation Pane Drag & Drop Reorder State
         public int DraggingAnimationPaneIndex { get; set; }
         public int DraggingAnimationPaneTargetIndex { get; set; }
@@ -266,6 +355,31 @@ namespace GenOffice.UI
         public DateTime LastPresenterMouseMoveTime { get; set; }
         public int LastViewedSlideIndex { get; set; }
 
+        // Speaker Notes (Ghi chú người thuyết trình) Interactive State
+        public bool IsNotesPaneOpen { get; set; } = true;
+        public int NotesPaneHeight { get; set; } = 68;
+        public bool IsDraggingNotesSplitter { get; set; } = false;
+        public bool IsHoverNotesSplitter { get; set; } = false;
+        public int NotesSplitterDragStartMouseY { get; set; } = 0;
+        public int NotesSplitterDragStartHeight { get; set; } = 68;
+        public bool IsEditingSpeakerNotes { get; set; } = false;
+        public int SpeakerNotesCaretIndex { get; set; } = 0;
+        public int SpeakerNotesSelectionStart { get; set; } = 0;
+        public int SpeakerNotesSelectionLength { get; set; } = 0;
+        public bool IsSelectingSpeakerNotes { get; set; } = false;
+        public int NotesScrollY { get; set; } = 0;
+        public Rectangle LastNotesTextRect { get; set; } = Rectangle.Empty;
+        public float LastNotesFontSize { get; set; } = 10.0f;
+
+        public int GetEffectiveNotesPaneHeight()
+        {
+            if (ViewMode == ImpressViewMode.Normal && !IsPresenting && IsNotesPaneOpen)
+            {
+                return Math.Max(40, Math.Min(260, NotesPaneHeight));
+            }
+            return 0;
+        }
+
         // Transition Engine & Live Preview State (60 FPS)
         public bool IsTransitioning { get; set; }
         public float TransitionProgress { get; set; } // 0.0f to 1.0f
@@ -305,12 +419,51 @@ namespace GenOffice.UI
         public Dictionary<string, List<int>> CustomShows { get; set; }
 
         // ==================== Dynamic Elements Drawer & Bottom Filmstrip Layout ====================
-        public bool IsElementsDrawerOpen { get; set; } = false;
-        public bool IsElementsDrawerCollapsed { get; set; } = false;
-        public int ElementsDrawerSelectedTab { get; set; } = 1; // 0: Mẫu, 1: Thành phần, 2: Văn bản, 3: Thương hiệu, 4: Tải lên, 5: Công cụ, 6: Dự án, 7: Ứng dụng
+        private bool _isElementsDrawerOpen = false;
+        public bool IsElementsDrawerOpen
+        {
+            get => _isElementsDrawerOpen;
+            set
+            {
+                _isElementsDrawerOpen = value;
+                if (!_isElementsDrawerOpen) HideSearchBox();
+            }
+        }
+
+        private bool _isElementsDrawerCollapsed = false;
+        public bool IsElementsDrawerCollapsed
+        {
+            get => _isElementsDrawerCollapsed;
+            set
+            {
+                _isElementsDrawerCollapsed = value;
+                if (_isElementsDrawerCollapsed) HideSearchBox();
+            }
+        }
+
+        private int _elementsDrawerSelectedTab = 1;
+        public int ElementsDrawerSelectedTab
+        {
+            get => _elementsDrawerSelectedTab;
+            set
+            {
+                _elementsDrawerSelectedTab = value;
+                if (_elementsDrawerSelectedTab != 1) HideSearchBox();
+            }
+        }
         public string ElementsSearchQuery { get; set; } = "";
         public int ElementsScrollY { get; set; } = 0;
+        public float SmoothElementsScrollY { get; set; } = 0f;
+        public float TargetElementsScrollY { get; set; } = 0f;
         public int BottomThumbScrollX { get; set; } = 0;
+        public float SmoothBottomThumbScrollX { get; set; } = 0f;
+        public float TargetBottomThumbScrollX { get; set; } = 0f;
+        public Rectangle BottomThumbScrollBarThumbRect = Rectangle.Empty;
+        public Rectangle BottomThumbScrollBarTrackRect = Rectangle.Empty;
+        public bool IsDraggingBottomThumbScrollBar = false;
+        public bool IsHoverBottomThumbScrollBarThumb = false;
+        private int _bottomThumbScrollDragStartMouseX = 0;
+        private int _bottomThumbScrollDragStartScrollX = 0;
         public Rectangle BtnCollapseDrawerBounds = Rectangle.Empty;
         public Rectangle BtnCloseDrawerBounds = Rectangle.Empty;
         public List<Rectangle> RailTabBounds = new List<Rectangle>();
@@ -349,11 +502,11 @@ namespace GenOffice.UI
             IsPresenting = false;
             IsEndSlideShowScreen = false;
             ZoomLevel = 1.0f;
-            GenOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (cat) => {
+            ZenQOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (cat) => {
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             };
-            GenOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
+            ZenQOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             };
@@ -462,6 +615,10 @@ namespace GenOffice.UI
 
             SelectedVariantIndex = 0;
             ApplyTheme(Presentation.CurrentTheme ?? "Office");
+
+            SlideVideoPlayerManager.Instance.RequestAdvancePresenter = () => AdvancePresenterStep();
+            SlideVideoPlayerManager.Instance.RequestPreviousPresenter = () => PreviousPresenterStep();
+            SlideVideoPlayerManager.Instance.RequestStopPresenter = () => StopPresenting();
         }
 
         public bool IsPlayingSlideAnimation { get; set; }
@@ -1510,11 +1667,13 @@ namespace GenOffice.UI
         {
             if (_cachedTransBmpA != null)
             {
+                try { D2DGraphics.InvalidateBitmapCache(_cachedTransBmpA); } catch { }
                 try { _cachedTransBmpA.Dispose(); } catch { }
                 _cachedTransBmpA = null;
             }
             if (_cachedTransBmpB != null)
             {
+                try { D2DGraphics.InvalidateBitmapCache(_cachedTransBmpB); } catch { }
                 try { _cachedTransBmpB.Dispose(); } catch { }
                 _cachedTransBmpB = null;
             }
@@ -1546,25 +1705,24 @@ namespace GenOffice.UI
                 // 1. Bake fromSlide
                 _cachedTransBmpA = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using (Graphics gA = Graphics.FromImage(_cachedTransBmpA))
+                using (D2DGraphics d2dA = new D2DGraphics(gA, rect.Width, rect.Height))
                 {
-                    gA.SmoothingMode = SmoothingMode.AntiAlias;
-                    gA.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    gA.PixelOffsetMode = PixelOffsetMode.Half;
-                    gA.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
                     Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
-                    DrawSlideFull(gA, originRect, fromSlide, scale, 1.0f, true);
+                    DrawSlideFull(d2dA, originRect, fromSlide, scale, 1.0f, true);
                 }
 
                 // 2. Bake toSlide
                 _cachedTransBmpB = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using (Graphics gB = Graphics.FromImage(_cachedTransBmpB))
+                using (D2DGraphics d2dB = new D2DGraphics(gB, rect.Width, rect.Height))
                 {
-                    gB.SmoothingMode = SmoothingMode.AntiAlias;
-                    gB.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    gB.PixelOffsetMode = PixelOffsetMode.Half;
-                    gB.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
                     Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
-                    DrawSlideFull(gB, originRect, toSlide, scale, 1.0f, false);
+                    DrawSlideFull(d2dB, originRect, toSlide, scale, 1.0f, false);
+                }
+                if (IsTransitioning)
+                {
+                    _transitionStopwatch.Restart();
+                    TransitionProgress = 0.0f;
                 }
             }
             catch (Exception ex)
@@ -1578,7 +1736,7 @@ namespace GenOffice.UI
             }
         }
 
-        private static void DrawCachedSlideBitmap(Graphics g, RectangleF targetRect, Bitmap bmp, float opacity)
+        private static void DrawCachedSlideBitmap(D2DGraphics g, RectangleF targetRect, Bitmap bmp, float opacity)
         {
             if (bmp == null || opacity <= 0.005f || targetRect.Width <= 0 || targetRect.Height <= 0) return;
 
@@ -1611,7 +1769,7 @@ namespace GenOffice.UI
                             Matrix33 = Math.Max(0f, Math.Min(1.0f, opacity))
                         };
                         ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                        g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, ia);
+                        g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, ia, opacity);
                     }
                 }
 
@@ -1638,7 +1796,7 @@ namespace GenOffice.UI
                     new PointF(targetRect.Right, targetRect.Y),
                     new PointF(targetRect.X, targetRect.Bottom)
                 };
-                g.DrawImage(bmp, destPoints, new RectangleF(0, 0, bmp.Width, bmp.Height), GraphicsUnit.Pixel, ia);
+                g.DrawImage(bmp, destPoints, new RectangleF(0, 0, bmp.Width, bmp.Height), GraphicsUnit.Pixel, ia, opacity);
             }
         }
 
@@ -1675,6 +1833,46 @@ namespace GenOffice.UI
             TransitionToSlideIndex = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, toIdx));
 
             SlideNode toSlide = Presentation.Slides[TransitionToSlideIndex];
+
+            // Xử lý âm thanh khi chuyển slide (Audio playback across slides & auto-start)
+            if (SlideAudioPlayerManager.Instance.IsPlaying)
+            {
+                var activeAudio = SlideAudioPlayerManager.Instance.ActiveShape;
+                if (activeAudio != null && !activeAudio.AudioPlayAcrossSlides)
+                {
+                    SlideAudioPlayerManager.Instance.Pause();
+                }
+            }
+
+            if (toSlide != null && toSlide.Shapes != null && IsPresenting)
+            {
+                for (int i = 0; i < toSlide.Shapes.Count; i++)
+                {
+                    var sh = toSlide.Shapes[i];
+                    if (sh == null) continue;
+                    if (sh.Type == ShapeType.Video || !string.IsNullOrEmpty(sh.VideoPath))
+                    {
+                        if (sh.VideoStartMode == VideoStartMode.Automatically && !sh.IsVideoPlaying)
+                        {
+                            Control parent = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                            PlayVideoPreview(sh, parent);
+                            _playedMediaShapesInPresentation.Add(sh);
+                            break;
+                        }
+                    }
+                    else if (sh.Type == ShapeType.Audio || !string.IsNullOrEmpty(sh.AudioPath))
+                    {
+                        if (sh.AudioStartMode == VideoStartMode.Automatically && !sh.IsAudioPlaying)
+                        {
+                            Control parent = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                            SlideAudioPlayerManager.Instance.Play(sh, parent);
+                            _playedMediaShapesInPresentation.Add(sh);
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (toSlide != null && toSlide.Transition != TransitionType.None)
             {
                 IsTransitioning = true;
@@ -2009,6 +2207,9 @@ namespace GenOffice.UI
         #region 60 FPS Update Loop (High Precision Stopwatch Delta-Time)
         public bool UpdateAnimationAndTransition()
         {
+            // Cập nhật hoạt ảnh cuộn mượt phong cách MS Office 365
+            bool scrollAnim = UpdateSmoothScroll();
+
             // Khi chưa trình chiếu và không ở chế độ xem trước (Preview) hay quét laser:
             // Tuyệt đối không chạy hiệu ứng để tránh gây lag giao diện khi chỉnh sửa/cuộn
             if (!IsPresenting && !IsPreviewingTransition && !IsPlayingAnimationPreview && !IsScanningActive)
@@ -2031,7 +2232,7 @@ namespace GenOffice.UI
                         }
                     }
                 }
-                return hasPlayingVideo;
+                return hasPlayingVideo || scrollAnim;
             }
 
             bool needRedraw = false;
@@ -2215,12 +2416,12 @@ namespace GenOffice.UI
                 }
             }
 
-            return needRedraw;
+            return needRedraw || scrollAnim;
         }
         #endregion
 
         #region Transition Sub-Routines
-        private void RenderTransitionFrame(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, TransitionType type, float progress, float scale)
+        private void RenderTransitionFrame(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, TransitionType type, float progress, float scale)
         {
             GraphicsState gState = g.Save();
             g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -2433,7 +2634,7 @@ namespace GenOffice.UI
             g.Restore(gState);
         }
 
-        private void RenderMorphTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderMorphTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             // Thresholds raised so the interpolated morph runs for the full visible range.
             // 0.999 was reached at only ~97% raw progress (SmoothEase), causing an early snap.
@@ -2651,7 +2852,7 @@ namespace GenOffice.UI
             return (float)Math.Sin(p * Math.PI / 2.0);
         }
 
-        private void DrawMorphingShape(Graphics g, float slideX, float slideY, float scale, ShapeNode sA, ShapeNode sB, float t)
+        private void DrawMorphingShape(D2DGraphics g, float slideX, float slideY, float scale, ShapeNode sA, ShapeNode sB, float t)
         {
             // 0.999f threshold caused a snap at ~97% raw progress (SmoothEase(0.97) ≈ 0.999).
             // Raising to 0.9998f means the snap only triggers at 99.97% raw — imperceptible.
@@ -2782,17 +2983,18 @@ namespace GenOffice.UI
         #endregion
 
         #region Model Actions
-        public void AddSlide(SlideLayoutType layout = SlideLayoutType.TitleAndContent)
+        public void AddSlide(SlideLayoutType layout = SlideLayoutType.Blank)
         {
             SaveUndoState();
-            SlideNode slide = Presentation.AddSlide(layout);
+            SlideNode slide = Presentation.AddSlide(SlideLayoutType.Blank);
+            slide.Shapes.Clear();
+            slide.BgColor = 0xFFFFFF;
+            slide.IsGradientBg = false;
+            slide.Transition = TransitionType.None;
+            slide.TransitionDuration = 0f;
             ActiveSlideIndex = Presentation.Slides.Count - 1;
             SelectedShapeIndex = -1;
             CurrentAnimationStep = 0;
-            if (Presentation != null && !string.IsNullOrEmpty(Presentation.CurrentTheme))
-            {
-                ApplyThemeToSlide(slide, Presentation.CurrentTheme);
-            }
         }
 
         public void InsertTextFromAI(string text)
@@ -2888,7 +3090,11 @@ namespace GenOffice.UI
             if (shape.Type == ShapeType.Image) return;
             IsInlineEditing = true;
             EditingShape = shape;
-            if (shape.Type != ShapeType.TextBox)
+            if (shape.TextRuns != null && shape.TextRuns.Count > 0 && shape.TextRuns[0].ParaAlignment.HasValue)
+            {
+                shape.Alignment = shape.TextRuns[0].ParaAlignment.Value;
+            }
+            if (shape.Type != ShapeType.TextBox && string.IsNullOrEmpty(shape.Text))
             {
                 if (shape.Alignment != TextAlignment.Left && shape.Alignment != TextAlignment.Right && shape.Alignment != TextAlignment.Justify)
                 {
@@ -2908,6 +3114,37 @@ namespace GenOffice.UI
             shape.IsEditingText = true;
         }
 
+        public void SyncEditingShapeText()
+        {
+            if (EditingShape == null) return;
+            EditingShape.Text = EditingTextBuffer ?? "";
+            if (EditingShape.TextRuns != null && EditingShape.TextRuns.Count > 0)
+            {
+                SlideTextRun proto = EditingShape.TextRuns[0];
+                EditingShape.TextRuns.Clear();
+                if (!string.IsNullOrEmpty(EditingShape.Text))
+                {
+                    EditingShape.TextRuns.Add(new SlideTextRun(EditingShape.Text, EditingShape.TextColor, EditingShape.FontSize, EditingShape.Bold, EditingShape.FontName)
+                    {
+                        Italic = EditingShape.Italic,
+                        Underline = EditingShape.Underline,
+                        Strikethrough = EditingShape.Strikethrough,
+                        HasGradient = proto.HasGradient,
+                        GradientColor2 = proto.GradientColor2,
+                        GradientAngle = proto.GradientAngle,
+                        GradientStops = proto.GradientStops != null ? new List<GradientStop>(proto.GradientStops) : null,
+                        HasHighlight = EditingShape.HasHighlight,
+                        HighlightColor = EditingShape.HighlightColor,
+                        ParaLineSpacing = proto.ParaLineSpacing,
+                        ParaSpaceBefore = proto.ParaSpaceBefore,
+                        ParaSpaceAfter = proto.ParaSpaceAfter,
+                        ParaAlignment = EditingShape.Alignment
+                    });
+                }
+            }
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+        }
+
         public void EndInlineEditing()
         {
             if (IsInlineEditing && EditingShape != null)
@@ -2916,7 +3153,7 @@ namespace GenOffice.UI
                 {
                     EditingTextBuffer = VietnameseAutoCorrect.CorrectText(EditingTextBuffer);
                 }
-                EditingShape.Text = EditingTextBuffer;
+                SyncEditingShapeText();
                 EditingShape.IsEditingText = false;
             }
             IsInlineEditing = false;
@@ -3284,7 +3521,7 @@ namespace GenOffice.UI
                 try
                 {
                     DataObject data = new DataObject();
-                    data.SetData("GenOffice.SlideShape", true);
+                    data.SetData("ZenQOffice.SlideShape", true);
                     if (imgToCopy != null)
                     {
                         using (Bitmap copyBmp = new Bitmap(imgToCopy))
@@ -3316,7 +3553,7 @@ namespace GenOffice.UI
                     try { Clipboard.SetText(EditingTextBuffer); } catch { }
                     EditingTextBuffer = "";
                     CaretIndex = 0;
-                    EditingShape.Text = "";
+                    SyncEditingShapeText();
                 }
                 return;
             }
@@ -3342,14 +3579,14 @@ namespace GenOffice.UI
                     {
                         EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, clip);
                         CaretIndex += clip.Length;
-                        EditingShape.Text = EditingTextBuffer;
+                        SyncEditingShapeText();
                     }
                 }
                 return;
             }
 
             bool isInternalShape = false;
-            try { isInternalShape = Clipboard.ContainsData("GenOffice.SlideShape"); } catch { }
+            try { isInternalShape = Clipboard.ContainsData("ZenQOffice.SlideShape"); } catch { }
 
             if (isInternalShape && _slidesClipboardShape != null && ActiveSlide != null)
             {
@@ -3468,35 +3705,37 @@ namespace GenOffice.UI
                     }
                 }
 
-                float imgW = clipImg.Width;
-                float imgH = clipImg.Height;
-                float maxW = 560f;
-                float maxH = 380f;
-                if (imgW > maxW || imgH > maxH)
+                float origW = Math.Max(1f, (float)clipImg.Width);
+                float origH = Math.Max(1f, (float)clipImg.Height);
+
+                float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+                float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+
+                float maxW = canvasW * 0.70f;
+                float maxH = canvasH * 0.70f;
+
+                float scaleFactor = Math.Min(maxW / origW, maxH / origH);
+                if (scaleFactor > 1.0f && origW > 120f && origH > 120f)
                 {
-                    float ratio = imgW / Math.Max(1f, imgH);
-                    if (ratio >= 1.0f)
-                    {
-                        imgW = maxW;
-                        imgH = imgW / ratio;
-                    }
-                    else
-                    {
-                        imgH = maxH;
-                        imgW = imgH * ratio;
-                    }
+                    scaleFactor = 1.0f;
                 }
 
-                float posX = Math.Max(40f, (960f - imgW) / 2f);
-                float posY = Math.Max(40f, (540f - imgH) / 2f);
+                float fitW = (float)Math.Round(origW * scaleFactor);
+                float fitH = (float)Math.Round(origH * scaleFactor);
+
+                float posX = (canvasW - fitW) / 2f;
+                float posY = (canvasH - fitH) / 2f;
 
                 ShapeNode imgShape = new ShapeNode
                 {
                     Id = Guid.NewGuid().ToString("N"),
+                    Name = "Hình ảnh " + (ActiveSlide.Shapes.Count + 1),
                     Type = ShapeType.Image,
                     ImagePath = tempPath,
                     CachedImage = new Bitmap(clipImg),
-                    Transform = new Transform2D(posX, posY, imgW, imgH),
+                    Transform = new Transform2D(posX, posY, fitW, fitH),
+                    OriginalWidth = origW,
+                    OriginalHeight = origH,
                     Text = "",
                     FillColor = 0x00FFFFFF,
                     StrokeWidth = 0f
@@ -3505,6 +3744,10 @@ namespace GenOffice.UI
                 SaveUndoState();
                 ActiveSlide.AddShape(imgShape);
                 SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
             }
             catch { }
         }
@@ -3558,11 +3801,42 @@ namespace GenOffice.UI
             PresentationStartTime = DateTime.Now;
             PresentationPausedElapsed = TimeSpan.Zero;
             IsPresentationTimerPaused = false;
+            _playedMediaShapesInPresentation.Clear();
             SlideVideoPlayerManager.Instance.Stop();
 
             if (RequestStartSlideShow != null)
             {
                 RequestStartSlideShow(fromBeginning);
+            }
+
+            // Check if active slide has auto-start media
+            if (ActiveSlide != null && ActiveSlide.Shapes != null)
+            {
+                for (int i = 0; i < ActiveSlide.Shapes.Count; i++)
+                {
+                    var sh = ActiveSlide.Shapes[i];
+                    if (sh == null) continue;
+                    if (sh.Type == ShapeType.Video || !string.IsNullOrEmpty(sh.VideoPath))
+                    {
+                        if (sh.VideoStartMode == VideoStartMode.Automatically && !sh.IsVideoPlaying)
+                        {
+                            Control parent = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                            PlayVideoPreview(sh, parent);
+                            _playedMediaShapesInPresentation.Add(sh);
+                            break;
+                        }
+                    }
+                    else if (sh.Type == ShapeType.Audio || !string.IsNullOrEmpty(sh.AudioPath))
+                    {
+                        if (sh.AudioStartMode == VideoStartMode.Automatically && !sh.IsAudioPlaying)
+                        {
+                            Control parent = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                            SlideAudioPlayerManager.Instance.Play(sh, parent);
+                            _playedMediaShapesInPresentation.Add(sh);
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -3659,7 +3933,7 @@ namespace GenOffice.UI
                 if (CustomShows == null) CustomShows = new Dictionary<string, List<int>>();
                 CustomShowNames.Add(showName);
                 CustomShows[showName] = slideList;
-                MessageBox.Show("Đã tạo trình chiếu tùy chỉnh: " + showName + "\nBao gồm tất cả " + slideList.Count + " slide.", "Trình chiếu Tùy chỉnh (Custom Slide Show)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Đã tạo trình chiếu tùy chỉnh: " + showName + "\nBao gồm tất cả " + slideList.Count + " slide.", "Trình chiếu tùy chỉnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             customMenu.Items.Add(miNew);
 
@@ -3716,6 +3990,7 @@ namespace GenOffice.UI
 
         public void GetScrollLimits(int canvasW, int canvasH, out int minScrollX, out int maxScrollX, out int minScrollY, out int maxScrollY)
         {
+            canvasH = Math.Max(80, canvasH - GetEffectiveNotesPaneHeight());
             float marginX = Math.Max(20f, canvasW * 0.04f);
             float marginY = Math.Max(20f, canvasH * 0.04f);
             float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
@@ -3740,22 +4015,28 @@ namespace GenOffice.UI
             int totalWsW = wsPxMaxX - wsPxMinX;
             int totalWsH = wsPxMaxY - wsPxMinY;
 
+            int centeredY = (canvasH - slideH) / 2;
+            int centeredX = (canvasW - slideW) / 2;
+            bool bleedsOut = (centeredY + wsPxMinY < 0) || (centeredY + wsPxMaxY > canvasH) ||
+                             (centeredX + wsPxMinX < 0) || (centeredX + wsPxMaxX > canvasW);
+
             // Khoảng không gian cuộn thoáng trên và dưới (Headroom margin) chuẩn PowerPoint
-            int verticalHeadroom = Math.Max(350, (int)(slideH * 0.85f));
-            int horizontalHeadroom = Math.Max(250, (int)(slideW * 0.6f));
+            bool isZoomed = (ZoomLevel > 1.05f) || (totalWsH > canvasH) || (totalWsW > canvasW) || bleedsOut;
+            int verticalHeadroom = isZoomed ? Math.Min(80, Math.Max(30, (int)(slideH * 0.10f))) : 0;
+            int horizontalHeadroom = isZoomed ? Math.Min(100, Math.Max(40, (int)(slideW * 0.10f))) : 0;
 
-            int spanX = Math.Max(horizontalHeadroom, (totalWsW - canvasW) / 2 + horizontalHeadroom);
-            int spanY = Math.Max(verticalHeadroom, (totalWsH - canvasH) / 2 + verticalHeadroom);
+            int spanX = isZoomed ? (Math.Max(0, (totalWsW - canvasW) / 2) + horizontalHeadroom) : 0;
+            int spanY = isZoomed ? (Math.Max(0, (totalWsH - canvasH) / 2) + verticalHeadroom) : 0;
 
-            int offLeft = Math.Max(0, -wsPxMinX);
-            int offRight = Math.Max(0, wsPxMaxX - slideW);
-            int offTop = Math.Max(0, -wsPxMinY);
-            int offBottom = Math.Max(0, wsPxMaxY - slideH);
+            int offLeft = isZoomed ? Math.Max(0, -wsPxMinX) : 0;
+            int offRight = isZoomed ? Math.Max(0, wsPxMaxX - slideW) : 0;
+            int offTop = isZoomed ? Math.Max(0, -wsPxMinY) : 0;
+            int offBottom = isZoomed ? Math.Max(0, wsPxMaxY - slideH) : 0;
 
-            minScrollX = -Math.Max(spanX, offRight + horizontalHeadroom);
-            maxScrollX = Math.Max(spanX, offLeft + horizontalHeadroom);
-            minScrollY = -Math.Max(spanY, offBottom + verticalHeadroom);
-            maxScrollY = Math.Max(spanY, offTop + verticalHeadroom);
+            minScrollX = isZoomed ? -Math.Max(spanX, offRight + horizontalHeadroom) : 0;
+            maxScrollX = isZoomed ? Math.Max(spanX, offLeft + horizontalHeadroom) : 0;
+            minScrollY = isZoomed ? -Math.Max(spanY, offBottom + verticalHeadroom) : 0;
+            maxScrollY = isZoomed ? Math.Max(spanY, offTop + verticalHeadroom) : 0;
         }
 
         public void ClampScroll(int canvasW, int canvasH)
@@ -3764,6 +4045,10 @@ namespace GenOffice.UI
             GetScrollLimits(canvasW, canvasH, out minX, out maxX, out minY, out maxY);
             CanvasScrollX = Math.Max(minX, Math.Min(maxX, CanvasScrollX));
             CanvasScrollY = Math.Max(minY, Math.Min(maxY, CanvasScrollY));
+            SmoothCanvasScrollX = Math.Max(minX, Math.Min(maxX, SmoothCanvasScrollX));
+            TargetCanvasScrollX = Math.Max(minX, Math.Min(maxX, TargetCanvasScrollX));
+            SmoothCanvasScrollY = Math.Max(minY, Math.Min(maxY, SmoothCanvasScrollY));
+            TargetCanvasScrollY = Math.Max(minY, Math.Min(maxY, TargetCanvasScrollY));
         }
 
         public void GetEffectiveLayoutMetrics(int width, int height, out int leftSidebarW, out int canvasX, out int canvasW, out int contentY, out int contentH, out int bottomThumbH)
@@ -3771,7 +4056,7 @@ namespace GenOffice.UI
             int topBarY = 155;
             contentY = topBarY;
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
 
             if (IsElementsDrawerOpen)
             {
@@ -3789,7 +4074,7 @@ namespace GenOffice.UI
                 bottomThumbH = 0;
 
                 canvasX = (isIsland && leftSidebarW > 0) ? (leftSidebarW + 10) : leftSidebarW;
-                canvasW = Math.Max(100, width - canvasX - rightSidebarW - ((isIsland && leftSidebarW > 0) ? 10 : 0));
+                canvasW = Math.Max(100, width - canvasX - rightSidebarW);
                 contentH = Math.Max(100, height - contentY - 26);
             }
         }
@@ -3808,6 +4093,8 @@ namespace GenOffice.UI
                 ShapeTaskPane.ExpandedCategoryKey = null;
                 ShapeTaskPane.SearchText = "";
                 ShapeTaskPane.ScrollY = 0;
+                ShapeTaskPane.SmoothScrollY = 0f;
+                ShapeTaskPane.TargetScrollY = 0f;
                 if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
                 IsElementsDrawerOpen = true;
                 ElementsDrawerSelectedTab = 1;
@@ -3832,6 +4119,8 @@ namespace GenOffice.UI
                 ShapeTaskPane.ExpandedCategoryKey = null;
                 ShapeTaskPane.SearchText = "";
                 ShapeTaskPane.ScrollY = 0;
+                ShapeTaskPane.SmoothScrollY = 0f;
+                ShapeTaskPane.TargetScrollY = 0f;
                 if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
                 IsElementsDrawerOpen = true;
                 ElementsDrawerSelectedTab = 1;
@@ -3889,6 +4178,10 @@ namespace GenOffice.UI
             ZoomLevel = 1.0f;
             CanvasScrollX = 0;
             CanvasScrollY = 0;
+            SmoothCanvasScrollX = 0f;
+            TargetCanvasScrollX = 0f;
+            SmoothCanvasScrollY = 0f;
+            TargetCanvasScrollY = 0f;
         }
 
         public void ZoomAt(Point mousePos, int delta, int width, int height)
@@ -3918,17 +4211,26 @@ namespace GenOffice.UI
                 int targetSlideX = (int)(mousePos.X - normX * newScale);
                 int targetSlideY = (int)(mousePos.Y - normY * newScale);
 
+                int effContentH = Math.Max(80, contentH - GetEffectiveNotesPaneHeight());
                 int centerOffsetX = canvasX + (canvasW - newSlideW) / 2;
-                int centerOffsetY = contentY + (contentH - newSlideH) / 2;
+                int centerOffsetY = contentY + (effContentH - newSlideH) / 2;
 
                 CanvasScrollX = centerOffsetX - targetSlideX;
                 CanvasScrollY = centerOffsetY - targetSlideY;
                 ClampScroll(canvasW, contentH);
+                SmoothCanvasScrollX = CanvasScrollX;
+                TargetCanvasScrollX = CanvasScrollX;
+                SmoothCanvasScrollY = CanvasScrollY;
+                TargetCanvasScrollY = CanvasScrollY;
             }
             else
             {
                 CanvasScrollX = 0;
                 CanvasScrollY = 0;
+                SmoothCanvasScrollX = 0f;
+                TargetCanvasScrollX = 0f;
+                SmoothCanvasScrollY = 0f;
+                TargetCanvasScrollY = 0f;
             }
         }
 
@@ -3939,14 +4241,43 @@ namespace GenOffice.UI
                 : (16.0f / 9.0f);
             if (slideAspect <= 0.01f) slideAspect = 16.0f / 9.0f;
 
-            int availableW = Math.Max(80, leftSidebarW - 48);
-            thumbW = Math.Min(160, availableW);
-            thumbH = (int)Math.Round(thumbW / slideAspect);
-            thumbX = 34 + (availableW - thumbW) / 2;
+            int availableW = Math.Max(70, leftSidebarW - 46);
+            int maxW = Math.Min(154, availableW);
+
+            if (slideAspect >= 1.0f)
+            {
+                // Landscape (16:9, 4:3, A4 Ngang, Facebook...)
+                int maxH = 110;
+                thumbW = maxW;
+                thumbH = (int)Math.Round(thumbW / slideAspect);
+                if (thumbH > maxH)
+                {
+                    thumbH = maxH;
+                    thumbW = (int)Math.Round(thumbH * slideAspect);
+                }
+            }
+            else
+            {
+                // Portrait (A4 Dọc, Instagram 1:1, TikTok 9:16, Infographic...)
+                // Chiều cao khống chế vừa vặn khung nhìn, không bị tràn hay kéo dài bất thường
+                int portraitMaxH = Math.Min(125, Math.Max(90, (int)Math.Round(maxW * 0.85f)));
+                thumbH = portraitMaxH;
+                thumbW = (int)Math.Round(thumbH * slideAspect);
+                if (thumbW > maxW)
+                {
+                    thumbW = maxW;
+                    thumbH = (int)Math.Round(thumbW / slideAspect);
+                }
+            }
+
+            thumbW = Math.Max(32, thumbW);
+            thumbH = Math.Max(32, thumbH);
+            thumbX = 34 + Math.Max(0, (availableW - thumbW) / 2);
         }
 
         public void GetSlideCanvasBounds(int canvasX, int canvasY, int canvasW, int canvasH, out int slideX, out int slideY, out int slideW, out int slideH, out float scale)
         {
+            canvasH = Math.Max(80, canvasH - GetEffectiveNotesPaneHeight());
             float marginX = Math.Max(20f, canvasW * 0.04f);
             float marginY = Math.Max(20f, canvasH * 0.04f);
             float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
@@ -3967,14 +4298,69 @@ namespace GenOffice.UI
             slideY = centerOffsetY - CanvasScrollY;
             scale = (float)slideW / canvasWf;
         }
+
+        public void GetPresenterSlideMetrics(int screenW, int screenH, out int slideX, out int slideY, out int slideW, out int slideH, out float scale)
+        {
+            float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+            float canvasHf = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
+
+            float fitScaleX = (float)screenW / canvasWf;
+            float fitScaleY = (float)screenH / canvasHf;
+            scale = Math.Min(fitScaleX, fitScaleY);
+
+            slideW = (int)Math.Round(canvasWf * scale);
+            slideH = (int)Math.Round(canvasHf * scale);
+            slideX = (screenW - slideW) / 2;
+            slideY = (screenH - slideH) / 2;
+        }
+
+        public void GetCurrentActiveSlidePresentationMetrics(int screenW, int screenH, out int slideX, out int slideY, out int slideW, out int slideH, out float scale)
+        {
+            if (IsPresenterViewMode)
+            {
+                int topH = 46;
+                int bottomH = 65;
+                int mainY = topH + 8;
+                int mainH = screenH - mainY - bottomH - 8;
+                int leftW = (int)(screenW * 0.58f);
+                int currSlideMaxW = leftW - 32;
+                int currSlideMaxH = mainH - 36;
+                float ratio = (Presentation != null && Presentation.IsWidescreen) ? (16.0f / 9.0f) : (4.0f / 3.0f);
+                int curW = currSlideMaxW;
+                int curH = (int)(curW / ratio);
+                if (curH > currSlideMaxH)
+                {
+                    curH = currSlideMaxH;
+                    curW = (int)(curH * ratio);
+                }
+                slideX = 20 + (currSlideMaxW - curW) / 2;
+                slideY = mainY + 28 + (currSlideMaxH - curH) / 2;
+                slideW = curW;
+                slideH = curH;
+                float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+                scale = (float)curW / canvasWf;
+            }
+            else
+            {
+                GetPresenterSlideMetrics(screenW, screenH, out slideX, out slideY, out slideW, out slideH, out scale);
+            }
+        }
         #endregion
 
         #region Elements Drawer & Bottom Filmstrip Layout Rendering
                 public void HideSearchBox()
         {
-            if (_shapeSearchBox != null && _shapeSearchBox.Visible)
+            if (_shapeSearchBox != null)
             {
                 _shapeSearchBox.Visible = false;
+                try
+                {
+                    if (ParentControl is ContainerControl cc && cc.ActiveControl == _shapeSearchBox)
+                    {
+                        cc.ActiveControl = null;
+                    }
+                }
+                catch { }
             }
         }
 
@@ -4006,6 +4392,8 @@ namespace GenOffice.UI
                     {
                         ShapeTaskPane.SearchText = _shapeSearchBox.Text;
                         ShapeTaskPane.ScrollY = 0;
+                        ShapeTaskPane.SmoothScrollY = 0f;
+                        ShapeTaskPane.TargetScrollY = 0f;
                         if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                     }
@@ -4056,7 +4444,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawElementsDrawerPanel(Graphics g, int totalW, int contentY, int totalH)
+        private void DrawElementsDrawerPanel(D2DGraphics g, int totalW, int contentY, int totalH)
         {
             RailTabBounds.Clear();
             PillTabBounds.Clear();
@@ -4073,6 +4461,7 @@ namespace GenOffice.UI
                 // If collapsed or width is 0, draw small expand button
                 if (IsElementsDrawerCollapsed || totalW <= 0)
                 {
+                    HideSearchBox();
                     Rectangle colBtnCollapsed = new Rectangle(0, contentY + 12, 22, 28);
                     BtnCollapseDrawerBounds = colBtnCollapsed;
                     using (GraphicsPath colPath = CreateRoundedRectPath(new RectangleF(colBtnCollapsed.X, colBtnCollapsed.Y, colBtnCollapsed.Width, colBtnCollapsed.Height), 4f))
@@ -4092,7 +4481,24 @@ namespace GenOffice.UI
                 if (ElementsDrawerSelectedTab == 1)
                 {
                     if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
-                    ShapeTaskPane.Draw(g, new Rectangle(0, contentY, totalW, totalH));
+                    try
+                    {
+                        if (totalW > 0 && contentY + totalH > 0)
+                        {
+                            using (Bitmap bmp = new Bitmap(totalW, contentY + totalH))
+                            {
+                                using (Graphics bmpG = Graphics.FromImage(bmp))
+                                {
+                                    ShapeTaskPane.Draw(bmpG, new Rectangle(0, contentY, totalW, totalH));
+                                }
+                                g.DrawImage(bmp, 0, 0, totalW, contentY + totalH);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        g.DrawString("ERROR: " + ex.Message + "\n" + ex.StackTrace, new Font("Segoe UI", 8), Brushes.Red, 10, contentY + 10);
+                    }
                     UpdateShapeSearchBox();
                     return;
                 }
@@ -4189,7 +4595,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawDrawerTabContent(Graphics g, int leftX, int contentTop, int drawerW, int drawerH, Font secFont, Font itemFont, StringFormat sfCenter)
+        private void DrawDrawerTabContent(D2DGraphics g, int leftX, int contentTop, int drawerW, int drawerH, Font secFont, Font itemFont, StringFormat sfCenter)
         {
             int curY = contentTop;
 
@@ -4277,11 +4683,7 @@ namespace GenOffice.UI
                     }
                     Rectangle iBox1 = new Rectangle(c1.X + 8, c1.Y + 8, 40, 40);
                     g.FillRectangle(iconBoxBg, iBox1);
-                    using (Font qrIconFont = new Font("Segoe UI", 14f, FontStyle.Bold))
-                    using (SolidBrush qrIconB = new SolidBrush(Color.FromArgb(37, 99, 235)))
-                    {
-                        g.DrawString("⚅", qrIconFont, qrIconB, new RectangleF(iBox1.X, iBox1.Y + 2, iBox1.Width, iBox1.Height), sfCenter);
-                    }
+                    FluentIconRenderer.DrawGlyph(g, '\uED14', iBox1, Color.FromArgb(37, 99, 235), 22f);
                     g.DrawString("Tạo mã QR", secFont, titleB, c1.X + 54, c1.Y + 10);
                     g.DrawString("Chèn mã QR tức thì cho link hoặc văn bản", itemFont, descB, c1.X + 54, c1.Y + 30);
                     curY += 64;
@@ -4297,11 +4699,7 @@ namespace GenOffice.UI
                     }
                     Rectangle iBox4 = new Rectangle(c4.X + 8, c4.Y + 8, 40, 40);
                     g.FillRectangle(iconBoxBg, iBox4);
-                    using (Font chtIconFont = new Font("Segoe UI", 12f, FontStyle.Bold))
-                    using (SolidBrush chtIconB = new SolidBrush(Color.FromArgb(124, 58, 237)))
-                    {
-                        g.DrawString("📊", chtIconFont, chtIconB, new RectangleF(iBox4.X, iBox4.Y + 4, iBox4.Width, iBox4.Height), sfCenter);
-                    }
+                    FluentIconRenderer.DrawGlyph(g, '\uE9D2', iBox4, Color.FromArgb(124, 58, 237), 22f);
                     g.DrawString("Biểu đồ infographic", secFont, titleB, c4.X + 54, c4.Y + 10);
                     g.DrawString("Chèn biểu đồ cột minh họa số liệu", itemFont, descB, c4.X + 54, c4.Y + 30);
                 }
@@ -4512,7 +4910,76 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawBottomSlideThumbnailStrip(Graphics g, int canvasX, int bottomY, int canvasW, int bottomH)
+        private void EnsureSlideThumbnail(SlideNode s, int targetW = -1, int targetH = -1)
+        {
+            if (s == null) return;
+            if (s.ThumbnailCache != null && !s.IsThumbnailDirty) return;
+
+            try
+            {
+                if (s.ThumbnailCache != null)
+                {
+                    try { D2DGraphics.InvalidateBitmapCache(s.ThumbnailCache); } catch { }
+                    s.ThumbnailCache.Dispose();
+                    s.ThumbnailCache = null;
+                }
+
+                float canvasW = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
+                float canvasH = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
+                float aspect = canvasW / Math.Max(1f, canvasH);
+                if (aspect <= 0.01f) aspect = 16.0f / 9.0f;
+
+                int finalW, finalH;
+                if (targetW > 0 && targetH > 0)
+                {
+                    finalW = targetW;
+                    finalH = targetH;
+                }
+                else
+                {
+                    // Tự động tính kích thước render thumbnail chuẩn xác 100% theo tỷ lệ thực tế của slide
+                    if (aspect >= 1.0f)
+                    {
+                        finalW = 320;
+                        finalH = Math.Max(24, (int)Math.Round(finalW / aspect));
+                    }
+                    else
+                    {
+                        finalH = 320;
+                        finalW = Math.Max(24, (int)Math.Round(finalH * aspect));
+                    }
+                }
+
+                Bitmap bmp = new Bitmap(finalW, finalH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                float renderScale = (float)finalW / canvasW;
+
+                using (Graphics bg = Graphics.FromImage(bmp))
+                using (D2DGraphics d2d = new D2DGraphics(bg, finalW, finalH))
+                {
+                    Rectangle miniFrame = new Rectangle(0, 0, finalW, finalH);
+                    DrawSlideBackground(d2d, miniFrame, s);
+
+                    if (s.Shapes != null)
+                    {
+                        foreach (ShapeNode shape in s.Shapes)
+                        {
+                            if (shape == null || !shape.IsVisible || (shape.Name != null && shape.Name.StartsWith("__morph_ghost__"))) continue;
+                            try
+                            {
+                                DrawShape(d2d, 0, 0, renderScale, shape, false);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                s.ThumbnailCache = bmp;
+                s.IsThumbnailDirty = false;
+            }
+            catch { }
+        }
+
+        private void DrawBottomSlideThumbnailStrip(D2DGraphics g, int canvasX, int bottomY, int canvasW, int bottomH)
         {
             BottomSlideThumbBounds.Clear();
             Rectangle stripRect = new Rectangle(canvasX, bottomY, canvasW, bottomH);
@@ -4529,22 +4996,35 @@ namespace GenOffice.UI
 
             if (Presentation == null || Presentation.Slides == null) return;
 
-            int cardW = 86;
             int cardH = 48;
+            float slideAspect = (Presentation != null && Presentation.CanvasHeight > 0)
+                ? ((float)Presentation.CanvasWidth / (float)Presentation.CanvasHeight)
+                : (16.0f / 9.0f);
+            if (slideAspect <= 0.01f) slideAspect = 16.0f / 9.0f;
+            int cardW = Math.Max(24, Math.Min(96, (int)Math.Round(cardH * slideAspect)));
             int cardY = bottomY + (bottomH - cardH) / 2;
             int curX = canvasX + 16 - BottomThumbScrollX;
+
+            int rightReservedW = 120;
+            int viewportX = canvasX + 16;
+            int viewportW = Math.Max(50, canvasW - 16 - rightReservedW);
+            Rectangle cardsViewport = new Rectangle(viewportX, bottomY, viewportW, bottomH);
 
             using (Font numFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
             using (Font addFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
             using (Font plusFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
             using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             {
+                // Khóa vùng vẽ thẻ và nút Thêm hoàn toàn bên trong viewport (không bao giờ lem qua số trang hay tràn ra ngoài)
+                GraphicsState gsCards = g.Save();
+                g.IntersectClip(cardsViewport);
+
                 for (int i = 0; i < Presentation.Slides.Count; i++)
                 {
                     Rectangle cRect = new Rectangle(curX, cardY, cardW, cardH);
                     BottomSlideThumbBounds.Add(cRect);
 
-                    if (cRect.Right > canvasX && cRect.Left < canvasX + canvasW - 130)
+                    if (cRect.IntersectsWith(cardsViewport))
                     {
                         SlideNode s = Presentation.Slides[i];
 
@@ -4554,8 +5034,9 @@ namespace GenOffice.UI
                             g.FillRectangle(cardBg, cRect);
                         }
 
-                        // Vẽ preview nhỏ từ ThumbnailCache nếu có
-                        if (s.ThumbnailCache != null && !s.IsThumbnailDirty)
+                        // Vẽ preview slide từ ThumbnailCache (tự động dựng nếu chưa có hoặc dirty)
+                        EnsureSlideThumbnail(s);
+                        if (s.ThumbnailCache != null)
                         {
                             g.DrawImage(s.ThumbnailCache, cRect);
                         }
@@ -4589,24 +5070,73 @@ namespace GenOffice.UI
                     curX += cardW + 10;
                 }
 
-                // Nút '+ Thêm trang' Office Style
+                // Nút '+ Thêm trang' Office Style (được clip sạch sẽ bên trong viewport)
                 Rectangle addRect = new Rectangle(curX, cardY, 46, cardH);
                 BtnBottomAddSlideBounds = addRect;
-                using (SolidBrush addBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
-                using (Pen addPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
-                using (SolidBrush addTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                if (addRect.IntersectsWith(cardsViewport))
                 {
-                    g.FillRectangle(addBg, addRect);
-                    g.DrawRectangle(addPen, addRect);
-                    g.DrawString("+", plusFont, addTxt, new RectangleF(addRect.X, addRect.Y + 2, addRect.Width, 20), sfCenter);
-                    g.DrawString("Thêm", addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
+                    using (SolidBrush addBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                    using (Pen addPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                    using (SolidBrush addTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                    {
+                        g.FillRectangle(addBg, addRect);
+                        g.DrawRectangle(addPen, addRect);
+                        g.DrawString("+", plusFont, addTxt, new RectangleF(addRect.X, addRect.Y + 2, addRect.Width, 20), sfCenter);
+                        g.DrawString("Thêm", addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
+                    }
                 }
 
-                // Thông tin trang ở góc phải
+                g.Restore(gsCards);
+
+                // Khu vực cố định hiển thị thông tin trang ở góc phải (có nền che chắn tuyệt đối)
+                Rectangle rightInfoRect = new Rectangle(canvasX + canvasW - rightReservedW, bottomY + 1, rightReservedW, bottomH - 2);
+                using (SolidBrush infoBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                {
+                    g.FillRectangle(infoBg, rightInfoRect);
+                }
                 string pageInfo = string.Format("Trang {0} / {1}", ActiveSlideIndex + 1, Presentation.Slides.Count);
                 using (SolidBrush infoBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
                 {
-                    g.DrawString(pageInfo, addFont, infoBrush, canvasX + canvasW - 100, bottomY + (bottomH - 16) / 2);
+                    g.DrawString(pageInfo, addFont, infoBrush, rightInfoRect, sfCenter);
+                }
+
+                // Thanh cuộn nhỏ ở đáy để cuộn qua lại (Horizontal Pill Scrollbar)
+                int totalBottomWidth = (Presentation.Slides.Count * (cardW + 10)) + 46 + 20;
+                int trackX = viewportX;
+                int trackW = viewportW;
+                int trackY = bottomY + bottomH - 7;
+                int trackH = 4;
+
+                BottomThumbScrollBarTrackRect = new Rectangle(trackX, trackY, trackW, trackH);
+
+                if (totalBottomWidth > trackW && trackW > 40)
+                {
+                    int maxScroll = totalBottomWidth - trackW;
+                    BottomThumbScrollX = Math.Max(0, Math.Min(maxScroll, BottomThumbScrollX));
+
+                    int thumbW = Math.Max(36, (int)((float)trackW / totalBottomWidth * trackW));
+                    float fracX = (float)BottomThumbScrollX / maxScroll;
+                    int thumbX = trackX + (int)(fracX * (trackW - thumbW));
+
+                    BottomThumbScrollBarThumbRect = new Rectangle(thumbX, trackY, thumbW, trackH);
+
+                    // Track Background
+                    using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(235, 238, 242)))
+                    {
+                        FillRoundedPill(g, trackBg, BottomThumbScrollBarTrackRect);
+                    }
+
+                    // Thumb Pill
+                    Color thumbCol = IsDraggingBottomThumbScrollBar ? Color.FromArgb(71, 85, 105) :
+                                     (IsHoverBottomThumbScrollBarThumb ? Color.FromArgb(100, 116, 139) : Color.FromArgb(160, 174, 192));
+                    using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                    {
+                        FillRoundedPill(g, thumbBrush, BottomThumbScrollBarThumbRect);
+                    }
+                }
+                else
+                {
+                    BottomThumbScrollBarThumbRect = Rectangle.Empty;
                 }
             }
         }
@@ -4642,6 +5172,12 @@ namespace GenOffice.UI
                     {
                         IsElementsDrawerCollapsed = !IsElementsDrawerCollapsed;
                         ZoomToFit();
+                    }
+                    else if (action == "SwitchMode")
+                    {
+                        if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                        if (parentControl != null) parentControl.Invalidate();
+                        return true;
                     }
                     else if (action == "InsertShape" && !string.IsNullOrEmpty(targetId))
                     {
@@ -4691,27 +5227,43 @@ namespace GenOffice.UI
             SaveUndoState();
             if (preset.IsOnlineImage)
             {
-                float imgW = 240f;
-                float imgH = 240f;
-                float imgCx = (Presentation.CanvasWidth - imgW) / 2f;
-                float imgCy = (Presentation.CanvasHeight - imgH) / 2f;
-
-                string localPath = GenOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
-                Bitmap bmp = GenOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl);
+                string localPath = ZenQOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
+                Bitmap bmp = ZenQOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl);
                 if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(localPath))
                 {
                     try
                     {
                         string svgXml = System.IO.File.ReadAllText(localPath);
-                        bmp = GenOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgXml, 1600, 1600) ?? bmp;
+                        bmp = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgXml, 1600, 1600) ?? bmp;
                     }
                     catch { }
                 }
 
+                float imgW = 240f;
+                float imgH = 240f;
+                if (bmp != null && bmp.Height > 0)
+                {
+                    float aspect = (float)bmp.Width / bmp.Height;
+                    if (aspect > 1f)
+                    {
+                        imgH = 240f / aspect;
+                    }
+                    else
+                    {
+                        imgW = 240f * aspect;
+                    }
+                }
+
+                float imgCx = (Presentation.CanvasWidth - imgW) / 2f;
+                float imgCy = (Presentation.CanvasHeight - imgH) / 2f;
+
                 ShapeNode imgShape = new ShapeNode
                 {
                     Id = Guid.NewGuid().ToString("N"),
+                    Name = !string.IsNullOrEmpty(preset.Name) ? preset.Name : "Minh họa Vector",
                     Type = ShapeType.Image,
+                    IsSvg = localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase),
+                    IsGraphic = true,
                     ImagePath = localPath,
                     CachedImage = bmp,
                     Transform = new Transform2D(imgCx, imgCy, imgW, imgH),
@@ -4877,8 +5429,36 @@ namespace GenOffice.UI
 
         public bool HandleBottomThumbnailStripClick(Point mousePos, int canvasX, int bottomY, int canvasW, int bottomH, Control parentControl)
         {
+            // 0. Drag hoặc click thanh cuộn nhỏ ở dưới
+            if (!BottomThumbScrollBarThumbRect.IsEmpty && BottomThumbScrollBarThumbRect.Contains(mousePos))
+            {
+                IsDraggingBottomThumbScrollBar = true;
+                _bottomThumbScrollDragStartMouseX = mousePos.X;
+                _bottomThumbScrollDragStartScrollX = BottomThumbScrollX;
+                SmoothBottomThumbScrollX = BottomThumbScrollX;
+                TargetBottomThumbScrollX = BottomThumbScrollX;
+                return true;
+            }
+            if (!BottomThumbScrollBarTrackRect.IsEmpty && BottomThumbScrollBarTrackRect.Contains(mousePos))
+            {
+                int totalBottomWidth = (Presentation != null ? Presentation.Slides.Count : 0) * (86 + 10) + 60;
+                int trackW = BottomThumbScrollBarTrackRect.Width;
+                int maxScroll = Math.Max(0, totalBottomWidth - trackW);
+                if (mousePos.X < BottomThumbScrollBarThumbRect.X)
+                    TargetBottomThumbScrollX = Math.Max(0, TargetBottomThumbScrollX - 220);
+                else
+                    TargetBottomThumbScrollX = Math.Min(maxScroll, TargetBottomThumbScrollX + 220);
+                if (parentControl != null) parentControl.Invalidate();
+                return true;
+            }
+
+            int rightReservedW = 120;
+            int viewportX = canvasX + 16;
+            int viewportW = Math.Max(50, canvasW - 16 - rightReservedW);
+            Rectangle cardsViewport = new Rectangle(viewportX, bottomY, viewportW, bottomH);
+
             // 1. Nút '+ Thêm trang'
-            if (!BtnBottomAddSlideBounds.IsEmpty && BtnBottomAddSlideBounds.Contains(mousePos))
+            if (!BtnBottomAddSlideBounds.IsEmpty && cardsViewport.Contains(mousePos) && BtnBottomAddSlideBounds.Contains(mousePos))
             {
                 AddSlide();
                 if (parentControl != null) parentControl.Invalidate();
@@ -4888,7 +5468,7 @@ namespace GenOffice.UI
             // 2. Click chọn thẻ slide
             for (int i = 0; i < BottomSlideThumbBounds.Count; i++)
             {
-                if (BottomSlideThumbBounds[i].Contains(mousePos) && Presentation != null && i < Presentation.Slides.Count)
+                if (cardsViewport.Contains(mousePos) && BottomSlideThumbBounds[i].Contains(mousePos) && Presentation != null && i < Presentation.Slides.Count)
                 {
                     ActiveSlideIndex = i;
                     SelectedShapeIndex = -1;
@@ -5166,8 +5746,9 @@ namespace GenOffice.UI
         #endregion
 
         #region Main Workspace Drawing Logic
-        public void Draw(Graphics g, int width, int height)
+        public void Draw(D2DGraphics g, int width, int height)
         {
+            LastViewportWidth = width;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.Bilinear;
             g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
@@ -5185,50 +5766,73 @@ namespace GenOffice.UI
 
             // 1. Draw Center Viewport with Clipping
             GraphicsState origState = g.Save();
-            g.SetClip(centerViewportRect);
-
-            switch (ViewMode)
+            try
             {
-                case ImpressViewMode.Normal:
-                case ImpressViewMode.ReadingView:
-                    DrawNormalCanvasView(g, canvasX, contentY, canvasW, contentH);
-                    break;
-                case ImpressViewMode.Outline:
-                    DrawOutlineView(g, canvasX, contentY, canvasW, contentH);
-                    break;
-                case ImpressViewMode.Notes:
-                    DrawNotesView(g, canvasX, contentY, canvasW, contentH);
-                    break;
-                case ImpressViewMode.SlideSorter:
-                    DrawSlideSorterView(g, 0, contentY, width - (IsSidebarOpen ? 280 : 0), contentH);
-                    break;
-                case ImpressViewMode.SlideMaster:
-                    DrawSlideMasterView(g, canvasX, contentY, canvasW, contentH);
-                    break;
-            }
+                g.SetClip(centerViewportRect);
 
-            g.Restore(origState);
+                switch (ViewMode)
+                {
+                    case ImpressViewMode.Normal:
+                    case ImpressViewMode.ReadingView:
+                        DrawNormalCanvasView(g, canvasX, contentY, canvasW, contentH);
+                        break;
+                    case ImpressViewMode.Outline:
+                        DrawOutlineView(g, canvasX, contentY, canvasW, contentH);
+                        break;
+                    case ImpressViewMode.Notes:
+                        DrawNotesView(g, canvasX, contentY, canvasW, contentH);
+                        break;
+                    case ImpressViewMode.SlideSorter:
+                        DrawSlideSorterView(g, 0, contentY, width - ((IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0), contentH);
+                        break;
+                    case ImpressViewMode.SlideMaster:
+                        DrawSlideMasterView(g, canvasX, contentY, canvasW, contentH);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[SlidesView] Center viewport render error: " + ex);
+            }
+            finally
+            {
+                g.Restore(origState);
+            }
 
             // 2. Draw Left Pane OR Elements Drawer ON TOP
-            if (IsElementsDrawerOpen)
+            try
             {
-                DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
-                DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
+                if (IsElementsDrawerOpen)
+                {
+                    DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
+                    DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
+                }
+                else if (leftSidebarW > 0)
+                {
+                    DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+                }
             }
-            else if (leftSidebarW > 0)
+            catch (Exception ex)
             {
-                DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+                System.Diagnostics.Debug.WriteLine("[SlidesView] Left pane render error: " + ex);
             }
 
             // 3. Draw Right Sidebar Task Pane (Animation Pane / Properties) ON TOP
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
-            if (rightSidebarW > 0)
+            try
             {
-                DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, contentH);
+                int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
+                if (rightSidebarW > 0)
+                {
+                    DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, contentH);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[SlidesView] Right pane render error: " + ex);
             }
         }
 
-        private void DrawNormalCanvasView(Graphics g, int x, int y, int w, int h)
+        private void DrawNormalCanvasView(D2DGraphics g, int x, int y, int w, int h)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -5246,12 +5850,19 @@ namespace GenOffice.UI
 
             if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape != null)
             {
-                ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
-                int vsx = slideX + (int)(vs.Transform.X * scale);
-                int vsy = slideY + (int)(vs.Transform.Y * scale);
-                int vsw = (int)(vs.Transform.Width * scale);
-                int vsh = (int)(vs.Transform.Height * scale);
-                SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
+                if (IsDraggingShape || IsResizingShape || IsRotatingShape || IsPanningCanvas)
+                {
+                    SlideVideoPlayerManager.Instance.Stop();
+                }
+                else
+                {
+                    ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
+                    int vsx = slideX + (int)(vs.Transform.X * scale);
+                    int vsy = slideY + (int)(vs.Transform.Y * scale);
+                    int vsw = (int)(vs.Transform.Width * scale);
+                    int vsh = (int)(vs.Transform.Height * scale);
+                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
+                }
             }
 
             Rectangle slideRect = new Rectangle(slideX, slideY, slideW, slideH);
@@ -5321,16 +5932,20 @@ namespace GenOffice.UI
 
                         if (isVis)
                         {
-                            DrawShape(g, slideX, slideY, scale, shape, isSel, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            try
+                            {
+                                DrawShape(g, slideX, slideY, scale, shape, isSel, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            }
+                            catch { }
                         }
                     }
 
                     // Render Motion Paths Trajectory & Ghost Silhouettes in Design Mode
-                    DrawMotionPathsOverlay(g, slideX, slideY, scale, slide);
+                    try { DrawMotionPathsOverlay(g, slideX, slideY, scale, slide); } catch { }
                 }
 
                 // Render Table Insert Live Preview (Ghost Overlay)
-                DrawTableInsertPreviewOverlay(g, slideX, slideY, scale);
+                try { DrawTableInsertPreviewOverlay(g, slideX, slideY, scale); } catch { }
 
                 if (shapesClipState != null)
                 {
@@ -5367,10 +5982,13 @@ namespace GenOffice.UI
                 }
             }
 
+            int notesPaneH = GetEffectiveNotesPaneHeight();
+            int stageH = Math.Max(80, h - notesPaneH);
+
             // Render Rulers
             if (ShowRuler)
             {
-                DrawSlideRulers(g, x, y, w, h, slideX, slideY, slideW, slideH, scale);
+                DrawSlideRulers(g, x, y, w, stageH, slideX, slideY, slideW, slideH, scale);
             }
 
             // Draw Workspace Scrollbars (Thanh cuộn ngang & dọc chuẩn PowerPoint / Office 365)
@@ -5386,7 +6004,7 @@ namespace GenOffice.UI
             {
                 int hTrackW = hasVScroll ? (w - sbW) : w;
                 int hTrackX = x;
-                int hTrackY = y + h - sbH;
+                int hTrackY = y + stageH - sbH;
                 Rectangle hTrackRect = new Rectangle(hTrackX, hTrackY, hTrackW, sbH);
 
                 // Track Background & Top subtle border
@@ -5415,7 +6033,7 @@ namespace GenOffice.UI
 
             if (hasVScroll)
             {
-                int vTrackH = hasHScroll ? (h - sbH) : h;
+                int vTrackH = hasHScroll ? (stageH - sbH) : stageH;
                 int vTrackX = x + w - sbW;
                 int vTrackY = y;
                 Rectangle vTrackRect = new Rectangle(vTrackX, vTrackY, sbW, vTrackH);
@@ -5429,8 +6047,8 @@ namespace GenOffice.UI
                 }
 
                 // Thumb Pill Calculation
-                int totalH = maxScrollY - minScrollY + h;
-                int thumbH = Math.Max(40, (int)((float)h / totalH * vTrackH));
+                int totalH = maxScrollY - minScrollY + stageH;
+                int thumbH = Math.Max(40, (int)((float)stageH / totalH * vTrackH));
                 thumbH = Math.Min(thumbH, vTrackH);
                 float fracY = (float)(CanvasScrollY - minScrollY) / Math.Max(1, maxScrollY - minScrollY);
                 int thumbY = vTrackY + (int)(fracY * (vTrackH - thumbH));
@@ -5446,11 +6064,59 @@ namespace GenOffice.UI
 
             if (hasHScroll && hasVScroll)
             {
-                Rectangle cornerRect = new Rectangle(x + w - sbW, y + h - sbH, sbW, sbH);
+                Rectangle cornerRect = new Rectangle(x + w - sbW, y + stageH - sbH, sbW, sbH);
                 using (SolidBrush cornerBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
                 {
                     g.FillRectangle(cornerBg, cornerRect);
                 }
+            }
+
+            // Render PowerPoint-Style Bottom Speaker Notes Pane (Khung Ghi chú cho người thuyết trình)
+            if (notesPaneH > 0)
+            {
+                Rectangle notesPaneRect = new Rectangle(x, y + stageH, w, notesPaneH);
+                using (SolidBrush notesBg = new SolidBrush(IsEditingSpeakerNotes ? Color.White : Color.FromArgb(250, 251, 253)))
+                {
+                    g.FillRectangle(notesBg, notesPaneRect);
+                }
+
+                bool splitterActive = IsDraggingNotesSplitter || IsHoverNotesSplitter;
+                Color splitterCol = splitterActive ? Color.FromArgb(210, 71, 38) : Color.FromArgb(214, 218, 224);
+                using (Pen splitPen = new Pen(splitterCol, splitterActive ? 2.0f : 1.0f))
+                {
+                    g.DrawLine(splitPen, x, notesPaneRect.Y, x + w, notesPaneRect.Y);
+                }
+
+                // Centered grab pill on top splitter
+                Rectangle pillRect = new Rectangle(x + w / 2 - 18, notesPaneRect.Y + 2, 36, 3);
+                using (SolidBrush pillBrush = new SolidBrush(splitterActive ? Color.FromArgb(210, 71, 38) : Color.FromArgb(196, 202, 212)))
+                {
+                    FillRoundedPill(g, pillBrush, pillRect);
+                }
+
+                if (IsEditingSpeakerNotes)
+                {
+                    using (SolidBrush activeBar = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                    {
+                        g.FillRectangle(activeBar, x, notesPaneRect.Y + 1, 3, notesPaneH - 1);
+                    }
+                }
+
+                using (Font iconFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                using (SolidBrush iconBrush = new SolidBrush(IsEditingSpeakerNotes ? Color.FromArgb(210, 71, 38) : Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString("📝", iconFont, iconBrush, x + 10, notesPaneRect.Y + 8);
+                }
+
+                Rectangle notesTextRect = new Rectangle(x + 34, notesPaneRect.Y + 8, Math.Max(60, w - 46), Math.Max(18, notesPaneH - 12));
+                DrawInteractiveSpeakerNotesContent(
+                    g,
+                    notesTextRect,
+                    10.0f,
+                    Color.FromArgb(30, 41, 59),
+                    Color.FromArgb(148, 163, 184),
+                    Color.FromArgb(210, 71, 38),
+                    "Nhấp để thêm ghi chú");
             }
 
             // Render Chroma Key Eyedropper Loupe on Top
@@ -5460,7 +6126,221 @@ namespace GenOffice.UI
             }
         }
 
-        private static void FillRoundedPill(Graphics g, Brush brush, Rectangle r)
+        public void DrawInteractiveSpeakerNotesContent(D2DGraphics g, RectangleF textBounds, float fontSize, bool isDark)
+        {
+            Rectangle r = new Rectangle((int)textBounds.X, (int)textBounds.Y, (int)textBounds.Width, (int)textBounds.Height);
+            if (isDark)
+            {
+                DrawInteractiveSpeakerNotesContent(
+                    g,
+                    r,
+                    fontSize,
+                    Color.FromArgb(241, 245, 249),
+                    Color.FromArgb(148, 163, 184),
+                    Color.FromArgb(249, 115, 22),
+                    "(Nhấp vào đây để nhập ghi chú cho người thuyết trình...)");
+            }
+            else
+            {
+                DrawInteractiveSpeakerNotesContent(
+                    g,
+                    r,
+                    fontSize,
+                    Color.FromArgb(30, 41, 59),
+                    Color.FromArgb(148, 163, 184),
+                    Color.FromArgb(210, 71, 38),
+                    "(Nhấp vào đây để thêm ghi chú diễn giả...)");
+            }
+        }
+
+        public void DrawInteractiveSpeakerNotesContent(D2DGraphics g, Rectangle textAreaRect, float fontSize, Color textColor, Color placeholderColor, Color caretColor, string placeholderText)
+        {
+            if (textAreaRect.Width <= 4 || textAreaRect.Height <= 4) return;
+            LastNotesTextRect = textAreaRect;
+            LastNotesFontSize = fontSize;
+
+            string notes = (ActiveSlide != null && ActiveSlide.SpeakerNotes != null) ? ActiveSlide.SpeakerNotes : "";
+            bool hasText = !string.IsNullOrEmpty(notes);
+
+            GraphicsState clipState = g.Save();
+            g.IntersectClip(textAreaRect);
+
+            try
+            {
+                using (Font notesFont = new Font("Segoe UI", fontSize, FontStyle.Regular))
+                {
+                    if (!hasText && !IsEditingSpeakerNotes)
+                    {
+                        using (SolidBrush phBrush = new SolidBrush(placeholderColor))
+                        {
+                            g.DrawString(placeholderText, notesFont, phBrush, textAreaRect.X, textAreaRect.Y);
+                        }
+                        return;
+                    }
+
+                    float wrapW = Math.Max(40f, textAreaRect.Width - 6f);
+                    List<VisualTextLine> visualLines = GetVisualWrappedLines(g, notes, notesFont, wrapW);
+                    float lineHeight = Math.Max(16f, notesFont.Height);
+                    int maxScrollY = Math.Max(0, (int)(visualLines.Count * lineHeight - textAreaRect.Height + 6));
+                    NotesScrollY = Math.Max(0, Math.Min(maxScrollY, NotesScrollY));
+                    float startY = textAreaRect.Y - NotesScrollY;
+
+                    if (IsEditingSpeakerNotes && SpeakerNotesSelectionLength != 0)
+                    {
+                        int selStart = Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength);
+                        int selEnd = Math.Max(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength);
+                        using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(95, 59, 130, 246)))
+                        {
+                            for (int li = 0; li < visualLines.Count; li++)
+                            {
+                                VisualTextLine vl = visualLines[li];
+                                int lineStart = vl.StartCharIndex;
+                                int lineEnd = vl.StartCharIndex + vl.Length;
+                                if (selEnd > lineStart && selStart < lineEnd)
+                                {
+                                    int subStart = Math.Max(0, selStart - lineStart);
+                                    int subEnd = Math.Min(vl.Length, selEnd - lineStart);
+                                    string pre = vl.Text.Substring(0, Math.Min(subStart, vl.Text.Length));
+                                    string selTxt = vl.Text.Substring(subStart, Math.Min(subEnd - subStart, vl.Text.Length - subStart));
+                                    float preW = g.MeasureString(pre, notesFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                                    float selW = Math.Max(4f, g.MeasureString(selTxt, notesFont, PointF.Empty, StringFormat.GenericTypographic).Width);
+                                    float curY = startY + li * lineHeight;
+                                    g.FillRectangle(selBrush, textAreaRect.X + preW, curY, selW, lineHeight);
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasText)
+                    {
+                        using (SolidBrush txtBrush = new SolidBrush(textColor))
+                        {
+                            for (int li = 0; li < visualLines.Count; li++)
+                            {
+                                float curY = startY + li * lineHeight;
+                                if (curY + lineHeight < textAreaRect.Top - 4 || curY > textAreaRect.Bottom + 4) continue;
+                                string lineText = visualLines[li].Text;
+                                if (string.IsNullOrEmpty(lineText)) continue;
+                                g.DrawString(lineText.TrimEnd('\r', '\n'), notesFont, txtBrush, textAreaRect.X, curY, StringFormat.GenericTypographic);
+                            }
+                        }
+                    }
+
+                    if (IsEditingSpeakerNotes)
+                    {
+                        int caret = Math.Max(0, Math.Min(SpeakerNotesCaretIndex, notes.Length));
+                        int curLineIdx = Math.Max(0, visualLines.Count - 1);
+                        int colInLine = visualLines.Count > 0 ? visualLines[curLineIdx].Length : 0;
+                        for (int i = 0; i < visualLines.Count; i++)
+                        {
+                            if (caret <= visualLines[i].StartCharIndex + visualLines[i].Length)
+                            {
+                                curLineIdx = i;
+                                colInLine = caret - visualLines[i].StartCharIndex;
+                                break;
+                            }
+                        }
+
+                        string cLineText = (curLineIdx < visualLines.Count) ? visualLines[curLineIdx].Text : "";
+                        string beforeCaret = cLineText.Substring(0, Math.Min(colInLine, cLineText.Length));
+                        float beforeWidth = g.MeasureString(beforeCaret, notesFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                        float caretX = textAreaRect.X + beforeWidth;
+                        float caretY = startY + curLineIdx * lineHeight;
+
+                        using (Pen caretPen = new Pen(caretColor, 1.8f))
+                        {
+                            g.DrawLine(caretPen, caretX, caretY + 1f, caretX, caretY + lineHeight - 1f);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                g.Restore(clipState);
+            }
+        }
+
+        public int GetSpeakerNotesCharIndexFromPoint(Point mousePos, RectangleF textBounds, float fontSize)
+        {
+            return GetSpeakerNotesCharIndexFromPoint(mousePos, new Rectangle((int)textBounds.X, (int)textBounds.Y, (int)textBounds.Width, (int)textBounds.Height), fontSize);
+        }
+
+        public int GetSpeakerNotesCharIndexFromPoint(Point mousePos, Rectangle textAreaRect, float fontSize)
+        {
+            string notes = (ActiveSlide != null && ActiveSlide.SpeakerNotes != null) ? ActiveSlide.SpeakerNotes : "";
+            if (string.IsNullOrEmpty(notes)) return 0;
+
+            using (Font notesFont = new Font("Segoe UI", fontSize, FontStyle.Regular))
+            using (D2DGraphics g = new D2DGraphics())
+            {
+                float wrapW = Math.Max(40f, textAreaRect.Width - 6f);
+                List<VisualTextLine> visualLines = GetVisualWrappedLines(g, notes, notesFont, wrapW);
+                if (visualLines.Count == 0) return 0;
+
+                float lineHeight = Math.Max(16f, notesFont.Height);
+                float startY = textAreaRect.Y - NotesScrollY;
+                int lineIdx = (int)((mousePos.Y - startY) / lineHeight);
+                lineIdx = Math.Max(0, Math.Min(visualLines.Count - 1, lineIdx));
+
+                VisualTextLine vLine = visualLines[lineIdx];
+                string lineText = vLine.Text ?? "";
+                float clickRelX = mousePos.X - textAreaRect.X;
+                if (clickRelX <= 0) return vLine.StartCharIndex;
+
+                float cLineWidth = g.MeasureString(lineText, notesFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                if (clickRelX >= cLineWidth) return vLine.StartCharIndex + vLine.Length;
+
+                int bestCol = 0;
+                float bestDist = float.MaxValue;
+                for (int c = 0; c <= lineText.Length; c++)
+                {
+                    string sub = lineText.Substring(0, c);
+                    float subW = g.MeasureString(sub, notesFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                    float dist = Math.Abs(subW - clickRelX);
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        bestCol = c;
+                    }
+                }
+                return vLine.StartCharIndex + bestCol;
+            }
+        }
+
+        public void EnsureSpeakerNotesCaretVisible()
+        {
+            if (LastNotesTextRect.Width <= 4 || LastNotesTextRect.Height <= 4) return;
+            string notes = (ActiveSlide != null && ActiveSlide.SpeakerNotes != null) ? ActiveSlide.SpeakerNotes : "";
+            using (Font notesFont = new Font("Segoe UI", LastNotesFontSize > 0 ? LastNotesFontSize : 10.0f, FontStyle.Regular))
+            using (D2DGraphics g = new D2DGraphics())
+            {
+                float wrapW = Math.Max(40f, LastNotesTextRect.Width - 6f);
+                List<VisualTextLine> visualLines = GetVisualWrappedLines(g, notes, notesFont, wrapW);
+                float lineHeight = Math.Max(16f, notesFont.Height);
+                int caret = Math.Max(0, Math.Min(SpeakerNotesCaretIndex, notes.Length));
+                int curLineIdx = Math.Max(0, visualLines.Count - 1);
+                for (int i = 0; i < visualLines.Count; i++)
+                {
+                    if (caret <= visualLines[i].StartCharIndex + visualLines[i].Length)
+                    {
+                        curLineIdx = i;
+                        break;
+                    }
+                }
+                float caretTop = curLineIdx * lineHeight;
+                float caretBottom = caretTop + lineHeight;
+                if (caretTop < NotesScrollY)
+                {
+                    NotesScrollY = Math.Max(0, (int)caretTop);
+                }
+                else if (caretBottom > NotesScrollY + LastNotesTextRect.Height - 4)
+                {
+                    NotesScrollY = Math.Max(0, (int)(caretBottom - LastNotesTextRect.Height + 6));
+                }
+            }
+        }
+
+        private static void FillRoundedPill(D2DGraphics g, Brush brush, Rectangle r)
         {
             if (r.Width <= 0 || r.Height <= 0) return;
             int radius = Math.Min(r.Width, r.Height) / 2;
@@ -5501,6 +6381,16 @@ namespace GenOffice.UI
             }
             totalH += 30; // bottom comfort spacing
             return totalH;
+        }
+
+        public int GetMaxThumbScrollY()
+        {
+            if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0) return 0;
+            bool isIslandMode = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+            int paneW = isIslandMode ? 200 : 210;
+            int viewH = (LastThumbViewportHeight > 0) ? LastThumbViewportHeight : Math.Max(100, 500);
+            int totalH = GetTotalThumbContentHeight(paneW);
+            return Math.Max(0, totalH - viewH);
         }
 
         public int GetSlideIndexFromScrollY(int scrollY, int sidebarW = 210)
@@ -5551,9 +6441,11 @@ namespace GenOffice.UI
         {
             if (_isDraggingThumbScrollBar) return;
             if (Presentation == null || Presentation.Slides == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return;
+            bool isIslandMode = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+            int paneW = isIslandMode ? 200 : 210;
             int viewH = (LastThumbViewportHeight > 0) ? LastThumbViewportHeight : 500;
             int thumbX, thumbW, thumbH;
-            GetThumbnailMetrics(210, out thumbX, out thumbW, out thumbH);
+            GetThumbnailMetrics(paneW, out thumbX, out thumbW, out thumbH);
 
             int itemY = 10;
             bool currentCollapsed = false;
@@ -5568,21 +6460,133 @@ namespace GenOffice.UI
                 if (!currentCollapsed) itemY += thumbH + 14;
             }
 
-            if (itemY < ThumbScrollY)
+            int targetY = (int)TargetThumbScrollY;
+            if (itemY < targetY)
             {
-                ThumbScrollY = Math.Max(0, itemY - 10);
+                targetY = Math.Max(0, itemY - 10);
             }
-            else if (itemY + thumbH > ThumbScrollY + viewH)
+            else if (itemY + thumbH > targetY + viewH)
             {
-                ThumbScrollY = itemY + thumbH - viewH + 20;
+                targetY = itemY + thumbH - viewH + 20;
             }
 
-            int totalH = GetTotalThumbContentHeight(210);
-            int maxScroll = Math.Max(0, totalH - viewH);
-            ThumbScrollY = Math.Max(0, Math.Min(maxScroll, ThumbScrollY));
+            int maxScroll = GetMaxThumbScrollY();
+            TargetThumbScrollY = Math.Max(0, Math.Min(maxScroll, targetY));
         }
 
-        private void DrawLeftSlidePane(Graphics g, int sidebarW, int y, int h)
+        public void EnsureSlideVisibleInBottomStrip(int slideIndex, int canvasW = 800)
+        {
+            if (Presentation == null || Presentation.Slides == null || slideIndex < 0 || slideIndex >= Presentation.Slides.Count) return;
+            int trackW = Math.Max(200, canvasW - 16 - 130);
+            int cardW = 96;
+            int itemX = slideIndex * cardW;
+            int targetX = (int)TargetBottomThumbScrollX;
+            if (itemX < targetX)
+            {
+                targetX = Math.Max(0, itemX - 20);
+            }
+            else if (itemX + cardW > targetX + trackW)
+            {
+                targetX = itemX + cardW - trackW + 30;
+            }
+            int totalBottomWidth = Presentation.Slides.Count * cardW + 60;
+            int maxScroll = Math.Max(0, totalBottomWidth - trackW);
+            TargetBottomThumbScrollX = Math.Max(0, Math.Min(maxScroll, targetX));
+        }
+
+        public bool UpdateSmoothScroll()
+        {
+            bool animating = false;
+            float easing = 0.33f; // Snappy, fluid MS Office 365 damping factor
+
+            // 1. Left Thumbnail Pane (ThumbScrollY)
+            int maxThumbScroll = GetMaxThumbScrollY();
+            TargetThumbScrollY = Math.Max(0, Math.Min(maxThumbScroll, TargetThumbScrollY));
+            float diffThumb = TargetThumbScrollY - SmoothThumbScrollY;
+            if (Math.Abs(diffThumb) >= 0.75f)
+            {
+                SmoothThumbScrollY += diffThumb * easing;
+                SmoothThumbScrollY = Math.Max(0, Math.Min(maxThumbScroll, SmoothThumbScrollY));
+                ThumbScrollY = (int)Math.Round(SmoothThumbScrollY);
+                animating = true;
+            }
+            else if (ThumbScrollY != (int)TargetThumbScrollY || Math.Abs(SmoothThumbScrollY - TargetThumbScrollY) > 0.001f)
+            {
+                SmoothThumbScrollY = TargetThumbScrollY;
+                ThumbScrollY = (int)TargetThumbScrollY;
+                animating = true;
+            }
+
+            // 2. Bottom Filmstrip (BottomThumbScrollX)
+            float diffBottom = TargetBottomThumbScrollX - SmoothBottomThumbScrollX;
+            if (Math.Abs(diffBottom) >= 0.75f)
+            {
+                SmoothBottomThumbScrollX += diffBottom * easing;
+                BottomThumbScrollX = (int)Math.Round(SmoothBottomThumbScrollX);
+                animating = true;
+            }
+            else if (BottomThumbScrollX != (int)TargetBottomThumbScrollX || Math.Abs(SmoothBottomThumbScrollX - TargetBottomThumbScrollX) > 0.001f)
+            {
+                SmoothBottomThumbScrollX = TargetBottomThumbScrollX;
+                BottomThumbScrollX = (int)TargetBottomThumbScrollX;
+                animating = true;
+            }
+
+            // 3. Canvas Scroll Y (CanvasScrollY)
+            float diffCanvasY = TargetCanvasScrollY - SmoothCanvasScrollY;
+            if (Math.Abs(diffCanvasY) >= 0.75f)
+            {
+                SmoothCanvasScrollY += diffCanvasY * easing;
+                CanvasScrollY = (int)Math.Round(SmoothCanvasScrollY);
+                animating = true;
+            }
+            else if (CanvasScrollY != (int)TargetCanvasScrollY || Math.Abs(SmoothCanvasScrollY - TargetCanvasScrollY) > 0.001f)
+            {
+                SmoothCanvasScrollY = TargetCanvasScrollY;
+                CanvasScrollY = (int)TargetCanvasScrollY;
+                animating = true;
+            }
+
+            // 4. Canvas Scroll X (CanvasScrollX)
+            float diffCanvasX = TargetCanvasScrollX - SmoothCanvasScrollX;
+            if (Math.Abs(diffCanvasX) >= 0.75f)
+            {
+                SmoothCanvasScrollX += diffCanvasX * easing;
+                CanvasScrollX = (int)Math.Round(SmoothCanvasScrollX);
+                animating = true;
+            }
+            else if (CanvasScrollX != (int)TargetCanvasScrollX || Math.Abs(SmoothCanvasScrollX - TargetCanvasScrollX) > 0.001f)
+            {
+                SmoothCanvasScrollX = TargetCanvasScrollX;
+                CanvasScrollX = (int)TargetCanvasScrollX;
+                animating = true;
+            }
+
+            // 5. Elements Drawer (ElementsScrollY)
+            float diffElem = TargetElementsScrollY - SmoothElementsScrollY;
+            if (Math.Abs(diffElem) >= 0.75f)
+            {
+                SmoothElementsScrollY += diffElem * easing;
+                ElementsScrollY = (int)Math.Round(SmoothElementsScrollY);
+                animating = true;
+            }
+            else if (ElementsScrollY != (int)TargetElementsScrollY || Math.Abs(SmoothElementsScrollY - TargetElementsScrollY) > 0.001f)
+            {
+                SmoothElementsScrollY = TargetElementsScrollY;
+                ElementsScrollY = (int)TargetElementsScrollY;
+                animating = true;
+            }
+
+            // 6. ShapeTaskPane
+            if (ShapeTaskPane != null && ShapeTaskPane.UpdateSmoothScroll())
+            {
+                animating = true;
+            }
+
+            return animating;
+        }
+
+        private void DrawLeftSlidePane(D2DGraphics g, int sidebarW, int y, int h)
         {
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
             int islandMarginX = 10;
@@ -5721,53 +6725,12 @@ namespace GenOffice.UI
                         // Thumbnail slide canvas
                         g.FillRectangle((i == ActiveSlideIndex) ? Brushes.White : Brushes.WhiteSmoke, frameRect);
 
-                        // Mini shape rendering chuẩn 100% như slide chính (2x supersampling downscaled for pixel-perfect typography)
-                        if (s.ThumbnailCache == null || s.IsThumbnailDirty || s.ThumbnailCache.Width != thumbW || s.ThumbnailCache.Height != thumbH)
+                        // Mini shape rendering chuẩn 100% như slide chính
+                        EnsureSlideThumbnail(s);
+                        if (s.ThumbnailCache != null)
                         {
-                            if (s.ThumbnailCache != null)
-                            {
-                                s.ThumbnailCache.Dispose();
-                                s.ThumbnailCache = null;
-                            }
-
-                            int renderW = thumbW * 2;
-                            int renderH = thumbH * 2;
-                            float canvasW = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
-                            float renderScale = (float)renderW / canvasW;
-
-                            using (Bitmap hiresBmp = new Bitmap(renderW, renderH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
-                            {
-                                using (Graphics bg = Graphics.FromImage(hiresBmp))
-                                {
-                                    bg.SmoothingMode = SmoothingMode.AntiAlias;
-                                    bg.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    bg.PixelOffsetMode = PixelOffsetMode.Half;
-                                    bg.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-                                    Rectangle miniFrame = new Rectangle(0, 0, renderW, renderH);
-                                    DrawSlideBackground(bg, miniFrame, s);
-
-                                    foreach (ShapeNode shape in s.Shapes)
-                                    {
-                                        if (shape == null || !shape.IsVisible || (shape.Name != null && shape.Name.StartsWith("__morph_ghost__"))) continue;
-                                        DrawShape(bg, 0, 0, renderScale, shape, false);
-                                    }
-                                }
-
-                                Bitmap bmp = new Bitmap(thumbW, thumbH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                                using (Graphics fg = Graphics.FromImage(bmp))
-                                {
-                                    fg.SmoothingMode = SmoothingMode.AntiAlias;
-                                    fg.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    fg.PixelOffsetMode = PixelOffsetMode.Half;
-                                    fg.DrawImage(hiresBmp, new Rectangle(0, 0, thumbW, thumbH));
-                                }
-                                s.ThumbnailCache = bmp;
-                                s.IsThumbnailDirty = false;
-                            }
+                            g.DrawImage(s.ThumbnailCache, frameRect);
                         }
-
-                        g.DrawImage(s.ThumbnailCache, frameRect);
 
                         // Active PowerPoint Orange Border (drawn ON TOP to frame content cleanly)
                         Color frameCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
@@ -5854,7 +6817,7 @@ namespace GenOffice.UI
             int trackY = viewTop + 2;
             int trackW = 7;
             int trackH = Math.Max(10, viewH - 4);
-            int maxScroll = Math.Max(0, totalContentH - viewH);
+            int maxScroll = GetMaxThumbScrollY();
 
             if (maxScroll > 0)
             {
@@ -5964,7 +6927,7 @@ namespace GenOffice.UI
             return false;
         }
 
-        private void DrawRightSidebarPanel(Graphics g, int x, int y, int w, int h)
+        private void DrawRightSidebarPanel(D2DGraphics g, int x, int y, int w, int h)
         {
             if (!IsSidebarOpen) return;
 
@@ -6043,7 +7006,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawSelectionPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawSelectionPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             if (ActiveSlide == null) return;
 
@@ -6114,7 +7077,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawEyeVisibilityIcon(Graphics g, int x, int y, bool isVisible)
+        private void DrawEyeVisibilityIcon(D2DGraphics g, int x, int y, bool isVisible)
         {
             using (Pen p = new Pen(isVisible ? Color.FromArgb(51, 65, 85) : Color.FromArgb(148, 163, 184), 1.3f))
             {
@@ -6134,7 +7097,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawAnimationPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawAnimationPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             // Play / Stop preview button
             Rectangle btnPlay = new Rectangle(x + 10, panelY, w - 20, 26);
@@ -6365,7 +7328,7 @@ namespace GenOffice.UI
             menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
         }
 
-        private void DrawTransitionsPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawTransitionsPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             g.DrawString("✨ HIỆU ỨNG CHUYỂN TRANG", titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
@@ -6373,7 +7336,7 @@ namespace GenOffice.UI
             Rectangle btnPreview = new Rectangle(x + 10, panelY, w - 20, 26);
             g.FillRectangle(Brushes.AliceBlue, btnPreview);
             g.DrawRectangle(Pens.DodgerBlue, btnPreview);
-            g.DrawString("⭐ Xem trước hiệu ứng (Preview)", boldFont, Brushes.Navy, btnPreview.X + 16, btnPreview.Y + 5);
+            g.DrawString("⭐ Xem trước hiệu ứng", boldFont, Brushes.Navy, btnPreview.X + 16, btnPreview.Y + 5);
             panelY += 34;
 
             string[] topTransitions = new string[] {
@@ -6402,7 +7365,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawFormatPropertiesPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawFormatPropertiesPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             g.DrawString("🎨 ĐỊNH DẠNG NỀN & HÌNH VẼ", titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
@@ -6459,7 +7422,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawNavigatorPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawNavigatorPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             g.DrawString("🌳 CÂY ĐỐI TƯỢNG SLIDE", titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
@@ -6485,7 +7448,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawFormatBackgroundPaneContent(Graphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        private void DrawFormatBackgroundPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
             SlideNode slide = ActiveSlide;
             if (slide == null) return;
@@ -6987,7 +7950,7 @@ namespace GenOffice.UI
             menu.Show(screenPos);
         }
 
-        private void DrawCustomRadioButton(Graphics g, int x, int y, bool isChecked, string text, Font font)
+        private void DrawCustomRadioButton(D2DGraphics g, int x, int y, bool isChecked, string text, Font font)
         {
             Rectangle circle = new Rectangle(x, y + 2, 13, 13);
             using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
@@ -7004,7 +7967,7 @@ namespace GenOffice.UI
             g.DrawString(text, font, Brushes.Black, x + 18, y);
         }
 
-        private void DrawCustomCheckBox(Graphics g, int x, int y, bool isChecked, string text, Font font)
+        private void DrawCustomCheckBox(D2DGraphics g, int x, int y, bool isChecked, string text, Font font)
         {
             Rectangle box = new Rectangle(x, y + 2, 13, 13);
             using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
@@ -7024,7 +7987,7 @@ namespace GenOffice.UI
             g.DrawString(text, font, Brushes.Black, x + 18, y);
         }
 
-        private void DrawPaintBucketVector(Graphics g, int x, int y, Color col)
+        private void DrawPaintBucketVector(D2DGraphics g, int x, int y, Color col)
         {
             using (Pen p = new Pen(Color.FromArgb(60, 60, 60), 1.3f))
             using (SolidBrush b = new SolidBrush(col))
@@ -7042,7 +8005,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawInteractiveButton(Graphics g, Rectangle r, bool isHovered, int radius = 3)
+        private void DrawInteractiveButton(D2DGraphics g, Rectangle r, bool isHovered, int radius = 3)
         {
             using (SolidBrush bg = new SolidBrush(isHovered ? Color.FromArgb(241, 245, 249) : Color.FromArgb(248, 250, 252)))
             using (Pen borderPen = new Pen(isHovered ? Color.FromArgb(148, 163, 184) : Color.FromArgb(203, 213, 225), 1.0f))
@@ -7052,7 +8015,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawFormatBgIconVector(Graphics g, int x, int y, Color color)
+        private void DrawFormatBgIconVector(D2DGraphics g, int x, int y, Color color)
         {
             using (Pen p = new Pen(color, 1.3f))
             using (SolidBrush b = new SolidBrush(color))
@@ -7078,14 +8041,14 @@ namespace GenOffice.UI
             float sw = shape.Transform.Width;
             float sh = shape.Transform.Height;
 
-            const float SNAP_THRESHOLD = 12.0f; // Soft, natural magnetic snap threshold for shapes & center
-            const float SLIDE_EDGE_THRESHOLD = 16.0f; // Magnetic snap threshold for slide edges & corners
+            const float SNAP_THRESHOLD = 5.0f; // Crisp, non-intrusive magnetic snap threshold for shapes & center
+            const float SLIDE_EDGE_THRESHOLD = 8.0f; // Magnetic snap threshold for slide edges & corners
 
-            float bestDistX = SNAP_THRESHOLD;
+            float bestDistX = SLIDE_EDGE_THRESHOLD;
             float bestSnapX = rawX;
             SmartGuideLine bestGuideX = null;
 
-            float bestDistY = SNAP_THRESHOLD;
+            float bestDistY = SLIDE_EDGE_THRESHOLD;
             float bestSnapY = rawY;
             SmartGuideLine bestGuideY = null;
 
@@ -7468,7 +8431,7 @@ namespace GenOffice.UI
             if (bestGuideY != null) ActiveSmartGuides.Add(bestGuideY);
         }
 
-        private void DrawSmartGuidesAndSpacingIndicators(Graphics g, int slideX, int slideY, float scale)
+        private void DrawSmartGuidesAndSpacingIndicators(D2DGraphics g, int slideX, int slideY, float scale)
         {
             // 1. Draw Smart Alignment Guide Lines
             if (ActiveSmartGuides != null && ActiveSmartGuides.Count > 0)
@@ -7534,7 +8497,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawHorizontalSpacingArrow(Graphics g, Pen p, SolidBrush b, float x1, float x2, float y)
+        private void DrawHorizontalSpacingArrow(D2DGraphics g, Pen p, SolidBrush b, float x1, float x2, float y)
         {
             if (x2 <= x1 + 2) return;
             g.DrawLine(p, x1, y - 5, x1, y + 5);
@@ -7548,7 +8511,7 @@ namespace GenOffice.UI
             g.FillPolygon(b, rightArrow);
         }
 
-        private void DrawVerticalSpacingArrow(Graphics g, Pen p, SolidBrush b, float x, float y1, float y2)
+        private void DrawVerticalSpacingArrow(D2DGraphics g, Pen p, SolidBrush b, float x, float y1, float y2)
         {
             if (y2 <= y1 + 2) return;
             g.DrawLine(p, x - 5, y1, x + 5, y1);
@@ -7562,7 +8525,7 @@ namespace GenOffice.UI
             g.FillPolygon(b, bottomArrow);
         }
 
-        private void DrawGridlines(Graphics g, Rectangle slideRect, float scale)
+        private void DrawGridlines(D2DGraphics g, Rectangle slideRect, float scale)
         {
             if (!ShowGrid || slideRect.Width <= 0 || slideRect.Height <= 0) return;
             float gridStep = 40.0f * scale;
@@ -7581,7 +8544,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawGuides(Graphics g, Rectangle slideRect)
+        private void DrawGuides(D2DGraphics g, Rectangle slideRect)
         {
             if (!ShowMouseGuides || slideRect.Width <= 0 || slideRect.Height <= 0) return;
 
@@ -7595,7 +8558,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawSlideRulers(Graphics g, int x, int y, int w, int h, int slideX, int slideY, int slideW, int slideH, float scale)
+        private void DrawSlideRulers(D2DGraphics g, int x, int y, int w, int h, int slideX, int slideY, int slideW, int slideH, float scale)
         {
             using (SolidBrush rBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
             using (Pen rBorder = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
@@ -7760,6 +8723,9 @@ namespace GenOffice.UI
             activeAnimProgress = 0f;
 
             if (shape == null || slide == null || slide.Animations == null || slide.Animations.Count == 0) return;
+
+            // Video và Audio luôn hiển thị khung hình / biểu tượng cái loa ngay từ đầu, không bị ẩn bởi hiệu ứng Entrance
+            if (shape.Type == ShapeType.Video || shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.VideoPath) || !string.IsNullOrEmpty(shape.AudioPath)) return;
 
             // Trong chế độ soạn thảo bình thường (khi không xem trước và không trình chiếu), luôn hiển thị mọi vật phẩm
             if (!isPresenting && !isPlayingPreview) return;
@@ -8504,7 +9470,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawMotionPathsOverlay(Graphics g, float slideX, float slideY, float scale, SlideNode slide)
+        private void DrawMotionPathsOverlay(D2DGraphics g, float slideX, float slideY, float scale, SlideNode slide)
         {
             if (slide == null || slide.Shapes == null) return;
             if (IsPresenting || IsPlayingAnimationPreview) return; // In design mode only
@@ -8672,7 +9638,7 @@ namespace GenOffice.UI
             return Color.FromArgb(alpha, r, g, b);
         }
 
-        public void DrawSlideBackground(Graphics g, RectangleF rect, SlideNode slide)
+        public void DrawSlideBackground(D2DGraphics g, RectangleF rect, SlideNode slide)
         {
             if (rect.Width <= 0.001f || rect.Height <= 0.001f || slide == null) return;
 
@@ -8688,7 +9654,7 @@ namespace GenOffice.UI
                     {
                         ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
                         PointF[] pts = new PointF[] { new PointF(rect.X, rect.Y), new PointF(rect.Right, rect.Y), new PointF(rect.X, rect.Bottom) };
-                        g.DrawImage(slide.CachedBgImage, pts, new RectangleF(0, 0, slide.CachedBgImage.Width, slide.CachedBgImage.Height), GraphicsUnit.Pixel, ia);
+                        g.DrawImage(slide.CachedBgImage, pts, new RectangleF(0, 0, slide.CachedBgImage.Width, slide.CachedBgImage.Height), GraphicsUnit.Pixel, ia, 1.0f - slide.BgTransparency);
                     }
                 }
                 else
@@ -8782,7 +9748,7 @@ namespace GenOffice.UI
             }
         }
 
-        public void DrawSlideBackground(Graphics g, Rectangle rect, SlideNode slide)
+        public void DrawSlideBackground(D2DGraphics g, Rectangle rect, SlideNode slide)
         {
             DrawSlideBackground(g, new RectangleF(rect.X, rect.Y, rect.Width, rect.Height), slide);
         }
@@ -8802,7 +9768,7 @@ namespace GenOffice.UI
             TablePreviewRows = 0;
         }
 
-        private void DrawTableInsertPreviewOverlay(Graphics g, float slideX, float slideY, float scale)
+        private void DrawTableInsertPreviewOverlay(D2DGraphics g, float slideX, float slideY, float scale)
         {
             if (TablePreviewCols <= 0 || TablePreviewRows <= 0 || Presentation == null) return;
 
@@ -8915,7 +9881,7 @@ namespace GenOffice.UI
             if (shape.TableCellTextColors != null) shape.TableCellTextColors.Clear();
         }
 
-        private void DrawTableShape(Graphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
+        private void DrawTableShape(D2DGraphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
         {
             int cols = Math.Max(1, shape.TableColumns);
             int rows = Math.Max(1, shape.TableRows);
@@ -9536,7 +10502,7 @@ namespace GenOffice.UI
             return resultBmp;
         }
 
-        public static void DrawLaserScanBeam(Graphics g, float baseW, float baseH, float beamY, float scale)
+        public static void DrawLaserScanBeam(D2DGraphics g, float baseW, float baseH, float beamY, float scale)
         {
             float glowH = Math.Max(28f, 48f * scale);
             RectangleF glowRect = new RectangleF(0, beamY - glowH, baseW, glowH * 2);
@@ -9590,7 +10556,7 @@ namespace GenOffice.UI
             }
         }
 
-        public static void DrawColorPickLoupe(Graphics g, PointF canvasMousePos, Color pickedColor)
+        public static void DrawColorPickLoupe(D2DGraphics g, PointF canvasMousePos, Color pickedColor)
         {
             float lx = canvasMousePos.X + 20;
             float ly = canvasMousePos.Y - 20;
@@ -10443,14 +11409,18 @@ namespace GenOffice.UI
         }
         #endregion
 
-        private void DrawVideoShape(Graphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
+        private void DrawVideoShape(D2DGraphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
         {
             RectangleF vRect = new RectangleF(0, 0, baseW, baseH);
             if (vRect.Width <= 2 || vRect.Height <= 2) return;
 
-            // 1. Poster Frame Image or Rich Dark Video Canvas
+            // 1. Poster Frame Image or Live WMF Decoded Video Frame
             Image poster = null;
-            if (!string.IsNullOrEmpty(shape.VideoPosterFramePath) && System.IO.File.Exists(shape.VideoPosterFramePath))
+            if (shape.IsVideoPlaying && shape.CachedImage != null)
+            {
+                poster = shape.CachedImage;
+            }
+            if (poster == null && !string.IsNullOrEmpty(shape.VideoPosterFramePath) && System.IO.File.Exists(shape.VideoPosterFramePath))
             {
                 try { poster = Image.FromFile(shape.VideoPosterFramePath); } catch { }
             }
@@ -10469,19 +11439,34 @@ namespace GenOffice.UI
             }
 
             // Create Path based on VideoStyleIndex & CropShapeType
-            GraphicsPath vPath = new GraphicsPath();
+            GraphicsPath vPath = null;
             int styleIdx = shape.VideoStyleIndex;
 
-            if (styleIdx == 7) // Oval
+            if (shape.CustomPath != null && shape.PathWidth > 0 && shape.PathHeight > 0)
             {
+                using (Matrix m = new Matrix())
+                {
+                    m.Scale(baseW / shape.PathWidth, baseH / shape.PathHeight);
+                    vPath = (GraphicsPath)shape.CustomPath.Clone();
+                    vPath.Transform(m);
+                }
+            }
+            else if (!string.IsNullOrEmpty(shape.CropShapeType) && shape.CropShapeType != "Rectangle")
+            {
+                vPath = CreateCropShapePath(shape.CropShapeType, 0, 0, baseW, baseH);
+            }
+            else if (styleIdx == 7) // Oval
+            {
+                vPath = new GraphicsPath();
                 vPath.AddEllipse(vRect);
             }
             else if (styleIdx == 2 || styleIdx == 8) // Rounded
             {
-                vPath.AddPath(CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(12 * scale + 4)), false);
+                vPath = CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(12 * scale + 4));
             }
             else
             {
+                vPath = new GraphicsPath();
                 vPath.AddRectangle(vRect);
             }
 
@@ -10500,7 +11485,43 @@ namespace GenOffice.UI
             if (poster != null)
             {
                 // In PowerPoint: clean poster frame without any obstructive center play button
-                g.DrawImage(poster, vRect);
+                if (shape.SoftEdgeRadius > 0.01f || shape.BlurRadius > 0.01f)
+                {
+                    int bw = Math.Max(1, (int)Math.Ceiling(baseW));
+                    int bh = Math.Max(1, (int)Math.Ceiling(baseH));
+                    float softPx = shape.SoftEdgeRadius * (96.0f / 72.0f) * scale;
+                    float blurPx = shape.BlurRadius * (96.0f / 72.0f) * scale;
+
+                    if (shape.CachedFeatheredBmp != null && shape.CachedFeatherW == bw && shape.CachedFeatherH == bh &&
+                        Math.Abs(shape.CachedSoftPx - softPx) < 0.05f && Math.Abs(shape.CachedBlurPx - blurPx) < 0.05f)
+                    {
+                        g.DrawImage(shape.CachedFeatheredBmp, 0, 0, 1.0f);
+                    }
+                    else
+                    {
+                        shape.InvalidateFeatherCache();
+                        using (Bitmap tmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                        {
+                            using (Graphics tg = Graphics.FromImage(tmp))
+                            {
+                                tg.SmoothingMode = SmoothingMode.AntiAlias;
+                                tg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                tg.DrawImage(poster, new RectangleF(0, 0, bw, bh));
+                            }
+                            Bitmap feathered = ApplySoftEdgeAndBlur(tmp, softPx, blurPx);
+                            shape.CachedFeatheredBmp = feathered;
+                            shape.CachedFeatherW = bw;
+                            shape.CachedFeatherH = bh;
+                            shape.CachedSoftPx = softPx;
+                            shape.CachedBlurPx = blurPx;
+                            g.DrawImage(feathered, 0, 0, 1.0f);
+                        }
+                    }
+                }
+                else
+                {
+                    g.DrawImage(poster, vRect);
+                }
             }
             else
             {
@@ -10601,121 +11622,566 @@ namespace GenOffice.UI
             }
 
             vPath.Dispose();
+        }
 
-            // 3. PowerPoint On-Canvas Video Playback Bar Overlay (At Bottom)
-            // IN POWERPOINT: Only visible when the video shape is selected in edit mode!
-            if (!IsPresenting && isSelected && baseH > 80 * scale)
+        private void DrawVideoFloatingPlaybackBar(D2DGraphics g, float shapeX, float shapeY, float shapeW, float shapeH, ShapeNode shape, float scale)
+        {
+            float barW = Math.Max(180f, Math.Min(360f, shapeW - 16f));
+            float barH = Math.Max(28f, 32f);
+            float barX = shapeX + (shapeW - barW) / 2f;
+            float barY = shapeY + shapeH - barH - 8f;
+
+            if (barX < shapeX + 4f) barX = shapeX + 4f;
+            if (barX + barW > shapeX + shapeW - 4f) barW = shapeX + shapeW - 4f - barX;
+            if (barW < 120f) return;
+
+            RectangleF barRect = new RectangleF(barX, barY, barW, barH);
+            LastVideoPlaybackBarBounds = barRect;
+
+            // 1. Soft Drop Shadow
+            using (GraphicsPath sPath = CreateRoundedRectPath(new RectangleF(barX + 1.5f, barY + 2f, barW, barH), 6f))
+            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
             {
-                float barH = Math.Max(26f, 34f * scale);
-                float barY = baseH - barH;
-                RectangleF barRect = new RectangleF(0, barY, baseW, barH);
+                g.FillPath(shadowB, sPath);
+            }
 
-                using (SolidBrush barBg = new SolidBrush(Color.FromArgb(200, 15, 23, 42)))
+            // 2. High contrast translucent dark glass (PowerPoint style)
+            using (GraphicsPath pillPath = CreateRoundedRectPath(barRect, 6f))
+            using (SolidBrush barBg = new SolidBrush(Color.FromArgb(230, 15, 23, 42)))
+            using (Pen borderPen = new Pen(Color.FromArgb(120, 71, 85, 105), 1.0f))
+            {
+                g.FillPath(barBg, pillPath);
+                g.DrawPath(borderPen, pillPath);
+            }
+
+            // 3. Play / Pause Button (Left: barX + 6, size 22x22)
+            float playBtnX = barX + 6f;
+            float playBtnY = barY + (barH - 22f) / 2f;
+            float playBtnSz = 22f;
+            bool isPlayHover = (HoveredVideoButton == 0);
+            if (isPlayHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(50, 255, 255, 255)))
                 {
-                    g.FillRectangle(barBg, barRect);
+                    g.FillEllipse(hBrush, playBtnX, playBtnY, playBtnSz, playBtnSz);
                 }
+            }
 
-                // Play / Pause Icon on Left
-                float btnSz = barH * 0.55f;
-                float btnX = 10 * scale;
-                float btnY = barY + (barH - btnSz) / 2f;
-                using (SolidBrush pb = new SolidBrush(Color.FromArgb(56, 189, 248)))
+            using (SolidBrush iconBrush = new SolidBrush(isPlayHover ? Color.FromArgb(56, 189, 248) : Color.White))
+            {
+                if (shape.IsVideoPlaying)
                 {
-                    if (shape.IsVideoPlaying)
+                    float barThickness = 3f;
+                    float barHeight = 10f;
+                    float topY = playBtnY + (playBtnSz - barHeight) / 2f;
+                    g.FillRectangle(iconBrush, playBtnX + 6f, topY, barThickness, barHeight);
+                    g.FillRectangle(iconBrush, playBtnX + 13f, topY, barThickness, barHeight);
+                }
+                else
+                {
+                    PointF[] tri = new PointF[] {
+                        new PointF(playBtnX + 7f, playBtnY + 5f),
+                        new PointF(playBtnX + 17f, playBtnY + 11f),
+                        new PointF(playBtnX + 7f, playBtnY + 17f)
+                    };
+                    g.FillPolygon(iconBrush, tri);
+                }
+            }
+
+            // 4. Volume Button (Right: barX + barW - 28, size 22x22)
+            float volBtnX = barX + barW - 28f;
+            float volBtnY = barY + (barH - 22f) / 2f;
+            float volBtnSz = 22f;
+            bool isVolHover = (HoveredVideoButton == 2);
+            if (isVolHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(50, 255, 255, 255)))
+                {
+                    g.FillEllipse(hBrush, volBtnX, volBtnY, volBtnSz, volBtnSz);
+                }
+            }
+
+            bool isMuted = (shape.VideoVolume == VideoVolumeLevel.Mute);
+            using (Pen spkPen = new Pen(isVolHover ? Color.FromArgb(56, 189, 248) : Color.FromArgb(203, 213, 225), 1.5f))
+            using (SolidBrush spkBrush = new SolidBrush(isVolHover ? Color.FromArgb(56, 189, 248) : Color.FromArgb(203, 213, 225)))
+            {
+                float midX = volBtnX + 8f;
+                float midY = volBtnY + 11f;
+                PointF[] horn = new PointF[] {
+                    new PointF(midX - 4f, midY - 3f),
+                    new PointF(midX - 1f, midY - 3f),
+                    new PointF(midX + 3f, midY - 6f),
+                    new PointF(midX + 3f, midY + 6f),
+                    new PointF(midX - 1f, midY + 3f),
+                    new PointF(midX - 4f, midY + 3f)
+                };
+                g.FillPolygon(spkBrush, horn);
+
+                if (isMuted)
+                {
+                    using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.6f))
                     {
-                        // Draw Pause Icon
-                        float w = btnSz * 0.3f;
-                        g.FillRectangle(pb, btnX + btnSz * 0.1f, btnY, w, btnSz);
-                        g.FillRectangle(pb, btnX + btnSz * 0.6f, btnY, w, btnSz);
+                        g.DrawLine(redPen, midX + 4f, midY - 4f, midX + 9f, midY + 4f);
                     }
-                    else
+                }
+                else
+                {
+                    g.DrawArc(spkPen, midX + 1f, midY - 4f, 8f, 8f, -45, 90);
+                }
+            }
+
+            // 5. Time Text (Bounded strictly so it NEVER overflows into black screen)
+            float timeTextW = (barW > 240f) ? 76f : 0f;
+            float timeTextX = volBtnX - timeTextW - 4f;
+            if (timeTextW > 0)
+            {
+                int curM = (int)(shape.VideoCurrentTime / 60);
+                int curS = (int)(shape.VideoCurrentTime % 60);
+                int totM = (int)(shape.VideoTotalTime / 60);
+                int totS = (int)(shape.VideoTotalTime % 60);
+                string timeStr = string.Format("{0:D2}:{1:D2}/{2:D2}:{3:D2}", curM, curS, totM, totS);
+
+                using (Font tFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (SolidBrush tBrush = new SolidBrush(Color.FromArgb(203, 213, 225)))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter })
+                {
+                    RectangleF timeRect = new RectangleF(timeTextX, barY, timeTextW, barH);
+                    g.DrawString(timeStr, tFont, tBrush, timeRect, sf);
+                }
+            }
+
+            // 6. Timeline Scrubber Track
+            float scrubX = playBtnX + playBtnSz + 8f;
+            float scrubRight = (timeTextW > 0) ? timeTextX - 8f : volBtnX - 8f;
+            float scrubW = Math.Max(20f, scrubRight - scrubX);
+            float scrubH = 4f;
+            float scrubY = barY + (barH - scrubH) / 2f;
+
+            using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                g.FillRectangle(trackBg, scrubX, scrubY, scrubW, scrubH);
+            }
+
+            float playedFrac = (shape.VideoTotalTime > 0) ? Math.Max(0f, Math.Min(1f, shape.VideoCurrentTime / shape.VideoTotalTime)) : 0f;
+            using (SolidBrush progB = new SolidBrush(Color.FromArgb(56, 189, 248)))
+            {
+                g.FillRectangle(progB, scrubX, scrubY, scrubW * playedFrac, scrubH);
+            }
+
+            // Bookmark pips (Yellow)
+            if (shape.VideoBookmarks != null && shape.VideoBookmarks.Count > 0 && shape.VideoTotalTime > 0)
+            {
+                using (SolidBrush bmB = new SolidBrush(Color.FromArgb(250, 204, 21)))
+                {
+                    foreach (float bmSec in shape.VideoBookmarks)
                     {
-                        // Draw Play Icon
-                        PointF[] playP = new PointF[] {
-                            new PointF(btnX, btnY),
-                            new PointF(btnX + btnSz, btnY + btnSz / 2f),
-                            new PointF(btnX, btnY + btnSz)
-                        };
-                        g.FillPolygon(pb, playP);
-                    }
-                }
-
-                // Timeline Track
-                float timeX = btnX + btnSz + 12 * scale;
-                float timeW = Math.Max(40f, baseW - timeX - (baseW > 240 ? 110 * scale : 45 * scale));
-                float timeY = barY + barH / 2f - 2.5f * scale;
-                float trackH = Math.Max(3f, 5f * scale);
-
-                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                {
-                    g.FillRectangle(trackBg, timeX, timeY, timeW, trackH);
-                }
-
-                // Played Progress Bar (0% default preview)
-                float playedFrac = shape.VideoTotalTime > 0 ? (shape.VideoCurrentTime / shape.VideoTotalTime) : 0f;
-                using (SolidBrush progB = new SolidBrush(Color.FromArgb(239, 68, 68)))
-                {
-                    g.FillRectangle(progB, timeX, timeY, timeW * playedFrac, trackH);
-                }
-
-                // Scrubber Knob
-                float scrubX = timeX + timeW * playedFrac;
-                float scrubR = Math.Max(4f, 6f * scale);
-                using (SolidBrush scrubB = new SolidBrush(Color.White))
-                using (Pen scrubPen = new Pen(Color.FromArgb(239, 68, 68), 1.5f))
-                {
-                    g.FillEllipse(scrubB, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
-                    g.DrawEllipse(scrubPen, scrubX - scrubR, timeY + trackH / 2f - scrubR, scrubR * 2, scrubR * 2);
-                }
-
-                // Yellow Bookmark Indicator Pips on timeline
-                if (shape.VideoBookmarks != null && shape.VideoBookmarks.Count > 0)
-                {
-                    using (SolidBrush bmB = new SolidBrush(Color.FromArgb(250, 204, 21)))
-                    using (Pen bmP = new Pen(Color.FromArgb(161, 98, 7), 1f))
-                    {
-                        foreach (float bSec in shape.VideoBookmarks)
+                        float bFrac = bmSec / shape.VideoTotalTime;
+                        if (bFrac >= 0f && bFrac <= 1f)
                         {
-                            float bFrac = Math.Max(0.05f, Math.Min(0.95f, bSec / 120f));
-                            float bx = timeX + timeW * bFrac;
-                            g.FillRectangle(bmB, bx - 2f, timeY - 3f * scale, 4f, trackH + 6f * scale);
-                            g.DrawRectangle(bmP, bx - 2f, timeY - 3f * scale, 4f, trackH + 6f * scale);
+                            float bx = scrubX + scrubW * bFrac;
+                            g.FillRectangle(bmB, bx - 1.5f, scrubY - 2f, 3f, scrubH + 4f);
+                        }
+                    }
+                }
+            }
+
+            // Scrubber Knob
+            float knobX = scrubX + scrubW * playedFrac;
+            float knobR = (HoveredVideoButton == 1 || IsDraggingVideoScrubber) ? 6f : 4.5f;
+            using (SolidBrush knobB = new SolidBrush(Color.White))
+            using (Pen knobPen = new Pen(Color.FromArgb(56, 189, 248), 1.5f))
+            {
+                g.FillEllipse(knobB, knobX - knobR, scrubY + scrubH / 2f - knobR, knobR * 2, knobR * 2);
+                g.DrawEllipse(knobPen, knobX - knobR, scrubY + scrubH / 2f - knobR, knobR * 2, knobR * 2);
+            }
+        }
+
+        private void DrawAudioShape(D2DGraphics g, float baseW, float baseH, ShapeNode shape, bool isSelected, int alpha, float scale)
+        {
+            RectangleF aRect = new RectangleF(0, 0, baseW, baseH);
+            if (aRect.Width <= 2 || aRect.Height <= 2) return;
+
+            // Microsoft PowerPoint Authentic Audio Shape:
+            // Pure Vector 3D Metallic Silver Speaker with Alpha Channel (100% transparent background, no card/badge).
+            
+            float padX = baseW * 0.08f;
+            float padY = baseH * 0.08f;
+            float drawW = baseW - padX * 2f;
+            float drawH = baseH - padY * 2f;
+
+            // 1. Magnet Driver Housing (Left Body)
+            float bodyX = padX;
+            float bodyW = drawW * 0.28f;
+            float bodyH = drawH * 0.44f;
+            float bodyY = padY + (drawH - bodyH) / 2f;
+
+            // 2. Conical Flared Horn (Middle)
+            float hornStartX = bodyX + bodyW;
+            float hornStartY = bodyY;
+            float hornEndY = bodyY + bodyH;
+            float hornEndX = bodyX + drawW * 0.58f;
+            float hornTopY = padY + drawH * 0.12f;
+            float hornBottomY = padY + drawH * 0.88f;
+
+            // Soft Drop Shadow behind speaker body & horn
+            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+            {
+                float shOff = Math.Max(1.5f, 2.0f * scale);
+                g.FillRectangle(shadowB, bodyX + shOff, bodyY + shOff, bodyW, bodyH);
+                PointF[] shadowCone = new PointF[] {
+                    new PointF(hornStartX + shOff, hornStartY + shOff),
+                    new PointF(hornEndX + shOff, hornTopY + shOff),
+                    new PointF(hornEndX + shOff, hornBottomY + shOff),
+                    new PointF(hornStartX + shOff, hornEndY + shOff)
+                };
+                g.FillPolygon(shadowB, shadowCone);
+            }
+
+            // Draw Metallic Magnet Body
+            RectangleF bodyRect = new RectangleF(bodyX, bodyY, bodyW, bodyH);
+            using (LinearGradientBrush bodyGrad = new LinearGradientBrush(bodyRect, Color.FromArgb(235, 238, 242), Color.FromArgb(148, 163, 184), 90f))
+            using (Pen bodyPen = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
+            {
+                using (GraphicsPath bp = CreateRoundedRectPath(bodyRect, 2f))
+                {
+                    g.FillPath(bodyGrad, bp);
+                    g.DrawPath(bodyPen, bp);
+                }
+            }
+
+            // Draw Conical Flared Horn
+            PointF[] hornCone = new PointF[] {
+                new PointF(hornStartX, hornStartY),
+                new PointF(hornEndX, hornTopY),
+                new PointF(hornEndX, hornBottomY),
+                new PointF(hornStartX, hornEndY)
+            };
+            RectangleF hornBounds = new RectangleF(hornStartX, hornTopY, hornEndX - hornStartX, hornBottomY - hornTopY);
+            using (LinearGradientBrush hornGrad = new LinearGradientBrush(hornBounds, Color.FromArgb(248, 250, 252), Color.FromArgb(100, 116, 139), 60f))
+            using (Pen hornPen = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+            {
+                g.FillPolygon(hornGrad, hornCone);
+                g.DrawPolygon(hornPen, hornCone);
+            }
+
+            // Horn Opening Acoustic Rim (Elliptical metallic bell opening)
+            float rimW = Math.Max(4f, drawW * 0.12f);
+            RectangleF rimRect = new RectangleF(hornEndX - rimW / 2f, hornTopY, rimW, hornBottomY - hornTopY);
+            using (LinearGradientBrush rimGrad = new LinearGradientBrush(rimRect, Color.FromArgb(71, 85, 105), Color.FromArgb(30, 41, 59), 90f))
+            using (Pen rimPen = new Pen(Color.FromArgb(51, 65, 85), 1.2f))
+            {
+                g.FillEllipse(rimGrad, rimRect);
+                g.DrawEllipse(rimPen, rimRect);
+            }
+
+            // 3. Concentric Sound Wave Arcs (Alpha Channel, crisp vector lines)
+            float arcOriginX = hornEndX - rimW * 0.2f;
+            float arcCenterY = padY + drawH / 2f;
+            float arcSpanX = drawW - (arcOriginX - padX);
+
+            Color waveCol = shape.IsAudioPlaying ? Color.FromArgb(37, 99, 235) : Color.FromArgb(100, 116, 139);
+            float wPenBase = Math.Max(1.8f, 2.2f * scale);
+
+            using (Pen wPen1 = new Pen(waveCol, wPenBase))
+            using (Pen wPen2 = new Pen(waveCol, wPenBase + 0.3f))
+            using (Pen wPen3 = new Pen(waveCol, wPenBase + 0.6f))
+            {
+                wPen1.StartCap = LineCap.Round; wPen1.EndCap = LineCap.Round;
+                wPen2.StartCap = LineCap.Round; wPen2.EndCap = LineCap.Round;
+                wPen3.StartCap = LineCap.Round; wPen3.EndCap = LineCap.Round;
+
+                // Wave 1 (inner)
+                float r1 = arcSpanX * 0.36f;
+                g.DrawArc(wPen1, arcOriginX - r1 * 0.2f, arcCenterY - r1, r1 * 2f, r1 * 2f, -44, 88);
+
+                // Wave 2 (middle)
+                float r2 = arcSpanX * 0.65f;
+                g.DrawArc(wPen2, arcOriginX - r2 * 0.2f, arcCenterY - r2, r2 * 2f, r2 * 2f, -46, 92);
+
+                // Wave 3 (outer)
+                float r3 = arcSpanX * 0.95f;
+                g.DrawArc(wPen3, arcOriginX - r3 * 0.2f, arcCenterY - r3, r3 * 2f, r3 * 2f, -48, 96);
+            }
+        }
+
+        private void DrawAudioFloatingPlaybackBar(D2DGraphics g, float shapeX, float shapeY, float shapeW, float shapeH, ShapeNode shape)
+        {
+            float barW = 340f;
+            float barH = 32f;
+            float barX = shapeX + (shapeW - barW) / 2f;
+            float barY = shapeY + shapeH + 4f;
+
+            if (LastViewportWidth > 0 && barX + barW > LastViewportWidth - 10f) barX = LastViewportWidth - barW - 10f;
+            if (barX < 10f) barX = 10f;
+            RectangleF barRect = new RectangleF(barX, barY, barW, barH);
+            LastAudioPlaybackBarBounds = barRect;
+
+            // 1. Soft Drop Shadow
+            using (GraphicsPath sPath = CreateRoundedRectPath(new RectangleF(barX + 1.5f, barY + 2.5f, barW, barH), 16f))
+            using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+            {
+                g.FillPath(shadowB, sPath);
+            }
+
+            // 2. Pill Container (Metallic Silver Gradient, thin crisp outline)
+            using (GraphicsPath pillPath = CreateRoundedRectPath(barRect, 16f))
+            using (LinearGradientBrush bgBrush = new LinearGradientBrush(barRect, Color.FromArgb(248, 250, 252), Color.FromArgb(226, 230, 236), 90f))
+            using (Pen borderPen = new Pen(Color.FromArgb(195, 200, 208), 1.0f))
+            {
+                g.FillPath(bgBrush, pillPath);
+                g.DrawPath(borderPen, pillPath);
+            }
+
+            // 3. Play / Pause Button (Left: barX + 6 to barX + 28)
+            bool isPlayHover = (HoveredAudioButton == 0);
+            if (isPlayHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
+                {
+                    g.FillEllipse(hBrush, barX + 5f, barY + 4f, 24f, 24f);
+                }
+            }
+
+            using (SolidBrush iconB = new SolidBrush(Color.FromArgb(51, 65, 85)))
+            {
+                if (shape.IsAudioPlaying)
+                {
+                    // Pause icon (2 vertical bars)
+                    g.FillRectangle(iconB, barX + 12f, barY + 10f, 3.5f, 12f);
+                    g.FillRectangle(iconB, barX + 18.5f, barY + 10f, 3.5f, 12f);
+                }
+                else
+                {
+                    // Play triangle
+                    PointF[] playPts = new PointF[] {
+                        new PointF(barX + 12f, barY + 9.5f),
+                        new PointF(barX + 23f, barY + 16f),
+                        new PointF(barX + 12f, barY + 22.5f)
+                    };
+                    g.FillPolygon(iconB, playPts);
+                }
+            }
+
+            // 4. Rewind button (Seek back: |◀)
+            bool isRewHover = (HoveredAudioButton == 1);
+            if (isRewHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(25, 0, 0, 0)))
+                {
+                    g.FillEllipse(hBrush, barX + 28f, barY + 5f, 22f, 22f);
+                }
+            }
+            using (SolidBrush rewB = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                // Vertical bar on left
+                g.FillRectangle(rewB, barX + 32f, barY + 11.5f, 2f, 9f);
+                // Triangle pointing left
+                PointF[] rewTri = new PointF[] {
+                    new PointF(barX + 43f, barY + 11.5f),
+                    new PointF(barX + 36f, barY + 16f),
+                    new PointF(barX + 43f, barY + 20.5f)
+                };
+                g.FillPolygon(rewB, rewTri);
+            }
+
+            // 5. Fast-Forward button (Seek forward: ▶|)
+            bool isFfHover = (HoveredAudioButton == 2);
+            if (isFfHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(25, 0, 0, 0)))
+                {
+                    g.FillEllipse(hBrush, barX + 48f, barY + 5f, 22f, 22f);
+                }
+            }
+            using (SolidBrush ffB = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                // Triangle pointing right
+                PointF[] ffTri = new PointF[] {
+                    new PointF(barX + 53f, barY + 11.5f),
+                    new PointF(barX + 60f, barY + 16f),
+                    new PointF(barX + 53f, barY + 20.5f)
+                };
+                g.FillPolygon(ffB, ffTri);
+                // Vertical bar on right
+                g.FillRectangle(ffB, barX + 61f, barY + 11.5f, 2f, 9f);
+            }
+
+            // 6. Timeline Scrubber Track Inset Box
+            float scrubX = barX + 74f;
+            float scrubW = barW - 74f - 88f; // ~178px
+            float scrubH = 12f;
+            float scrubY = barY + (barH - scrubH) / 2f;
+            RectangleF scrubRect = new RectangleF(scrubX, scrubY, scrubW, scrubH);
+
+            using (GraphicsPath sBoxPath = CreateRoundedRectPath(scrubRect, 2.5f))
+            using (SolidBrush whiteB = new SolidBrush(Color.White))
+            using (Pen sBoxBorder = new Pen(Color.FromArgb(190, 196, 204), 1.0f))
+            {
+                g.FillPath(whiteB, sBoxPath);
+
+                // Played Progress Bar Fill
+                float totalSec = shape.AudioTotalTime > 0 ? shape.AudioTotalTime : 180f;
+                float playedFrac = Math.Max(0f, Math.Min(1f, shape.AudioCurrentTime / totalSec));
+                if (playedFrac > 0)
+                {
+                    float progW = Math.Max(0f, (scrubW - 2f) * playedFrac);
+                    using (SolidBrush progB = new SolidBrush(Color.FromArgb(203, 213, 225)))
+                    {
+                        g.FillRectangle(progB, scrubX + 1f, scrubY + 1f, progW, scrubH - 2f);
+                    }
+                }
+
+                // Bookmark Indicators (Yellow vertical pips)
+                if (shape.AudioBookmarks != null && shape.AudioBookmarks.Count > 0 && totalSec > 0)
+                {
+                    using (SolidBrush bmB = new SolidBrush(Color.FromArgb(234, 179, 8)))
+                    using (Pen bmP = new Pen(Color.FromArgb(161, 98, 7), 0.8f))
+                    {
+                        foreach (float bSec in shape.AudioBookmarks)
+                        {
+                            float bFrac = Math.Max(0f, Math.Min(1f, bSec / totalSec));
+                            float bx = scrubX + 1f + (scrubW - 2f) * bFrac;
+                            g.FillRectangle(bmB, bx - 1f, scrubY, 2.5f, scrubH);
+                            g.DrawRectangle(bmP, bx - 1f, scrubY, 2.5f, scrubH);
                         }
                     }
                 }
 
-                // Time Timestamp String & Speaker on Right
-                if (baseW > 240)
+                // Outline Scrubber Box
+                g.DrawPath(sBoxBorder, sBoxPath);
+
+                // Needle Playhead Line (dark charcoal vertical line)
+                float needleX = scrubX + 1f + (scrubW - 2f) * playedFrac;
+                using (Pen needlePen = new Pen(Color.FromArgb(31, 41, 55), 1.5f))
                 {
-                    float rightX = timeX + timeW + 8 * scale;
-                    using (Font timeFont = new Font("Segoe UI", Math.Max(6.5f, 9f * scale), FontStyle.Regular))
-                    using (SolidBrush tb = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                    g.DrawLine(needlePen, needleX, scrubY, needleX, scrubY + scrubH);
+                }
+            }
+
+            // 7. Hover Needle Line & Tooltip Balloon (Speech bubble with time e.g. 00:00.96)
+            if (IsHoveringAudioScrubber)
+            {
+                float totalSec = shape.AudioTotalTime > 0 ? shape.AudioTotalTime : 180f;
+                float hoverFrac = Math.Max(0f, Math.Min(1f, HoveredAudioScrubberTime / totalSec));
+                float hoverNeedleX = scrubX + 1f + (scrubW - 2f) * hoverFrac;
+
+                // Subtle dashed or gray hover line in track
+                using (Pen hLinePen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+                {
+                    g.DrawLine(hLinePen, hoverNeedleX, scrubY, hoverNeedleX, scrubY + scrubH);
+                }
+
+                // Tooltip Balloon directly above hoverNeedleX
+                float tipW = 54f;
+                float tipH = 18f;
+                float tipX = hoverNeedleX - tipW / 2f;
+                if (tipX < barX + 6f) tipX = barX + 6f;
+                if (tipX + tipW > barX + barW - 6f) tipX = barX + barW - tipW - 6f;
+                float tipY = scrubY - tipH - 5f;
+
+                RectangleF balloonRect = new RectangleF(tipX, tipY, tipW, tipH);
+
+                // Draw Balloon Path (rounded rect + downward arrow pointer)
+                using (GraphicsPath bPath = new GraphicsPath())
+                {
+                    float d = 4f;
+                    bPath.AddArc(tipX, tipY, d, d, 180, 90);
+                    bPath.AddArc(tipX + tipW - d, tipY, d, d, 270, 90);
+                    bPath.AddArc(tipX + tipW - d, tipY + tipH - d, d, d, 0, 90);
+                    // Bottom edge with arrow
+                    bPath.AddLine(tipX + tipW - d, tipY + tipH, hoverNeedleX + 3f, tipY + tipH);
+                    bPath.AddLine(hoverNeedleX + 3f, tipY + tipH, hoverNeedleX, tipY + tipH + 4f);
+                    bPath.AddLine(hoverNeedleX, tipY + tipH + 4f, hoverNeedleX - 3f, tipY + tipH);
+                    bPath.AddLine(hoverNeedleX - 3f, tipY + tipH, tipX + d, tipY + tipH);
+                    bPath.AddArc(tipX, tipY + tipH - d, d, d, 90, 90);
+                    bPath.CloseFigure();
+
+                    // Drop shadow for balloon
+                    using (SolidBrush bShadow = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
                     {
-                        int curM = (int)(shape.VideoCurrentTime / 60);
-                        int curS = (int)(shape.VideoCurrentTime % 60);
-                        int totM = (int)(shape.VideoTotalTime / 60);
-                        int totS = (int)(shape.VideoTotalTime % 60);
-                        string timeStr = string.Format("{0:D2}:{1:D2} / {2:D2}:{3:D2}", curM, curS, totM, totS);
-                        g.DrawString(timeStr, timeFont, tb, rightX, barY + (barH - 12 * scale) / 2f);
+                        var mShadow = (GraphicsPath)bPath.Clone();
+                        using (Matrix tr = new Matrix())
+                        {
+                            tr.Translate(1f, 1.5f);
+                            mShadow.Transform(tr);
+                        }
+                        g.FillPath(bShadow, mShadow);
                     }
 
-                    // Speaker Volume Icon
-                    float spkX = baseW - 24 * scale;
-                    float spkY = barY + barH / 2f;
-                    using (Pen spkPen = new Pen(Color.FromArgb(148, 163, 184), 1.5f))
+                    using (SolidBrush bBg = new SolidBrush(Color.FromArgb(255, 255, 255)))
+                    using (Pen bBorder = new Pen(Color.FromArgb(100, 116, 139), 1.0f))
                     {
-                        g.DrawLine(spkPen, spkX, spkY - 4 * scale, spkX + 4 * scale, spkY - 4 * scale);
-                        g.DrawLine(spkPen, spkX + 4 * scale, spkY - 4 * scale, spkX + 8 * scale, spkY - 8 * scale);
-                        g.DrawLine(spkPen, spkX + 8 * scale, spkY - 8 * scale, spkX + 8 * scale, spkY + 8 * scale);
-                        g.DrawLine(spkPen, spkX + 8 * scale, spkY + 8 * scale, spkX + 4 * scale, spkY + 4 * scale);
-                        g.DrawLine(spkPen, spkX + 4 * scale, spkY + 4 * scale, spkX, spkY + 4 * scale);
-                        g.DrawLine(spkPen, spkX, spkY + 4 * scale, spkX, spkY - 4 * scale);
+                        g.FillPath(bBg, bPath);
+                        g.DrawPath(bBorder, bPath);
                     }
+                }
+
+                // Tooltip Time Text (e.g. "00:00.96")
+                int tipM = (int)(HoveredAudioScrubberTime / 60);
+                float tipS = HoveredAudioScrubberTime % 60;
+                string tipTimeStr = string.Format("{0:D2}:{1:00.00}", tipM, tipS);
+                using (Font tipFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+                using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                {
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString(tipTimeStr, tipFont, tb, new RectangleF(tipX, tipY, tipW, tipH), sf);
+                }
+            }
+
+            // 8. Time Readout to the right of scrubber (e.g. 00:00.00)
+            float timeX = scrubX + scrubW + 6f;
+            int curM = (int)(shape.AudioCurrentTime / 60);
+            float curS = shape.AudioCurrentTime % 60;
+            string curTimeStr = string.Format("{0:D2}:{1:00.00}", curM, curS);
+            using (Font timeFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (SolidBrush timeB = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+                g.DrawString(curTimeStr, timeFont, timeB, new RectangleF(timeX, barY, 48f, barH), sf);
+            }
+
+            // 9. Volume Speaker Button (Far right: barX + barW - 24 to barX + barW - 6)
+            bool isVolHover = (HoveredAudioButton == 4);
+            if (isVolHover)
+            {
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(25, 0, 0, 0)))
+                {
+                    g.FillEllipse(hBrush, barX + barW - 25f, barY + 5f, 22f, 22f);
+                }
+            }
+
+            float spkX = barX + barW - 17f;
+            float spkY = barY + barH / 2f;
+            using (Pen vPen = new Pen(Color.FromArgb(71, 85, 105), 1.2f))
+            using (SolidBrush vBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                // Vector speaker icon
+                g.FillRectangle(vBrush, spkX - 5f, spkY - 2.5f, 2.5f, 5f);
+                PointF[] vCone = new PointF[] {
+                    new PointF(spkX - 2.5f, spkY - 2.5f),
+                    new PointF(spkX + 1f, spkY - 5f),
+                    new PointF(spkX + 1f, spkY + 5f),
+                    new PointF(spkX - 2.5f, spkY + 2.5f)
+                };
+                g.FillPolygon(vBrush, vCone);
+
+                if (shape.AudioVolume == VideoVolumeLevel.Mute)
+                {
+                    // Red diagonal slash
+                    using (Pen redPen = new Pen(Color.FromArgb(239, 68, 68), 1.6f))
+                    {
+                        g.DrawLine(redPen, spkX - 5f, spkY + 5f, spkX + 4f, spkY - 5f);
+                    }
+                }
+                else
+                {
+                    // Small sound wave arc
+                    g.DrawArc(vPen, spkX - 1f, spkY - 4f, 5f, 8f, -40, 80);
                 }
             }
         }
 
-        private static void DrawStarFlare(Graphics g, float cx, float cy, float radius, Color coreCol, Color glowCol)
+        private static void DrawStarFlare(D2DGraphics g, float cx, float cy, float radius, Color coreCol, Color glowCol)
         {
             if (radius <= 0.5f) return;
             using (SolidBrush gB = new SolidBrush(glowCol))
@@ -10759,7 +12225,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawExclusiveAnimationBackgroundVisuals(Graphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
+        private void DrawExclusiveAnimationBackgroundVisuals(D2DGraphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
         {
             if (anim == null || !anim.IsExclusive || p < 0.001f || p > 0.999f) return;
 
@@ -10936,7 +12402,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawExclusiveAnimationForegroundVisuals(Graphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
+        private void DrawExclusiveAnimationForegroundVisuals(D2DGraphics g, float baseW, float baseH, ShapeNode shape, ShapeAnimation anim, float p, float scale, float opacityMultiplier)
         {
             if (anim == null || !anim.IsExclusive || p < 0.001f || p > 0.999f) return;
 
@@ -11277,7 +12743,7 @@ namespace GenOffice.UI
             return output;
         }
 
-        public void DrawShape(Graphics g, float slideX, float slideY, float scale, ShapeNode shape, bool isSelected, float opacityMultiplier = 1.0f, float animOffsetX = 0f, float animOffsetY = 0f, float animScaleX = 1.0f, float animScaleY = 1.0f, float animRotDelta = 0f, ShapeAnimation activeAnim = null, float activeAnimProgress = 0f)
+        public void DrawShape(D2DGraphics g, float slideX, float slideY, float scale, ShapeNode shape, bool isSelected, float opacityMultiplier = 1.0f, float animOffsetX = 0f, float animOffsetY = 0f, float animScaleX = 1.0f, float animScaleY = 1.0f, float animRotDelta = 0f, ShapeAnimation activeAnim = null, float activeAnimProgress = 0f)
         {
             if (!shape.IsVisible) return;
             if ((shape.IsDecorative || shape.PlaceholderType == "ThemeDecoration") && ActiveSlide != null && ActiveSlide.HideBackgroundGraphics) return;
@@ -11343,7 +12809,7 @@ namespace GenOffice.UI
 
             float op = Math.Max(0.0f, Math.Min(1.0f, shape.FillOpacity * opacityMultiplier));
             float shapeOp = Math.Max(0.0f, Math.Min(1.0f, opacityMultiplier));
-            if (op <= 0.001f && string.IsNullOrEmpty(shape.Text) && !isSelected && shape.Type != ShapeType.TextBox && shape.CachedImage == null)
+            if (op <= 0.001f && string.IsNullOrEmpty(shape.Text) && !isSelected && shape.Type != ShapeType.TextBox && shape.Type != ShapeType.Audio && shape.Type != ShapeType.Video && shape.CachedImage == null)
             {
                 g.Restore(state);
                 return;
@@ -11378,11 +12844,52 @@ namespace GenOffice.UI
                 DrawVideoShape(g, baseW, baseH, shape, isSelected, alpha, scale);
                 g.Restore(state);
 
-                if (isSelected)
+                float naturalSx = slideX + shape.Transform.X * scale;
+                float naturalSy = slideY + shape.Transform.Y * scale;
+
+                // PowerPoint Floating Video Playback Bar
+                bool showVideoBar = false;
+                if (IsPresenting)
                 {
-                    float naturalSx = slideX + shape.Transform.X * scale;
-                    float naturalSy = slideY + shape.Transform.Y * scale;
+                    // In Presentation Mode: ONLY show when mouse is directly hovering over this video!
+                    showVideoBar = (HoveredVideoShape == shape);
+                }
+                else
+                {
+                    // In Edit Mode: Show if selected OR if mouse is hovering over this video!
+                    showVideoBar = (isSelected || HoveredVideoShape == shape);
+                }
+
+                if (showVideoBar && baseH > 50 * scale)
+                {
+                    DrawVideoFloatingPlaybackBar(g, naturalSx, naturalSy, baseW, baseH, shape, scale);
+                }
+
+                if (isSelected && !IsPresenting)
+                {
                     DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
+                }
+                return;
+            }
+
+            if (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath))
+            {
+                DrawAudioShape(g, baseW, baseH, shape, isSelected, alpha, scale);
+                g.Restore(state);
+
+                float naturalSx = slideX + shape.Transform.X * scale;
+                float naturalSy = slideY + shape.Transform.Y * scale;
+
+                if (isSelected && !IsPresenting)
+                {
+                    DrawSelectedShapeHandles(g, naturalSx, naturalSy, baseW, baseH, shape.Transform.Rotation, shape);
+                }
+
+                // PowerPoint Floating Playback Bar (Visible when hovered, selected, or playing)
+                bool showBar = (!IsPresenting && isSelected) || HoveredAudioShape == shape || shape.IsAudioPlaying;
+                if (showBar)
+                {
+                    DrawAudioFloatingPlaybackBar(g, naturalSx, naturalSy, baseW, baseH, shape);
                 }
                 return;
             }
@@ -11431,7 +12938,7 @@ namespace GenOffice.UI
                             {
                                 int renderW = Math.Max(minRequiredW, 1600);
                                 int renderH = Math.Max(minRequiredH, 1600);
-                                Bitmap sharpSvg = GenOffice.Core.SvgRasterizer.RenderSvgToBitmap(System.IO.File.ReadAllText(shape.ImagePath), renderW, renderH);
+                                Bitmap sharpSvg = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(System.IO.File.ReadAllText(shape.ImagePath), renderW, renderH);
                                 if (sharpSvg != null)
                                 {
                                     shape.CachedImage = sharpSvg;
@@ -11469,16 +12976,18 @@ namespace GenOffice.UI
                     int bw = Math.Max(1, (int)Math.Round(baseW));
                     int bh = Math.Max(1, (int)Math.Round(baseH));
 
+                    bool hasFillRect = (Math.Abs(shape.FillRectLeft) > 0.0001f || Math.Abs(shape.FillRectTop) > 0.0001f || Math.Abs(shape.FillRectRight) > 0.0001f || Math.Abs(shape.FillRectBottom) > 0.0001f);
+
                     // High-performance display cache: avoids re-downsampling large 4K images on every animation frame
                     bool isLargeImage = (shape.CachedImage.Width > bw * 1.25f || shape.CachedImage.Height > bh * 1.25f);
                     Image imageToDraw = shape.CachedImage;
                     RectangleF drawSrcRect = srcRect;
 
-                    if (isLargeImage && !IsCropping && bw > 0 && bh > 0)
+                    if (isLargeImage && !hasFillRect && !IsCropping && bw > 300 && bh > 200)
                     {
                         if (shape.DisplayCachedImage == null ||
-                            shape.DisplayCachedW != bw ||
-                            shape.DisplayCachedH != bh ||
+                            Math.Abs(shape.DisplayCachedW - bw) > 24 ||
+                            Math.Abs(shape.DisplayCachedH - bh) > 24 ||
                             Math.Abs(shape.DisplayCachedCropL - cropL) > 0.001f ||
                             Math.Abs(shape.DisplayCachedCropT - cropT) > 0.001f ||
                             Math.Abs(shape.DisplayCachedCropR - cropR) > 0.001f ||
@@ -11542,34 +13051,38 @@ namespace GenOffice.UI
                                 new PointF(fullX + fullW, fullY),
                                 new PointF(fullX, fullY + fullH)
                             };
-                            g.DrawImage(shape.CachedImage, dimDestPoints, new RectangleF(0, 0, shape.CachedImage.Width, shape.CachedImage.Height), GraphicsUnit.Pixel, dimIa);
+                            g.DrawImage(shape.CachedImage, dimDestPoints, new RectangleF(0, 0, shape.CachedImage.Width, shape.CachedImage.Height), GraphicsUnit.Pixel, dimIa, 0.35f);
                         }
                     }
 
                     System.Drawing.Imaging.ColorMatrix cm = CreateImageColorMatrix(shape);
                     cm.Matrix33 *= Math.Max(0.0f, Math.Min(1.0f, opacityMultiplier));
-                    using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                    float effectiveOpacity = Math.Max(0.0f, Math.Min(1.0f, cm.Matrix33));
+                    float prevImgOpacity = g.CurrentImageOpacity;
+                    g.CurrentImageOpacity = effectiveOpacity;
+                    try
                     {
-                        ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                        using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                        {
+                            ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
 
-                        PointF[] destPoints;
-                        bool hasFillRect = (Math.Abs(shape.FillRectLeft) > 0.0001f || Math.Abs(shape.FillRectTop) > 0.0001f || Math.Abs(shape.FillRectRight) > 0.0001f || Math.Abs(shape.FillRectBottom) > 0.0001f);
-                        if (hasFillRect)
-                        {
-                            float destX = baseW * shape.FillRectLeft;
-                            float destY = baseH * shape.FillRectTop;
-                            float destW = baseW * (1.0f - shape.FillRectLeft - shape.FillRectRight);
-                            float destH = baseH * (1.0f - shape.FillRectTop - shape.FillRectBottom);
-                            destPoints = new PointF[] {
-                                new PointF(destX, destY),
-                                new PointF(destX + destW, destY),
-                                new PointF(destX, destY + destH)
-                            };
-                        }
-                        else
-                        {
-                            destPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
-                        }
+                            PointF[] destPoints;
+                            if (hasFillRect)
+                            {
+                                float destX = baseW * shape.FillRectLeft;
+                                float destY = baseH * shape.FillRectTop;
+                                float destW = baseW * (1.0f - shape.FillRectLeft - shape.FillRectRight);
+                                float destH = baseH * (1.0f - shape.FillRectTop - shape.FillRectBottom);
+                                destPoints = new PointF[] {
+                                    new PointF(destX, destY),
+                                    new PointF(destX + destW, destY),
+                                    new PointF(destX, destY + destH)
+                                };
+                            }
+                            else
+                            {
+                                destPoints = new PointF[] { new PointF(0, 0), new PointF(baseW, 0), new PointF(0, baseH) };
+                            }
 
                         // Picture Styles / Crop to Shape / CustomPath Multi-Shape Clipping
                         GraphicsPath customCropPath = null;
@@ -11612,7 +13125,7 @@ namespace GenOffice.UI
                             ovalPath.AddEllipse(0, 0, baseW, baseH);
                             GraphicsState pState = g.Save();
                             g.SetClip(ovalPath, CombineMode.Intersect);
-                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
+                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia, effectiveOpacity);
                             g.Restore(pState);
                             using (Pen ovalPen = new Pen(Color.White, Math.Max(3f, 4f * scale)))
                             {
@@ -11624,7 +13137,7 @@ namespace GenOffice.UI
                             GraphicsPath roundPath = CreateRoundedRectPath(new Rectangle(0, 0, (int)baseW, (int)baseH), (int)(14 * scale));
                             GraphicsState pState = g.Save();
                             g.SetClip(roundPath, CombineMode.Intersect);
-                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
+                            g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia, effectiveOpacity);
                             g.Restore(pState);
                             using (Pen roundPen = new Pen(Color.FromArgb(200, 255, 255, 255), Math.Max(2f, 3f * scale)))
                             {
@@ -11653,7 +13166,7 @@ namespace GenOffice.UI
                                 {
                                     GraphicsState upperClip = g.Save();
                                     g.SetClip(new RectangleF(0, 0, baseW, beamY), CombineMode.Intersect);
-                                    g.DrawImage(ScanPendingResultBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
+                                    g.DrawImage(ScanPendingResultBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia, effectiveOpacity);
                                     g.Restore(upperClip);
                                 }
 
@@ -11662,7 +13175,7 @@ namespace GenOffice.UI
                                 {
                                     GraphicsState lowerClip = g.Save();
                                     g.SetClip(new RectangleF(0, beamY, baseW, baseH - beamY), CombineMode.Intersect);
-                                    g.DrawImage(ScanSourceOriginalBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia);
+                                    g.DrawImage(ScanSourceOriginalBitmap, fullDestPoints, srcRect, GraphicsUnit.Pixel, ia, effectiveOpacity);
                                     g.Restore(lowerClip);
                                 }
 
@@ -11681,7 +13194,7 @@ namespace GenOffice.UI
                                     if (shape.CachedFeatheredBmp != null && shape.CachedFeatherW == bw && shape.CachedFeatherH == bh &&
                                         Math.Abs(shape.CachedSoftPx - softPx) < 0.05f && Math.Abs(shape.CachedBlurPx - blurPx) < 0.05f)
                                     {
-                                        g.DrawImage(shape.CachedFeatheredBmp, 0, 0);
+                                        g.DrawImage(shape.CachedFeatheredBmp, 0, 0, 1.0f);
                                     }
                                     else
                                     {
@@ -11700,13 +13213,13 @@ namespace GenOffice.UI
                                             shape.CachedFeatherH = bh;
                                             shape.CachedSoftPx = softPx;
                                             shape.CachedBlurPx = blurPx;
-                                            g.DrawImage(feathered, 0, 0);
+                                            g.DrawImage(feathered, 0, 0, 1.0f);
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia);
+                                    g.DrawImage(imageToDraw, destPoints, drawSrcRect, GraphicsUnit.Pixel, ia, effectiveOpacity);
                                 }
                             }
 
@@ -11878,7 +13391,12 @@ namespace GenOffice.UI
                         }
                     }
                 }
-                else
+                finally
+                {
+                    g.CurrentImageOpacity = prevImgOpacity;
+                }
+            }
+            else
                 {
                     using (SolidBrush placeholderBg = new SolidBrush(Color.FromArgb(alpha, 240, 243, 246)))
                     using (Pen placeholderPen = new Pen(Color.FromArgb(alpha, 180, 200, 220), 1.5f))
@@ -11990,7 +13508,7 @@ namespace GenOffice.UI
                         if (shape.StrokeWidth > 0 && strokeCol.A > 0)
                         {
                             float pw = Math.Max(1.0f, shape.StrokeWidth * (shape.PathWidth / Math.Max(1f, baseW)));
-                            using (Pen pPen = new Pen(strokeCol, pw))
+                            using (Pen pPen = new Pen(strokeCol, pw) { DashStyle = shape.DashStyle, LineJoin = LineJoin.Round })
                             {
                                 g.DrawPath(pPen, shape.CustomPath);
                             }
@@ -12028,53 +13546,7 @@ namespace GenOffice.UI
 
             if (!string.IsNullOrEmpty(dispText) || isEditingThis)
             {
-                // Calculate inner margin / padding constraint
-                float padLeft = shape.MarginLeft.HasValue ? shape.MarginLeft.Value * scale : Math.Max(0.5f, 6.0f * scale);
-                float padRight = shape.MarginRight.HasValue ? shape.MarginRight.Value * scale : Math.Max(0.5f, 6.0f * scale);
-                float padTop = shape.MarginTop.HasValue ? shape.MarginTop.Value * scale : Math.Max(0.5f, 4.0f * scale);
-                float padBottom = shape.MarginBottom.HasValue ? shape.MarginBottom.Value * scale : Math.Max(0.5f, 4.0f * scale);
-                if (shape.Type == ShapeType.Parallelogram)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.22f);
-                    padRight = Math.Max(padRight, baseW * 0.22f);
-                }
-                else if (shape.Type == ShapeType.Trapezoid)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.20f);
-                    padRight = Math.Max(padRight, baseW * 0.20f);
-                }
-                else if (shape.Type == ShapeType.Chevron || shape.Type == ShapeType.BlockArrowRight || shape.Type == ShapeType.BlockArrowLeft)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.22f);
-                    padRight = Math.Max(padRight, baseW * 0.22f);
-                }
-                else if (shape.Type == ShapeType.Diamond)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.22f);
-                    padRight = Math.Max(padRight, baseW * 0.22f);
-                    padTop = Math.Max(padTop, baseH * 0.22f);
-                    padBottom = Math.Max(padBottom, baseH * 0.22f);
-                }
-                else if (shape.Type == ShapeType.Triangle)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.24f);
-                    padRight = Math.Max(padRight, baseW * 0.24f);
-                    padTop = Math.Max(padTop, baseH * 0.32f);
-                    padBottom = Math.Max(padBottom, baseH * 0.12f);
-                }
-                else if (shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Octagon)
-                {
-                    padLeft = Math.Max(padLeft, baseW * 0.20f);
-                    padRight = Math.Max(padRight, baseW * 0.20f);
-                }
-                else if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Callout)
-                {
-                    padLeft = Math.Max(1.0f, baseW * 0.10f);
-                    padRight = padLeft;
-                    padTop = Math.Max(1.0f, baseH * 0.10f);
-                    padBottom = padTop;
-                }
-                RectangleF textBounds = new RectangleF(padLeft, padTop, Math.Max(1.0f, baseW - padLeft - padRight), Math.Max(1.0f, baseH - padTop - padBottom));
+                RectangleF textBounds = GetShapeTextBounds(shape, baseW, baseH, scale);
 
                 // If editing, draw subtle inner dashed boundary
                 if (isEditingThis)
@@ -12095,19 +13567,13 @@ namespace GenOffice.UI
                 {
                     if (isEditingThis)
                     {
+                        var effAlign = (shape.TextRuns != null && shape.TextRuns.Count > 0 && shape.TextRuns[0].ParaAlignment.HasValue) ? shape.TextRuns[0].ParaAlignment.Value : shape.Alignment;
+
                         // Exact visual line wrapping and synchronized caret during interactive typing
                         List<VisualTextLine> visualLines = GetVisualWrappedLines(g, dispText, font, textBounds.Width);
 
-                        float lineHeight = font.Height;
-                        float totalTextH = Math.Max(lineHeight, visualLines.Count * lineHeight);
-
-                        float startY;
-                        if (shape.VerticalAlignment == VerticalTextAlignment.Top)
-                            startY = textBounds.Y;
-                        else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom)
-                            startY = textBounds.Bottom - totalTextH;
-                        else
-                            startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+                        float lineHeight, drawStartY, boxStartY;
+                        ComputeInlineTextVerticalMetrics(shape, font, textBounds, Math.Max(1, visualLines.Count), scale, out lineHeight, out drawStartY, out boxStartY);
 
                         // Draw text selection highlight if TextSelectionLength != 0
                         if (TextSelectionLength != 0)
@@ -12136,21 +13602,21 @@ namespace GenOffice.UI
 
                                         float curX;
                                         float lineWidth = g.MeasureString(vl.Text.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
-                                        if (shape.Alignment == TextAlignment.Left)
+                                        if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
                                             curX = textBounds.X;
-                                        else if (shape.Alignment == TextAlignment.Right)
+                                        else if (effAlign == TextAlignment.Right)
                                             curX = textBounds.Right - lineWidth;
                                         else
                                             curX = textBounds.X + (textBounds.Width - lineWidth) / 2f;
 
-                                        float curY = startY + li * lineHeight;
+                                        float curY = boxStartY + li * lineHeight;
                                         g.FillRectangle(selBrush, curX + preW, curY, selW, lineHeight);
                                     }
                                 }
                             }
                         }
 
-                        if (!string.IsNullOrEmpty(dispText) && alpha > 0)
+                        if (!string.IsNullOrEmpty(dispText) && textAlpha > 0)
                         {
                             using (SolidBrush txtBrush = new SolidBrush(txtCol))
                             {
@@ -12160,14 +13626,14 @@ namespace GenOffice.UI
                                     if (string.IsNullOrEmpty(lineText)) continue;
                                     float lineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
                                     float curX;
-                                    if (shape.Alignment == TextAlignment.Left)
+                                    if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
                                         curX = textBounds.X;
-                                    else if (shape.Alignment == TextAlignment.Right)
+                                    else if (effAlign == TextAlignment.Right)
                                         curX = textBounds.Right - lineWidth;
                                     else
                                         curX = textBounds.X + (textBounds.Width - lineWidth) / 2f;
 
-                                    float curY = startY + li * lineHeight;
+                                    float curY = drawStartY + li * lineHeight;
                                     g.DrawString(lineText.TrimEnd(), font, txtBrush, curX, curY, StringFormat.GenericTypographic);
                                 }
                             }
@@ -12196,15 +13662,15 @@ namespace GenOffice.UI
                         float beforeWidth = g.MeasureString(beforeCaret, font, PointF.Empty, StringFormat.GenericTypographic).Width;
 
                         float lineStartX;
-                        if (shape.Alignment == TextAlignment.Left)
+                        if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
                             lineStartX = textBounds.X;
-                        else if (shape.Alignment == TextAlignment.Right)
+                        else if (effAlign == TextAlignment.Right)
                             lineStartX = textBounds.Right - cLineWidth;
                         else
                             lineStartX = textBounds.X + (textBounds.Width - cLineWidth) / 2f;
 
                         float caretX = lineStartX + beforeWidth;
-                        float caretY = startY + curLineIdx * lineHeight;
+                        float caretY = boxStartY + curLineIdx * lineHeight;
 
                         CurrentCaretScreenX = (int)caretX;
                         CurrentCaretScreenY = (int)(caretY + lineHeight + 2);
@@ -12411,9 +13877,21 @@ namespace GenOffice.UI
             public TextAlignment? Alignment;
         }
 
-        private void DrawShapeTextRuns(Graphics g, ShapeNode shape, RectangleF textBounds, float scale, float opacityMultiplier)
+        private void DrawShapeTextRuns(D2DGraphics g, ShapeNode shape, RectangleF textBounds, float scale, float opacityMultiplier)
         {
             List<SlideTextRun> runList = shape.TextRuns;
+            if (runList != null && runList.Count == 1 && !string.IsNullOrEmpty(shape.Text))
+            {
+                runList[0].Text = shape.Text;
+                runList[0].FontName = shape.FontName;
+                runList[0].FontSize = shape.FontSize;
+                runList[0].Bold = shape.Bold;
+                runList[0].Italic = shape.Italic;
+                runList[0].Underline = shape.Underline;
+                runList[0].Strikethrough = shape.Strikethrough;
+                if (!runList[0].HasGradient) runList[0].TextColor = shape.TextColor;
+                runList[0].ParaAlignment = shape.Alignment;
+            }
             if (runList == null || runList.Count == 0)
             {
                 if (!string.IsNullOrEmpty(shape.Text))
@@ -12730,6 +14208,88 @@ namespace GenOffice.UI
                                     cb.Positions[cb.Positions.Length - 1] = 1f;
                                     lgb.InterpolationColors = cb;
                                 }
+                                if (shape.HasTextOutline && shape.TextOutlineWidth > 0f)
+                                {
+                                    using (GraphicsPath tokPath = new GraphicsPath())
+                                    {
+                                        float emSize = tok.Font.SizeInPoints * g.DpiY / 72.0f;
+                                        tokPath.AddString(tok.Text, tok.Font.FontFamily, (int)tok.Font.Style, emSize, new PointF(tokX, lineY), StringFormat.GenericTypographic);
+                                        if (shape.HasTextShadow)
+                                        {
+                                            using (Matrix sm = new Matrix())
+                                            {
+                                                sm.Translate(1.8f * scale, 1.8f * scale);
+                                                using (GraphicsPath sPath = (GraphicsPath)tokPath.Clone())
+                                                {
+                                                    sPath.Transform(sm);
+                                                    Color sc = (shape.ShadowColor != 0) ? Color.FromArgb((int)(110 * opacityMultiplier), Color.FromArgb(shape.ShadowColor & 0xFFFFFF)) : Color.FromArgb((int)(110 * opacityMultiplier), 60, 60, 60);
+                                                    using (SolidBrush shadowBr = new SolidBrush(sc))
+                                                    {
+                                                        g.FillPath(shadowBr, sPath);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Color outCol = Color.FromArgb((int)(255 * opacityMultiplier), Color.FromArgb(shape.TextOutlineColor & 0xFFFFFF));
+                                        using (Pen outPen = new Pen(outCol, Math.Max(1.0f, shape.TextOutlineWidth * scale)))
+                                        {
+                                            outPen.LineJoin = LineJoin.Round;
+                                            g.DrawPath(outPen, tokPath);
+                                        }
+                                        g.FillPath(lgb, tokPath);
+                                    }
+                                }
+                                else
+                                {
+                                    if (shape.HasTextShadow)
+                                    {
+                                        using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 80, 80, 80)))
+                                        {
+                                            g.DrawString(tok.Text, tok.Font, shadowBr, tokX + 1.2f * scale, lineY + 1.2f * scale, StringFormat.GenericTypographic);
+                                        }
+                                    }
+                                    g.DrawString(tok.Text, tok.Font, lgb, tokX, lineY, StringFormat.GenericTypographic);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (shape.HasTextOutline && shape.TextOutlineWidth > 0f)
+                            {
+                                using (GraphicsPath tokPath = new GraphicsPath())
+                                {
+                                    float emSize = tok.Font.SizeInPoints * g.DpiY / 72.0f;
+                                    tokPath.AddString(tok.Text, tok.Font.FontFamily, (int)tok.Font.Style, emSize, new PointF(tokX, lineY), StringFormat.GenericTypographic);
+                                    if (shape.HasTextShadow)
+                                    {
+                                        using (Matrix sm = new Matrix())
+                                        {
+                                            sm.Translate(1.8f * scale, 1.8f * scale);
+                                            using (GraphicsPath sPath = (GraphicsPath)tokPath.Clone())
+                                            {
+                                                sPath.Transform(sm);
+                                                Color sc = (shape.ShadowColor != 0) ? Color.FromArgb((int)(110 * opacityMultiplier), Color.FromArgb(shape.ShadowColor & 0xFFFFFF)) : Color.FromArgb((int)(110 * opacityMultiplier), 60, 60, 60);
+                                                using (SolidBrush shadowBr = new SolidBrush(sc))
+                                                {
+                                                    g.FillPath(shadowBr, sPath);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Color outCol = Color.FromArgb((int)(255 * opacityMultiplier), Color.FromArgb(shape.TextOutlineColor & 0xFFFFFF));
+                                    using (Pen outPen = new Pen(outCol, Math.Max(1.0f, shape.TextOutlineWidth * scale)))
+                                    {
+                                        outPen.LineJoin = LineJoin.Round;
+                                        g.DrawPath(outPen, tokPath);
+                                    }
+                                    using (SolidBrush b = new SolidBrush(tok.Color))
+                                    {
+                                        g.FillPath(b, tokPath);
+                                    }
+                                }
+                            }
+                            else
+                            {
                                 if (shape.HasTextShadow)
                                 {
                                     using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 80, 80, 80)))
@@ -12737,21 +14297,10 @@ namespace GenOffice.UI
                                         g.DrawString(tok.Text, tok.Font, shadowBr, tokX + 1.2f * scale, lineY + 1.2f * scale, StringFormat.GenericTypographic);
                                     }
                                 }
-                                g.DrawString(tok.Text, tok.Font, lgb, tokX, lineY, StringFormat.GenericTypographic);
-                            }
-                        }
-                        else
-                        {
-                            if (shape.HasTextShadow)
-                            {
-                                using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb((int)(110 * opacityMultiplier), 80, 80, 80)))
+                                using (SolidBrush b = new SolidBrush(tok.Color))
                                 {
-                                    g.DrawString(tok.Text, tok.Font, shadowBr, tokX + 1.2f * scale, lineY + 1.2f * scale, StringFormat.GenericTypographic);
+                                    g.DrawString(tok.Text, tok.Font, b, tokX, lineY, StringFormat.GenericTypographic);
                                 }
-                            }
-                            using (SolidBrush b = new SolidBrush(tok.Color))
-                            {
-                                g.DrawString(tok.Text, tok.Font, b, tokX, lineY, StringFormat.GenericTypographic);
                             }
                         }
                     }
@@ -12830,30 +14379,13 @@ namespace GenOffice.UI
             if (ActiveSlide == null) return;
             SaveUndoState();
             if (string.IsNullOrEmpty(text)) text = "ZENQ WORDART";
-            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
-            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
+            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
 
-            Color[] colors = new Color[] {
-                Color.Black,
-                Color.FromArgb(0, 114, 198),
-                Color.FromArgb(216, 59, 1),
-                Color.FromArgb(16, 124, 65),
-                Color.FromArgb(112, 48, 160),
-                Color.DarkOrange,
-                Color.FromArgb(0, 120, 215),
-                Color.DimGray,
-                Color.Crimson,
-                Color.Teal,
-                Color.DarkGoldenrod,
-                Color.MediumPurple,
-                Color.ForestGreen,
-                Color.DodgerBlue,
-                Color.Tomato
-            };
-            Color c = (styleIndex >= 0 && styleIndex < colors.Length) ? colors[styleIndex] : Color.FromArgb(0, 114, 198);
+            var preset = WordArtGalleryForm.GetPreset(styleIndex);
 
-            float w = Math.Max(320f, Math.Min(680f, text.Length * 26f + 60f));
-            float h = 100f;
+            float w = Math.Max(420f, Math.Min(1400f, text.Length * 34f + 80f));
+            float h = 120f;
             float x = (canvasW - w) / 2f;
             float y = (canvasH - h) / 2f;
 
@@ -12863,17 +14395,60 @@ namespace GenOffice.UI
                 Type = ShapeType.TextBox,
                 Transform = new Transform2D(x, y, w, h),
                 Text = text,
-                FontSize = 36f,
-                Bold = true,
-                TextColor = c.ToArgb() & 0xFFFFFF,
+                FontName = preset.FontName ?? "Segoe UI Black",
+                FontSize = 44f,
+                Bold = false,
+                TextColor = preset.FillColor1.ToArgb() & 0xFFFFFF,
+                HasGradientFill = preset.HasGradient,
+                GradientColor2 = preset.FillColor2.ToArgb() & 0xFFFFFF,
+                GradientAngle = preset.GradientAngle,
                 FillColor = 0x00FFFFFF,
                 StrokeColor = 0x00FFFFFF,
                 StrokeWidth = 0f,
-                HasTextShadow = true,
-                Alignment = TextAlignment.Center
+                HasTextShadow = preset.HasShadow,
+                ShadowColor = preset.ShadowColor.ToArgb(),
+                HasTextOutline = (preset.OutlineColor != Color.Transparent && preset.OutlineWidth > 0f),
+                TextOutlineColor = preset.OutlineColor.ToArgb() & 0xFFFFFF,
+                TextOutlineWidth = preset.OutlineWidth,
+                WordArtPresetIndex = styleIndex,
+                Alignment = TextAlignment.Center,
+                VerticalAlignment = VerticalTextAlignment.Middle
             };
+
+            if (preset.HasGradient)
+            {
+                wordArt.GradientStops = new List<GradientStop>
+                {
+                    new GradientStop(preset.FillColor1.ToArgb() & 0xFFFFFF, 0.0f),
+                    new GradientStop(preset.FillColor2.ToArgb() & 0xFFFFFF, 1.0f)
+                };
+                wordArt.TextRuns = new List<SlideTextRun>
+                {
+                    new SlideTextRun
+                    {
+                        Text = text,
+                        FontName = preset.FontName ?? "Segoe UI Black",
+                        FontSize = 44f,
+                        Bold = false,
+                        TextColor = preset.FillColor1.ToArgb() & 0xFFFFFF,
+                        HasGradient = true,
+                        GradientColor2 = preset.FillColor2.ToArgb() & 0xFFFFFF,
+                        GradientAngle = preset.GradientAngle,
+                        GradientStops = new List<GradientStop>
+                        {
+                            new GradientStop(preset.FillColor1.ToArgb() & 0xFFFFFF, 0.0f),
+                            new GradientStop(preset.FillColor2.ToArgb() & 0xFFFFFF, 1.0f)
+                        }
+                    }
+                };
+            }
+
             ActiveSlide.AddShape(wordArt);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertChart(int chartType)
@@ -12886,6 +14461,7 @@ namespace GenOffice.UI
         public void InsertChart(string chartType = "Column_Clustered")
         {
             if (ActiveSlide == null) return;
+            SaveUndoState();
             if (string.IsNullOrEmpty(chartType)) chartType = "Column_Clustered";
             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
@@ -12925,6 +14501,10 @@ namespace GenOffice.UI
 
             ActiveSlide.AddShape(chartShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
 
             // Open Chart Data Excel Form just like in Writer!
             ChartDataExcelForm excelForm = new ChartDataExcelForm(chartData);
@@ -12933,7 +14513,8 @@ namespace GenOffice.UI
                 if (newData != null)
                 {
                     chartShape.ChartData = newData;
-                    if (Form.ActiveForm != null) Form.ActiveForm.Invalidate();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                    if (InvalidateCallback != null) InvalidateCallback();
                 }
             };
             excelForm.Show();
@@ -12951,6 +14532,7 @@ namespace GenOffice.UI
         public void InsertSmartArt(string type = "Process_Linear", string name = "Quy trình Tuyến tính")
         {
             if (ActiveSlide == null) return;
+            SaveUndoState();
             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 960f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 540f;
 
@@ -12977,11 +14559,16 @@ namespace GenOffice.UI
 
             ActiveSlide.AddShape(smartArt);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertEquation(string formula = "")
         {
             if (ActiveSlide == null) return;
+            SaveUndoState();
             if (string.IsNullOrEmpty(formula)) formula = "A = πr²";
 
             if (SelectedShape != null && (SelectedShape.Type == ShapeType.TextBox || SelectedShape.Type == ShapeType.Rectangle))
@@ -12994,6 +14581,8 @@ namespace GenOffice.UI
                 {
                     SelectedShape.Text += " " + formula;
                 }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -13017,6 +14606,10 @@ namespace GenOffice.UI
             };
             ActiveSlide.AddShape(eqShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertSymbol(string symbol)
@@ -13054,12 +14647,17 @@ namespace GenOffice.UI
             };
             ActiveSlide.AddShape(symShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertVideo(string videoPath = "")
         {
             if (ActiveSlide == null) return;
-            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+           SaveUndoState();
+             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
 
             string label = string.IsNullOrEmpty(videoPath) ? "Video Trình Chiếu" : System.IO.Path.GetFileName(videoPath);
@@ -13093,6 +14691,10 @@ namespace GenOffice.UI
             }
             ActiveSlide.AddShape(videoShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void PlayVideoPreview(ShapeNode shape = null, Control parentControl = null)
@@ -13110,60 +14712,16 @@ namespace GenOffice.UI
 
             if (parentControl == null) return;
 
-            if (SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape == shape)
+            if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
             {
-                SlideVideoPlayerManager.Instance.Stop();
+                SlideVideoPlayerManager.Instance.TogglePlay();
                 return;
             }
 
-            Rectangle targetBounds;
-            if (IsPresenting)
+            SlideVideoPlayerManager.Instance.Play(shape, parentControl, default(Rectangle), IsPresenting, () =>
             {
-                int screenW = parentControl.ClientSize.Width;
-                int screenH = parentControl.ClientSize.Height;
-                int slideW = screenW;
-                int slideH = Presentation.IsWidescreen ? (slideW * 9 / 16) : (slideW * 3 / 4);
-                if (slideH > screenH)
-                {
-                    slideH = screenH;
-                    slideW = Presentation.IsWidescreen ? (slideH * 16 / 9) : (slideH * 4 / 3);
-                }
-                int sxOffset = (screenW - slideW) / 2;
-                int syOffset = (screenH - slideH) / 2;
-                float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
-
-                if (shape.VideoPlayFullScreen)
-                {
-                    targetBounds = new Rectangle(sxOffset, syOffset, slideW, slideH);
-                }
-                else
-                {
-                    int sx = sxOffset + (int)(shape.Transform.X * scaleP);
-                    int sy = syOffset + (int)(shape.Transform.Y * scaleP);
-                    int sw = (int)(shape.Transform.Width * scaleP);
-                    int sh = (int)(shape.Transform.Height * scaleP);
-                    targetBounds = new Rectangle(sx, sy, Math.Max(100, sw), Math.Max(60, sh));
-                }
-
-                SlideVideoPlayerManager.Instance.Play(shape, parentControl, targetBounds, true);
-            }
-            else
-            {
-                int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
-                GetEffectiveLayoutMetrics(parentControl.ClientSize.Width, parentControl.ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
-
-                int slideX, slideY, slideW, slideH;
-                float scale;
-                GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
-
-                int sx = slideX + (int)(shape.Transform.X * scale);
-                int sy = slideY + (int)(shape.Transform.Y * scale);
-                int sw = (int)(shape.Transform.Width * scale);
-                int sh = (int)(shape.Transform.Height * scale);
-                targetBounds = new Rectangle(sx, sy, Math.Max(100, sw), Math.Max(60, sh));
-
-                SlideVideoPlayerManager.Instance.Play(shape, parentControl, targetBounds, false);
-            }
+                if (InvalidateCallback != null) InvalidateCallback();
+            });
         }
 
         public void ShowTrimVideoDialog(ShapeNode shape = null, Control parent = null)
@@ -13213,53 +14771,122 @@ namespace GenOffice.UI
         public void InsertAudio(string audioPath = "")
         {
             if (ActiveSlide == null) return;
-            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+           SaveUndoState();
+             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
 
-            string label = string.IsNullOrEmpty(audioPath) ? "🔊 Âm thanh Nền (Audio Track)" : "🔊 " + System.IO.Path.GetFileName(audioPath);
+            string fileName = !string.IsNullOrEmpty(audioPath) ? System.IO.Path.GetFileName(audioPath) : "Âm thanh Nền (Audio Track)";
+            string label = "🔊 " + fileName;
 
             ShapeNode audioShape = new ShapeNode
             {
                 Name = label,
-                Type = ShapeType.RoundedRectangle,
-                Transform = new Transform2D((canvasW - 360f) / 2f, (canvasH - 100f) / 2f, 360f, 100f),
-                FillColor = 0x1E293B,
-                StrokeColor = 0xF59E0B,
-                StrokeWidth = 2.0f,
-                Text = label,
-                TextColor = 0xFFFFFF,
-                FontSize = 14f,
-                Bold = true,
-                Alignment = TextAlignment.Center
+                Type = ShapeType.Audio,
+                AudioPath = audioPath,
+                Transform = new Transform2D((canvasW - 60f) / 2f, (canvasH - 60f) / 2f, 60f, 60f),
+                FillOpacity = 0f,
+                StrokeWidth = 0f,
+                AudioVolume = VideoVolumeLevel.High,
+                AudioStartMode = VideoStartMode.InClickSequence,
+                AudioRewindAfterPlaying = true,
+                AudioStyleIndex = 0,
+                AudioBookmarks = new List<float>()
             };
+
+            if (!string.IsNullOrEmpty(audioPath) && System.IO.File.Exists(audioPath))
+            {
+                SlideAudioPlayerManager.Instance.InspectAudioDuration(audioShape);
+            }
+
             ActiveSlide.AddShape(audioShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
-        public void InsertHyperlink(string urlOrSlide = "")
+        public void PlayAudioPreview(ShapeNode shape = null, Control parentControl = null)
         {
-            if (SelectedShape != null)
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            SlideAudioPlayerManager.Instance.TogglePlay(shape, parentControl);
+        }
+
+        public void ShowTrimAudioDialog(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            SlideAudioPlayerManager.Instance.ShowTrimAudioDialog(shape, parent);
+        }
+
+        public void AddAudioBookmark(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            SlideAudioPlayerManager.Instance.AddBookmark(shape, parent);
+        }
+
+        public void RemoveAudioBookmark(ShapeNode shape = null, Control parent = null)
+        {
+            if (shape == null) shape = SelectedShape;
+            if (shape == null) return;
+            SlideAudioPlayerManager.Instance.RemoveBookmark(shape, parent);
+        }
+
+        public void InsertHyperlink(string urlOrSlide = "", string displayText = "")
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+            if (string.IsNullOrEmpty(urlOrSlide)) urlOrSlide = "https://zenqoffice.vn";
+            if (string.IsNullOrEmpty(displayText)) displayText = urlOrSlide;
+
+            if (SelectedShape != null && !string.IsNullOrEmpty(SelectedShape.Text))
             {
                 SelectedShape.TextColor = 0x2563EB;
                 SelectedShape.Underline = true;
-                if (string.IsNullOrEmpty(SelectedShape.Text)) SelectedShape.Text = !string.IsNullOrEmpty(urlOrSlide) ? urlOrSlide : "https://zenqoffice.vn";
+                if (!string.IsNullOrEmpty(displayText)) SelectedShape.Text = displayText;
             }
             else
             {
-                StartShapeDrawMode(ShapeType.TextBox);
+                float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+                float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+                float w = Math.Max(280f, displayText.Length * 14f + 40f);
+                float h = 50f;
+                ShapeNode linkShape = new ShapeNode
+                {
+                    Name = "Liên kết: " + displayText,
+                    Type = ShapeType.TextBox,
+                    Transform = new Transform2D((canvasW - w) / 2f, (canvasH - h) / 2f, w, h),
+                    Text = displayText,
+                    FontSize = 18f,
+                    TextColor = 0x2563EB,
+                    Underline = true,
+                    FillColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    Alignment = TextAlignment.Center
+                };
+                ActiveSlide.AddShape(linkShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndices.Add(SelectedShapeIndex);
             }
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertComment(string commentText = "")
         {
             if (ActiveSlide == null) return;
+            SaveUndoState();
             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
 
             ShapeNode commentShape = new ShapeNode
             {
                 Name = "Bình luận",
                 Type = ShapeType.Callout,
-                Transform = new Transform2D(canvasW - 280f, 80f, 240f, 120f),
+                Transform = new Transform2D((canvasW - 240f) / 2f, (canvasH - 120f) / 2f, 240f, 120f),
                 FillColor = 0xFEF08A,
                 StrokeColor = 0xCA8A04,
                 StrokeWidth = 1.5f,
@@ -13271,12 +14898,17 @@ namespace GenOffice.UI
             };
             ActiveSlide.AddShape(commentShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertHeaderFooter(string footerText = "Trình bày bởi ZENQ OFFICE | Trang trình chiếu")
         {
             if (ActiveSlide == null) return;
-            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+           SaveUndoState();
+             float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
             float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
 
             SaveUndoState();
@@ -13296,6 +14928,10 @@ namespace GenOffice.UI
             };
             ActiveSlide.AddShape(footerShape);
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+        SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public static PointF RotatePoint(PointF p, PointF center, float angleDeg)
@@ -13328,7 +14964,7 @@ namespace GenOffice.UI
             return (shape.Type == ShapeType.RoundedRectangle || shape.Type == ShapeType.Rectangle);
         }
 
-        private void DrawSelectedShapeHandles(Graphics g, float sx, float sy, float sw, float sh, float rotation, ShapeNode shape = null)
+        private void DrawSelectedShapeHandles(D2DGraphics g, float sx, float sy, float sw, float sh, float rotation, ShapeNode shape = null)
         {
             ShapeNode targetShape = shape ?? SelectedShape;
             GraphicsState s = g.Save();
@@ -13491,7 +15127,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawCornerRadiusBadge(Graphics g, PointF center, float rotation, PointF unrotatedCornerH, float radiusPx)
+        private void DrawCornerRadiusBadge(D2DGraphics g, PointF center, float rotation, PointF unrotatedCornerH, float radiusPx)
         {
             string text = string.Format("Bo góc: {0:0} px", radiusPx);
             PointF badgeCenter = RotatePoint(new PointF(unrotatedCornerH.X, unrotatedCornerH.Y - 18f), center, rotation);
@@ -13516,7 +15152,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawRotationDegreeBadge(Graphics g, PointF center, float rotation, PointF unrotatedRotH)
+        private void DrawRotationDegreeBadge(D2DGraphics g, PointF center, float rotation, PointF unrotatedRotH)
         {
             int normDeg = (int)Math.Round(rotation) % 360;
             if (normDeg < 0) normDeg += 360;
@@ -13544,7 +15180,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawCropHandles(Graphics g, float sx, float sy, float sw, float sh, float scale)
+        private void DrawCropHandles(D2DGraphics g, float sx, float sy, float sw, float sh, float scale)
         {
             float arm = Math.Max(14f, 18f * Math.Min(1.2f, scale));
             float thick = Math.Max(3.5f, 4.5f * Math.Min(1.2f, scale));
@@ -13669,7 +15305,7 @@ namespace GenOffice.UI
             public int Length;
         }
 
-        public static List<VisualTextLine> GetVisualWrappedLines(Graphics g, string text, Font font, float maxWidth)
+        public static List<VisualTextLine> GetVisualWrappedLines(D2DGraphics g, string text, Font font, float maxWidth)
         {
             List<VisualTextLine> result = new List<VisualTextLine>();
             if (string.IsNullOrEmpty(text))
@@ -13742,6 +15378,98 @@ namespace GenOffice.UI
             return result;
         }
 
+        public static RectangleF GetShapeTextBounds(ShapeNode shape, float baseW, float baseH, float scale)
+        {
+            float padLeft = shape.MarginLeft.HasValue ? shape.MarginLeft.Value * scale : Math.Max(0.5f, 6.0f * scale);
+            float padRight = shape.MarginRight.HasValue ? shape.MarginRight.Value * scale : Math.Max(0.5f, 6.0f * scale);
+            float padTop = shape.MarginTop.HasValue ? shape.MarginTop.Value * scale : Math.Max(0.5f, 4.0f * scale);
+            float padBottom = shape.MarginBottom.HasValue ? shape.MarginBottom.Value * scale : Math.Max(0.5f, 4.0f * scale);
+            if (shape.Type == ShapeType.Parallelogram)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.22f);
+                padRight = Math.Max(padRight, baseW * 0.22f);
+            }
+            else if (shape.Type == ShapeType.Trapezoid)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.20f);
+                padRight = Math.Max(padRight, baseW * 0.20f);
+            }
+            else if (shape.Type == ShapeType.Chevron || shape.Type == ShapeType.BlockArrowRight || shape.Type == ShapeType.BlockArrowLeft)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.22f);
+                padRight = Math.Max(padRight, baseW * 0.22f);
+            }
+            else if (shape.Type == ShapeType.Diamond)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.22f);
+                padRight = Math.Max(padRight, baseW * 0.22f);
+                padTop = Math.Max(padTop, baseH * 0.22f);
+                padBottom = Math.Max(padBottom, baseH * 0.22f);
+            }
+            else if (shape.Type == ShapeType.Triangle)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.24f);
+                padRight = Math.Max(padRight, baseW * 0.24f);
+                padTop = Math.Max(padTop, baseH * 0.32f);
+                padBottom = Math.Max(padBottom, baseH * 0.12f);
+            }
+            else if (shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Octagon)
+            {
+                padLeft = Math.Max(padLeft, baseW * 0.20f);
+                padRight = Math.Max(padRight, baseW * 0.20f);
+            }
+            else if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Callout)
+            {
+                padLeft = Math.Max(1.0f, baseW * 0.10f);
+                padRight = padLeft;
+                padTop = Math.Max(1.0f, baseH * 0.10f);
+                padBottom = padTop;
+            }
+            return new RectangleF(padLeft, padTop, Math.Max(1.0f, baseW - padLeft - padRight), Math.Max(1.0f, baseH - padTop - padBottom));
+        }
+
+        public static void ComputeInlineTextVerticalMetrics(ShapeNode shape, Font font, RectangleF textBounds, int lineCount, float scale, out float lineHeight, out float drawStartY, out float boxStartY)
+        {
+            float maxH = (font != null && font.Height > 0) ? font.Height : Math.Max(4.0f, 16.0f * scale);
+            float effSpacing = (shape.TextRuns != null && shape.TextRuns.Count > 0 && shape.TextRuns[0].ParaLineSpacing.HasValue)
+                ? shape.TextRuns[0].ParaLineSpacing.Value
+                : shape.LineSpacing;
+
+            if (effSpacing > 4.0f)
+                lineHeight = effSpacing * scale;
+            else if (effSpacing < 0)
+                lineHeight = maxH * (-effSpacing) * 0.97f;
+            else if (effSpacing > 0 && Math.Abs(effSpacing - 1.2f) > 0.01f)
+                lineHeight = maxH * (effSpacing / 1.2f) * 0.97f;
+            else
+                lineHeight = maxH;
+
+            float totalTextH = Math.Max(lineHeight, lineCount * lineHeight);
+            if (shape.VerticalAlignment == VerticalTextAlignment.Top)
+                boxStartY = textBounds.Y;
+            else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom)
+                boxStartY = textBounds.Bottom - totalTextH;
+            else
+                boxStartY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+
+            drawStartY = boxStartY;
+            if (shape.VerticalAlignment == VerticalTextAlignment.Top && effSpacing > 4.0f && font != null)
+            {
+                try
+                {
+                    float em = font.FontFamily.GetEmHeight(font.Style);
+                    if (em > 0)
+                    {
+                        float ascent = font.FontFamily.GetCellAscent(font.Style);
+                        float gdiBaselineOffset = font.Size * (ascent / em);
+                        float pptBaselineOffset = (effSpacing * 0.75f) * scale;
+                        drawStartY += (pptBaselineOffset - gdiBaselineOffset);
+                    }
+                }
+                catch { }
+            }
+        }
+
         public int GetTextCharIndexFromPoint(Point mousePos, ShapeNode shape, float slideX, float slideY, float scale)
         {
             if (shape == null) return 0;
@@ -13756,49 +15484,38 @@ namespace GenOffice.UI
             PointF center = new PointF(sx + baseW / 2f, sy + baseH / 2f);
             PointF localPt = RotatePoint(mousePos, center, -shape.Transform.Rotation);
 
-            float padX = Math.Max(2.0f, 6.0f * scale);
-            float padY = Math.Max(2.0f, 4.0f * scale);
-            if (shape.Type == ShapeType.Ellipse || shape.Type == ShapeType.Diamond || shape.Type == ShapeType.Triangle ||
-                shape.Type == ShapeType.Star || shape.Type == ShapeType.Heart || shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Callout)
-            {
-                padX = Math.Max(4.0f, baseW * 0.08f);
-                padY = Math.Max(4.0f, baseH * 0.08f);
-            }
-            RectangleF textBounds = new RectangleF(padX, padY, Math.Max(2.0f, baseW - padX * 2f), Math.Max(2.0f, baseH - padY * 2f));
+            RectangleF textBounds = GetShapeTextBounds(shape, baseW, baseH, scale);
 
-            float calculatedFontSize = Math.Max(3.0f, shape.FontSize * scale);
-            using (Font font = new Font(shape.FontName, calculatedFontSize, shape.Bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
-            using (Bitmap tmpBmp = new Bitmap(1, 1))
-            using (Graphics g = Graphics.FromImage(tmpBmp))
+            float calculatedFontSize = Math.Max(1.0f, shape.FontSize * scale);
+            FontStyle editFs = FontStyle.Regular;
+            if (shape.Bold) editFs |= FontStyle.Bold;
+            if (shape.Italic) editFs |= FontStyle.Italic;
+            if (shape.Underline) editFs |= FontStyle.Underline;
+            if (shape.Strikethrough) editFs |= FontStyle.Strikeout;
+            using (Font font = SlideFontManager.CreateFont(shape.FontName, calculatedFontSize, editFs, GraphicsUnit.Pixel))
+            using (D2DGraphics g = new D2DGraphics())
             {
                 List<VisualTextLine> visualLines = GetVisualWrappedLines(g, text, font, textBounds.Width);
                 if (visualLines.Count == 0) return 0;
 
-                float lineHeight = font.Height;
-                float totalTextH = Math.Max(lineHeight, visualLines.Count * lineHeight);
-
-                float startY;
-                if (shape.VerticalAlignment == VerticalTextAlignment.Top)
-                    startY = textBounds.Y;
-                else if (shape.VerticalAlignment == VerticalTextAlignment.Bottom)
-                    startY = textBounds.Bottom - totalTextH;
-                else
-                    startY = textBounds.Y + Math.Max(0, (textBounds.Height - totalTextH) / 2f);
+                float lineHeight, drawStartY, boxStartY;
+                ComputeInlineTextVerticalMetrics(shape, font, textBounds, Math.Max(1, visualLines.Count), scale, out lineHeight, out drawStartY, out boxStartY);
 
                 float relX = localPt.X - sx;
                 float relY = localPt.Y - sy;
 
-                int lineIdx = (int)((relY - startY) / lineHeight);
+                int lineIdx = (int)Math.Floor((relY - boxStartY) / Math.Max(1.0f, lineHeight));
                 lineIdx = Math.Max(0, Math.Min(visualLines.Count - 1, lineIdx));
 
                 VisualTextLine vLine = visualLines[lineIdx];
                 string lineText = vLine.Text ?? "";
 
                 float cLineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                var effAlign = (shape.TextRuns != null && shape.TextRuns.Count > 0 && shape.TextRuns[0].ParaAlignment.HasValue) ? shape.TextRuns[0].ParaAlignment.Value : shape.Alignment;
                 float lineStartX;
-                if (shape.Alignment == TextAlignment.Left)
+                if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
                     lineStartX = textBounds.X;
-                else if (shape.Alignment == TextAlignment.Right)
+                else if (effAlign == TextAlignment.Right)
                     lineStartX = textBounds.Right - cLineWidth;
                 else
                     lineStartX = textBounds.X + (textBounds.Width - cLineWidth) / 2f;
@@ -15240,40 +16957,6 @@ namespace GenOffice.UI
         public void ShowShapeContextMenu(Control parentControl, Point screenPos, int shapeIndex)
         {
             if (ActiveSlide == null || shapeIndex < 0 || shapeIndex >= ActiveSlide.Shapes.Count) return;
-            
-            try
-            {
-                var wpfMenu = new WpfSlidesContextMenu();
-                
-                System.Drawing.Point pt = parentControl.PointToScreen(screenPos);
-                wpfMenu.Left = pt.X;
-                wpfMenu.Top = pt.Y;
-                
-                ShapeNode shapeNode = ActiveSlide.Shapes[shapeIndex];
-                
-                wpfMenu.CutRequested += (s, e) => { Cut(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.CopyRequested += (s, e) => { Copy(); };
-                wpfMenu.PasteRequested += (s, e) => { Paste(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.BringToFrontRequested += (s, e) => { BringShapeToFront(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.BringForwardRequested += (s, e) => { BringShapeForward(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.SendToBackRequested += (s, e) => { SendShapeToBack(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.SendBackwardRequested += (s, e) => { SendShapeBackward(); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.GroupRequested += (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.UngroupRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); };
-                wpfMenu.FormatShapeRequested += (s, e) => { if (parentControl != null) parentControl.Invalidate(); }; // Just invalidate for now
-                
-                // For Font formatting, we can apply to EditingShape or SelectedShape
-                wpfMenu.BoldRequested += (s, e) => { if (shapeNode != null) { shapeNode.Bold = !shapeNode.Bold; if (parentControl != null) parentControl.Invalidate(); } };
-                wpfMenu.ItalicRequested += (s, e) => { if (shapeNode != null) { shapeNode.Italic = !shapeNode.Italic; if (parentControl != null) parentControl.Invalidate(); } };
-                wpfMenu.UnderlineRequested += (s, e) => { if (shapeNode != null) { shapeNode.Underline = !shapeNode.Underline; if (parentControl != null) parentControl.Invalidate(); } };
-                
-                wpfMenu.Show();
-                return;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Failed to show WPF context menu: " + ex.Message);
-            }
 
             ShapeNode shape = ActiveSlide.Shapes[shapeIndex];
 
@@ -15374,11 +17057,11 @@ namespace GenOffice.UI
             menu.Items.Add(new ToolStripSeparator());
 
             // 2. Edit Text & Edit Points
-            ToolStripMenuItem miEditText = new ToolStripMenuItem("Chỉnh sửa Văn bản (Edit Text)", CreateEditTextIcon(), (s, e) => {
+            ToolStripMenuItem miEditText = new ToolStripMenuItem("Chỉnh sửa văn bản", CreateEditTextIcon(), (s, e) => {
                 StartInlineEditing(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miEditPoints = new ToolStripMenuItem("Chỉnh sửa Điểm (Edit Points)", CreateEditPointsIcon());
+            ToolStripMenuItem miEditPoints = new ToolStripMenuItem("Chỉnh sửa điểm", CreateEditPointsIcon());
             miEditPoints.Enabled = (shape.Type == ShapeType.CustomPath);
             menu.Items.Add(miEditText);
             menu.Items.Add(miEditPoints);
@@ -15650,7 +17333,7 @@ namespace GenOffice.UI
             menu.Items.Add(new ToolStripSeparator());
 
             // 6. Photo Album...
-            ToolStripMenuItem miPhotoAlbum = new ToolStripMenuItem("Tập ảnh (Photo Album)...", CreatePhotoAlbumIcon());
+            ToolStripMenuItem miPhotoAlbum = new ToolStripMenuItem("Bộ sưu tập ảnh...", CreatePhotoAlbumIcon());
             miPhotoAlbum.Enabled = false;
             menu.Items.Add(miPhotoAlbum);
 
@@ -15933,11 +17616,21 @@ namespace GenOffice.UI
         public void InsertNewSlideAfter(int index)
         {
             if (Presentation == null) return;
-            SlideNode newSlide = new SlideNode { Layout = SlideLayoutType.TitleAndContent };
-            ApplySlideLayoutTemplate(newSlide, SlideLayoutType.TitleAndContent);
+            SlideNode newSlide = new SlideNode
+            {
+                Title = "Slide " + (Presentation.Slides.Count + 1),
+                Layout = SlideLayoutType.Blank,
+                BgColor = 0xFFFFFF,
+                IsGradientBg = false,
+                Shapes = new List<ShapeNode>(),
+                Transition = TransitionType.None,
+                TransitionDuration = 0f
+            };
             int insertIdx = Math.Min(Presentation.Slides.Count, index + 1);
             Presentation.Slides.Insert(insertIdx, newSlide);
             ActiveSlideIndex = insertIdx;
+            SelectedShapeIndex = -1;
+            CurrentAnimationStep = 0;
         }
 
         public void DuplicateSlide(int index)
@@ -15965,7 +17658,9 @@ namespace GenOffice.UI
                     Presentation.Slides[0].Shapes.Clear();
                     Presentation.Slides[0].BgColor = 0xFFFFFF;
                     Presentation.Slides[0].IsGradientBg = false;
-                    ApplySlideLayoutTemplate(Presentation.Slides[0], SlideLayoutType.TitleSlide);
+                    Presentation.Slides[0].Layout = SlideLayoutType.Blank;
+                    Presentation.Slides[0].Transition = TransitionType.None;
+                    Presentation.Slides[0].TransitionDuration = 0f;
                 }
             }
         }
@@ -16830,7 +18525,7 @@ namespace GenOffice.UI
             return CreateRoundedRectPath(new RectangleF(bounds.X, bounds.Y, bounds.Width, bounds.Height), radius);
         }
 
-        private void DrawStarShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawStarShape(D2DGraphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
         {
             PointF[] pts = new PointF[10];
             float cx = r.X + r.Width / 2f;
@@ -16852,12 +18547,12 @@ namespace GenOffice.UI
             if (stroke) g.DrawPolygon(p, pts);
         }
 
-        private void DrawStarShape(Graphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawStarShape(D2DGraphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
         {
             DrawStarShape(g, new RectangleF(r.X, r.Y, r.Width, r.Height), b, p, fill, stroke);
         }
 
-        private void DrawArrowShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawArrowShape(D2DGraphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
         {
             float yMid = r.Y + r.Height / 2f;
             float yTop = r.Y + r.Height * 0.25f;
@@ -16879,12 +18574,12 @@ namespace GenOffice.UI
             if (stroke) g.DrawPolygon(p, pts);
         }
 
-        private void DrawArrowShape(Graphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawArrowShape(D2DGraphics g, Rectangle r, Brush b, Pen p, bool fill, bool stroke)
         {
             DrawArrowShape(g, new RectangleF(r.X, r.Y, r.Width, r.Height), b, p, fill, stroke);
         }
 
-        private void DrawHeartShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawHeartShape(D2DGraphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
         {
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -16916,7 +18611,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawCalloutShape(Graphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
+        private void DrawCalloutShape(D2DGraphics g, RectangleF r, Brush b, Pen p, bool fill, bool stroke)
         {
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -16966,7 +18661,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawPendingShapeOverlay(Graphics g)
+        private void DrawPendingShapeOverlay(D2DGraphics g)
         {
             int x, y, w, h;
             bool isSquare;
@@ -17026,7 +18721,7 @@ namespace GenOffice.UI
         #endregion
 
         #region Transitions & Morph Renderer (60 FPS)
-        public void DrawFullscreenPresenter(Graphics g, int screenW, int screenH, bool isMainDisplay = true)
+        public void DrawFullscreenPresenter(D2DGraphics g, int screenW, int screenH, bool isMainDisplay = true)
         {
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -17082,34 +18777,9 @@ namespace GenOffice.UI
 
             g.FillRectangle(Brushes.Black, 0, 0, screenW, screenH);
 
-            float canvasWf = (Presentation != null && Presentation.CanvasWidth > 0) ? Presentation.CanvasWidth : 1920.0f;
-            float canvasHf = (Presentation != null && Presentation.CanvasHeight > 0) ? Presentation.CanvasHeight : 1080.0f;
-
-            float fitScaleX = (float)screenW / canvasWf;
-            float fitScaleY = (float)screenH / canvasHf;
-            float scale = Math.Min(fitScaleX, fitScaleY);
-
-            int slideW = (int)Math.Round(canvasWf * scale);
-            int slideH = (int)Math.Round(canvasHf * scale);
-            int slideX = (screenW - slideW) / 2;
-            int slideY = (screenH - slideH) / 2;
-
-            if (IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying && SlideVideoPlayerManager.Instance.ActiveShape != null)
-            {
-                ShapeNode vs = SlideVideoPlayerManager.Instance.ActiveShape;
-                if (vs.VideoPlayFullScreen)
-                {
-                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(slideX, slideY, slideW, slideH));
-                }
-                else
-                {
-                    int vsx = slideX + (int)(vs.Transform.X * scale);
-                    int vsy = slideY + (int)(vs.Transform.Y * scale);
-                    int vsw = (int)(vs.Transform.Width * scale);
-                    int vsh = (int)(vs.Transform.Height * scale);
-                    SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vsx, vsy, Math.Max(100, vsw), Math.Max(60, vsh)));
-                }
-            }
+            int slideX, slideY, slideW, slideH;
+            float scale;
+            GetPresenterSlideMetrics(screenW, screenH, out slideX, out slideY, out slideW, out slideH, out scale);
 
             Rectangle slideRect = new Rectangle(slideX, slideY, slideW, slideH);
 
@@ -17148,7 +18818,11 @@ namespace GenOffice.UI
 
                         if (isVis)
                         {
-                            DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            try
+                            {
+                                DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            }
+                            catch { }
                         }
                     }
                 }
@@ -17218,7 +18892,7 @@ namespace GenOffice.UI
             return -1;
         }
 
-        private void DrawSlideShowHoverToolbar(Graphics g, int screenW, int screenH)
+        private void DrawSlideShowHoverToolbar(D2DGraphics g, int screenW, int screenH)
         {
             int barY = screenH - 46;
             g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -17303,7 +18977,7 @@ namespace GenOffice.UI
 
         private Rectangle _rehearsalToolbarRect = new Rectangle(20, 20, 240, 66);
 
-        private void DrawRehearsalFloatingToolbar(Graphics g, int screenW, int screenH)
+        private void DrawRehearsalFloatingToolbar(D2DGraphics g, int screenW, int screenH)
         {
             Rectangle r = _rehearsalToolbarRect;
             g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -17436,7 +19110,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawPresenterView(Graphics g, int screenW, int screenH)
+        private void DrawPresenterView(D2DGraphics g, int screenW, int screenH)
         {
             // Nền tối sang trọng
             using (SolidBrush darkBg = new SolidBrush(Color.FromArgb(24, 24, 24)))
@@ -17563,7 +19237,11 @@ namespace GenOffice.UI
 
                         if (isVis)
                         {
-                            DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            try
+                            {
+                                DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                            }
+                            catch { }
                         }
                     }
                 }
@@ -17616,7 +19294,11 @@ namespace GenOffice.UI
                 float nextScale = (float)nextW / Presentation.CanvasWidth;
                 foreach (ShapeNode shape in nextSlide.Shapes)
                 {
-                    DrawShape(g, nextX, nextY, nextScale, shape, false);
+                    try
+                    {
+                        DrawShape(g, nextX, nextY, nextScale, shape, false);
+                    }
+                    catch { }
                 }
                 g.DrawRectangle(Pens.Gray, nextRect);
             }
@@ -17649,20 +19331,14 @@ namespace GenOffice.UI
 
             Rectangle notesRect = new Rectangle(rightX, notesY + 24, rightW - 24, notesH - 24);
             using (SolidBrush notesBg = new SolidBrush(Color.FromArgb(30, 30, 30)))
-            using (Pen notesBorder = new Pen(Color.FromArgb(60, 60, 60), 1f))
+            using (Pen notesBorder = new Pen(IsEditingSpeakerNotes ? Color.FromArgb(210, 71, 38) : Color.FromArgb(60, 60, 60), IsEditingSpeakerNotes ? 1.5f : 1f))
             {
                 g.FillRectangle(notesBg, notesRect);
                 g.DrawRectangle(notesBorder, notesRect);
             }
 
-            string notes = (ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes))
-                ? ActiveSlide.SpeakerNotes : "(Không có ghi chú cho slide này)";
-            using (Font notesFont = new Font("Segoe UI", PresenterNotesFontSize))
-            using (SolidBrush textBrush = new SolidBrush((ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes)) ? Color.White : Color.Gray))
-            {
-                RectangleF textBounds = new RectangleF(notesRect.X + 10, notesRect.Y + 10, notesRect.Width - 20, notesRect.Height - 20);
-                g.DrawString(notes, notesFont, textBrush, textBounds);
-            }
+            RectangleF textBounds = new RectangleF(notesRect.X + 10, notesRect.Y + 10, Math.Max(40, notesRect.Width - 20), Math.Max(20, notesRect.Height - 20));
+            DrawInteractiveSpeakerNotesContent(g, textBounds, PresenterNotesFontSize, true);
 
             // 3. BOTTOM BAR (Thanh công cụ điều hướng & công cụ bổ trợ)
             int botY = screenH - bottomH;
@@ -17718,7 +19394,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawSlideSorterModal(Graphics g, int screenW, int screenH)
+        private void DrawSlideSorterModal(D2DGraphics g, int screenW, int screenH)
         {
             // Lớp phủ mờ nền
             using (SolidBrush darkDim = new SolidBrush(Color.FromArgb(235, 15, 15, 15)))
@@ -18136,7 +19812,7 @@ namespace GenOffice.UI
         }
         #endregion
 
-        private void DrawSlideFull(Graphics g, RectangleF targetRect, SlideNode slide, float baseScale, float opacity = 1.0f, bool isFromSlide = false)
+        private void DrawSlideFull(D2DGraphics g, RectangleF targetRect, SlideNode slide, float baseScale, float opacity = 1.0f, bool isFromSlide = false)
         {
             if (slide == null || targetRect.Width <= 0 || targetRect.Height <= 0) return;
 
@@ -18222,7 +19898,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFadeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFadeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (fromSlide != null && t < 0.999f)
             {
@@ -18234,7 +19910,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderPushTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPushTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromBottom;
             RectangleF rectA, rectB;
@@ -18266,7 +19942,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderWipeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderWipeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
@@ -18293,7 +19969,7 @@ namespace GenOffice.UI
             g.Restore(st);
         }
 
-        private void RenderSplitTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderSplitTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Vertical;
@@ -18314,7 +19990,7 @@ namespace GenOffice.UI
             g.Restore(st);
         }
 
-        private void RenderRevealTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderRevealTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
@@ -18341,13 +20017,13 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderCutTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCutTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f) DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             else DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
         }
 
-        private void RenderCoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCoverTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
@@ -18374,7 +20050,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderUncoverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderUncoverTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale, 1.0f, false);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromLeft;
@@ -18401,7 +20077,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFlashTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFlashTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f)
             {
@@ -18423,7 +20099,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderShapeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderShapeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f, true);
             float maxR = (float)Math.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height) * 0.6f;
@@ -18438,7 +20114,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderFallOverTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFallOverTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float rad = t * (float)(Math.PI / 2.0);
@@ -18465,7 +20141,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderCurtainsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCurtainsTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             // 1. Stage Background (Slide B is on stage)
             DrawSlideFull(g, rect, toSlide, scale);
@@ -18530,7 +20206,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderWindTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderWindTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float wx = rect.X + rect.Width * 0.9f * t;
@@ -18541,7 +20217,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderPrestigeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPrestigeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float curH = rect.Height * t;
@@ -18553,7 +20229,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFractureTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFractureTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             int nCols = 6;
@@ -18569,7 +20245,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderCrushTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCrushTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float s = Math.Max(0.01f, 1.0f - t);
@@ -18580,7 +20256,7 @@ namespace GenOffice.UI
             DrawSlideFull(g, new RectangleF(cx, cy, cw, ch), fromSlide, scale, s);
         }
 
-        private void RenderPeelOffTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPeelOffTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float peelW = rect.Width * (1.0f - t);
@@ -18600,7 +20276,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderPageCurlTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPageCurlTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float remW = rect.Width * (1.0f - t);
@@ -18633,7 +20309,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderAirplaneTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderAirplaneTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
 
@@ -18689,7 +20365,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderOrigamiTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderOrigamiTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float ox = rect.X + rect.Width * t * 1.1f;
@@ -18698,7 +20374,7 @@ namespace GenOffice.UI
             DrawSlideFull(g, new RectangleF(ox, oy, rect.Width * os, rect.Height * os), fromSlide, scale, 1.0f - t);
         }
 
-        private void RenderDissolveTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderDissolveTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             if (t <= 0.001f) return;
@@ -18729,7 +20405,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderCheckerTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCheckerTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             int rows = 4;
@@ -18745,7 +20421,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderBlindsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderBlindsTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Vertical;
             int slats = 6;
@@ -18791,7 +20467,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderClockTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderClockTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float sweep = 360f * t;
@@ -18806,7 +20482,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderRippleTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderRippleTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
             DrawSlideFull(g, rect, toSlide, scale, t);
@@ -18820,7 +20496,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderHoneycombTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderHoneycombTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             int hCols = 8;
@@ -18855,13 +20531,13 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderGlitterTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderGlitterTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale, 1.0f - t);
             DrawSlideFull(g, rect, toSlide, scale, t);
         }
 
-        private void RenderVortexTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderVortexTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f)
             {
@@ -18883,7 +20559,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderShredTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderShredTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             int strips = 6;
@@ -18899,7 +20575,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderSwitchTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderSwitchTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float offA = -rect.Width * 0.4f * t;
             float sA = 1.0f - t * 0.3f;
@@ -18913,7 +20589,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFlipTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFlipTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float rad = t * (float)Math.PI;
             float cos = (float)Math.Cos(rad);
@@ -18950,7 +20626,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderGalleryTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderGalleryTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float offA = -rect.Width * t;
             float offB = rect.Width * (1.0f - t);
@@ -18961,7 +20637,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderCubeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCubeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromRight;
             float rad = t * (float)(Math.PI / 2.0);
@@ -19019,7 +20695,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderDoorsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderDoorsTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float halfW = rect.Width / 2f;
@@ -19070,7 +20746,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderBoxTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderBoxTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f)
             {
@@ -19092,7 +20768,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderCombTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCombTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.Horizontal;
@@ -19126,7 +20802,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderZoomTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderZoomTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.In;
             float cx = rect.X + rect.Width / 2f;
@@ -19221,7 +20897,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderRandomBarsTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderRandomBarsTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             if (t <= 0.001f) return;
@@ -19247,7 +20923,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderPanTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPanTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             TransitionDirection dir = (toSlide != null) ? toSlide.TransitionDirection : TransitionDirection.FromBottom;
             RectangleF rectA, rectB;
@@ -19278,7 +20954,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFerrisWheelTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFerrisWheelTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float rad = (float)(t * Math.PI / 2.0);
             float offXA = -(float)Math.Sin(rad) * rect.Width;
@@ -19293,7 +20969,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderConveyorTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderConveyorTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float offA = -rect.Width * t;
             float offB = rect.Width * (1.0f - t);
@@ -19304,7 +20980,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderRotateTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderRotateTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f)
             {
@@ -19322,7 +20998,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderWindowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderWindowTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             float hw = rect.Width / 2f;
@@ -19343,7 +21019,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderOrbitTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderOrbitTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float offA = -rect.Width * 0.5f * t;
             float sA = 1.0f - t * 0.4f;
@@ -19357,7 +21033,7 @@ namespace GenOffice.UI
             g.Restore(gs);
         }
 
-        private void RenderFlyThroughTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderFlyThroughTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             if (t < 0.5f)
             {
@@ -19386,7 +21062,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 10 HIỆU ỨNG CHUYỂN CẢNH ĐỘC QUYỀN GENOFFICE ====================
-        private void RenderCinematicPrismTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderCinematicPrismTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float sweepX = rect.X + rect.Width * t;
@@ -19407,7 +21083,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderLiquidFluidTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderLiquidFluidTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             using (GraphicsPath wavePath = new GraphicsPath())
@@ -19439,7 +21115,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderMatrixRainTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderMatrixRainTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             int cols = 20;
@@ -19482,7 +21158,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderNeonPulseTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderNeonPulseTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float cx = rect.X + rect.Width / 2f;
@@ -19512,7 +21188,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderPortalWarpTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderPortalWarpTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float cx = rect.X + rect.Width / 2f;
             float cy = rect.Y + rect.Height / 2f;
@@ -19544,7 +21220,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderSupernovaTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderSupernovaTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float cx = rect.X + rect.Width / 2f;
             float cy = rect.Y + rect.Height / 2f;
@@ -19583,7 +21259,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderHologramGlitchTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderHologramGlitchTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, toSlide, scale);
             int strips = 12;
@@ -19608,7 +21284,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderKaleidoscopeTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderKaleidoscopeTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float cx = rect.X + rect.Width / 2f;
@@ -19645,7 +21321,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawGoldenStarCard(Graphics g, float cx, float cy, float r, float rotationAngle, int alpha)
+        private void DrawGoldenStarCard(D2DGraphics g, float cx, float cy, float r, float rotationAngle, int alpha)
         {
             if (r <= 1.0f || alpha <= 0) return;
             PointF[] starPts = new PointF[10];
@@ -19676,7 +21352,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderStarlightTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderStarlightTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             float screenCx = rect.X + rect.Width / 2f;
             float screenCy = rect.Y + rect.Height / 2f;
@@ -19762,7 +21438,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void RenderGoldenRibbonTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderGoldenRibbonTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             DrawSlideFull(g, rect, fromSlide, scale);
             float sweepX = rect.X + rect.Width * t;
@@ -19835,7 +21511,7 @@ namespace GenOffice.UI
                 : (float)(1.0 - Math.Pow(-2.0 * t + 2.0, 4) / 2.0);
         }
 
-        private void RenderSmoothFlowTransition(Graphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
+        private void RenderSmoothFlowTransition(D2DGraphics g, Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float t, float scale)
         {
             GraphicsState gsClip = g.Save();
             g.IntersectClip(rect);
@@ -19968,7 +21644,7 @@ namespace GenOffice.UI
         #endregion
 
         #region Other Presentation Views
-        private void DrawOutlineView(Graphics g, int x, int y, int w, int h)
+        private void DrawOutlineView(D2DGraphics g, int x, int y, int w, int h)
         {
             g.FillRectangle(Brushes.White, x, y, w, h);
             int py = y + 20;
@@ -20000,7 +21676,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawNotesView(Graphics g, int x, int y, int w, int h)
+        private void DrawNotesView(D2DGraphics g, int x, int y, int w, int h)
         {
             using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
             {
@@ -20024,24 +21700,38 @@ namespace GenOffice.UI
             if (slide != null)
             {
                 DrawSlideBackground(g, miniRect, slide);
+                float miniScale = (float)miniW / Presentation.CanvasWidth;
+                GraphicsState miniState = g.Save();
+                g.SetClip(miniRect);
+                foreach (ShapeNode shape in slide.Shapes)
+                {
+                    try
+                    {
+                        DrawShape(g, miniRect.X, miniRect.Y, miniScale, shape, false);
+                    }
+                    catch { }
+                }
+                g.Restore(miniState);
                 g.DrawRectangle(Pens.LightGray, miniRect);
             }
 
             int notesY = miniRect.Bottom + 20;
             int notesH = pageH - (notesY - pageY) - 20;
             Rectangle notesRect = new Rectangle(pageX + 20, notesY, miniW, notesH);
-            g.DrawRectangle(Pens.Silver, notesRect);
+            using (Pen notesPen = new Pen(IsEditingSpeakerNotes ? Color.FromArgb(210, 71, 38) : Color.Silver, IsEditingSpeakerNotes ? 1.5f : 1f))
+            {
+                g.DrawRectangle(notesPen, notesRect);
+            }
 
             using (Font headerFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
-            using (Font notesFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
             {
                 g.DrawString("GHI CHÚ DIỄN GIẢ (SPEAKER NOTES):", headerFont, Brushes.DarkOrange, notesRect.X + 8, notesRect.Y + 8);
-                string notesText = (slide != null && !string.IsNullOrEmpty(slide.SpeakerNotes)) ? slide.SpeakerNotes : "Nhấp vào đây để thêm ghi chú cho slide...";
-                g.DrawString(notesText, notesFont, Brushes.Black, new RectangleF(notesRect.X + 8, notesRect.Y + 30, notesRect.Width - 16, notesRect.Height - 40));
             }
+            RectangleF notesTextBounds = new RectangleF(notesRect.X + 8, notesRect.Y + 30, Math.Max(40, notesRect.Width - 16), Math.Max(20, notesRect.Height - 38));
+            DrawInteractiveSpeakerNotesContent(g, notesTextBounds, 10.5f, false);
         }
 
-        private void DrawSlideSorterView(Graphics g, int x, int y, int w, int h)
+        private void DrawSlideSorterView(D2DGraphics g, int x, int y, int w, int h)
         {
             using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
             {
@@ -20099,7 +21789,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawSlideMasterView(Graphics g, int x, int y, int w, int h)
+        private void DrawSlideMasterView(D2DGraphics g, int x, int y, int w, int h)
         {
             using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
             {
@@ -20134,8 +21824,8 @@ namespace GenOffice.UI
                 {
                     if (_shapeSearchBox != null && _shapeSearchBox.Focused)
                     {
-                        _shapeSearchBox.Enabled = false;
-                        _shapeSearchBox.Enabled = true;
+                        if (parentControl is Form form) form.ActiveControl = null;
+                        parentControl.Focus();
                     }
                     if (!parentControl.Focused)
                     {
@@ -20146,8 +21836,8 @@ namespace GenOffice.UI
 
             if (IsPresenting)
             {
-                // Nếu đang ở Màn hình Đen Kết thúc Slide Show
-                if (IsEndSlideShowScreen)
+                // Nếu đang ở Màn hình Đen Kết thúc Slide Show (chế độ toàn màn hình thường)
+                if (!IsPresenterViewMode && IsEndSlideShowScreen)
                 {
                     if (buttons == MouseButtons.Right)
                     {
@@ -20236,6 +21926,7 @@ namespace GenOffice.UI
                             if (parentControl != null) parentControl.Invalidate();
                             return;
                         }
+                        return;
                     }
 
                     // Bottom Bar clicks
@@ -20247,7 +21938,7 @@ namespace GenOffice.UI
                             PreviousPresenterStep();
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tiến (160..206)
@@ -20256,7 +21947,7 @@ namespace GenOffice.UI
                             AdvancePresenterStep();
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Bút & Laser (240..350)
@@ -20265,7 +21956,7 @@ namespace GenOffice.UI
                             ShowPenOptionsMenu(parentControl, new Point(mousePos.X, height - 70));
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Tất cả Slide Grid (360..490)
@@ -20274,7 +21965,7 @@ namespace GenOffice.UI
                             IsSlideSorterModalOpen = true;
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Zoom (500..590)
@@ -20284,7 +21975,7 @@ namespace GenOffice.UI
                             SlideZoomCenter = new Point(width / 4, height / 2);
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         // Màn đen (600..720)
@@ -20293,14 +21984,23 @@ namespace GenOffice.UI
                             BlackScreenMode = !BlackScreenMode;
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
+                        return;
                     }
 
-                    // Nút Zoom chữ A- / A+ trong khung Ghi chú
-                    int nextH = (int)((height - 46 - 8 - 65 - 8) * 0.44f);
-                    int notesY = 46 + 8 + nextH + 10;
+                    // Nút Zoom chữ A- / A+ và Khung Ghi chú người thuyết trình (Speaker Notes)
+                    int topH = 46;
+                    int bottomH = 65;
+                    int mainY = topH + 8;
+                    int mainH = height - mainY - bottomH - 8;
+                    int leftW = (int)(width * 0.58f);
+                    int rightW = width - leftW - 24;
+                    int rightX = leftW + 12;
+                    int nextH = (int)(mainH * 0.44f);
+                    int notesY = mainY + nextH + 10;
+                    int notesH = mainH - nextH - 14;
                     if (mousePos.Y >= notesY && mousePos.Y <= notesY + 22)
                     {
                         if (mousePos.X >= width - 80 && mousePos.X <= width - 54)
@@ -20308,7 +22008,7 @@ namespace GenOffice.UI
                             PresenterNotesFontSize = Math.Max(10, PresenterNotesFontSize - 2);
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                         if (mousePos.X >= width - 48 && mousePos.X <= width - 22)
@@ -20316,23 +22016,190 @@ namespace GenOffice.UI
                             PresenterNotesFontSize = Math.Min(28, PresenterNotesFontSize + 2);
                             if (parentControl != null) parentControl.Invalidate();
                             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                            if (InvalidateCallback != null) InvalidateCallback();
                             return;
                         }
                     }
 
-                    // Nhấp vào màn hình slide chính bên trái
-                    if (buttons == MouseButtons.Left)
+                    // Nhấp vào khung Ghi chú người thuyết trình để gõ / chỉnh sửa trực tiếp ngay trong Presenter View
+                    Rectangle notesRect = new Rectangle(rightX, notesY + 24, rightW - 24, notesH - 24);
+                    if (notesRect.Contains(mousePos) && ActiveSlide != null)
                     {
-                        AdvancePresenterStep();
+                        IsEditingSpeakerNotes = true;
+                        RectangleF notesTextBounds = new RectangleF(notesRect.X + 10, notesRect.Y + 10, Math.Max(40, notesRect.Width - 20), Math.Max(20, notesRect.Height - 20));
+                        SpeakerNotesCaretIndex = GetSpeakerNotesCharIndexFromPoint(mousePos, notesTextBounds, PresenterNotesFontSize);
+                        SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                        SpeakerNotesSelectionLength = 0;
+                        IsSelectingSpeakerNotes = (buttons == MouseButtons.Left);
+                        if (parentControl != null) parentControl.Invalidate();
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
                     }
-                    else if (buttons == MouseButtons.Right)
+
+                    IsEditingSpeakerNotes = false;
+
+                    // Kiểm tra nhấp vào Thanh điều khiển Video nổi (Video Floating Playback Bar) trong Presenter View
+                    if (buttons == MouseButtons.Left && !LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && HoveredVideoShape != null)
                     {
-                        PreviousPresenterStep();
+                        float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                        float barW = LastVideoPlaybackBarBounds.Width;
+                        float playBtnW = 32f;
+                        float volBtnW = 32f;
+                        float timeTextW = (barW > 240f) ? 80f : 0f;
+                        float scrubX = playBtnW + 8f;
+                        float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+
+                        if (relX < playBtnW)
+                        {
+                            SlideVideoPlayerManager.Instance.TogglePlay(HoveredVideoShape, parentControl, default(Rectangle), true, () =>
+                            {
+                                if (InvalidateCallback != null) InvalidateCallback();
+                            });
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        else if (relX >= scrubX && relX <= scrubX + scrubW)
+                        {
+                            IsDraggingVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
+                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        else if (relX >= barW - volBtnW)
+                        {
+                            SlideVideoPlayerManager.Instance.ToggleVolume();
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+
+                    // Kiểm tra nhấp vào Thanh điều khiển Âm thanh nổi (Audio Floating Playback Bar) trong Presenter View
+                    ShapeNode targetAudioForBar = HoveredAudioShape ?? SlideAudioPlayerManager.Instance.ActiveShape;
+                    if (buttons == MouseButtons.Left && !LastAudioPlaybackBarBounds.IsEmpty && LastAudioPlaybackBarBounds.Contains(mousePos) && targetAudioForBar != null)
+                    {
+                        HoveredAudioShape = targetAudioForBar;
+                        float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                        float barW = LastAudioPlaybackBarBounds.Width;
+                        float scrubX = 74f;
+                        float scrubW = barW - 74f - 88f;
+
+                        if (relX < 28f)
+                        {
+                            SlideAudioPlayerManager.Instance.TogglePlay(targetAudioForBar, parentControl);
+                            _playedMediaShapesInPresentation.Add(targetAudioForBar);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= 28f && relX < 48f)
+                        {
+                            SlideAudioPlayerManager.Instance.StepRelative(targetAudioForBar, -0.25f, parentControl);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= 48f && relX < 68f)
+                        {
+                            SlideAudioPlayerManager.Instance.StepRelative(targetAudioForBar, 0.25f, parentControl);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= scrubX && relX <= scrubX + scrubW)
+                        {
+                            IsDraggingAudioScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = targetAudioForBar.AudioTotalTime > 0 ? targetAudioForBar.AudioTotalTime : 180f;
+                            if (!SlideAudioPlayerManager.Instance.IsPlaying || SlideAudioPlayerManager.Instance.ActiveShape != targetAudioForBar)
+                            {
+                                SlideAudioPlayerManager.Instance.Play(targetAudioForBar, parentControl);
+                            }
+                            SlideAudioPlayerManager.Instance.Seek(targetAudioForBar, frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= barW - 28f)
+                        {
+                            SlideAudioPlayerManager.Instance.ToggleMute(targetAudioForBar);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                    }
+
+                    // Chuẩn PowerPoint: CHỈ khi nhấp chuột BÊN TRONG khung Slide hiện tại (curSlideRect) mới phát video hoặc chuyển slide!
+                    // Nhấp ra ngoài vùng nền đen hoặc vùng Slide tiếp theo sẽ KHÔNG chuyển slide.
+                    int presSlideX, presSlideY, presSlideW, presSlideH;
+                    float scaleP;
+                    GetCurrentActiveSlidePresentationMetrics(width, height, out presSlideX, out presSlideY, out presSlideW, out presSlideH, out scaleP);
+                    Rectangle curSlideRect = new Rectangle(presSlideX, presSlideY, presSlideW, presSlideH);
+
+                    if (curSlideRect.Contains(mousePos))
+                    {
+                        if (IsEndSlideShowScreen)
+                        {
+                            if (buttons == MouseButtons.Right)
+                            {
+                                IsEndSlideShowScreen = false;
+                            }
+                            else if (buttons == MouseButtons.Left)
+                            {
+                                IsEndSlideShowScreen = false;
+                                StopPresenting();
+                            }
+                        }
+                        else if (buttons == MouseButtons.Left)
+                        {
+                            bool clickedMedia = false;
+                            if (ActiveSlide != null && !AnnotationPenMode && !LaserPointerMode)
+                            {
+                                for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+                                {
+                                    ShapeNode shape = ActiveSlide.Shapes[i];
+                                    if (shape == null) continue;
+                                    int sx = presSlideX + (int)(shape.Transform.X * scaleP);
+                                    int sy = presSlideY + (int)(shape.Transform.Y * scaleP);
+                                    int sw = (int)(shape.Transform.Width * scaleP);
+                                    int sh = (int)(shape.Transform.Height * scaleP);
+
+                                    if (mousePos.X >= sx && mousePos.X <= sx + sw && mousePos.Y >= sy && mousePos.Y <= sy + sh)
+                                    {
+                                        if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
+                                        {
+                                            HoveredVideoShape = shape;
+                                            PlayVideoPreview(shape, parentControl);
+                                            _playedMediaShapesInPresentation.Add(shape);
+                                            clickedMedia = true;
+                                            break;
+                                        }
+                                        else if (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath))
+                                        {
+                                            HoveredAudioShape = shape;
+                                            SlideAudioPlayerManager.Instance.TogglePlay(shape, parentControl);
+                                            _playedMediaShapesInPresentation.Add(shape);
+                                            clickedMedia = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!clickedMedia)
+                            {
+                                AdvancePresenterStep();
+                            }
+                        }
+                        else if (buttons == MouseButtons.Right)
+                        {
+                            PreviousPresenterStep();
+                        }
                     }
                     if (parentControl != null) parentControl.Invalidate();
                     if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
 
@@ -20442,25 +22309,111 @@ namespace GenOffice.UI
                 // Tiến bước / slide hoặc phát video
                 if (buttons == MouseButtons.Left)
                 {
+                    // Check if clicked the Video Floating Playback Bar in Presentation Mode
+                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && HoveredVideoShape != null)
+                    {
+                        float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                        float barW = LastVideoPlaybackBarBounds.Width;
+                        float playBtnW = 32f;
+                        float volBtnW = 32f;
+                        float timeTextW = (barW > 240f) ? 80f : 0f;
+                        float scrubX = playBtnW + 8f;
+                        float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+
+                        if (relX < playBtnW)
+                        {
+                            SlideVideoPlayerManager.Instance.TogglePlay(HoveredVideoShape, parentControl, default(Rectangle), true, () =>
+                            {
+                                if (InvalidateCallback != null) InvalidateCallback();
+                            });
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        else if (relX >= scrubX && relX <= scrubX + scrubW)
+                        {
+                            IsDraggingVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
+                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        else if (relX >= barW - volBtnW)
+                        {
+                            SlideVideoPlayerManager.Instance.ToggleVolume();
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+
+                    // Check if clicked the Audio Floating Playback Bar in Fullscreen Presentation Mode
+                    ShapeNode targetAudioForBar = HoveredAudioShape ?? SlideAudioPlayerManager.Instance.ActiveShape;
+                    if (!LastAudioPlaybackBarBounds.IsEmpty && LastAudioPlaybackBarBounds.Contains(mousePos) && targetAudioForBar != null)
+                    {
+                        HoveredAudioShape = targetAudioForBar;
+                        float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                        float barW = LastAudioPlaybackBarBounds.Width;
+                        float scrubX = 74f;
+                        float scrubW = barW - 74f - 88f;
+
+                        if (relX < 28f)
+                        {
+                            SlideAudioPlayerManager.Instance.TogglePlay(targetAudioForBar, parentControl);
+                            _playedMediaShapesInPresentation.Add(targetAudioForBar);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= 28f && relX < 48f)
+                        {
+                            SlideAudioPlayerManager.Instance.StepRelative(targetAudioForBar, -0.25f, parentControl);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= 48f && relX < 68f)
+                        {
+                            SlideAudioPlayerManager.Instance.StepRelative(targetAudioForBar, 0.25f, parentControl);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= scrubX && relX <= scrubX + scrubW)
+                        {
+                            IsDraggingAudioScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = targetAudioForBar.AudioTotalTime > 0 ? targetAudioForBar.AudioTotalTime : 180f;
+                            if (!SlideAudioPlayerManager.Instance.IsPlaying || SlideAudioPlayerManager.Instance.ActiveShape != targetAudioForBar)
+                            {
+                                SlideAudioPlayerManager.Instance.Play(targetAudioForBar, parentControl);
+                            }
+                            SlideAudioPlayerManager.Instance.Seek(targetAudioForBar, frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                        else if (relX >= barW - 28f)
+                        {
+                            SlideAudioPlayerManager.Instance.ToggleMute(targetAudioForBar);
+                            if (parentControl != null) parentControl.Invalidate();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                            return;
+                        }
+                    }
+
                     bool clickedVideo = false;
                     if (ActiveSlide != null)
                     {
-                        int slideW = width;
-                        int slideH = Presentation.IsWidescreen ? (slideW * 9 / 16) : (slideW * 3 / 4);
-                        if (slideH > height)
-                        {
-                            slideH = height;
-                            slideW = Presentation.IsWidescreen ? (slideH * 16 / 9) : (slideH * 4 / 3);
-                        }
-                        int sxOffset = (width - slideW) / 2;
-                        int syOffset = (height - slideH) / 2;
-                        float scaleP = (float)slideW / (Presentation != null ? Presentation.CanvasWidth : 1920f);
+                        int presSlideX, presSlideY, presSlideW, presSlideH;
+                        float scaleP;
+                        GetCurrentActiveSlidePresentationMetrics(width, height, out presSlideX, out presSlideY, out presSlideW, out presSlideH, out scaleP);
 
                         for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
                         {
                             ShapeNode shape = ActiveSlide.Shapes[i];
-                            int sx = sxOffset + (int)(shape.Transform.X * scaleP);
-                            int sy = syOffset + (int)(shape.Transform.Y * scaleP);
+                            if (shape == null) continue;
+                            int sx = presSlideX + (int)(shape.Transform.X * scaleP);
+                            int sy = presSlideY + (int)(shape.Transform.Y * scaleP);
                             int sw = (int)(shape.Transform.Width * scaleP);
                             int sh = (int)(shape.Transform.Height * scaleP);
                             
@@ -20468,8 +22421,18 @@ namespace GenOffice.UI
                             {
                                 if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
                                 {
+                                    HoveredVideoShape = shape;
                                     PlayVideoPreview(shape, parentControl);
+                                    _playedMediaShapesInPresentation.Add(shape);
                                     clickedVideo = true;
+                                    break;
+                                }
+                                else if (shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.AudioPath))
+                                {
+                                    HoveredAudioShape = shape;
+                                    SlideAudioPlayerManager.Instance.TogglePlay(shape, parentControl);
+                                    _playedMediaShapesInPresentation.Add(shape);
+                                    clickedVideo = true; // prevent slide advance
                                     break;
                                 }
                             }
@@ -20497,7 +22460,7 @@ namespace GenOffice.UI
 
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
 
             if (IsElementsDrawerOpen)
             {
@@ -20558,6 +22521,8 @@ namespace GenOffice.UI
                     _isDraggingThumbScrollBar = true;
                     _thumbScrollDragStartMouseY = mousePos.Y;
                     _thumbScrollDragStartScrollY = ThumbScrollY;
+                    SmoothThumbScrollY = ThumbScrollY;
+                    TargetThumbScrollY = ThumbScrollY;
                     if (parentControl != null) parentControl.Invalidate();
                     return;
                 }
@@ -20569,12 +22534,14 @@ namespace GenOffice.UI
                     int thumbBarH = ThumbScrollBarThumbRect.Height;
                     int availY = trackH - thumbBarH;
                     int totalContentH = GetTotalThumbContentHeight(paneRect.Width);
-                    int maxScroll = Math.Max(0, totalContentH - (paneRect.Height - 48));
+                    int maxScroll = GetMaxThumbScrollY();
                     if (availY > 0 && maxScroll > 0)
                     {
                         float ratio = (float)(mousePos.Y - ThumbScrollBarTrackRect.Y - thumbBarH / 2) / availY;
                         ratio = Math.Max(0f, Math.Min(1f, ratio));
                         ThumbScrollY = (int)(ratio * maxScroll);
+                        SmoothThumbScrollY = ThumbScrollY;
+                        TargetThumbScrollY = ThumbScrollY;
                         _isDraggingThumbScrollBar = true;
                         _thumbScrollDragStartMouseY = mousePos.Y;
                         _thumbScrollDragStartScrollY = ThumbScrollY;
@@ -21299,6 +23266,40 @@ namespace GenOffice.UI
             // 3. Center Slide Viewport Interaction
             if (ViewMode == ImpressViewMode.Normal || ViewMode == ImpressViewMode.ReadingView)
             {
+                int notesPaneH = GetEffectiveNotesPaneHeight();
+                int stageH = Math.Max(80, contentH - notesPaneH);
+                int notesTopY = contentY + stageH;
+
+                // 3.0. Xử lý kéo thanh phân cách (Splitter) hoặc nhấp vào Khung Ghi chú người thuyết trình (Speaker Notes Pane) ở đáy Canvas
+                if (notesPaneH > 0 && mousePos.X >= canvasX && mousePos.X <= canvasX + canvasW)
+                {
+                    if (buttons == MouseButtons.Left && mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4)
+                    {
+                        IsDraggingNotesSplitter = true;
+                        NotesSplitterDragStartMouseY = mousePos.Y;
+                        NotesSplitterDragStartHeight = NotesPaneHeight;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                    if (mousePos.Y > notesTopY + 4 && mousePos.Y <= contentY + contentH)
+                    {
+                        EndInlineEditing();
+                        SelectedShapeIndex = -1;
+                        if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                        IsEditingSpeakerNotes = true;
+                        RectangleF notesTextBounds = new RectangleF(canvasX + 34, notesTopY + 8, Math.Max(40, canvasW - 46), Math.Max(18, notesPaneH - 12));
+                        SpeakerNotesCaretIndex = GetSpeakerNotesCharIndexFromPoint(mousePos, notesTextBounds, 10.0f);
+                        SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                        SpeakerNotesSelectionLength = 0;
+                        IsSelectingSpeakerNotes = (buttons == MouseButtons.Left);
+                        if (parentControl != null) parentControl.Invalidate();
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                }
+
+                IsEditingSpeakerNotes = false;
+
                 int minScrollX, maxScrollX, minScrollY, maxScrollY;
                 GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
 
@@ -21308,11 +23309,11 @@ namespace GenOffice.UI
                 int sbW = 14;
 
                 // 3.1. Xử lý nhấp và kéo thanh cuộn ngang (Horizontal Scrollbar)
-                if (hasHScroll && mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH &&
-                    mousePos.X >= leftSidebarW && mousePos.X <= leftSidebarW + (hasVScroll ? (canvasW - sbW) : canvasW))
+                if (hasHScroll && mousePos.Y >= contentY + stageH - sbH && mousePos.Y <= contentY + stageH &&
+                    mousePos.X >= canvasX && mousePos.X <= canvasX + (hasVScroll ? (canvasW - sbW) : canvasW))
                 {
                     int hTrackW = hasVScroll ? (canvasW - sbW) : canvasW;
-                    int hTrackX = leftSidebarW;
+                    int hTrackX = canvasX;
                     int totalW = maxScrollX - minScrollX + canvasW;
                     int thumbW = Math.Max(40, (int)((float)canvasW / totalW * hTrackW));
                     thumbW = Math.Min(thumbW, hTrackW);
@@ -21324,6 +23325,8 @@ namespace GenOffice.UI
                         IsDraggingHScrollBar = true;
                         ScrollBarDragStartMouseX = mousePos.X;
                         ScrollBarDragStartScrollX = CanvasScrollX;
+                        SmoothCanvasScrollX = CanvasScrollX;
+                        TargetCanvasScrollX = CanvasScrollX;
                     }
                     else
                     {
@@ -21332,6 +23335,8 @@ namespace GenOffice.UI
                         targetFrac = Math.Max(0f, Math.Min(1f, targetFrac));
                         CanvasScrollX = minScrollX + (int)(targetFrac * (maxScrollX - minScrollX));
                         ClampScroll(canvasW, contentH);
+                        SmoothCanvasScrollX = CanvasScrollX;
+                        TargetCanvasScrollX = CanvasScrollX;
                         IsDraggingHScrollBar = true;
                         ScrollBarDragStartMouseX = mousePos.X;
                         ScrollBarDragStartScrollX = CanvasScrollX;
@@ -21341,13 +23346,15 @@ namespace GenOffice.UI
                 }
 
                 // 3.2. Xử lý nhấp và kéo thanh cuộn dọc (Vertical Scrollbar)
-                if (hasVScroll && mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW &&
-                    mousePos.Y >= contentY && mousePos.Y <= contentY + (hasHScroll ? (contentH - sbH) : contentH))
+                int vTrackX = canvasX + canvasW - sbW;
+                int vTrackY = contentY;
+                int vTrackH = hasHScroll ? (stageH - sbH) : stageH;
+
+                if (hasVScroll && mousePos.X >= vTrackX && mousePos.X <= vTrackX + sbW &&
+                    mousePos.Y >= vTrackY && mousePos.Y <= vTrackY + vTrackH)
                 {
-                    int vTrackH = hasHScroll ? (contentH - sbH) : contentH;
-                    int vTrackY = contentY;
-                    int totalH = maxScrollY - minScrollY + contentH;
-                    int thumbH = Math.Max(40, (int)((float)contentH / totalH * vTrackH));
+                    int totalH = maxScrollY - minScrollY + stageH;
+                    int thumbH = Math.Max(40, (int)((float)stageH / totalH * vTrackH));
                     thumbH = Math.Min(thumbH, vTrackH);
                     float fracY = (float)(CanvasScrollY - minScrollY) / Math.Max(1, maxScrollY - minScrollY);
                     int thumbY = vTrackY + (int)(fracY * (vTrackH - thumbH));
@@ -21357,6 +23364,8 @@ namespace GenOffice.UI
                         IsDraggingVScrollBar = true;
                         ScrollBarDragStartMouseY = mousePos.Y;
                         ScrollBarDragStartScrollY = CanvasScrollY;
+                        SmoothCanvasScrollY = CanvasScrollY;
+                        TargetCanvasScrollY = CanvasScrollY;
                     }
                     else
                     {
@@ -21365,6 +23374,8 @@ namespace GenOffice.UI
                         targetFrac = Math.Max(0f, Math.Min(1f, targetFrac));
                         CanvasScrollY = minScrollY + (int)(targetFrac * (maxScrollY - minScrollY));
                         ClampScroll(canvasW, contentH);
+                        SmoothCanvasScrollY = CanvasScrollY;
+                        TargetCanvasScrollY = CanvasScrollY;
                         IsDraggingVScrollBar = true;
                         ScrollBarDragStartMouseY = mousePos.Y;
                         ScrollBarDragStartScrollY = CanvasScrollY;
@@ -21602,6 +23613,7 @@ namespace GenOffice.UI
                     float dRotY = mousePos.Y - rotH.Y;
                     if (buttons == MouseButtons.Left && dRotX * dRotX + dRotY * dRotY <= 144f) // 12px hit radius
                     {
+                        if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying) SlideVideoPlayerManager.Instance.Stop();
                         SaveUndoState();
                         IsRotatingShape = true;
                         DragStartMouse = mousePos;
@@ -21617,6 +23629,7 @@ namespace GenOffice.UI
                         float dHY = mousePos.Y - handles[hIdx].Y;
                         if (buttons == MouseButtons.Left && dHX * dHX + dHY * dHY <= 64f) // 8px hit radius
                         {
+                            if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying) SlideVideoPlayerManager.Instance.Stop();
                             SaveUndoState();
                             IsResizingShape = true;
                             DragResizeHandleIndex = hIdx;
@@ -21628,6 +23641,110 @@ namespace GenOffice.UI
                             CropInitialBottom = shape.CropBottom;
                             return;
                         }
+                    }
+                }
+
+                // Audio Floating Playback Bar Hit Testing (PowerPoint style)
+                if (!LastAudioPlaybackBarBounds.IsEmpty && LastAudioPlaybackBarBounds.Contains(mousePos) && HoveredAudioShape != null)
+                {
+                    ShapeNode aShape = HoveredAudioShape;
+                    float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                    float barW = LastAudioPlaybackBarBounds.Width;
+                    float scrubX = 74f;
+                    float scrubW = Math.Max(30f, barW - 74f - 88f);
+
+                    if (relX < 28f)
+                    {
+                        // Play / Pause
+                        SlideAudioPlayerManager.Instance.TogglePlay(aShape, parentControl);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= 28f && relX < 48f)
+                    {
+                        // Rewind / Step backward
+                        SlideAudioPlayerManager.Instance.StepRelative(aShape, -0.25f, parentControl);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= 48f && relX < 68f)
+                    {
+                        // Fast Forward / Step forward
+                        SlideAudioPlayerManager.Instance.StepRelative(aShape, 0.25f, parentControl);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= scrubX && relX <= scrubX + scrubW)
+                    {
+                        // Timeline scrubber click / drag
+                        IsDraggingAudioScrubber = true;
+                        float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                        float totalSec = aShape.AudioTotalTime > 0 ? aShape.AudioTotalTime : 180f;
+                        float targetSec = frac * totalSec;
+                        if (!SlideAudioPlayerManager.Instance.IsPlaying || SlideAudioPlayerManager.Instance.ActiveShape != aShape)
+                        {
+                            SlideAudioPlayerManager.Instance.Play(aShape, parentControl);
+                        }
+                        SlideAudioPlayerManager.Instance.Seek(aShape, targetSec);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= barW - 28f)
+                    {
+                        // Volume / Mute
+                        SlideAudioPlayerManager.Instance.ToggleMute(aShape);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                }
+
+                // Video Floating Playback Bar Hit Testing in Edit Mode
+                ShapeNode targetVideo = HoveredVideoShape ?? (SelectedShape != null && (SelectedShape.Type == ShapeType.Video || !string.IsNullOrEmpty(SelectedShape.VideoPath)) ? SelectedShape : null);
+                if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && targetVideo != null)
+                {
+                    ShapeNode vShape = targetVideo;
+                    float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                    float barW = LastVideoPlaybackBarBounds.Width;
+                    float playBtnW = 32f;
+                    float volBtnW = 32f;
+                    float timeTextW = (barW > 240f) ? 80f : 0f;
+                    float scrubX = playBtnW + 8f;
+                    float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+
+                    if (relX < playBtnW)
+                    {
+                        // Play / Pause
+                        SlideVideoPlayerManager.Instance.TogglePlay(vShape, parentControl, default(Rectangle), false, () =>
+                        {
+                            if (InvalidateCallback != null) InvalidateCallback();
+                        });
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= scrubX && relX <= scrubX + scrubW)
+                    {
+                        // Scrubber seek
+                        IsDraggingVideoScrubber = true;
+                        float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                        float totalSec = vShape.VideoTotalTime > 0 ? vShape.VideoTotalTime : 120f;
+                        float targetSec = frac * totalSec;
+                        if (!SlideVideoPlayerManager.Instance.IsPlaying || SlideVideoPlayerManager.Instance.ActiveShape != vShape)
+                        {
+                            SlideVideoPlayerManager.Instance.Play(vShape, parentControl, default(Rectangle), false, () =>
+                            {
+                                if (InvalidateCallback != null) InvalidateCallback();
+                            });
+                        }
+                        SlideVideoPlayerManager.Instance.Seek(targetSec);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    else if (relX >= barW - volBtnW)
+                    {
+                        // Volume / Mute
+                        SlideVideoPlayerManager.Instance.ToggleVolume();
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
                     }
                 }
 
@@ -21771,49 +23888,49 @@ namespace GenOffice.UI
                         }
                     }
 
-                    if (hitShape.Type == ShapeType.Video || !string.IsNullOrEmpty(hitShape.VideoPath))
+                    if (hitShape.Type == ShapeType.Audio || !string.IsNullOrEmpty(hitShape.AudioPath))
                     {
-                        int vx = slideX + (int)(hitShape.Transform.X * scale);
-                        int vy = slideY + (int)(hitShape.Transform.Y * scale);
-                        int vw = (int)(hitShape.Transform.Width * scale);
-                        int vh = (int)(hitShape.Transform.Height * scale);
-                        float barH = Math.Max(26f, 34f * scale);
-
-                        // 1. Playback Bar Click (Play, Timeline, Volume) - ONLY when shape is already selected!
-                        if (SelectedShape == hitShape && mousePos.Y >= vy + vh - barH && mousePos.Y <= vy + vh && mousePos.X >= vx && mousePos.X <= vx + vw)
+                        HoveredAudioShape = hitShape;
+                        if (IsPresenting)
                         {
-                            float relX = mousePos.X - vx;
-                            float btnSz = barH * 0.55f;
-                            float btnX = 10 * scale;
-                            float timeX = btnX + btnSz + 12 * scale;
-                            float timeW = Math.Max(40f, vw - timeX - (vw > 240 ? 110 * scale : 45 * scale));
-
-                            if (relX < timeX)
-                            {
-                                PlayVideoPreview(hitShape, parentControl);
-                                return;
-                            }
-                            else if (relX >= timeX && relX <= timeX + timeW)
-                            {
-                                float seekFrac = Math.Max(0f, Math.Min(1f, (relX - timeX) / timeW));
-                                float targetSec = seekFrac * (hitShape.VideoTotalTime > 0 ? hitShape.VideoTotalTime : 150f);
-                                if (!SlideVideoPlayerManager.Instance.IsPlaying || SlideVideoPlayerManager.Instance.ActiveShape != hitShape)
-                                {
-                                    PlayVideoPreview(hitShape, parentControl);
-                                }
-                                SlideVideoPlayerManager.Instance.Seek(targetSec);
-                                return;
-                            }
-                            else
-                            {
-                                SlideVideoPlayerManager.Instance.ToggleVolume();
-                                return;
-                            }
+                            SlideAudioPlayerManager.Instance.TogglePlay(hitShape, parentControl);
+                            return;
                         }
                     }
 
                     if (IsInlineEditing && EditingShape == hitShape)
                     {
+                        float hsx = slideX + hitShape.Transform.X * scale;
+                        float hsy = slideY + hitShape.Transform.Y * scale;
+                        float hsw = hitShape.Transform.Width * scale;
+                        float hsh = hitShape.Transform.Height * scale;
+                        PointF hcenter = new PointF(hsx + hsw / 2f, hsy + hsh / 2f);
+                        PointF hlocal = RotatePoint(mousePos, hcenter, -hitShape.Transform.Rotation);
+                        float borderTol = Math.Max(7f, 10f * scale);
+
+                        // Nhấn vào rìa / khung viền của đối tượng: thoát soạn thảo và chuyển ngay sang hành động kéo thả di chuyển!
+                        if (hlocal.X <= hsx + borderTol || hlocal.X >= hsx + hsw - borderTol ||
+                            hlocal.Y <= hsy + borderTol || hlocal.Y >= hsy + hsh - borderTol)
+                        {
+                            EndInlineEditing();
+                            IsDraggingShape = true;
+                            DragStartMouse = mousePos;
+                            DragStartTransform = hitShape.Transform.Clone();
+                            DragStartTransforms.Clear();
+                            if (SelectedShapeIndices != null && SelectedShapeIndices.Count > 0)
+                            {
+                                foreach (int idx in SelectedShapeIndices)
+                                {
+                                    if (idx >= 0 && idx < slide.Shapes.Count)
+                                    {
+                                        DragStartTransforms[idx] = slide.Shapes[idx].Transform.Clone();
+                                    }
+                                }
+                            }
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+
                         IsDraggingShape = false;
                         CaretIndex = GetTextCharIndexFromPoint(mousePos, hitShape, slideX, slideY, scale);
                         TextSelectionStart = CaretIndex;
@@ -21826,6 +23943,7 @@ namespace GenOffice.UI
                     SyncSelectedAnimationWithShape();
                     if (buttons == MouseButtons.Left)
                     {
+                        if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying) SlideVideoPlayerManager.Instance.Stop();
                         SaveUndoState();
                         IsDraggingShape = true;
                         DragStartMouse = mousePos;
@@ -21845,6 +23963,7 @@ namespace GenOffice.UI
                 }
                 else
                 {
+                    if (!IsPresenting && SlideVideoPlayerManager.Instance.IsPlaying) SlideVideoPlayerManager.Instance.Stop();
                     bool isCtrlOrShift = (Control.ModifierKeys & Keys.Control) != 0 || (Control.ModifierKeys & Keys.Shift) != 0;
                     if (!isCtrlOrShift)
                     {
@@ -21918,6 +24037,37 @@ namespace GenOffice.UI
                     }
                 }
             }
+            else if (ViewMode == ImpressViewMode.Notes && Presentation != null)
+            {
+                int pageW = 480;
+                int pageH = 640;
+                int pageX = canvasX + (canvasW - pageW) / 2;
+                int pageY = contentY + 20;
+                int miniW = pageW - 40;
+                int miniH = miniW * 9 / 16;
+                int notesY = pageY + 20 + miniH + 20;
+                int notesH = pageH - (notesY - pageY) - 20;
+                Rectangle notesRect = new Rectangle(pageX + 20, notesY, miniW, notesH);
+
+                if (notesRect.Contains(mousePos) && ActiveSlide != null)
+                {
+                    EndInlineEditing();
+                    SelectedShapeIndex = -1;
+                    if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
+                    IsEditingSpeakerNotes = true;
+                    RectangleF notesTextBounds = new RectangleF(notesRect.X + 8, notesRect.Y + 30, Math.Max(40, notesRect.Width - 16), Math.Max(20, notesRect.Height - 38));
+                    SpeakerNotesCaretIndex = GetSpeakerNotesCharIndexFromPoint(mousePos, notesTextBounds, 10.5f);
+                    SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                    SpeakerNotesSelectionLength = 0;
+                    IsSelectingSpeakerNotes = (buttons == MouseButtons.Left);
+                }
+                else
+                {
+                    IsEditingSpeakerNotes = false;
+                }
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
         }
 
         public void HandleDoubleClick(Point mousePos, int width, int height, Control parentControl = null)
@@ -21933,6 +24083,24 @@ namespace GenOffice.UI
 
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
+
+            if (IsEditingSpeakerNotes && !LastNotesTextRect.IsEmpty && LastNotesTextRect.Contains(mousePos))
+            {
+                string notes = ActiveSlide.SpeakerNotes ?? "";
+                if (notes.Length > 0)
+                {
+                    int idx = Math.Max(0, Math.Min(SpeakerNotesCaretIndex, notes.Length));
+                    int wStart = idx;
+                    while (wStart > 0 && !char.IsWhiteSpace(notes[wStart - 1])) wStart--;
+                    int wEnd = idx;
+                    while (wEnd < notes.Length && !char.IsWhiteSpace(notes[wEnd])) wEnd++;
+                    SpeakerNotesSelectionStart = wStart;
+                    SpeakerNotesSelectionLength = wEnd - wStart;
+                    SpeakerNotesCaretIndex = wEnd;
+                    if (parentControl != null) parentControl.Invalidate();
+                }
+                return;
+            }
 
             int slideX, slideY, slideW, slideH;
             float scale;
@@ -21986,7 +24154,7 @@ namespace GenOffice.UI
 
                     if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
                     {
-                        PlayVideoPreview(shape, parentControl);
+                        // In PowerPoint edit mode, double clicking selects the shape; playback is controlled via the playback bar
                         break;
                     }
                     else if (shape.Type == ShapeType.Chart || shape.ChartData != null)
@@ -22071,6 +24239,226 @@ namespace GenOffice.UI
                     CurrentStroke.Add(mousePos);
                 }
 
+                // Check for Video and Audio hover in Presentation Mode!
+                ShapeNode prevHoveredVideo = HoveredVideoShape;
+                ShapeNode prevHoveredAudio = HoveredAudioShape;
+                int prevHoveredVideoBtn = HoveredVideoButton;
+                bool prevHoveredVideoScrub = IsHoveringVideoScrubber;
+                int prevHoveredAudioBtn = HoveredAudioButton;
+                bool prevHoveredAudioScrub = IsHoveringAudioScrubber;
+
+                HoveredVideoShape = null;
+                HoveredAudioShape = null;
+                bool isOverMedia = false;
+
+                if (IsSelectingSpeakerNotes && IsEditingSpeakerNotes && !LastNotesTextRect.IsEmpty)
+                {
+                    SpeakerNotesCaretIndex = GetSpeakerNotesCharIndexFromPoint(mousePos, LastNotesTextRect, LastNotesFontSize);
+                    SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                    Cursor.Current = Cursors.IBeam;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+
+                if (IsDraggingAudioScrubber && !LastAudioPlaybackBarBounds.IsEmpty)
+                {
+                    ShapeNode targetAudio = prevHoveredAudio ?? SlideAudioPlayerManager.Instance.ActiveShape;
+                    if (targetAudio != null)
+                    {
+                        HoveredAudioShape = targetAudio;
+                        isOverMedia = true;
+                        float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                        float barW = LastAudioPlaybackBarBounds.Width;
+                        float scrubX = 74f;
+                        float scrubW = barW - 74f - 88f;
+                        float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                        float totalSec = targetAudio.AudioTotalTime > 0 ? targetAudio.AudioTotalTime : 180f;
+                        HoveredAudioScrubberTime = frac * totalSec;
+                        IsHoveringAudioScrubber = true;
+                        SlideAudioPlayerManager.Instance.Seek(targetAudio, HoveredAudioScrubberTime);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                }
+                else if (IsDraggingVideoScrubber && prevHoveredVideo != null && !LastVideoPlaybackBarBounds.IsEmpty)
+                {
+                    HoveredVideoShape = prevHoveredVideo;
+                    isOverMedia = true;
+                    float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                    float barW = LastVideoPlaybackBarBounds.Width;
+                    float playBtnW = 32f;
+                    float volBtnW = 32f;
+                    float timeTextW = (barW > 240f) ? 80f : 0f;
+                    float scrubX = playBtnW + 8f;
+                    float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+                    float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                    float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
+                    SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+                else if (ActiveSlide != null && !LaserPointerMode && !AnnotationPenMode)
+                {
+                    int presSlideX, presSlideY, presSlideW, presSlideH;
+                    float presScale;
+                    GetCurrentActiveSlidePresentationMetrics(width, height, out presSlideX, out presSlideY, out presSlideW, out presSlideH, out presScale);
+
+                    // Check if mouse is hovering over the active video floating playback bar
+                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && prevHoveredVideo != null)
+                    {
+                        HoveredVideoShape = prevHoveredVideo;
+                        isOverMedia = true;
+                        float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                        float barW = LastVideoPlaybackBarBounds.Width;
+                        float playBtnW = 32f;
+                        float volBtnW = 32f;
+                        float timeTextW = (barW > 240f) ? 80f : 0f;
+                        float scrubX = playBtnW + 8f;
+                        float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+
+                        if (relX < playBtnW)
+                        {
+                            HoveredVideoButton = 0;
+                            IsHoveringVideoScrubber = false;
+                        }
+                        else if (relX >= scrubX && relX <= scrubX + scrubW)
+                        {
+                            HoveredVideoButton = 1;
+                            IsHoveringVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
+                            HoveredVideoScrubberTime = frac * totalSec;
+                        }
+                        else if (relX >= barW - volBtnW)
+                        {
+                            HoveredVideoButton = 2;
+                            IsHoveringVideoScrubber = false;
+                        }
+                        else
+                        {
+                            HoveredVideoButton = -1;
+                            IsHoveringVideoScrubber = false;
+                        }
+                    }
+                    else
+                    {
+                        // Check if mouse is hovering over the active audio floating playback bar or bridging between speaker icon and bar
+                        ShapeNode activeOrPrevAudio = prevHoveredAudio ?? SlideAudioPlayerManager.Instance.ActiveShape;
+                        bool inAudioEnvelope = false;
+                        if (activeOrPrevAudio != null && !LastAudioPlaybackBarBounds.IsEmpty)
+                        {
+                            float asx = presSlideX + activeOrPrevAudio.Transform.X * presScale;
+                            float asy = presSlideY + activeOrPrevAudio.Transform.Y * presScale;
+                            float asw = activeOrPrevAudio.Transform.Width * presScale;
+                            float ash = activeOrPrevAudio.Transform.Height * presScale;
+                            RectangleF iconScreenRect = new RectangleF(asx - 8f, asy - 8f, asw + 16f, ash + 16f);
+                            RectangleF barScreenRect = new RectangleF(
+                                LastAudioPlaybackBarBounds.X - 10f,
+                                Math.Min(iconScreenRect.Bottom - 8f, LastAudioPlaybackBarBounds.Y - 12f),
+                                LastAudioPlaybackBarBounds.Width + 20f,
+                                (LastAudioPlaybackBarBounds.Bottom - Math.Min(iconScreenRect.Bottom - 8f, LastAudioPlaybackBarBounds.Y - 12f)) + 12f);
+
+                            if (iconScreenRect.Contains(mousePos) || barScreenRect.Contains(mousePos))
+                            {
+                                inAudioEnvelope = true;
+                            }
+                        }
+
+                        if (inAudioEnvelope && activeOrPrevAudio != null)
+                        {
+                            HoveredAudioShape = activeOrPrevAudio;
+                            isOverMedia = true;
+                            HoveredAudioButton = -1;
+                            IsHoveringAudioScrubber = false;
+
+                            if (!LastAudioPlaybackBarBounds.IsEmpty && LastAudioPlaybackBarBounds.Contains(mousePos))
+                            {
+                                float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                                float barW = LastAudioPlaybackBarBounds.Width;
+                                float scrubX = 74f;
+                                float scrubW = barW - 74f - 88f;
+
+                                if (relX < 28f) HoveredAudioButton = 0; // Play/Pause
+                                else if (relX >= 28f && relX < 48f) HoveredAudioButton = 1; // Rewind
+                                else if (relX >= 48f && relX < 68f) HoveredAudioButton = 2; // Fast-forward
+                                else if (relX >= scrubX && relX <= scrubX + scrubW)
+                                {
+                                    HoveredAudioButton = 3; // Scrubber
+                                    IsHoveringAudioScrubber = true;
+                                    float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                                    float totalSec = activeOrPrevAudio.AudioTotalTime > 0 ? activeOrPrevAudio.AudioTotalTime : 180f;
+                                    HoveredAudioScrubberTime = frac * totalSec;
+                                }
+                                else if (relX >= barW - 28f) HoveredAudioButton = 4; // Volume
+                            }
+                        }
+                        else
+                        {
+                            for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+                            {
+                                ShapeNode s = ActiveSlide.Shapes[i];
+                                if (s == null) continue;
+                                int sx = presSlideX + (int)(s.Transform.X * presScale);
+                                int sy = presSlideY + (int)(s.Transform.Y * presScale);
+                                int sw = (int)(s.Transform.Width * presScale);
+                                int sh = (int)(s.Transform.Height * presScale);
+
+                                if (mousePos.X >= sx && mousePos.X <= sx + sw && mousePos.Y >= sy && mousePos.Y <= sy + sh)
+                                {
+                                    if (s.Type == ShapeType.Video || !string.IsNullOrEmpty(s.VideoPath))
+                                    {
+                                        HoveredVideoShape = s;
+                                        HoveredVideoButton = -1;
+                                        IsHoveringVideoScrubber = false;
+                                        LastVideoHoverTime = DateTime.Now;
+                                        isOverMedia = true;
+                                        break;
+                                    }
+                                    else if (s.Type == ShapeType.Audio || !string.IsNullOrEmpty(s.AudioPath))
+                                    {
+                                        HoveredAudioShape = s;
+                                        HoveredAudioButton = -1;
+                                        IsHoveringAudioScrubber = false;
+                                        isOverMedia = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (HoveredVideoShape == null)
+                        {
+                            LastVideoPlaybackBarBounds = RectangleF.Empty;
+                            HoveredVideoButton = -1;
+                            IsHoveringVideoScrubber = false;
+                        }
+                        if (HoveredAudioShape == null && (SlideAudioPlayerManager.Instance.ActiveShape == null || !SlideAudioPlayerManager.Instance.ActiveShape.IsAudioPlaying))
+                        {
+                            LastAudioPlaybackBarBounds = RectangleF.Empty;
+                            HoveredAudioButton = -1;
+                            IsHoveringAudioScrubber = false;
+                        }
+                    }
+                }
+
+                if (IsPresenterViewMode && !LastNotesTextRect.IsEmpty && LastNotesTextRect.Contains(mousePos))
+                {
+                    Cursor.Current = Cursors.IBeam;
+                }
+                else if (isOverMedia || HoverToolbarButtonIndex >= 0)
+                {
+                    Cursor.Current = Cursors.Hand;
+                }
+                else if (!LaserPointerMode && !AnnotationPenMode)
+                {
+                    Cursor.Current = Cursors.Default;
+                }
+
+                if (prevHoveredVideo != HoveredVideoShape || prevHoveredAudio != HoveredAudioShape ||
+                    prevHoveredVideoBtn != HoveredVideoButton || prevHoveredVideoScrub != IsHoveringVideoScrubber ||
+                    prevHoveredAudioBtn != HoveredAudioButton || prevHoveredAudioScrub != IsHoveringAudioScrubber)
+                {
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
@@ -22092,6 +24480,33 @@ namespace GenOffice.UI
                 }
             }
 
+            // Bottom Thumbnail Strip Scrollbar Dragging & Hover
+            if (IsDraggingBottomThumbScrollBar && !BottomThumbScrollBarTrackRect.IsEmpty)
+            {
+                int trackW = BottomThumbScrollBarTrackRect.Width;
+                int thumbW = BottomThumbScrollBarThumbRect.Width;
+                int availX = trackW - thumbW;
+                int totalBottomWidth = (Presentation != null ? Presentation.Slides.Count : 0) * (86 + 10) + 60;
+                int maxScroll = Math.Max(0, totalBottomWidth - trackW);
+                if (availX > 0 && maxScroll > 0)
+                {
+                    int deltaX = mousePos.X - _bottomThumbScrollDragStartMouseX;
+                    int newScroll = _bottomThumbScrollDragStartScrollX + (int)((float)deltaX / availX * maxScroll);
+                    BottomThumbScrollX = Math.Max(0, Math.Min(maxScroll, newScroll));
+                    SmoothBottomThumbScrollX = BottomThumbScrollX;
+                    TargetBottomThumbScrollX = BottomThumbScrollX;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+                return;
+            }
+
+            bool prevHoverBtmThumb = IsHoverBottomThumbScrollBarThumb;
+            IsHoverBottomThumbScrollBarThumb = !BottomThumbScrollBarThumbRect.IsEmpty && BottomThumbScrollBarThumbRect.Contains(mousePos);
+            if (prevHoverBtmThumb != IsHoverBottomThumbScrollBarThumb)
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+
             // Left Thumbnail Fast Scrollbar Dragging & Hover
             if (_isDraggingThumbScrollBar)
             {
@@ -22102,12 +24517,14 @@ namespace GenOffice.UI
                 int paneW = isIslandMode ? 200 : 210;
                 int viewH = (LastThumbViewportHeight > 0) ? LastThumbViewportHeight : 500;
                 int totalContentH = GetTotalThumbContentHeight(paneW);
-                int maxScroll = Math.Max(0, totalContentH - viewH);
+                int maxScroll = GetMaxThumbScrollY();
                 if (availY > 0 && maxScroll > 0)
                 {
                     int deltaY = mousePos.Y - _thumbScrollDragStartMouseY;
                     int newScroll = _thumbScrollDragStartScrollY + (int)((float)deltaY / availY * maxScroll);
                     ThumbScrollY = Math.Max(0, Math.Min(maxScroll, newScroll));
+                    SmoothThumbScrollY = ThumbScrollY;
+                    TargetThumbScrollY = ThumbScrollY;
                     if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 }
@@ -22126,7 +24543,41 @@ namespace GenOffice.UI
 
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
+
+            if (IsDraggingNotesSplitter)
+            {
+                int deltaY = NotesSplitterDragStartMouseY - mousePos.Y;
+                NotesPaneHeight = Math.Max(42, Math.Min(Math.Max(140, contentH / 2), NotesSplitterDragStartHeight + deltaY));
+                Cursor.Current = Cursors.SizeNS;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (IsSelectingSpeakerNotes && IsEditingSpeakerNotes && !LastNotesTextRect.IsEmpty)
+            {
+                SpeakerNotesCaretIndex = GetSpeakerNotesCharIndexFromPoint(mousePos, LastNotesTextRect, LastNotesFontSize);
+                SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                Cursor.Current = Cursors.IBeam;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            int effNotesH = GetEffectiveNotesPaneHeight();
+            bool prevHoverNotesSplitter = IsHoverNotesSplitter;
+            if (effNotesH > 0 && mousePos.X >= canvasX && mousePos.X <= canvasX + canvasW)
+            {
+                int notesTopY = contentY + Math.Max(80, contentH - effNotesH);
+                IsHoverNotesSplitter = (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4);
+            }
+            else
+            {
+                IsHoverNotesSplitter = false;
+            }
+            if (prevHoverNotesSplitter != IsHoverNotesSplitter && InvalidateCallback != null)
+            {
+                InvalidateCallback();
+            }
 
             if (IsColorPickingMode && SelectedShape != null && SelectedShape.CachedImage != null)
             {
@@ -22373,6 +24824,8 @@ namespace GenOffice.UI
                 float scrollPerPx = (float)(maxScrollX - minScrollX) / trackScrollableW;
                 CanvasScrollX = ScrollBarDragStartScrollX + (int)(deltaMouseX * scrollPerPx);
                 ClampScroll(canvasW, contentH);
+                SmoothCanvasScrollX = CanvasScrollX;
+                TargetCanvasScrollX = CanvasScrollX;
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
@@ -22395,6 +24848,8 @@ namespace GenOffice.UI
                 float scrollPerPx = (float)(maxScrollY - minScrollY) / trackScrollableH;
                 CanvasScrollY = ScrollBarDragStartScrollY + (int)(deltaMouseY * scrollPerPx);
                 ClampScroll(canvasW, contentH);
+                SmoothCanvasScrollY = CanvasScrollY;
+                TargetCanvasScrollY = CanvasScrollY;
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
@@ -22412,11 +24867,15 @@ namespace GenOffice.UI
                 bool oldHoverH = IsHoverHScrollBarThumb;
                 bool oldHoverV = IsHoverVScrollBarThumb;
 
-                IsHoverHScrollBarThumb = hasHScroll && (mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH &&
-                    mousePos.X >= leftSidebarW && mousePos.X <= leftSidebarW + (hasVScroll ? (canvasW - sbW) : canvasW));
+                int vTrackX = canvasX + canvasW - sbW;
+                int vTrackY = contentY;
+                int vTrackH = hasHScroll ? (contentH - sbH) : contentH;
 
-                IsHoverVScrollBarThumb = hasVScroll && (mousePos.X >= leftSidebarW + canvasW - sbW && mousePos.X <= leftSidebarW + canvasW &&
-                    mousePos.Y >= contentY && mousePos.Y <= contentY + (hasHScroll ? (contentH - sbH) : contentH));
+                IsHoverHScrollBarThumb = hasHScroll && (mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH &&
+                    mousePos.X >= canvasX && mousePos.X <= canvasX + (hasVScroll ? (canvasW - sbW) : canvasW));
+
+                IsHoverVScrollBarThumb = hasVScroll && (mousePos.X >= vTrackX && mousePos.X <= vTrackX + sbW &&
+                    mousePos.Y >= vTrackY && mousePos.Y <= vTrackY + vTrackH);
 
                 if (oldHoverH != IsHoverHScrollBarThumb || oldHoverV != IsHoverVScrollBarThumb)
                 {
@@ -22432,12 +24891,32 @@ namespace GenOffice.UI
                 CanvasScrollX = PanStartScroll.X - dx;
                 CanvasScrollY = PanStartScroll.Y - dy;
                 ClampScroll(canvasW, contentH);
+                SmoothCanvasScrollX = CanvasScrollX;
+                TargetCanvasScrollX = CanvasScrollX;
+                SmoothCanvasScrollY = CanvasScrollY;
+                TargetCanvasScrollY = CanvasScrollY;
                 return;
             }
 
             int slideX, slideY, slideW, slideH;
             float scale;
             GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+
+            if (IsDraggingAudioScrubber && HoveredAudioShape != null && !LastAudioPlaybackBarBounds.IsEmpty)
+            {
+                float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                float barW = LastAudioPlaybackBarBounds.Width;
+                float scrubX = 74f;
+                float scrubW = Math.Max(30f, barW - 74f - 88f);
+                float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                float totalSec = HoveredAudioShape.AudioTotalTime > 0 ? HoveredAudioShape.AudioTotalTime : 180f;
+                float targetSec = frac * totalSec;
+                HoveredAudioScrubberTime = targetSec;
+                IsHoveringAudioScrubber = true;
+                SlideAudioPlayerManager.Instance.Seek(HoveredAudioShape, targetSec);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
 
             // 0. Rubberband / Marquee Multi-Shape Selection MouseMove (Quét khối chọn đối tượng)
             if (IsRubberbandSelecting && ActiveSlide != null)
@@ -22596,14 +25075,15 @@ namespace GenOffice.UI
 
             if (IsDraggingShape && shape != null)
             {
+                int dmx = Math.Abs(mousePos.X - DragStartMouse.X);
+                int dmy = Math.Abs(mousePos.Y - DragStartMouse.Y);
+                if (dmx <= 3 && dmy <= 3)
+                {
+                    return;
+                }
                 if (_pendingDeselectOnMouseUp)
                 {
-                    int dmx = Math.Abs(mousePos.X - DragStartMouse.X);
-                    int dmy = Math.Abs(mousePos.Y - DragStartMouse.Y);
-                    if (dmx > 3 || dmy > 3)
-                    {
-                        _pendingDeselectOnMouseUp = false;
-                    }
+                    _pendingDeselectOnMouseUp = false;
                 }
 
                 float rawDx = (mousePos.X - DragStartMouse.X) / scale;
@@ -22644,7 +25124,7 @@ namespace GenOffice.UI
                     int vh = (int)(shape.Transform.Height * scale);
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
                 }
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                // Do not mark thumbnail dirty on every mouse move pixel to ensure 60 FPS buttery smooth dragging
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -22690,7 +25170,8 @@ namespace GenOffice.UI
                 float startH = DragStartTransform.Height;
                 float ratio = startW / Math.Max(1.0f, startH);
                 bool isGraphic = shape.Type == ShapeType.Image || shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.Video;
-                bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0 || isGraphic;
+                bool isCornerHandle = (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 2 || DragResizeHandleIndex == 4 || DragResizeHandleIndex == 6);
+                bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0 || (isGraphic && isCornerHandle);
 
                 float rotRad = (float)(-shape.Transform.Rotation * Math.PI / 180.0);
                 float cosR = (float)Math.Cos(rotRad);
@@ -22711,47 +25192,87 @@ namespace GenOffice.UI
                     case 7: ax = 1f; ay = 0.5f; break; // Left-Center
                 }
 
-                float newW = startW, newH = startH;
-                
-                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 1 || DragResizeHandleIndex == 2)
-                    newH = Math.Max(10f, startH - localDy);
-                else if (DragResizeHandleIndex == 4 || DragResizeHandleIndex == 5 || DragResizeHandleIndex == 6)
-                    newH = Math.Max(10f, startH + localDy);
-                    
-                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 6 || DragResizeHandleIndex == 7)
-                    newW = Math.Max(10f, startW - localDx);
-                else if (DragResizeHandleIndex == 2 || DragResizeHandleIndex == 3 || DragResizeHandleIndex == 4)
-                    newW = Math.Max(10f, startW + localDx);
+                float rawW = startW, rawH = startH;
 
-                if (keepAspect && (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 2 || DragResizeHandleIndex == 4 || DragResizeHandleIndex == 6))
+                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 1 || DragResizeHandleIndex == 2)
+                    rawH = startH - localDy;
+                else if (DragResizeHandleIndex == 4 || DragResizeHandleIndex == 5 || DragResizeHandleIndex == 6)
+                    rawH = startH + localDy;
+
+                if (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 6 || DragResizeHandleIndex == 7)
+                    rawW = startW - localDx;
+                else if (DragResizeHandleIndex == 2 || DragResizeHandleIndex == 3 || DragResizeHandleIndex == 4)
+                    rawW = startW + localDx;
+
+                float newW, newH;
+                if (keepAspect && isCornerHandle)
                 {
-                    if (Math.Abs(newW - startW) > Math.Abs(newH - startH) * ratio)
-                        newH = newW / ratio;
-                    else
-                        newW = newH * ratio;
+                    // Orthogonal projection of signed (rawW, rawH) onto the aspect-ratio diagonal (startW, startH)
+                    // Ensures 100% continuous, jump-free resizing even when pushing up or sideways from a diagonal drag
+                    float diagSq = startW * startW + startH * startH;
+                    float projScale = (rawW * startW + rawH * startH) / Math.Max(1.0f, diagSq);
+                    float minScale = Math.Max(10.0f / Math.Max(1.0f, startW), 10.0f / Math.Max(1.0f, startH));
+                    projScale = Math.Max(minScale, projScale);
+                    newW = startW * projScale;
+                    newH = startH * projScale;
+                }
+                else
+                {
+                    newW = Math.Max(10f, rawW);
+                    newH = Math.Max(10f, rawH);
                 }
 
-                bool isMiddleHandle = (DragResizeHandleIndex == 1 || DragResizeHandleIndex == 3 || DragResizeHandleIndex == 5 || DragResizeHandleIndex == 7);
-                if (isGraphic && isMiddleHandle)
+                // Canvas-edge magnetic snapping during resize (PowerPoint-style edge fit)
+                ActiveSmartGuides.Clear();
+                if (Presentation != null && Math.Abs(shape.Transform.Rotation) < 0.5f && (Control.ModifierKeys & Keys.Alt) == 0)
                 {
-                    float initVisWFrac = Math.Max(0.05f, 1.0f - CropInitialLeft - CropInitialRight);
-                    float initVisHFrac = Math.Max(0.05f, 1.0f - CropInitialTop - CropInitialBottom);
-                    float fullW = startW / initVisWFrac;
-                    float fullH = startH / initVisHFrac;
-                    float newVisWFrac = newW / fullW;
-                    float newVisHFrac = newH / fullH;
+                    float cw = Presentation.CanvasWidth;
+                    float ch = Presentation.CanvasHeight;
+                    const float RESIZE_SNAP_TOL = 9.0f;
 
-                    if (DragResizeHandleIndex == 3)
-                        shape.CropRight = Math.Max(0f, Math.Min(0.85f - CropInitialLeft, 1.0f - CropInitialLeft - newVisWFrac));
-                    else if (DragResizeHandleIndex == 7)
-                        shape.CropLeft = Math.Max(0f, Math.Min(0.85f - CropInitialRight, 1.0f - CropInitialRight - newVisWFrac));
-                    else if (DragResizeHandleIndex == 5)
-                        shape.CropBottom = Math.Max(0f, Math.Min(0.85f - CropInitialTop, 1.0f - CropInitialTop - newVisHFrac));
-                    else if (DragResizeHandleIndex == 1)
-                        shape.CropTop = Math.Max(0f, Math.Min(0.85f - CropInitialBottom, 1.0f - CropInitialBottom - newVisHFrac));
+                    if (ax == 0f) // Dragging right edge
+                    {
+                        float rightEdge = DragStartTransform.X + newW;
+                        if (Math.Abs(rightEdge - cw) <= RESIZE_SNAP_TOL)
+                        {
+                            newW = Math.Max(10f, cw - DragStartTransform.X);
+                            if (keepAspect && isCornerHandle) newH = newW / ratio;
+                            ActiveSmartGuides.Add(new SmartGuideLine { IsVertical = true, Position = cw, Min = 0f, Max = ch });
+                        }
+                    }
+                    else if (ax == 1f) // Dragging left edge
+                    {
+                        float rightAnchor = DragStartTransform.X + startW;
+                        float leftEdge = rightAnchor - newW;
+                        if (Math.Abs(leftEdge - 0f) <= RESIZE_SNAP_TOL)
+                        {
+                            newW = Math.Max(10f, rightAnchor);
+                            if (keepAspect && isCornerHandle) newH = newW / ratio;
+                            ActiveSmartGuides.Add(new SmartGuideLine { IsVertical = true, Position = 0f, Min = 0f, Max = ch });
+                        }
+                    }
 
-                    newW = Math.Max(10f, fullW * Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight));
-                    newH = Math.Max(10f, fullH * Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom));
+                    if (ay == 0f) // Dragging bottom edge
+                    {
+                        float bottomEdge = DragStartTransform.Y + newH;
+                        if (Math.Abs(bottomEdge - ch) <= RESIZE_SNAP_TOL)
+                        {
+                            newH = Math.Max(10f, ch - DragStartTransform.Y);
+                            if (keepAspect && isCornerHandle) newW = newH * ratio;
+                            ActiveSmartGuides.Add(new SmartGuideLine { IsVertical = false, Position = ch, Min = 0f, Max = cw });
+                        }
+                    }
+                    else if (ay == 1f) // Dragging top edge
+                    {
+                        float bottomAnchor = DragStartTransform.Y + startH;
+                        float topEdge = bottomAnchor - newH;
+                        if (Math.Abs(topEdge - 0f) <= RESIZE_SNAP_TOL)
+                        {
+                            newH = Math.Max(10f, bottomAnchor);
+                            if (keepAspect && isCornerHandle) newW = newH * ratio;
+                            ActiveSmartGuides.Add(new SmartGuideLine { IsVertical = false, Position = 0f, Min = 0f, Max = cw });
+                        }
+                    }
                 }
 
                 float rotPosRad = (float)(shape.Transform.Rotation * Math.PI / 180.0);
@@ -22783,9 +25304,289 @@ namespace GenOffice.UI
                     int vh = (int)(shape.Transform.Height * scale);
                     SlideVideoPlayerManager.Instance.UpdateBounds(new Rectangle(vx, vy, Math.Max(100, vw), Math.Max(60, vh)));
                 }
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                // Do not mark thumbnail dirty on every mouse move pixel to ensure 60 FPS buttery smooth dragging
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
+            }
+
+            // Hover check for PowerPoint Audio Shapes & Floating Playback Bar (with seamless hover bridge corridor)
+            ShapeNode oldHoverAudio = HoveredAudioShape;
+            bool oldHoverScrub = IsHoveringAudioScrubber;
+            int oldHoverBtn = HoveredAudioButton;
+
+            bool isInAudioEnvelope = false;
+
+            if (HoveredAudioShape != null)
+            {
+                // Calculate unified envelope bridging the speaker and its floating playback bar
+                float sx = slideX + HoveredAudioShape.Transform.X * scale;
+                float sy = slideY + HoveredAudioShape.Transform.Y * scale;
+                float sw = HoveredAudioShape.Transform.Width * scale;
+                float sh = HoveredAudioShape.Transform.Height * scale;
+
+                float envLeft = sx - 8f;
+                float envRight = sx + sw + 8f;
+                float envTop = sy - 8f;
+                float envBottom = sy + sh + 8f;
+
+                // Predict bar bounds to avoid async paint gap where LastAudioPlaybackBarBounds is empty
+                float barW = 340f;
+                float barH = 32f;
+                float barX = sx + (sw - barW) / 2f;
+                float barY = sy + sh + 4f;
+                if (LastViewportWidth > 0 && barX + barW > LastViewportWidth - 10f) barX = LastViewportWidth - barW - 10f;
+                if (barX < 10f) barX = 10f;
+                RectangleF predictedBar = new RectangleF(barX, barY, barW, barH);
+
+                envLeft = Math.Min(envLeft, predictedBar.Left - 8f);
+                envRight = Math.Max(envRight, predictedBar.Right + 8f);
+                envTop = Math.Min(envTop, predictedBar.Top - 6f);
+                envBottom = Math.Max(envBottom, predictedBar.Bottom + 8f);
+
+                if (!LastAudioPlaybackBarBounds.IsEmpty)
+                {
+                    envLeft = Math.Min(envLeft, LastAudioPlaybackBarBounds.Left - 8f);
+                    envRight = Math.Max(envRight, LastAudioPlaybackBarBounds.Right + 8f);
+                    envTop = Math.Min(envTop, LastAudioPlaybackBarBounds.Top - 6f);
+                    envBottom = Math.Max(envBottom, LastAudioPlaybackBarBounds.Bottom + 8f);
+                }
+
+                RectangleF hoverEnvelope = new RectangleF(envLeft, envTop, envRight - envLeft, envBottom - envTop);
+                if (hoverEnvelope.Contains(mousePos))
+                {
+                    isInAudioEnvelope = true;
+                }
+            }
+
+            bool isOverBar = !LastAudioPlaybackBarBounds.IsEmpty && LastAudioPlaybackBarBounds.Contains(mousePos) && HoveredAudioShape != null;
+
+            if (isOverBar)
+            {
+                // Mouse is inside the floating playback bar
+                float relX = mousePos.X - LastAudioPlaybackBarBounds.X;
+                float barW = LastAudioPlaybackBarBounds.Width;
+                float scrubX = 74f;
+                float scrubW = Math.Max(30f, barW - 74f - 88f);
+
+                if (relX < 28f)
+                {
+                    HoveredAudioButton = 0; // Play/Pause
+                    IsHoveringAudioScrubber = false;
+                }
+                else if (relX >= 28f && relX < 48f)
+                {
+                    HoveredAudioButton = 1; // Rewind
+                    IsHoveringAudioScrubber = false;
+                }
+                else if (relX >= 48f && relX < 68f)
+                {
+                    HoveredAudioButton = 2; // Fast Forward
+                    IsHoveringAudioScrubber = false;
+                }
+                else if (relX >= scrubX && relX <= scrubX + scrubW)
+                {
+                    HoveredAudioButton = 3; // Scrubber
+                    IsHoveringAudioScrubber = true;
+                    float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                    float totalSec = HoveredAudioShape.AudioTotalTime > 0 ? HoveredAudioShape.AudioTotalTime : 180f;
+                    HoveredAudioScrubberTime = frac * totalSec;
+                }
+                else if (relX >= barW - 28f)
+                {
+                    HoveredAudioButton = 4; // Volume
+                    IsHoveringAudioScrubber = false;
+                }
+                else
+                {
+                    HoveredAudioButton = -1;
+                    IsHoveringAudioScrubber = false;
+                }
+                HoveredAudioMousePos = mousePos;
+            }
+            else if (isInAudioEnvelope)
+            {
+                // Mouse is in the bridge corridor between speaker and playback bar:
+                // Keep HoveredAudioShape active so playback bar stays 100% visible while moving mouse down!
+                HoveredAudioButton = -1;
+                IsHoveringAudioScrubber = false;
+                HoveredAudioMousePos = mousePos;
+            }
+            else
+            {
+                // Mouse is outside the active envelope. Check if mouse is entering any Audio shape on the slide.
+                ShapeNode foundAudio = null;
+                if (ActiveSlide != null)
+                {
+                    for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+                    {
+                        ShapeNode s = ActiveSlide.Shapes[i];
+                        if (s != null && (s.Type == ShapeType.Audio || !string.IsNullOrEmpty(s.AudioPath)))
+                        {
+                            if (IsPresenting && s.AudioHideDuringShow) continue;
+                            float sx = slideX + s.Transform.X * scale;
+                            float sy = slideY + s.Transform.Y * scale;
+                            float sw = s.Transform.Width * scale;
+                            float sh = s.Transform.Height * scale;
+                            // Generous 8px hit padding for easy hovering over speaker icon
+                            RectangleF sRect = new RectangleF(sx - 8f, sy - 8f, sw + 16f, sh + 16f);
+                            if (sRect.Contains(mousePos))
+                            {
+                                foundAudio = s;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (foundAudio != null)
+                {
+                    HoveredAudioShape = foundAudio;
+                    HoveredAudioButton = -1;
+                    IsHoveringAudioScrubber = false;
+                }
+                else if (SelectedShape != null && (SelectedShape.Type == ShapeType.Audio || !string.IsNullOrEmpty(SelectedShape.AudioPath)))
+                {
+                    // Audio shape is selected -> keep playback bar visible
+                    HoveredAudioShape = SelectedShape;
+                    HoveredAudioButton = -1;
+                    IsHoveringAudioScrubber = false;
+                }
+                else
+                {
+                    HoveredAudioShape = null;
+                    HoveredAudioButton = -1;
+                    IsHoveringAudioScrubber = false;
+                    LastAudioPlaybackBarBounds = RectangleF.Empty;
+                }
+            }
+
+            if (oldHoverAudio != HoveredAudioShape || oldHoverScrub != IsHoveringAudioScrubber || oldHoverBtn != HoveredAudioButton || isOverBar || isInAudioEnvelope)
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+
+            // Hover check for PowerPoint Video Shapes & Floating Playback Bar in Edit Mode
+            ShapeNode oldHoverVideo = HoveredVideoShape;
+            bool oldHoverVideoScrub = IsHoveringVideoScrubber;
+            int oldHoverVideoBtn = HoveredVideoButton;
+
+            if (IsDraggingVideoScrubber && (HoveredVideoShape != null || SelectedShape != null) && !LastVideoPlaybackBarBounds.IsEmpty)
+            {
+                ShapeNode targetVideo = HoveredVideoShape ?? SelectedShape;
+                float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                float barW = LastVideoPlaybackBarBounds.Width;
+                float playBtnW = 32f;
+                float volBtnW = 32f;
+                float timeTextW = (barW > 240f) ? 80f : 0f;
+                float scrubX = playBtnW + 8f;
+                float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+                float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                float totalSec = targetVideo.VideoTotalTime > 0 ? targetVideo.VideoTotalTime : 120f;
+                SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            bool isOverVideoBar = !LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos);
+
+            if (isOverVideoBar)
+            {
+                // Mouse is inside the floating playback bar
+                ShapeNode targetVideo = HoveredVideoShape ?? (SelectedShape != null && (SelectedShape.Type == ShapeType.Video || !string.IsNullOrEmpty(SelectedShape.VideoPath)) ? SelectedShape : null);
+                if (HoveredVideoShape == null && targetVideo != null)
+                {
+                    HoveredVideoShape = targetVideo;
+                }
+
+                float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                float barW = LastVideoPlaybackBarBounds.Width;
+                float playBtnW = 32f;
+                float volBtnW = 32f;
+                float timeTextW = (barW > 240f) ? 80f : 0f;
+                float scrubX = playBtnW + 8f;
+                float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+
+                if (relX < playBtnW)
+                {
+                    HoveredVideoButton = 0; // Play/Pause
+                    IsHoveringVideoScrubber = false;
+                }
+                else if (relX >= scrubX && relX <= scrubX + scrubW)
+                {
+                    HoveredVideoButton = 1; // Scrubber
+                    IsHoveringVideoScrubber = true;
+                    if (targetVideo != null)
+                    {
+                        float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                        float totalSec = targetVideo.VideoTotalTime > 0 ? targetVideo.VideoTotalTime : 120f;
+                        HoveredVideoScrubberTime = frac * totalSec;
+                    }
+                }
+                else if (relX >= barW - volBtnW)
+                {
+                    HoveredVideoButton = 2; // Volume
+                    IsHoveringVideoScrubber = false;
+                }
+                else
+                {
+                    HoveredVideoButton = -1;
+                    IsHoveringVideoScrubber = false;
+                }
+                HoveredVideoMousePos = mousePos;
+                Cursor.Current = Cursors.Hand;
+            }
+            else
+            {
+                // Check if mouse is hovering over any Video shape on the active slide
+                ShapeNode foundVideo = null;
+                if (ActiveSlide != null)
+                {
+                    for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
+                    {
+                        ShapeNode s = ActiveSlide.Shapes[i];
+                        if (s != null && (s.Type == ShapeType.Video || !string.IsNullOrEmpty(s.VideoPath)))
+                        {
+                            float sx = slideX + s.Transform.X * scale;
+                            float sy = slideY + s.Transform.Y * scale;
+                            float sw = s.Transform.Width * scale;
+                            float sh = s.Transform.Height * scale;
+                            PointF center = new PointF(sx + sw / 2f, sy + sh / 2f);
+                            PointF unrot = RotatePoint(mousePos, center, -s.Transform.Rotation);
+                            RectangleF sRect = new RectangleF(sx, sy, sw, sh);
+                            if (sRect.Contains(unrot))
+                            {
+                                foundVideo = s;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (foundVideo != null)
+                {
+                    HoveredVideoShape = foundVideo;
+                    HoveredVideoButton = -1;
+                    IsHoveringVideoScrubber = false;
+                    HoveredVideoMousePos = mousePos;
+                }
+                else if (SelectedShape != null && (SelectedShape.Type == ShapeType.Video || !string.IsNullOrEmpty(SelectedShape.VideoPath)))
+                {
+                    HoveredVideoShape = SelectedShape;
+                    HoveredVideoButton = -1;
+                    IsHoveringVideoScrubber = false;
+                }
+                else
+                {
+                    HoveredVideoShape = null;
+                    HoveredVideoButton = -1;
+                    IsHoveringVideoScrubber = false;
+                    LastVideoPlaybackBarBounds = RectangleF.Empty;
+                }
+            }
+
+            if (oldHoverVideo != HoveredVideoShape || oldHoverVideoScrub != IsHoveringVideoScrubber || oldHoverVideoBtn != HoveredVideoButton || isOverVideoBar)
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
             }
         }
 
@@ -23053,7 +25854,7 @@ namespace GenOffice.UI
         {
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
-            int rightSidebarW = IsSidebarOpen ? 280 : 0;
+            int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
 
             // 1. Khi rê chuột qua thanh thumbnail bên trái, ribbon ở trên, task pane bên phải hoặc thanh trạng thái ở dưới:
             // Luôn trả về con trỏ chuột bình thường (Cursors.Default)
@@ -23062,7 +25863,27 @@ namespace GenOffice.UI
                 return Cursors.Default;
             }
 
-            // 1.1 Khi rê chuột lên thanh cuộn ngang hoặc thanh cuộn dọc -> Con trỏ Default
+            // 1.1 Khi rê chuột lên Khung Ghi chú người thuyết trình (Speaker Notes Pane) hoặc thanh phân cách Splitter
+            int effNotesH = GetEffectiveNotesPaneHeight();
+            int stageH = Math.Max(80, contentH - effNotesH);
+            if (effNotesH > 0 && mousePos.X >= canvasX && mousePos.X < canvasX + canvasW)
+            {
+                int notesTopY = contentY + stageH;
+                if (IsDraggingNotesSplitter || (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4))
+                {
+                    return Cursors.SizeNS;
+                }
+                if (mousePos.Y > notesTopY + 4 && mousePos.Y <= contentY + contentH)
+                {
+                    return Cursors.IBeam;
+                }
+            }
+            if (ViewMode == ImpressViewMode.Notes && !LastNotesTextRect.IsEmpty && LastNotesTextRect.Contains(mousePos))
+            {
+                return Cursors.IBeam;
+            }
+
+            // 1.2 Khi rê chuột lên thanh cuộn ngang hoặc thanh cuộn dọc -> Con trỏ Default
             int minScrollX, maxScrollX, minScrollY, maxScrollY;
             GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
             bool hasVScroll = (minScrollY < maxScrollY);
@@ -23070,7 +25891,7 @@ namespace GenOffice.UI
             int sbH = 14;
             int sbW = 14;
 
-            if (hasHScroll && mousePos.Y >= contentY + contentH - sbH && mousePos.Y <= contentY + contentH)
+            if (hasHScroll && mousePos.Y >= contentY + stageH - sbH && mousePos.Y <= contentY + stageH)
             {
                 return Cursors.Default;
             }
@@ -23233,6 +26054,12 @@ namespace GenOffice.UI
                 {
                     if (IsInlineEditing && EditingShape == shape)
                     {
+                        float borderTol = Math.Max(7f, 10f * scale);
+                        if (unrotatedMouse.X <= sx + borderTol || unrotatedMouse.X >= sx + sw - borderTol ||
+                            unrotatedMouse.Y <= sy + borderTol || unrotatedMouse.Y >= sy + sh - borderTol)
+                        {
+                            return Cursors.SizeAll;
+                        }
                         return Cursors.IBeam;
                     }
                     return Cursors.SizeAll;
@@ -23268,6 +26095,15 @@ namespace GenOffice.UI
 
         public void HandleMouseUp(Point mousePos, int width, int height)
         {
+            if (IsDraggingAudioScrubber)
+            {
+                IsDraggingAudioScrubber = false;
+            }
+            if (IsDraggingVideoScrubber)
+            {
+                IsDraggingVideoScrubber = false;
+            }
+
             if (ShapeTaskPane != null && ShapeTaskPane.IsDraggingScrollbar)
             {
                 ShapeTaskPane.HandleMouseUp(mousePos);
@@ -23278,6 +26114,8 @@ namespace GenOffice.UI
             if (_isDraggingThumbScrollBar)
             {
                 _isDraggingThumbScrollBar = false;
+                SmoothThumbScrollY = ThumbScrollY;
+                TargetThumbScrollY = ThumbScrollY;
                 bool isIslandMode = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
                 int paneW = isIslandMode ? 200 : 210;
                 int targetIdx = GetSlideIndexFromScrollY(ThumbScrollY, paneW);
@@ -23295,6 +26133,15 @@ namespace GenOffice.UI
             if (IsSelectingText)
             {
                 IsSelectingText = false;
+            }
+            if (IsSelectingSpeakerNotes)
+            {
+                IsSelectingSpeakerNotes = false;
+            }
+            if (IsDraggingNotesSplitter)
+            {
+                IsDraggingNotesSplitter = false;
+                if (InvalidateCallback != null) InvalidateCallback();
             }
 
             if (IsPresenting)
@@ -23499,9 +26346,20 @@ namespace GenOffice.UI
             }
             if (DragStartTransforms != null) DragStartTransforms.Clear();
 
+            if (IsDraggingShape || IsResizingShape || IsRotatingShape || IsAdjustingCornerRadius)
+            {
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            }
+            IsDraggingBottomThumbScrollBar = false;
+            SmoothBottomThumbScrollX = BottomThumbScrollX;
+            TargetBottomThumbScrollX = BottomThumbScrollX;
             IsPanningCanvas = false;
             IsDraggingHScrollBar = false;
+            SmoothCanvasScrollX = CanvasScrollX;
+            TargetCanvasScrollX = CanvasScrollX;
             IsDraggingVScrollBar = false;
+            SmoothCanvasScrollY = CanvasScrollY;
+            TargetCanvasScrollY = CanvasScrollY;
             IsDraggingShape = false;
             IsSelectingTableCells = false;
             IsResizingShape = false;
@@ -23569,6 +26427,50 @@ namespace GenOffice.UI
                 CurrentAnimationStep++;
                 PlayCurrentStepAnimation(CurrentAnimationStep);
                 return;
+            }
+
+            // 2.5. Kiểm tra nếu slide có video hoặc âm thanh theo trình tự nhấp (InClickSequence) chưa phát:
+            ShapeNode unplayedMedia = null;
+            if (slide.Shapes != null)
+            {
+                for (int i = 0; i < slide.Shapes.Count; i++)
+                {
+                    var s = slide.Shapes[i];
+                    if (s == null) continue;
+                    bool isVideo = (s.Type == ShapeType.Video || !string.IsNullOrEmpty(s.VideoPath));
+                    bool isAudio = (s.Type == ShapeType.Audio || !string.IsNullOrEmpty(s.AudioPath));
+                    if (!isVideo && !isAudio) continue;
+
+                    if (_playedMediaShapesInPresentation.Contains(s)) continue;
+
+                    VideoStartMode startMode = isVideo ? s.VideoStartMode : s.AudioStartMode;
+                    if (startMode == VideoStartMode.InClickSequence)
+                    {
+                        unplayedMedia = s;
+                        break;
+                    }
+                }
+            }
+
+            if (unplayedMedia != null)
+            {
+                _playedMediaShapesInPresentation.Add(unplayedMedia);
+                Control parent = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                if (unplayedMedia.Type == ShapeType.Video || !string.IsNullOrEmpty(unplayedMedia.VideoPath))
+                {
+                    PlayVideoPreview(unplayedMedia, parent);
+                }
+                else
+                {
+                    SlideAudioPlayerManager.Instance.Play(unplayedMedia, parent);
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (SlideVideoPlayerManager.Instance.IsPlaying)
+            {
+                SlideVideoPlayerManager.Instance.Stop();
             }
 
             int maxSlideLimit = (ShowSlideRangeEnd > 0 && Presentation != null && ShowSlideRangeEnd <= Presentation.Slides.Count) ? ShowSlideRangeEnd - 1 : (Presentation != null ? Presentation.Slides.Count - 1 : 0);
@@ -23642,7 +26544,35 @@ namespace GenOffice.UI
             }
 
             if (Presentation == null) return;
+
+            bool wasVidPlaying = SlideVideoPlayerManager.Instance.IsPlaying;
+            ShapeNode activeVid = SlideVideoPlayerManager.Instance.ActiveShape;
+            if (wasVidPlaying || activeVid != null)
+            {
+                SlideVideoPlayerManager.Instance.Stop();
+            }
+
             SlideNode slide = ActiveSlide;
+            if (slide != null && slide.Shapes != null)
+            {
+                foreach (var s in slide.Shapes)
+                {
+                    if (s != null && (s.Type == ShapeType.Video || !string.IsNullOrEmpty(s.VideoPath)))
+                    {
+                        s.VideoCurrentTime = (float)(s.VideoTrimStart > 0 ? s.VideoTrimStart : 0.0);
+                    }
+                }
+            }
+
+            // Nếu video vừa đang phát hoặc đã phát trên slide hiện tại mà bấm Lùi -> trả lại trạng thái chưa phát để bấm phát lại ngay
+            if (wasVidPlaying || _playedMediaShapesInPresentation.Count > 0)
+            {
+                _playedMediaShapesInPresentation.Clear();
+                if (wasVidPlaying)
+                {
+                    return;
+                }
+            }
 
             // Nếu đang ở bước hoạt họa lớn hơn 0: Lùi lại 1 bước hoạt họa mà KHÔNG phát ngược hiệu ứng (chỉ phục hồi trạng thái tĩnh trước lúc phát)
             if (CurrentAnimationStep > 0)
@@ -23666,6 +26596,17 @@ namespace GenOffice.UI
             {
                 int prevIdx = ActiveSlideIndex;
                 ActiveSlideIndex = prevTarget;
+                _playedMediaShapesInPresentation.Clear();
+                if (ActiveSlide != null && ActiveSlide.Shapes != null)
+                {
+                    foreach (var s in ActiveSlide.Shapes)
+                    {
+                        if (s != null && (s.Type == ShapeType.Video || !string.IsNullOrEmpty(s.VideoPath)))
+                        {
+                            s.VideoCurrentTime = (float)(s.VideoTrimStart > 0 ? s.VideoTrimStart : 0.0);
+                        }
+                    }
+                }
                 IsPlayingSlideAnimation = false;
                 _animStopwatch.Stop();
                 AnimationProgress = 0.0f;
@@ -23673,10 +26614,209 @@ namespace GenOffice.UI
                 CurrentAnimationStep = GetTotalAnimationSteps(ActiveSlide);
                 TriggerTransition(prevIdx, ActiveSlideIndex, true);
             }
+            else
+            {
+                // Đã ở tận cùng đầu Slide 1 ("trở về slide đầu max đầu"): Đặt lại hoàn toàn trạng thái phát video và bước hoạt họa về 0!
+                CurrentAnimationStep = 0;
+                _playedMediaShapesInPresentation.Clear();
+            }
         }
 
         public void HandleKeyDown(Keys key)
         {
+            if (IsEditingSpeakerNotes && ActiveSlide != null)
+            {
+                string notes = ActiveSlide.SpeakerNotes ?? "";
+                SpeakerNotesCaretIndex = Math.Max(0, Math.Min(SpeakerNotesCaretIndex, notes.Length));
+
+                if (key == Keys.Escape)
+                {
+                    IsEditingSpeakerNotes = false;
+                    SpeakerNotesSelectionLength = 0;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+
+                if ((Control.ModifierKeys & Keys.Control) != 0)
+                {
+                    if (key == Keys.A)
+                    {
+                        SpeakerNotesSelectionStart = 0;
+                        SpeakerNotesSelectionLength = notes.Length;
+                        SpeakerNotesCaretIndex = notes.Length;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    if (key == Keys.C)
+                    {
+                        if (SpeakerNotesSelectionLength != 0)
+                        {
+                            int sStart = Math.Max(0, Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength));
+                            int sLen = Math.Min(notes.Length - sStart, Math.Abs(SpeakerNotesSelectionLength));
+                            if (sLen > 0) Clipboard.SetText(notes.Substring(sStart, sLen));
+                        }
+                        return;
+                    }
+                    if (key == Keys.X)
+                    {
+                        if (SpeakerNotesSelectionLength != 0)
+                        {
+                            int sStart = Math.Max(0, Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength));
+                            int sLen = Math.Min(notes.Length - sStart, Math.Abs(SpeakerNotesSelectionLength));
+                            if (sLen > 0)
+                            {
+                                Clipboard.SetText(notes.Substring(sStart, sLen));
+                                ActiveSlide.SpeakerNotes = notes.Remove(sStart, sLen);
+                                SpeakerNotesCaretIndex = sStart;
+                                SpeakerNotesSelectionStart = sStart;
+                                SpeakerNotesSelectionLength = 0;
+                                EnsureSpeakerNotesCaretVisible();
+                                if (InvalidateCallback != null) InvalidateCallback();
+                            }
+                        }
+                        return;
+                    }
+                    if (key == Keys.V)
+                    {
+                        if (Clipboard.ContainsText())
+                        {
+                            string clip = Clipboard.GetText().Replace("\r\n", "\n").Replace("\r", "\n");
+                            if (SpeakerNotesSelectionLength != 0)
+                            {
+                                int sStart = Math.Max(0, Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength));
+                                int sLen = Math.Min(notes.Length - sStart, Math.Abs(SpeakerNotesSelectionLength));
+                                notes = notes.Remove(sStart, sLen);
+                                SpeakerNotesCaretIndex = sStart;
+                            }
+                            ActiveSlide.SpeakerNotes = notes.Insert(SpeakerNotesCaretIndex, clip);
+                            SpeakerNotesCaretIndex += clip.Length;
+                            SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                            SpeakerNotesSelectionLength = 0;
+                            EnsureSpeakerNotesCaretVisible();
+                            if (InvalidateCallback != null) InvalidateCallback();
+                        }
+                        return;
+                    }
+                }
+
+                if (SpeakerNotesSelectionLength != 0 && (key == Keys.Back || key == Keys.Delete))
+                {
+                    int sStart = Math.Max(0, Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength));
+                    int sLen = Math.Min(notes.Length - sStart, Math.Abs(SpeakerNotesSelectionLength));
+                    ActiveSlide.SpeakerNotes = notes.Remove(sStart, sLen);
+                    SpeakerNotesCaretIndex = sStart;
+                    SpeakerNotesSelectionStart = sStart;
+                    SpeakerNotesSelectionLength = 0;
+                    EnsureSpeakerNotesCaretVisible();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+
+                bool isShift = (Control.ModifierKeys & Keys.Shift) != 0;
+                if (key == Keys.Left)
+                {
+                    if (!isShift && SpeakerNotesSelectionLength != 0)
+                    {
+                        SpeakerNotesCaretIndex = Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength);
+                        SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                        SpeakerNotesSelectionLength = 0;
+                    }
+                    else
+                    {
+                        SpeakerNotesCaretIndex = Math.Max(0, SpeakerNotesCaretIndex - 1);
+                        if (isShift) SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                        else { SpeakerNotesSelectionStart = SpeakerNotesCaretIndex; SpeakerNotesSelectionLength = 0; }
+                    }
+                    EnsureSpeakerNotesCaretVisible();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Right)
+                {
+                    if (!isShift && SpeakerNotesSelectionLength != 0)
+                    {
+                        SpeakerNotesCaretIndex = Math.Max(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength);
+                        SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                        SpeakerNotesSelectionLength = 0;
+                    }
+                    else
+                    {
+                        SpeakerNotesCaretIndex = Math.Min(notes.Length, SpeakerNotesCaretIndex + 1);
+                        if (isShift) SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                        else { SpeakerNotesSelectionStart = SpeakerNotesCaretIndex; SpeakerNotesSelectionLength = 0; }
+                    }
+                    EnsureSpeakerNotesCaretVisible();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Home)
+                {
+                    int lineStart = SpeakerNotesCaretIndex;
+                    while (lineStart > 0 && notes[lineStart - 1] != '\n') lineStart--;
+                    SpeakerNotesCaretIndex = lineStart;
+                    if (isShift) SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                    else { SpeakerNotesSelectionStart = SpeakerNotesCaretIndex; SpeakerNotesSelectionLength = 0; }
+                    EnsureSpeakerNotesCaretVisible();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.End)
+                {
+                    int lineEnd = SpeakerNotesCaretIndex;
+                    while (lineEnd < notes.Length && notes[lineEnd] != '\n') lineEnd++;
+                    SpeakerNotesCaretIndex = lineEnd;
+                    if (isShift) SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                    else { SpeakerNotesSelectionStart = SpeakerNotesCaretIndex; SpeakerNotesSelectionLength = 0; }
+                    EnsureSpeakerNotesCaretVisible();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Up || key == Keys.Down)
+                {
+                    if (!LastNotesTextRect.IsEmpty)
+                    {
+                        using (Bitmap dummy = new Bitmap(1, 1))
+                        using (Graphics g = Graphics.FromImage(dummy))
+                        using (Font font = SlideFontManager.CreateFont("Segoe UI", LastNotesFontSize, FontStyle.Regular, GraphicsUnit.Point))
+                        {
+                            List<VisualTextLine> vLines = GetVisualWrappedLines(g, notes, font, Math.Max(40f, LastNotesTextRect.Width));
+                            int curLine = 0;
+                            int col = 0;
+                            for (int i = 0; i < vLines.Count; i++)
+                            {
+                                if (SpeakerNotesCaretIndex <= vLines[i].StartCharIndex + vLines[i].Length)
+                                {
+                                    curLine = i;
+                                    col = SpeakerNotesCaretIndex - vLines[i].StartCharIndex;
+                                    break;
+                                }
+                            }
+                            int targetLine = (key == Keys.Up) ? Math.Max(0, curLine - 1) : Math.Min(vLines.Count - 1, curLine + 1);
+                            if (targetLine >= 0 && targetLine < vLines.Count)
+                            {
+                                SpeakerNotesCaretIndex = vLines[targetLine].StartCharIndex + Math.Min(col, vLines[targetLine].Length);
+                                if (isShift) SpeakerNotesSelectionLength = SpeakerNotesCaretIndex - SpeakerNotesSelectionStart;
+                                else { SpeakerNotesSelectionStart = SpeakerNotesCaretIndex; SpeakerNotesSelectionLength = 0; }
+                                EnsureSpeakerNotesCaretVisible();
+                                if (InvalidateCallback != null) InvalidateCallback();
+                            }
+                        }
+                    }
+                    return;
+                }
+                if (key == Keys.Delete)
+                {
+                    if (SpeakerNotesCaretIndex < notes.Length)
+                    {
+                        ActiveSlide.SpeakerNotes = notes.Remove(SpeakerNotesCaretIndex, 1);
+                        EnsureSpeakerNotesCaretVisible();
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                    return;
+                }
+                return;
+            }
+
             if (IsPresenting)
             {
                 if (IsEndSlideShowScreen)
@@ -23875,7 +27015,7 @@ namespace GenOffice.UI
                             CaretIndex = sStart;
                             TextSelectionStart = sStart;
                             TextSelectionLength = 0;
-                            EditingShape.Text = EditingTextBuffer;
+                            SyncEditingShapeText();
                         }
                         return;
                     }
@@ -23895,7 +27035,7 @@ namespace GenOffice.UI
                             CaretIndex += clip.Length;
                             TextSelectionStart = CaretIndex;
                             TextSelectionLength = 0;
-                            EditingShape.Text = EditingTextBuffer;
+                            SyncEditingShapeText();
                         }
                         return;
                     }
@@ -23909,7 +27049,7 @@ namespace GenOffice.UI
                     CaretIndex = sStart;
                     TextSelectionStart = sStart;
                     TextSelectionLength = 0;
-                    EditingShape.Text = EditingTextBuffer;
+                    SyncEditingShapeText();
                     return;
                 }
 
@@ -23946,7 +27086,7 @@ namespace GenOffice.UI
                     if (CaretIndex < EditingTextBuffer.Length)
                     {
                         EditingTextBuffer = EditingTextBuffer.Remove(CaretIndex, 1);
-                        EditingShape.Text = EditingTextBuffer;
+                        SyncEditingShapeText();
                     }
                     return;
                 }
@@ -24066,6 +27206,10 @@ namespace GenOffice.UI
                         if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                         CanvasScrollX = 0;
                         CanvasScrollY = 0;
+                        SmoothCanvasScrollX = 0f;
+                        TargetCanvasScrollX = 0f;
+                        SmoothCanvasScrollY = 0f;
+                        TargetCanvasScrollY = 0f;
                         if (IsPresenting && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                         {
                             TriggerTransition(prevIdx, ActiveSlideIndex, false);
@@ -24082,6 +27226,10 @@ namespace GenOffice.UI
                         if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                         CanvasScrollX = 0;
                         CanvasScrollY = 0;
+                        SmoothCanvasScrollX = 0f;
+                        TargetCanvasScrollX = 0f;
+                        SmoothCanvasScrollY = 0f;
+                        TargetCanvasScrollY = 0f;
                         if (IsPresenting && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                         {
                             TriggerTransition(prevIdx, ActiveSlideIndex, true);
@@ -24106,6 +27254,10 @@ namespace GenOffice.UI
 
         public string GetCurrentWordBeforeCursor(out int wordStart)
         {
+            if (IsEditingSpeakerNotes && ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes))
+            {
+                return VietnameseWordPredictor.GetWordBeforePos(ActiveSlide.SpeakerNotes, SpeakerNotesCaretIndex, out wordStart);
+            }
             if (IsInlineEditing && EditingShape != null && !string.IsNullOrEmpty(EditingTextBuffer))
             {
                 return VietnameseWordPredictor.GetWordBeforePos(EditingTextBuffer, CaretIndex, out wordStart);
@@ -24120,7 +27272,18 @@ namespace GenOffice.UI
 
         public void ReplaceWordAtCursor(string newWord)
         {
-            if (IsInlineEditing && EditingShape != null && !string.IsNullOrEmpty(EditingTextBuffer))
+            if (IsEditingSpeakerNotes && ActiveSlide != null && !string.IsNullOrEmpty(ActiveSlide.SpeakerNotes))
+            {
+                int wordStart;
+                string wordBefore = VietnameseWordPredictor.GetWordBeforePos(ActiveSlide.SpeakerNotes, SpeakerNotesCaretIndex, out wordStart);
+                if (!string.IsNullOrEmpty(wordBefore) && wordStart >= 0)
+                {
+                    ActiveSlide.SpeakerNotes = ActiveSlide.SpeakerNotes.Remove(wordStart, wordBefore.Length).Insert(wordStart, newWord + " ");
+                    SpeakerNotesCaretIndex = wordStart + newWord.Length + 1;
+                    EnsureSpeakerNotesCaretVisible();
+                }
+            }
+            else if (IsInlineEditing && EditingShape != null && !string.IsNullOrEmpty(EditingTextBuffer))
             {
                 int wordStart;
                 string wordBefore = VietnameseWordPredictor.GetWordBeforePos(EditingTextBuffer, CaretIndex, out wordStart);
@@ -24128,7 +27291,7 @@ namespace GenOffice.UI
                 {
                     EditingTextBuffer = EditingTextBuffer.Remove(wordStart, wordBefore.Length).Insert(wordStart, newWord + " ");
                     CaretIndex = wordStart + newWord.Length + 1;
-                    EditingShape.Text = EditingTextBuffer;
+                    SyncEditingShapeText();
                 }
             }
             else if (IsEditingTableCell && EditingTableShape != null && !string.IsNullOrEmpty(EditingTableCellBuffer))
@@ -24153,6 +27316,75 @@ namespace GenOffice.UI
 
         public void HandleKeyPress(char keyChar)
         {
+            if (IsEditingSpeakerNotes && ActiveSlide != null)
+            {
+                string notes = ActiveSlide.SpeakerNotes ?? "";
+                SpeakerNotesCaretIndex = Math.Max(0, Math.Min(notes.Length, SpeakerNotesCaretIndex));
+                if (SpeakerNotesSelectionLength != 0 && (keyChar == '\b' || !char.IsControl(keyChar) || keyChar == '\r' || keyChar == '\n'))
+                {
+                    int sStart = Math.Max(0, Math.Min(notes.Length, Math.Min(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength)));
+                    int sEnd = Math.Max(0, Math.Min(notes.Length, Math.Max(SpeakerNotesSelectionStart, SpeakerNotesSelectionStart + SpeakerNotesSelectionLength)));
+                    notes = notes.Remove(sStart, sEnd - sStart);
+                    SpeakerNotesCaretIndex = sStart;
+                    SpeakerNotesSelectionStart = sStart;
+                    SpeakerNotesSelectionLength = 0;
+                    if (keyChar == '\b')
+                    {
+                        ActiveSlide.SpeakerNotes = notes;
+                        EnsureSpeakerNotesCaretVisible();
+                        return;
+                    }
+                }
+
+                if (keyChar == '\b')
+                {
+                    if (notes.Length > 0 && SpeakerNotesCaretIndex > 0)
+                    {
+                        notes = notes.Remove(SpeakerNotesCaretIndex - 1, 1);
+                        SpeakerNotesCaretIndex--;
+                    }
+                }
+                else if (!char.IsControl(keyChar) || keyChar == '\r' || keyChar == '\n')
+                {
+                    if (VietnameseAutoCorrect.IsEnabled)
+                    {
+                        if (VietnameseAutoCorrect.IsWordDelimiter(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(notes, SpeakerNotesCaretIndex);
+                            string correctedWord;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryCorrectWord(wordBefore, out correctedWord))
+                            {
+                                int wordStart = SpeakerNotesCaretIndex - wordBefore.Length;
+                                notes = notes.Remove(wordStart, wordBefore.Length).Insert(wordStart, correctedWord);
+                                SpeakerNotesCaretIndex = wordStart + correctedWord.Length;
+                            }
+                        }
+                        else if (!char.IsControl(keyChar))
+                        {
+                            string wordBefore = GetWordBeforePos(notes, SpeakerNotesCaretIndex);
+                            int charsToRemove;
+                            string textToInsert;
+                            if (!string.IsNullOrEmpty(wordBefore) && VietnameseAutoCorrect.TryProcessChar(wordBefore, keyChar, out charsToRemove, out textToInsert))
+                            {
+                                int removeStart = SpeakerNotesCaretIndex - charsToRemove;
+                                notes = notes.Remove(removeStart, charsToRemove).Insert(removeStart, textToInsert);
+                                SpeakerNotesCaretIndex = removeStart + textToInsert.Length;
+                                ActiveSlide.SpeakerNotes = notes;
+                                EnsureSpeakerNotesCaretVisible();
+                                return;
+                            }
+                        }
+                    }
+
+                    string ins = (keyChar == '\r' || keyChar == '\n') ? "\n" : keyChar.ToString();
+                    notes = notes.Insert(SpeakerNotesCaretIndex, ins);
+                    SpeakerNotesCaretIndex += ins.Length;
+                }
+                ActiveSlide.SpeakerNotes = notes;
+                EnsureSpeakerNotesCaretVisible();
+                return;
+            }
+
             if (IsEditingTableCell && EditingTableShape != null)
             {
                 if (keyChar == '\b')
@@ -24212,7 +27444,7 @@ namespace GenOffice.UI
                     TextSelectionLength = 0;
                     if (keyChar == '\b')
                     {
-                        EditingShape.Text = EditingTextBuffer;
+                        SyncEditingShapeText();
                         return;
                     }
                 }
@@ -24250,7 +27482,7 @@ namespace GenOffice.UI
                                 int removeStart = CaretIndex - charsToRemove;
                                 EditingTextBuffer = EditingTextBuffer.Remove(removeStart, charsToRemove).Insert(removeStart, textToInsert);
                                 CaretIndex = removeStart + textToInsert.Length;
-                                EditingShape.Text = EditingTextBuffer;
+                                SyncEditingShapeText();
                                 return;
                             }
                         }
@@ -24260,7 +27492,7 @@ namespace GenOffice.UI
                     EditingTextBuffer = EditingTextBuffer.Insert(CaretIndex, ins);
                     CaretIndex += ins.Length;
                 }
-                EditingShape.Text = EditingTextBuffer;
+                SyncEditingShapeText();
             }
         }
         #endregion

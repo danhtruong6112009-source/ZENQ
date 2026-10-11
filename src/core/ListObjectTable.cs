@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Excel ListObject / Table definition providing structured references and auto-expansion.

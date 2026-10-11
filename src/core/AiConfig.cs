@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public enum AiProviderType
     {
@@ -148,7 +148,7 @@ namespace GenOffice.Core
     }
 
     /// <summary>
-    /// Cấu hình và quản lý đa Key / đa Model cho toàn bộ ứng dụng GenOffice.
+    /// Cấu hình và quản lý đa Key / đa Model cho toàn bộ ứng dụng ZenQOffice.
     /// 
     /// LOGIC MỚI:
     /// - Khi mở app lần đầu: danh sách Profiles hoàn toàn trống (0 profile).

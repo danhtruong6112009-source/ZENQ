@@ -1,14 +1,23 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public static class ChartRenderer
     {
         public static void DrawChart(Graphics g, Rectangle bounds, DocChartData data, bool isSelected, float zoomLevel)
+        {
+            if (bounds.Width <= 20 || bounds.Height <= 20) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, bounds.Width, bounds.Height))
+            {
+                DrawChart(d2d, bounds, data, isSelected, zoomLevel);
+            }
+        }
+
+        public static void DrawChart(D2DGraphics g, Rectangle bounds, DocChartData data, bool isSelected, float zoomLevel)
         {
             if (bounds.Width <= 20 || bounds.Height <= 20) return;
             if (data == null) data = DocChartData.CreateDefault("Column_Clustered");
@@ -175,7 +184,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 1. COLUMN CHART (2D & 3D CLUSTERED, STACKED, 100%, DEEP) ====================
-        private static void DrawColumnChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, bool isDeep, float zoom)
+        private static void DrawColumnChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, bool isDeep, float zoom)
         {
             double maxVal = GetMaxDataValue(data, isStacked);
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
@@ -263,7 +272,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 2. BAR CHART (2D & 3D HORIZONTAL) ====================
-        private static void DrawBarChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
+        private static void DrawBarChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
         {
             double maxVal = GetMaxDataValue(data, isStacked);
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
@@ -333,7 +342,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 3. LINE CHART (2D & 3D RIBBON) ====================
-        private static void DrawLineChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
+        private static void DrawLineChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
         {
             double maxVal = GetMaxDataValue(data, isStacked);
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
@@ -407,7 +416,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 4. AREA CHART (2D & 3D TERRAIN) ====================
-        private static void DrawAreaChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
+        private static void DrawAreaChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isStacked, float zoom)
         {
             double maxVal = GetMaxDataValue(data, isStacked);
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
@@ -464,7 +473,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 5. PIE & DOUGHNUT CHART (2D & 3D) ====================
-        private static void DrawPieChart(Graphics g, Rectangle bounds, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isDoughnut, float zoom)
+        private static void DrawPieChart(D2DGraphics g, Rectangle bounds, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool is3D, bool isDoughnut, float zoom)
         {
             int pieSize = Math.Min(plotW, plotH) - (int)(10 * zoom);
             if (pieSize < 20) pieSize = 20;
@@ -535,7 +544,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 6. 3D SURFACE & WIREFRAME ====================
-        private static void DrawSurfaceChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool wireframeOnly, float zoom)
+        private static void DrawSurfaceChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool wireframeOnly, float zoom)
         {
             int rows = Math.Max(3, data.Categories != null ? data.Categories.Count : 4);
             int cols = Math.Max(3, data.SeriesNames != null ? data.SeriesNames.Count : 4);
@@ -611,7 +620,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 7. RADAR CHART ====================
-        private static void DrawRadarChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool filled, bool showMarkers, float zoom)
+        private static void DrawRadarChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool filled, bool showMarkers, float zoom)
         {
             int catCount = Math.Max(3, data.Categories != null ? data.Categories.Count : 5);
             int serCount = Math.Max(1, data.SeriesNames != null ? data.SeriesNames.Count : 1);
@@ -694,7 +703,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 8. TREEMAP CHART (HIERARCHY) ====================
-        private static void DrawTreemapChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawTreemapChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             double total = 0;
@@ -751,7 +760,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 9. SUNBURST CHART ====================
-        private static void DrawSunburstChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawSunburstChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             int size = Math.Min(plotW, plotH) - (int)(10 * zoom);
@@ -797,7 +806,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 10. WATERFALL CHART ====================
-        private static void DrawWaterfallChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawWaterfallChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             DrawYGridlines(g, plotX, plotY, plotW, plotH, GetMaxDataValue(data, true), zoom);
@@ -862,7 +871,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 11. FUNNEL CHART ====================
-        private static void DrawFunnelChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawFunnelChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             int stageH = plotH / catCount;
@@ -903,7 +912,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 12. STOCK CHART (CANDLESTICK) ====================
-        private static void DrawStockChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool showOpen, float zoom)
+        private static void DrawStockChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool showOpen, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             double maxV = GetMaxDataValue(data, false);
@@ -948,7 +957,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 13. HISTOGRAM & BOX-WHISKER ====================
-        private static void DrawHistogramChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool pareto, float zoom)
+        private static void DrawHistogramChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool pareto, float zoom)
         {
             DrawColumnChart(g, data, colors, plotX, plotY, plotW, plotH, false, false, false, zoom);
 
@@ -981,7 +990,7 @@ namespace GenOffice.UI
             }
         }
 
-        private static void DrawBoxWhiskerChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawBoxWhiskerChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             double maxV = GetMaxDataValue(data, false);
@@ -1025,7 +1034,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 14. SCATTER & BUBBLE CHART ====================
-        private static void DrawScatterChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool isSmooth, bool isBubble, float zoom)
+        private static void DrawScatterChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, bool isSmooth, bool isBubble, float zoom)
         {
             double maxVal = GetMaxDataValue(data, false);
             int catCount = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
@@ -1071,7 +1080,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 15. COMBO CHART (DUAL AXIS) ====================
-        private static void DrawComboChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawComboChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             // Series 0 as Column on Left Axis, Series 1 as Line on Right Axis
             DrawColumnChart(g, data, colors, plotX, plotY, plotW, plotH, false, false, false, zoom);
@@ -1105,7 +1114,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 16. FILLED MAP (BẢN ĐỒ ĐỊA LÝ PHÂN VÙNG) ====================
-        private static void DrawMapChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawMapChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             int n = Math.Max(1, data.Categories != null ? data.Categories.Count : 1);
             double minV = double.MaxValue;
@@ -1197,7 +1206,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 17. PIVOT CHART (BIỂU ĐỒ PIVOT CÓ NÚT LỌC TRƯỜNG) ====================
-        private static void DrawPivotChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void DrawPivotChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             // 1. Draw Pivot Filter Pill Buttons at Top
             int pillY = plotY;
@@ -1232,7 +1241,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 18. 3D MAPS (BẢN ĐỒ KHÔNG GIAN 3 CHIỀU) ====================
-        private static void Draw3DMapChart(Graphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
+        private static void Draw3DMapChart(D2DGraphics g, DocChartData data, Color[] colors, int plotX, int plotY, int plotW, int plotH, float zoom)
         {
             // 1. Dark Spatial Canvas
             using (SolidBrush darkBg = new SolidBrush(Color.FromArgb(15, 23, 42)))
@@ -1306,7 +1315,7 @@ namespace GenOffice.UI
         }
 
         // ==================== 3D COLUMN / BAR DRAWING HELPERS ====================
-        private static void Draw3DColumnBar(Graphics g, int x, int y, int w, int h, int depth, Color c)
+        private static void Draw3DColumnBar(D2DGraphics g, int x, int y, int w, int h, int depth, Color c)
         {
             if (h <= 0) return;
             Color topCol = ControlPaint.Light(c, 0.35f);
@@ -1352,7 +1361,7 @@ namespace GenOffice.UI
             }
         }
 
-        private static void Draw3DHorzBar(Graphics g, int x, int y, int w, int h, int depth, Color c)
+        private static void Draw3DHorzBar(D2DGraphics g, int x, int y, int w, int h, int depth, Color c)
         {
             if (w <= 0) return;
             Color topCol = ControlPaint.Light(c, 0.35f);
@@ -1387,7 +1396,7 @@ namespace GenOffice.UI
         }
 
         // ==================== Y-GRIDLINES & LABELS ====================
-        private static void DrawYGridlines(Graphics g, int plotX, int plotY, int plotW, int plotH, double maxVal, float zoom)
+        private static void DrawYGridlines(D2DGraphics g, int plotX, int plotY, int plotW, int plotH, double maxVal, float zoom)
         {
             using (Pen gridPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
             using (Font yFont = new Font("Segoe UI", Math.Max(6.5f, 7.5f * zoom)))
@@ -1408,7 +1417,7 @@ namespace GenOffice.UI
         }
 
         // ==================== LEGEND ====================
-        private static void DrawLegend(Graphics g, Rectangle bounds, DocChartData data, Color[] colors, int legendH, float zoom)
+        private static void DrawLegend(D2DGraphics g, Rectangle bounds, DocChartData data, Color[] colors, int legendH, float zoom)
         {
             int serCount = (data.SeriesNames != null && data.SeriesNames.Count > 0) ? data.SeriesNames.Count : ((data.Categories != null) ? data.Categories.Count : 0);
             if (serCount <= 0) return;

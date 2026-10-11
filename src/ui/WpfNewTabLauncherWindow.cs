@@ -7,9 +7,9 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Interop;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Modern, hardware-accelerated WPF Popover Launcher for creating new documents (+).
@@ -140,8 +140,8 @@ namespace GenOffice.UI
             };
             mainStack.Children.Add(header);
 
-            // 4 App Options
-            _itemBorders = new Border[4];
+            // 5 App Options
+            _itemBorders = new Border[5];
             _itemBorders[0] = CreateItemRow(OfficeAppMode.Writer, "Writer", "Văn bản Word", "DOCX",
                 Color.FromRgb(37, 99, 235), Color.FromRgb(29, 78, 216),
                 Color.FromRgb(239, 246, 255), Color.FromRgb(191, 219, 254), 0);
@@ -158,7 +158,11 @@ namespace GenOffice.UI
                 Color.FromRgb(220, 38, 38), Color.FromRgb(185, 28, 28),
                 Color.FromRgb(254, 242, 242), Color.FromRgb(254, 202, 202), 3);
 
-            for (int i = 0; i < 4; i++)
+            _itemBorders[4] = CreateItemRow(OfficeAppMode.Photo, "Photo", "Thiết kế & Đồ họa", "PSD",
+                Color.FromRgb(99, 102, 241), Color.FromRgb(79, 70, 229),
+                Color.FromRgb(238, 242, 255), Color.FromRgb(199, 210, 254), 4);
+
+            for (int i = 0; i < 5; i++)
             {
                 mainStack.Children.Add(_itemBorders[i]);
             }
@@ -396,6 +400,30 @@ namespace GenOffice.UI
                 canvas.Children.Add(pieSlice);
                 canvas.Children.Add(stand);
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                Border photoRect = new Border
+                {
+                    Width = 18,
+                    Height = 16,
+                    Background = Brushes.White,
+                    CornerRadius = new CornerRadius(3),
+                    Opacity = 0.95
+                };
+                Canvas.SetLeft(photoRect, 2);
+                Canvas.SetTop(photoRect, 3);
+                TextBlock psText = new TextBlock
+                {
+                    Text = "Ps",
+                    FontWeight = FontWeights.Bold,
+                    FontSize = 9,
+                    Foreground = new SolidColorBrush(Color.FromRgb(99, 102, 241))
+                };
+                Canvas.SetLeft(psText, 5.5);
+                Canvas.SetTop(psText, 4.5);
+                canvas.Children.Add(photoRect);
+                canvas.Children.Add(psText);
+            }
             else // PDF
             {
                 // PDF document with bold 'P'
@@ -547,21 +575,21 @@ namespace GenOffice.UI
             }
             else if (e.Key == Key.Down)
             {
-                _focusedIndex = (_focusedIndex + 1) % 4;
+                _focusedIndex = (_focusedIndex + 1) % 5;
                 HighlightFocusedItem();
                 e.Handled = true;
             }
             else if (e.Key == Key.Up)
             {
-                _focusedIndex = (_focusedIndex <= 0) ? 3 : _focusedIndex - 1;
+                _focusedIndex = (_focusedIndex <= 0) ? 4 : _focusedIndex - 1;
                 HighlightFocusedItem();
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
             {
-                if (_focusedIndex >= 0 && _focusedIndex < 4)
+                if (_focusedIndex >= 0 && _focusedIndex < 5)
                 {
-                    OfficeAppMode[] modes = new[] { OfficeAppMode.Writer, OfficeAppMode.Calc, OfficeAppMode.Slides, OfficeAppMode.Pdf };
+                    OfficeAppMode[] modes = new[] { OfficeAppMode.Writer, OfficeAppMode.Calc, OfficeAppMode.Slides, OfficeAppMode.Pdf, OfficeAppMode.Photo };
                     ExecuteSelection(modes[_focusedIndex]);
                 }
                 e.Handled = true;
@@ -571,7 +599,7 @@ namespace GenOffice.UI
         private void HighlightFocusedItem()
         {
             SolidColorBrush hoverBrush = new SolidColorBrush(Color.FromArgb(160, 241, 245, 249));
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 5; i++)
             {
                 _itemBorders[i].Background = (i == _focusedIndex) ? hoverBrush : Brushes.Transparent;
             }

@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public class ReleaseInfo
     {
@@ -30,7 +30,7 @@ namespace GenOffice.Core
             Title = "";
             Changelog = "";
             DownloadUrl = "";
-            DownloadFileName = "GenOffice.exe";
+            DownloadFileName = "ZenQOffice.exe";
             HtmlUrl = "";
             HasUpdate = false;
         }
@@ -38,10 +38,10 @@ namespace GenOffice.Core
 
     public static class UpdateManager
     {
-        public const string CURRENT_VERSION = "3.5.0";
-        public const string CURRENT_VERSION_TAG = "v3.5";
+        public const string CURRENT_VERSION = "4.0.0";
+        public const string CURRENT_VERSION_TAG = "v4.0";
         public const string GITHUB_OWNER = "thedanh6112009-collab";
-        public const string GITHUB_REPO = "GENOFFICE";
+        public const string GITHUB_REPO = "ZENQ";
 
         public static string GitHubReleasesWebUrl
         {
@@ -182,7 +182,7 @@ namespace GenOffice.Core
                         {
                             score = 100;
                         }
-                        // Ưu tiên 2: Tệp GenOffice.exe
+                        // Ưu tiên 2: Tệp ZenQOffice.exe
                         else if (lower == "genoffice.exe")
                         {
                             score = 90;
@@ -366,7 +366,7 @@ namespace GenOffice.Core
                     bat.AppendLine("chcp 65001 >nul");
                     bat.AppendLine("timeout /t 1 /nobreak >nul");
                     bat.AppendLine(":wait_loop");
-                    bat.AppendLine("tasklist /fi \"imagename eq GenOffice.exe\" 2>nul | find /i \"GenOffice.exe\" >nul");
+                    bat.AppendLine("tasklist /fi \"imagename eq ZenQOffice.exe\" 2>nul | find /i \"ZenQOffice.exe\" >nul");
                     bat.AppendLine("if %errorlevel% equ 0 (");
                     bat.AppendLine("    timeout /t 1 /nobreak >nul");
                     bat.AppendLine("    goto wait_loop");
@@ -397,7 +397,7 @@ namespace GenOffice.Core
                     }
                     else
                     {
-                        // Ghi đè file GenOffice.exe
+                        // Ghi đè file ZenQOffice.exe
                         bat.AppendLine(string.Format("copy /y \"{0}\" \"{1}\" >nul", targetDownloadPath, currentAppPath));
                         bat.AppendLine(string.Format("start \"\" \"{0}\"", currentAppPath));
                         bat.AppendLine(string.Format("del \"{0}\" >nul 2>&1", targetDownloadPath));

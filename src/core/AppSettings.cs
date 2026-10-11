@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Xml;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public enum RibbonStyle
     {
@@ -51,6 +51,14 @@ namespace GenOffice.Core
         public int SelectedAiProvider { get; set; }
         public bool AutoCorrectVietnamese { get; set; }
         public bool WordPredictionEnabled { get; set; }
+        public bool TouchModeEnabled { get; set; }
+        public bool TouchPanActive { get; set; }
+        public bool AutoSwitchPenInk { get; set; }
+        public bool PenPressureSensitivity { get; set; }
+        public bool AutoSummonTouchKeyboard { get; set; }
+        public bool CalcBarcodeScannerMode { get; set; }
+        public bool PeripheralAutoNotify { get; set; }
+        public bool AutoStraightenInk { get; set; } = true;
 
         public event EventHandler SettingsChanged;
 
@@ -69,6 +77,14 @@ namespace GenOffice.Core
             SelectedAiProvider = 0;
             AutoCorrectVietnamese = false;
             WordPredictionEnabled = false;
+            TouchModeEnabled = false;
+            TouchPanActive = false;
+            AutoSwitchPenInk = true;
+            PenPressureSensitivity = true;
+            AutoSummonTouchKeyboard = true;
+            CalcBarcodeScannerMode = false;
+            PeripheralAutoNotify = true;
+            AutoStraightenInk = true;
         }
 
         public static string GetSettingsFilePath()
@@ -151,6 +167,30 @@ namespace GenOffice.Core
                 elWordPred.InnerText = WordPredictionEnabled.ToString();
                 root.AppendChild(elWordPred);
 
+                XmlElement elTouchMode = doc.CreateElement("TouchModeEnabled");
+                elTouchMode.InnerText = TouchModeEnabled.ToString();
+                root.AppendChild(elTouchMode);
+
+                XmlElement elPenInk = doc.CreateElement("AutoSwitchPenInk");
+                elPenInk.InnerText = AutoSwitchPenInk.ToString();
+                root.AppendChild(elPenInk);
+
+                XmlElement elPenPressure = doc.CreateElement("PenPressureSensitivity");
+                elPenPressure.InnerText = PenPressureSensitivity.ToString();
+                root.AppendChild(elPenPressure);
+
+                XmlElement elTouchKbd = doc.CreateElement("AutoSummonTouchKeyboard");
+                elTouchKbd.InnerText = AutoSummonTouchKeyboard.ToString();
+                root.AppendChild(elTouchKbd);
+
+                XmlElement elBarcode = doc.CreateElement("CalcBarcodeScannerMode");
+                elBarcode.InnerText = CalcBarcodeScannerMode.ToString();
+                root.AppendChild(elBarcode);
+
+                XmlElement elPeriphNotify = doc.CreateElement("PeripheralAutoNotify");
+                elPeriphNotify.InnerText = PeripheralAutoNotify.ToString();
+                root.AppendChild(elPeriphNotify);
+
                 doc.Save(path);
                 NotifyChanged();
             }
@@ -208,6 +248,24 @@ namespace GenOffice.Core
 
                         XmlNode nWordPred = root.SelectSingleNode("WordPredictionEnabled");
                         if (nWordPred != null) { bool v; if (bool.TryParse(nWordPred.InnerText, out v)) s.WordPredictionEnabled = v; }
+
+                        XmlNode nTouchMode = root.SelectSingleNode("TouchModeEnabled");
+                        if (nTouchMode != null) { bool v; if (bool.TryParse(nTouchMode.InnerText, out v)) s.TouchModeEnabled = v; }
+
+                        XmlNode nPenInk = root.SelectSingleNode("AutoSwitchPenInk");
+                        if (nPenInk != null) { bool v; if (bool.TryParse(nPenInk.InnerText, out v)) s.AutoSwitchPenInk = v; }
+
+                        XmlNode nPenPressure = root.SelectSingleNode("PenPressureSensitivity");
+                        if (nPenPressure != null) { bool v; if (bool.TryParse(nPenPressure.InnerText, out v)) s.PenPressureSensitivity = v; }
+
+                        XmlNode nTouchKbd = root.SelectSingleNode("AutoSummonTouchKeyboard");
+                        if (nTouchKbd != null) { bool v; if (bool.TryParse(nTouchKbd.InnerText, out v)) s.AutoSummonTouchKeyboard = v; }
+
+                        XmlNode nBarcode = root.SelectSingleNode("CalcBarcodeScannerMode");
+                        if (nBarcode != null) { bool v; if (bool.TryParse(nBarcode.InnerText, out v)) s.CalcBarcodeScannerMode = v; }
+
+                        XmlNode nPeriphNotify = root.SelectSingleNode("PeripheralAutoNotify");
+                        if (nPeriphNotify != null) { bool v; if (bool.TryParse(nPeriphNotify.InnerText, out v)) s.PeripheralAutoNotify = v; }
                     }
                 }
             }

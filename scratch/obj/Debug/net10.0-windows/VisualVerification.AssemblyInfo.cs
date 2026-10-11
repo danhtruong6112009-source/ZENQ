@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VisualVerification")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d63e594ce0d4e98869d2c921aaa2849e1aa894a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0f8d9b7f452726ce2370ea128aa6a13b96750bbd")]
 [assembly: System.Reflection.AssemblyProductAttribute("VisualVerification")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VisualVerification")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

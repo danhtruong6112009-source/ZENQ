@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Bảng điều khiển cấu hình AI Liquid Glass căn chỉnh Pixel-Perfect trên màn hình chính (Tab Thiết lập AI).

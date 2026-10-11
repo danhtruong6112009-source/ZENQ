@@ -7,7 +7,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>ZenQOffice</AssemblyName>
     <ApplicationIcon>ZenQOffice.ico</ApplicationIcon>
-    <StartupObject>GenOffice.Program</StartupObject>
+    <StartupObject>ZenQOffice.Program</StartupObject>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -21,6 +21,16 @@
 
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
+  
+    <Reference Include="Vortice.Direct2D1"><HintPath>Vortice.Direct2D1.dll</HintPath></Reference>
+    <Reference Include="Vortice.Mathematics"><HintPath>Vortice.Mathematics.dll</HintPath></Reference>
+    <Reference Include="Vortice.DXGI"><HintPath>Vortice.DXGI.dll</HintPath></Reference>
+    <Reference Include="Vortice.DirectX"><HintPath>Vortice.DirectX.dll</HintPath></Reference>
+
+  
+    <Reference Include="SharpGen.Runtime"><HintPath>SharpGen.Runtime.dll</HintPath></Reference>
+    <Reference Include="SharpGen.Runtime.COM"><HintPath>SharpGen.Runtime.COM.dll</HintPath></Reference>
+
   </ItemGroup>
 
   <ItemGroup>
@@ -68,4 +78,19 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="data\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="CopyToRoot" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.exe" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.exe')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.dll" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.runtimeconfig.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.runtimeconfig.json')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.deps.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.deps.json')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.pdb" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.pdb')" />
+  </Target>
+
 </Project>
+

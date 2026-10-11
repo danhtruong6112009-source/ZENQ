@@ -1,7 +1,7 @@
 #include "PieceTable.hpp"
 #include <algorithm>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 PieceTable::PieceTable() {
     clear();
@@ -125,4 +125,4 @@ std::string PieceTable::getText() const {
     return result;
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

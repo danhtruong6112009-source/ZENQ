@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// HardwareAsmEngine: Lớp thực thi mã máy Assembly x86/x64 ở mức vi mô (Micro-optimization)

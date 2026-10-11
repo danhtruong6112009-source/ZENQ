@@ -3,9 +3,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class SlideFontDialogForm : Form
     {
@@ -259,13 +259,30 @@ namespace GenOffice.UI
             tabFont.Controls.Add(grpPreview);
 
             // Action Buttons
+            Button btnVietnameseToolkit = new Button { 
+                Text = "🇻🇳 Sửa Lỗi Font & Trích Xuất...", 
+                Location = new Point(12, 475), 
+                Size = new Size(210, 30), 
+                BackColor = Color.FromArgb(243, 244, 246), 
+                ForeColor = Color.FromArgb(31, 41, 55), 
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Regular)
+            };
+            btnVietnameseToolkit.FlatAppearance.BorderColor = Color.FromArgb(209, 213, 219);
+            btnVietnameseToolkit.Click += (s, e) => {
+                using (var toolkit = new VietnameseFontToolkitForm())
+                {
+                    toolkit.ShowDialog(this);
+                }
+            };
+
             Button btnOk = new Button { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(340, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             Button btnCancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel, Location = new Point(430, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
 
             btnOk.FlatAppearance.BorderSize = 0;
             btnCancel.FlatAppearance.BorderSize = 0;
 
-            Controls.AddRange(new Control[] { btnOk, btnCancel });
+            Controls.AddRange(new Control[] { btnVietnameseToolkit, btnOk, btnCancel });
             AcceptButton = btnOk;
             CancelButton = btnCancel;
         }

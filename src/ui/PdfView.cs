@@ -5,10 +5,10 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Threading;
 using System.Windows.Forms;
-using GenOffice.Core;
-using GenOffice.Format;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class PdfSearchMatch
     {
@@ -566,7 +566,7 @@ namespace GenOffice.UI
             using (SolidBrush hTxt = new SolidBrush(Color.FromArgb(51, 65, 85)))
             {
                 g.FillRectangle(hBg, sideHead);
-                g.DrawString("TRANG (" + (Document != null ? Document.Pages.Count : 0) + ")", hFont, hTxt, 12, topOffset + 9);
+                g.DrawString("TRANG: " + (Document != null ? Document.Pages.Count : 0), hFont, hTxt, 12, topOffset + 9);
             }
 
             // Vùng cuộn danh sách ảnh thu nhỏ các trang
@@ -1959,7 +1959,7 @@ namespace GenOffice.UI
         public int AutoDetectTextForPage(int pageIdx = -1)
         {
             if (Document == null) return 0;
-            GenOffice.Format.PdfHandler.AutoDetectAndExtractText(Document, pageIdx);
+            ZenQOffice.Format.PdfHandler.AutoDetectAndExtractText(Document, pageIdx);
             InvalidateAllCaches();
             if (pageIdx >= 0 && pageIdx < Document.Pages.Count)
                 return Document.Pages[pageIdx].TextElements.Count;

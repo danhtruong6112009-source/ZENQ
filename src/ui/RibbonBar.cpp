@@ -4,7 +4,7 @@
 #include "RibbonBar.hpp"
 #include <vector>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 RibbonBar::RibbonBar() {
     // Default 3 open tabs representing the 3 office modules (WPS Office style)
@@ -365,4 +365,4 @@ void RibbonBar::drawVectorIcon(HDC hdc, VectorIcon icon, int x, int y, int width
     DeleteObject(hBrush);
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

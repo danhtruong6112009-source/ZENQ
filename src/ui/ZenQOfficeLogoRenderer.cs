@@ -6,7 +6,7 @@ using System.IO;
 using System.Windows.Forms;
 using System.Collections.Generic;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Bộ kết xuất Logo & Icon chính thức của ZenQ Office từ file thiết kế ZENQOFFICE.png / ZenQOffice.ico
@@ -49,11 +49,11 @@ namespace GenOffice.UI
             string[] possiblePaths = new string[]
             {
                 Path.Combine(Application.StartupPath, "ZenQOffice.ico"),
-                Path.Combine(Application.StartupPath, "GenOffice.ico"),
+                Path.Combine(Application.StartupPath, "ZenQOffice.ico"),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ZenQOffice.ico"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GenOffice.ico"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ZenQOffice.ico"),
                 Path.Combine(Directory.GetCurrentDirectory(), "ZenQOffice.ico"),
-                Path.Combine(Directory.GetCurrentDirectory(), "GenOffice.ico")
+                Path.Combine(Directory.GetCurrentDirectory(), "ZenQOffice.ico")
             };
 
             foreach (string p in possiblePaths)
@@ -113,7 +113,7 @@ namespace GenOffice.UI
                     catch { }
                 }
 
-                // 3. Thử nạp từ ZenQOffice.ico / GenOffice.ico
+                // 3. Thử nạp từ ZenQOffice.ico / ZenQOffice.ico
                 string icoPath = GetIcoFilePath();
                 if (File.Exists(icoPath))
                 {
@@ -285,7 +285,7 @@ namespace GenOffice.UI
         }
 
         /// <summary>
-        /// Lấy Icon chính thức cho ứng dụng (từ ZenQOffice.ico / GenOffice.ico hoặc tạo từ Bitmap bo góc)
+        /// Lấy Icon chính thức cho ứng dụng (từ ZenQOffice.ico / ZenQOffice.ico hoặc tạo từ Bitmap bo góc)
         /// </summary>
         public static Icon CreateAppIcon(int size = 32)
         {

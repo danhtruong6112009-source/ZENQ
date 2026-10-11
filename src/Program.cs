@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 using System.Windows.Forms;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice
+namespace ZenQOffice
 {
     static class Program
     {
@@ -72,6 +72,9 @@ namespace GenOffice
                 MessageBox.Show("Lỗi khởi động ZENQ OFFICE:\n" + ex.ToString(), "ZENQ OFFICE Crash Report", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+
+
 
         private static void RenderRibbonPreview()
         {
@@ -241,7 +244,7 @@ namespace GenOffice
             sb.AppendLine("File: " + pptxPath);
             try
             {
-                var pres = GenOffice.Format.PptxHandler.LoadPptx(pptxPath);
+                var pres = ZenQOffice.Format.PptxHandler.LoadPptx(pptxPath);
                 sb.AppendLine($"Total slides: {pres.Slides.Count}");
                 sb.AppendLine($"Canvas: {pres.CanvasWidth} x {pres.CanvasHeight}");
 

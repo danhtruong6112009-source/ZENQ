@@ -8,10 +8,10 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using GenOffice.Core;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public class XlsxHandler
     {
@@ -624,7 +624,18 @@ namespace GenOffice.Format
 
                                     if (fNode != null && !string.IsNullOrEmpty(fNode.InnerText))
                                     {
-                                        sheet.SetCellText(r, c, "=" + fNode.InnerText);
+                                        string rawFormula = fNode.InnerText;
+                                        while (rawFormula.IndexOf("_xlfn.", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            int idx = rawFormula.IndexOf("_xlfn.", StringComparison.OrdinalIgnoreCase);
+                                            rawFormula = rawFormula.Remove(idx, 6);
+                                        }
+                                        while (rawFormula.IndexOf("_xlws.", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            int idx = rawFormula.IndexOf("_xlws.", StringComparison.OrdinalIgnoreCase);
+                                            rawFormula = rawFormula.Remove(idx, 6);
+                                        }
+                                        sheet.SetCellText(r, c, "=" + rawFormula);
                                     }
                                     else if (cellType == "s" && vNode != null)
                                     {
@@ -638,6 +649,10 @@ namespace GenOffice.Format
                                     {
                                         sheet.SetCellText(r, c, isNode.InnerText);
                                     }
+                                    else if (cellType == "b" && vNode != null)
+                                    {
+                                        sheet.SetCellText(r, c, (vNode.InnerText == "1" || vNode.InnerText.Equals("true", StringComparison.OrdinalIgnoreCase)) ? "TRUE" : "FALSE");
+                                    }
                                     else if (vNode != null)
                                     {
                                         sheet.SetCellText(r, c, vNode.InnerText);
@@ -649,6 +664,14 @@ namespace GenOffice.Format
                                         XlsxXf xf = xfs[sAttrId];
                                         CellData loadedCell = sheet.GetOrCreateCell(r, c);
                                         if (loadedCell.Format == null) loadedCell.Format = new CellFormat();
+
+                                        // Apply NumberFormat from NumFmtId
+                                        if (xf.NumFmtId == 1 || xf.NumFmtId == 2) { loadedCell.Format.NumberFormat = "Number"; loadedCell.Format.DecimalPlaces = xf.NumFmtId == 1 ? 0 : 2; }
+                                        else if (xf.NumFmtId == 3 || xf.NumFmtId == 4) { loadedCell.Format.NumberFormat = "Comma"; loadedCell.Format.DecimalPlaces = xf.NumFmtId == 3 ? 0 : 2; }
+                                        else if ((xf.NumFmtId >= 5 && xf.NumFmtId <= 8) || (xf.NumFmtId >= 41 && xf.NumFmtId <= 44)) { loadedCell.Format.NumberFormat = "Currency"; loadedCell.Format.DecimalPlaces = 0; }
+                                        else if (xf.NumFmtId == 9 || xf.NumFmtId == 10) { loadedCell.Format.NumberFormat = "Percent"; loadedCell.Format.DecimalPlaces = xf.NumFmtId == 9 ? 0 : 1; }
+                                        else if (xf.NumFmtId >= 14 && xf.NumFmtId <= 22) { loadedCell.Format.NumberFormat = "Date"; }
+                                        else if (xf.NumFmtId == 49) { loadedCell.Format.NumberFormat = "Text"; }
 
                                         // Apply Font
                                         if (xf.FontId >= 0 && xf.FontId < fonts.Count)
@@ -756,7 +779,6 @@ namespace GenOffice.Format
                         {
                             calcView.Sheets.Add(loadedSheets[i]);
                             calcView.SheetNames.Add(finalSheetNames[i]);
-                            FormulaEngine.EvaluateSheet(loadedSheets[i]);
 
                             var st = new CalcSheetState();
                             st.CustomColWidths = loadedColWidthsList[i];
@@ -764,6 +786,8 @@ namespace GenOffice.Format
                             st.Shapes = (i < loadedShapesList.Count && loadedShapesList[i] != null) ? loadedShapesList[i] : new List<DocShapeObject>();
                             calcView.SheetStates.Add(st);
                         }
+
+                        FormulaEngine.EvaluateWorkbook(calcView.Sheets, calcView.SheetNames);
 
                         if (loadedDefColWList.Count > 0 && loadedDefColWList[0] > 0) calcView.DefaultColWidth = loadedDefColWList[0];
                         if (loadedDefRowHList.Count > 0 && loadedDefRowHList[0] > 0) calcView.DefaultRowHeight = loadedDefRowHList[0];
@@ -802,6 +826,24 @@ namespace GenOffice.Format
                 using (FileStream fs = new FileStream(filepath, FileMode.Create, FileAccess.ReadWrite, FileShare.None))
                 using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Create))
                 {
+                    FormulaEngine.SetWorkbookContext(calcView.Sheets, calcView.SheetNames);
+                    FormulaEngine.EvaluateWorkbook(calcView.Sheets, calcView.SheetNames);
+
+                    // Count total charts across all sheets so [Content_Types].xml can declare them
+                    int totalChartsCount = 0;
+                    for (int s = 0; s < calcView.Sheets.Count; s++)
+                    {
+                        List<DocShapeObject> sShapes = GetSheetShapes(calcView, s);
+                        if (sShapes != null)
+                        {
+                            foreach (var sh in sShapes)
+                            {
+                                if (sh != null && (sh.ShapeType == "Chart" || sh.ChartData != null))
+                                    totalChartsCount++;
+                            }
+                        }
+                    }
+
                     // 1. [Content_Types].xml
                     ZipArchiveEntry ctEntry = archive.CreateEntry("[Content_Types].xml");
                     using (StreamWriter sw = new StreamWriter(ctEntry.Open(), Encoding.UTF8))
@@ -824,6 +866,10 @@ namespace GenOffice.Format
                             {
                                 sw.WriteLine(string.Format("  <Override PartName=\"/xl/drawings/drawing{0}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>", s + 1));
                             }
+                        }
+                        for (int cIdx = 1; cIdx <= totalChartsCount; cIdx++)
+                        {
+                            sw.WriteLine(string.Format("  <Override PartName=\"/xl/charts/chart{0}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawingml.chart+xml\"/>", cIdx));
                         }
                         sw.WriteLine("</Types>");
                     }
@@ -970,13 +1016,21 @@ namespace GenOffice.Format
 
                             bool isDiagHeader = (fmt.IsDiagonalHeader || (fmt.Borders != null && (fmt.Borders.DiagonalDown || fmt.Borders.DiagonalUp)));
 
+                            int numFmtId = 0;
+                            if (fmt.NumberFormat == "Number") numFmtId = fmt.DecimalPlaces == 0 ? 1 : 2;
+                            else if (fmt.NumberFormat == "Comma") numFmtId = fmt.DecimalPlaces == 0 ? 3 : 4;
+                            else if (fmt.NumberFormat == "Currency") numFmtId = 44;
+                            else if (fmt.NumberFormat == "Percent") numFmtId = fmt.DecimalPlaces == 0 ? 9 : 10;
+                            else if (fmt.NumberFormat == "Date") numFmtId = 14;
+                            else if (fmt.NumberFormat == "Text") numFmtId = 49;
+
                             // Xf
                             XlsxXf xf = new XlsxXf
                             {
                                 FontId = fId,
                                 FillId = flId,
                                 BorderId = bId,
-                                NumFmtId = 0,
+                                NumFmtId = numFmtId,
                                 HorizontalAlign = fmt.Align,
                                 VerticalAlign = fmt.VAlign,
                                 WrapText = fmt.WrapText || isDiagHeader
@@ -1086,8 +1140,8 @@ namespace GenOffice.Format
                                 alignXml = string.Format("<alignment{0}{1}{2}/>", hAttr, vAttr, wrapStr);
                             }
 
-                            string applyAttrs = string.Format(" applyFont=\"{0}\" applyFill=\"{1}\" applyBorder=\"{2}\" applyAlignment=\"{3}\"",
-                                xf.FontId > 0 ? "1" : "0", xf.FillId > 0 ? "1" : "0", xf.BorderId > 0 ? "1" : "0", !string.IsNullOrEmpty(alignXml) ? "1" : "0");
+                            string applyAttrs = string.Format(" applyNumberFormat=\"{0}\" applyFont=\"{1}\" applyFill=\"{2}\" applyBorder=\"{3}\" applyAlignment=\"{4}\"",
+                                xf.NumFmtId > 0 ? "1" : "0", xf.FontId > 0 ? "1" : "0", xf.FillId > 0 ? "1" : "0", xf.BorderId > 0 ? "1" : "0", !string.IsNullOrEmpty(alignXml) ? "1" : "0");
 
                             if (!string.IsNullOrEmpty(alignXml))
                             {
@@ -1108,6 +1162,11 @@ namespace GenOffice.Format
                     for (int s = 0; s < calcView.Sheets.Count; s++)
                     {
                         SparseMatrix sheet = calcView.Sheets[s];
+                        Dictionary<uint, int> sColWidths = (calcView.SheetStates != null && s < calcView.SheetStates.Count && calcView.SheetStates[s] != null && calcView.SheetStates[s].CustomColWidths != null)
+                            ? calcView.SheetStates[s].CustomColWidths : calcView.CustomColWidths;
+                        Dictionary<uint, int> sRowHeights = (calcView.SheetStates != null && s < calcView.SheetStates.Count && calcView.SheetStates[s] != null && calcView.SheetStates[s].CustomRowHeights != null)
+                            ? calcView.SheetStates[s].CustomRowHeights : calcView.CustomRowHeights;
+
                         ZipArchiveEntry wsEntry = archive.CreateEntry(string.Format("xl/worksheets/sheet{0}.xml", s + 1));
                         using (StreamWriter sw = new StreamWriter(wsEntry.Open(), Encoding.UTF8))
                         {
@@ -1115,10 +1174,10 @@ namespace GenOffice.Format
                             sw.WriteLine("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
 
                             // Custom Column Widths
-                            if (calcView.CustomColWidths != null && calcView.CustomColWidths.Count > 0)
+                            if (sColWidths != null && sColWidths.Count > 0)
                             {
                                 sw.WriteLine("  <cols>");
-                                foreach (var kvp in calcView.CustomColWidths)
+                                foreach (var kvp in sColWidths)
                                 {
                                     double wChars = Math.Max(1.0, (kvp.Value - 5) / 7.5);
                                     sw.WriteLine(string.Format("    <col min=\"{0}\" max=\"{0}\" width=\"{1}\" customWidth=\"1\"/>", kvp.Key, wChars.ToString("0.00", CultureInfo.InvariantCulture)));
@@ -1145,9 +1204,9 @@ namespace GenOffice.Format
                             foreach (uint r in rows)
                             {
                                 string htAttr = "";
-                                if (calcView.CustomRowHeights != null && calcView.CustomRowHeights.ContainsKey(r))
+                                if (sRowHeights != null && sRowHeights.ContainsKey(r))
                                 {
-                                    double htPt = calcView.CustomRowHeights[r] / 1.333;
+                                    double htPt = sRowHeights[r] / 1.333;
                                     htAttr = string.Format(" ht=\"{0}\" customHeight=\"1\"", htPt.ToString("0.00", CultureInfo.InvariantCulture));
                                 }
 
@@ -1167,8 +1226,26 @@ namespace GenOffice.Format
 
                                     if (cell.Type == CellType.Formula && !string.IsNullOrEmpty(cell.FormulaStr))
                                     {
-                                        string fClean = cell.FormulaStr.TrimStart('=');
-                                        sw.WriteLine(string.Format("      <c r=\"{0}\"{1}><f>{2}</f><v>{3}</v></c>", cellRef, styleAttr, EscapeXml(fClean), cell.NumericValue.ToString(CultureInfo.InvariantCulture)));
+                                        string fClean = NormalizeExcelFormula(cell.FormulaStr.TrimStart('='));
+                                        string rawRes = cell.RawValue ?? "";
+                                        double numRes;
+                                        if (rawRes.StartsWith("#"))
+                                        {
+                                            sw.WriteLine(string.Format("      <c r=\"{0}\" t=\"e\"{1}><f>{2}</f><v>{3}</v></c>", cellRef, styleAttr, EscapeXml(fClean), EscapeXml(rawRes)));
+                                        }
+                                        else if (rawRes.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || rawRes.Equals("FALSE", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            string bVal = rawRes.Equals("TRUE", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+                                            sw.WriteLine(string.Format("      <c r=\"{0}\" t=\"b\"{1}><f>{2}</f><v>{3}</v></c>", cellRef, styleAttr, EscapeXml(fClean), bVal));
+                                        }
+                                        else if (double.TryParse(rawRes, NumberStyles.Any, CultureInfo.InvariantCulture, out numRes))
+                                        {
+                                            sw.WriteLine(string.Format("      <c r=\"{0}\"{1}><f>{2}</f><v>{3}</v></c>", cellRef, styleAttr, EscapeXml(fClean), numRes.ToString(CultureInfo.InvariantCulture)));
+                                        }
+                                        else
+                                        {
+                                            sw.WriteLine(string.Format("      <c r=\"{0}\" t=\"str\"{1}><f>{2}</f><v>{3}</v></c>", cellRef, styleAttr, EscapeXml(fClean), EscapeXml(rawRes)));
+                                        }
                                     }
                                     else if (cell.Type == CellType.Number)
                                     {
@@ -1231,8 +1308,9 @@ namespace GenOffice.Format
                         }
                     }
 
-                    // 7. DrawingML Export for Shapes & Pictures across all sheets
+                    // 7. DrawingML & Native OpenXML Chart Export across all sheets
                     int nextImgId = 1;
+                    int nextChartId = 1;
                     for (int s = 0; s < calcView.Sheets.Count; s++)
                     {
                         List<DocShapeObject> sShapes = GetSheetShapes(calcView, s);
@@ -1249,12 +1327,25 @@ namespace GenOffice.Format
                         }
 
                         Dictionary<DocShapeObject, int> imageIds = new Dictionary<DocShapeObject, int>();
+                        Dictionary<DocShapeObject, int> chartIds = new Dictionary<DocShapeObject, int>();
                         for (int shIdx = 0; shIdx < sShapes.Count; shIdx++)
                         {
                             DocShapeObject sh = sShapes[shIdx];
                             byte[] imgBytes = null;
 
-                            if (sh.ShapeType == "Image")
+                            if (sh.ShapeType == "Chart" || sh.ChartData != null)
+                            {
+                                int cId = nextChartId++;
+                                chartIds[sh] = cId;
+                                DocChartData cd = sh.ChartData ?? DocChartData.CreateDefault("Column_Clustered");
+                                ZipArchiveEntry chartEntry = archive.CreateEntry(string.Format("xl/charts/chart{0}.xml", cId));
+                                using (StreamWriter cSw = new StreamWriter(chartEntry.Open(), Encoding.UTF8))
+                                {
+                                    WriteChartXml(cSw, cd);
+                                }
+                                continue;
+                            }
+                            else if (sh.ShapeType == "Image")
                             {
                                 if (sh.CachedImage != null)
                                 {
@@ -1269,7 +1360,7 @@ namespace GenOffice.Format
                                     try { imgBytes = File.ReadAllBytes(sh.ImagePath); } catch { }
                                 }
                             }
-                            else if (sh.ShapeType == "Chart" || sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType) || sh.ChartData != null)
+                            else if (sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType))
                             {
                                 int wPx = Math.Max(50, (sh.BaseWidth + sh.WidthDelta) * 2);
                                 int hPx = Math.Max(50, (sh.BaseHeight + sh.HeightDelta) * 2);
@@ -1309,6 +1400,10 @@ namespace GenOffice.Format
                             {
                                 sw.WriteLine(string.Format("  <Relationship Id=\"rIdImg{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image{0}.png\"/>", kvp.Value));
                             }
+                            foreach (var kvp in chartIds)
+                            {
+                                sw.WriteLine(string.Format("  <Relationship Id=\"rIdChart{0}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart{0}.xml\"/>", kvp.Value));
+                            }
                             sw.WriteLine("</Relationships>");
                         }
 
@@ -1316,7 +1411,7 @@ namespace GenOffice.Format
                         using (StreamWriter sw = new StreamWriter(drawEntry.Open(), Encoding.UTF8))
                         {
                             sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
-                            sw.WriteLine("<xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
+                            sw.WriteLine("<xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\">");
 
                             Dictionary<uint, int> sColWidths = (calcView.SheetStates != null && s < calcView.SheetStates.Count && calcView.SheetStates[s] != null && calcView.SheetStates[s].CustomColWidths != null)
                                 ? calcView.SheetStates[s].CustomColWidths : calcView.CustomColWidths;
@@ -1374,7 +1469,37 @@ namespace GenOffice.Format
                                 long extCx = (long)wPx * 9525;
                                 long extCy = (long)hPx * 9525;
 
-                                if ((sh.ShapeType == "Image" || sh.ShapeType == "Chart" || sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType) || sh.ChartData != null) && imageIds.ContainsKey(sh))
+                                if (chartIds.ContainsKey(sh))
+                                {
+                                    int cId = chartIds[sh];
+                                    sw.WriteLine("  <xdr:twoCellAnchor>");
+                                    sw.WriteLine("    <xdr:from>");
+                                    sw.WriteLine(string.Format("      <xdr:col>{0}</xdr:col><xdr:colOff>{1}</xdr:colOff>", fromCol - 1, colOff));
+                                    sw.WriteLine(string.Format("      <xdr:row>{0}</xdr:row><xdr:rowOff>{1}</xdr:rowOff>", fromRow - 1, rowOff));
+                                    sw.WriteLine("    </xdr:from>");
+                                    sw.WriteLine("    <xdr:to>");
+                                    sw.WriteLine(string.Format("      <xdr:col>{0}</xdr:col><xdr:colOff>{1}</xdr:colOff>", toCol - 1, toColOff));
+                                    sw.WriteLine(string.Format("      <xdr:row>{0}</xdr:row><xdr:rowOff>{1}</xdr:rowOff>", toRow - 1, toRowOff));
+                                    sw.WriteLine("    </xdr:to>");
+                                    sw.WriteLine("    <xdr:graphicFrame macro=\"\">");
+                                    sw.WriteLine("      <xdr:nvGraphicFramePr>");
+                                    sw.WriteLine(string.Format("        <xdr:cNvPr id=\"{0}\" name=\"Chart {0}\"/>", shapeId));
+                                    sw.WriteLine("        <xdr:cNvGraphicFramePr/>");
+                                    sw.WriteLine("      </xdr:nvGraphicFramePr>");
+                                    sw.WriteLine("      <xdr:xfrm>");
+                                    sw.WriteLine("        <a:off x=\"0\" y=\"0\"/>");
+                                    sw.WriteLine(string.Format("        <a:ext cx=\"{0}\" cy=\"{1}\"/>", extCx, extCy));
+                                    sw.WriteLine("      </xdr:xfrm>");
+                                    sw.WriteLine("      <a:graphic>");
+                                    sw.WriteLine("        <a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/chart\">");
+                                    sw.WriteLine(string.Format("          <c:chart xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"rIdChart{0}\"/>", cId));
+                                    sw.WriteLine("        </a:graphicData>");
+                                    sw.WriteLine("      </a:graphic>");
+                                    sw.WriteLine("    </xdr:graphicFrame>");
+                                    sw.WriteLine("    <xdr:clientData/>");
+                                    sw.WriteLine("  </xdr:twoCellAnchor>");
+                                }
+                                else if ((sh.ShapeType == "Image" || sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType)) && imageIds.ContainsKey(sh))
                                 {
                                     int imgId = imageIds[sh];
                                     sw.WriteLine("  <xdr:twoCellAnchor editAs=\"oneCell\">");
@@ -1388,15 +1513,7 @@ namespace GenOffice.Format
                                     sw.WriteLine("    </xdr:to>");
                                     sw.WriteLine("    <xdr:pic>");
                                     sw.WriteLine("      <xdr:nvPicPr>");
-                                    if (sh.ShapeType == "Chart" || sh.ChartData != null)
-                                    {
-                                        string cType = (sh.ChartData != null && !string.IsNullOrEmpty(sh.ChartData.ChartType)) ? sh.ChartData.ChartType : "Column_Clustered";
-                                        sw.WriteLine(string.Format("        <xdr:cNvPr id=\"{0}\" name=\"Chart {0}\" descr=\"Chart|{1}\"/>", shapeId, cType));
-                                    }
-                                    else
-                                    {
-                                        sw.WriteLine(string.Format("        <xdr:cNvPr id=\"{0}\" name=\"Picture {0}\" descr=\"{1}\"/>", shapeId, EscapeXml(sh.AltText ?? "")));
-                                    }
+                                    sw.WriteLine(string.Format("        <xdr:cNvPr id=\"{0}\" name=\"Picture {0}\" descr=\"{1}\"/>", shapeId, EscapeXml(sh.AltText ?? "")));
                                     sw.WriteLine("        <xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr>");
                                     sw.WriteLine("      </xdr:nvPicPr>");
                                     sw.WriteLine("      <xdr:blipFill>");
@@ -2183,6 +2300,285 @@ namespace GenOffice.Format
             return sh;
         }
 
+        private static string NormalizeExcelFormula(string formula)
+        {
+            if (string.IsNullOrEmpty(formula)) return "";
+            StringBuilder sb = new StringBuilder(formula.Length);
+            bool inQuotes = false;
+            for (int i = 0; i < formula.Length; i++)
+            {
+                char ch = formula[i];
+                if (ch == '"')
+                {
+                    inQuotes = !inQuotes;
+                    sb.Append(ch);
+                }
+                else if (ch == ';' && !inQuotes)
+                {
+                    sb.Append(',');
+                }
+                else
+                {
+                    sb.Append(ch);
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static void WriteChartXml(StreamWriter sw, DocChartData data)
+        {
+            if (data == null) data = DocChartData.CreateDefault("Column_Clustered");
+            string cType = data.ChartType ?? "Column_Clustered";
+
+            sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+            sw.WriteLine("<c:chartSpace xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
+            sw.WriteLine("  <c:roundedCorners val=\"0\"/>");
+            sw.WriteLine("  <c:chart>");
+
+            if (data.ShowTitle && !string.IsNullOrEmpty(data.Title))
+            {
+                sw.WriteLine("    <c:title>");
+                sw.WriteLine("      <c:tx>");
+                sw.WriteLine("        <c:rich>");
+                sw.WriteLine("          <a:bodyPr/>");
+                sw.WriteLine("          <a:lstStyle/>");
+                sw.WriteLine("          <a:p>");
+                sw.WriteLine("            <a:pPr><a:defRPr sz=\"1400\" b=\"1\"/></a:pPr>");
+                sw.WriteLine(string.Format("            <a:r><a:rPr lang=\"vi-VN\" sz=\"1400\" b=\"1\"/><a:t>{0}</a:t></a:r>", EscapeXml(data.Title)));
+                sw.WriteLine("          </a:p>");
+                sw.WriteLine("        </c:rich>");
+                sw.WriteLine("      </c:tx>");
+                sw.WriteLine("      <c:overlay val=\"0\"/>");
+                sw.WriteLine("    </c:title>");
+                sw.WriteLine("    <c:autoTitleDeleted val=\"0\"/>");
+            }
+            else
+            {
+                sw.WriteLine("    <c:autoTitleDeleted val=\"1\"/>");
+            }
+
+            sw.WriteLine("    <c:plotArea>");
+            sw.WriteLine("      <c:layout/>");
+
+            string tag = "c:barChart";
+            bool isPieLike = false;
+            bool isScatter = false;
+            bool needAxes = true;
+
+            if (cType.StartsWith("Bar", StringComparison.OrdinalIgnoreCase) || cType.StartsWith("Column", StringComparison.OrdinalIgnoreCase) || cType == "Waterfall" || cType == "Histogram" || cType == "Pareto" || cType == "BoxWhisker" || cType == "Funnel")
+            {
+                tag = "c:barChart";
+            }
+            else if (cType.StartsWith("Line", StringComparison.OrdinalIgnoreCase) || cType == "Combo")
+            {
+                tag = "c:lineChart";
+            }
+            else if (cType.StartsWith("Pie", StringComparison.OrdinalIgnoreCase) || cType == "Sunburst" || cType == "Treemap")
+            {
+                tag = "c:pieChart";
+                isPieLike = true;
+                needAxes = false;
+            }
+            else if (cType.StartsWith("Doughnut", StringComparison.OrdinalIgnoreCase))
+            {
+                tag = "c:doughnutChart";
+                isPieLike = true;
+                needAxes = false;
+            }
+            else if (cType.StartsWith("Area", StringComparison.OrdinalIgnoreCase) || cType == "Surface")
+            {
+                tag = "c:areaChart";
+            }
+            else if (cType.StartsWith("Radar", StringComparison.OrdinalIgnoreCase))
+            {
+                tag = "c:radarChart";
+            }
+            else if (cType.StartsWith("Scatter", StringComparison.OrdinalIgnoreCase) || cType.StartsWith("Bubble", StringComparison.OrdinalIgnoreCase))
+            {
+                tag = "c:scatterChart";
+                isScatter = true;
+            }
+
+            sw.WriteLine(string.Format("      <{0}>", tag));
+
+            if (tag == "c:barChart")
+            {
+                string barDir = cType.StartsWith("Bar", StringComparison.OrdinalIgnoreCase) ? "bar" : "col";
+                string grouping = cType.IndexOf("Stacked", StringComparison.OrdinalIgnoreCase) >= 0 ? "stacked" : "clustered";
+                sw.WriteLine(string.Format("        <c:barDir val=\"{0}\"/>", barDir));
+                sw.WriteLine(string.Format("        <c:grouping val=\"{0}\"/>", grouping));
+                sw.WriteLine("        <c:varyColors val=\"0\"/>");
+            }
+            else if (tag == "c:lineChart" || tag == "c:areaChart")
+            {
+                string grouping = cType.IndexOf("Stacked", StringComparison.OrdinalIgnoreCase) >= 0 ? "stacked" : "standard";
+                sw.WriteLine(string.Format("        <c:grouping val=\"{0}\"/>", grouping));
+                sw.WriteLine("        <c:varyColors val=\"0\"/>");
+            }
+            else if (tag == "c:radarChart")
+            {
+                sw.WriteLine("        <c:radarStyle val=\"marker\"/>");
+                sw.WriteLine("        <c:varyColors val=\"0\"/>");
+            }
+            else if (tag == "c:scatterChart")
+            {
+                sw.WriteLine("        <c:scatterStyle val=\"lineMarker\"/>");
+                sw.WriteLine("        <c:varyColors val=\"0\"/>");
+            }
+            else if (isPieLike)
+            {
+                sw.WriteLine("        <c:varyColors val=\"1\"/>");
+            }
+
+            string[] accentHex = new string[] { "4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47" };
+            int sCount = data.SeriesNames != null ? data.SeriesNames.Count : 0;
+            int catCount = data.Categories != null ? data.Categories.Count : 0;
+            if (isPieLike && sCount > 1) sCount = 1;
+
+            for (int s = 0; s < sCount; s++)
+            {
+                string sName = data.SeriesNames[s] ?? ("Chuỗi " + (s + 1));
+                string clrHex = accentHex[s % accentHex.Length];
+
+                sw.WriteLine("        <c:ser>");
+                sw.WriteLine(string.Format("          <c:idx val=\"{0}\"/>", s));
+                sw.WriteLine(string.Format("          <c:order val=\"{0}\"/>", s));
+                sw.WriteLine("          <c:tx>");
+                sw.WriteLine(string.Format("            <c:v>{0}</c:v>", EscapeXml(sName)));
+                sw.WriteLine("          </c:tx>");
+                if (!isPieLike)
+                {
+                    sw.WriteLine("          <c:spPr>");
+                    sw.WriteLine(string.Format("            <a:solidFill><a:srgbClr val=\"{0}\"/></a:solidFill>", clrHex));
+                    sw.WriteLine("          </c:spPr>");
+                }
+
+                if (isScatter)
+                {
+                    sw.WriteLine("          <c:xVal>");
+                    sw.WriteLine("            <c:numLit>");
+                    sw.WriteLine("              <c:formatCode>General</c:formatCode>");
+                    sw.WriteLine(string.Format("              <c:ptCount val=\"{0}\"/>", catCount));
+                    for (int c = 0; c < catCount; c++)
+                    {
+                        double xNum;
+                        if (!double.TryParse(data.Categories[c], NumberStyles.Any, CultureInfo.InvariantCulture, out xNum))
+                            xNum = c + 1;
+                        sw.WriteLine(string.Format("              <c:pt idx=\"{0}\"><c:v>{1}</c:v></c:pt>", c, xNum.ToString(CultureInfo.InvariantCulture)));
+                    }
+                    sw.WriteLine("            </c:numLit>");
+                    sw.WriteLine("          </c:xVal>");
+
+                    sw.WriteLine("          <c:yVal>");
+                    sw.WriteLine("            <c:numLit>");
+                    sw.WriteLine("              <c:formatCode>General</c:formatCode>");
+                    sw.WriteLine(string.Format("              <c:ptCount val=\"{0}\"/>", catCount));
+                    for (int c = 0; c < catCount; c++)
+                    {
+                        double yVal = (data.Values != null && c < data.Values.Count && data.Values[c] != null && s < data.Values[c].Count) ? data.Values[c][s] : 0.0;
+                        sw.WriteLine(string.Format("              <c:pt idx=\"{0}\"><c:v>{1}</c:v></c:pt>", c, yVal.ToString(CultureInfo.InvariantCulture)));
+                    }
+                    sw.WriteLine("            </c:numLit>");
+                    sw.WriteLine("          </c:yVal>");
+                }
+                else
+                {
+                    sw.WriteLine("          <c:cat>");
+                    sw.WriteLine("            <c:strLit>");
+                    sw.WriteLine(string.Format("              <c:ptCount val=\"{0}\"/>", catCount));
+                    for (int c = 0; c < catCount; c++)
+                    {
+                        string catLabel = data.Categories[c] ?? ("Mục " + (c + 1));
+                        sw.WriteLine(string.Format("              <c:pt idx=\"{0}\"><c:v>{1}</c:v></c:pt>", c, EscapeXml(catLabel)));
+                    }
+                    sw.WriteLine("            </c:strLit>");
+                    sw.WriteLine("          </c:cat>");
+
+                    sw.WriteLine("          <c:val>");
+                    sw.WriteLine("            <c:numLit>");
+                    sw.WriteLine("              <c:formatCode>General</c:formatCode>");
+                    sw.WriteLine(string.Format("              <c:ptCount val=\"{0}\"/>", catCount));
+                    for (int c = 0; c < catCount; c++)
+                    {
+                        double yVal = (data.Values != null && c < data.Values.Count && data.Values[c] != null && s < data.Values[c].Count) ? data.Values[c][s] : 0.0;
+                        sw.WriteLine(string.Format("              <c:pt idx=\"{0}\"><c:v>{1}</c:v></c:pt>", c, yVal.ToString(CultureInfo.InvariantCulture)));
+                    }
+                    sw.WriteLine("            </c:numLit>");
+                    sw.WriteLine("          </c:val>");
+                }
+
+                sw.WriteLine("        </c:ser>");
+            }
+
+            if (tag == "c:doughnutChart")
+            {
+                sw.WriteLine("        <c:holeSize val=\"50\"/>");
+            }
+
+            if (needAxes)
+            {
+                sw.WriteLine("        <c:axId val=\"1001\"/>");
+                sw.WriteLine("        <c:axId val=\"1002\"/>");
+            }
+
+            sw.WriteLine(string.Format("      </{0}>", tag));
+
+            if (needAxes)
+            {
+                if (isScatter)
+                {
+                    sw.WriteLine("      <c:valAx>");
+                    sw.WriteLine("        <c:axId val=\"1001\"/>");
+                    sw.WriteLine("        <c:scaling><c:orientation val=\"minMax\"/></c:scaling>");
+                    sw.WriteLine("        <c:delete val=\"0\"/>");
+                    sw.WriteLine("        <c:axPos val=\"b\"/>");
+                    sw.WriteLine("        <c:CrossAx val=\"1002\"/>");
+                    sw.WriteLine("        <c:crosses val=\"autoZero\"/>");
+                    sw.WriteLine("      </c:valAx>");
+                }
+                else
+                {
+                    sw.WriteLine("      <c:catAx>");
+                    sw.WriteLine("        <c:axId val=\"1001\"/>");
+                    sw.WriteLine("        <c:scaling><c:orientation val=\"minMax\"/></c:scaling>");
+                    sw.WriteLine("        <c:delete val=\"0\"/>");
+                    sw.WriteLine("        <c:axPos val=\"b\"/>");
+                    sw.WriteLine("        <c:crossAx val=\"1002\"/>");
+                    sw.WriteLine("        <c:crosses val=\"autoZero\"/>");
+                    sw.WriteLine("        <c:auto val=\"1\"/>");
+                    sw.WriteLine("        <c:lblAlgn val=\"ctr\"/>");
+                    sw.WriteLine("        <c:lblOffset val=\"100\"/>");
+                    sw.WriteLine("      </c:catAx>");
+                }
+
+                sw.WriteLine("      <c:valAx>");
+                sw.WriteLine("        <c:axId val=\"1002\"/>");
+                sw.WriteLine("        <c:scaling><c:orientation val=\"minMax\"/></c:scaling>");
+                sw.WriteLine("        <c:delete val=\"0\"/>");
+                sw.WriteLine("        <c:axPos val=\"l\"/>");
+                sw.WriteLine("        <c:majorGridlines/>");
+                sw.WriteLine("        <c:numFmt formatCode=\"General\" sourceLinked=\"1\"/>");
+                sw.WriteLine("        <c:crossAx val=\"1001\"/>");
+                sw.WriteLine("        <c:crosses val=\"autoZero\"/>");
+                sw.WriteLine("        <c:crossBetween val=\"between\"/>");
+                sw.WriteLine("      </c:valAx>");
+            }
+
+            sw.WriteLine("    </c:plotArea>");
+
+            if (data.ShowLegend)
+            {
+                sw.WriteLine("    <c:legend>");
+                sw.WriteLine("      <c:legendPos val=\"b\"/>");
+                sw.WriteLine("      <c:overlay val=\"0\"/>");
+                sw.WriteLine("    </c:legend>");
+            }
+
+            sw.WriteLine("    <c:plotVisOnly val=\"1\"/>");
+            sw.WriteLine("  </c:chart>");
+            sw.WriteLine("</c:chartSpace>");
+        }
+
         private static DocChartData ParseChartXml(Stream stream)
         {
             DocChartData data = new DocChartData();
@@ -2226,7 +2622,7 @@ namespace GenOffice.Format
                     if (chartTypeNode != null)
                     {
                         string localName = chartTypeNode.LocalName;
-                        if (localName == "barChart")
+                        if (localName == "barChart" || localName == "bar3DChart")
                         {
                             string barDir = "col";
                             string grouping = "clustered";
@@ -2238,16 +2634,17 @@ namespace GenOffice.Format
                                 grouping = grpNode.Attributes["val"].Value;
 
                             if (barDir == "bar")
-                                data.ChartType = (grouping == "stacked") ? "Bar_Stacked" : "Bar_Clustered";
+                                data.ChartType = (grouping == "stacked" || grouping == "percentStacked") ? "Bar_Stacked" : "Bar_Clustered";
                             else
-                                data.ChartType = (grouping == "stacked") ? "Column_Stacked" : "Column_Clustered";
+                                data.ChartType = (grouping == "stacked" || grouping == "percentStacked") ? "Column_Stacked" : "Column_Clustered";
                         }
-                        else if (localName == "lineChart") data.ChartType = "Line";
-                        else if (localName == "pieChart") data.ChartType = "Pie";
+                        else if (localName == "lineChart" || localName == "line3DChart") data.ChartType = "Line";
+                        else if (localName == "pieChart" || localName == "pie3DChart" || localName == "ofPieChart") data.ChartType = "Pie";
                         else if (localName == "doughnutChart") data.ChartType = "Doughnut";
-                        else if (localName == "areaChart") data.ChartType = "Area";
+                        else if (localName == "areaChart" || localName == "area3DChart") data.ChartType = "Area";
                         else if (localName == "radarChart") data.ChartType = "Radar";
-                        else if (localName == "scatterChart") data.ChartType = "Scatter";
+                        else if (localName == "scatterChart" || localName == "bubbleChart") data.ChartType = "Scatter";
+                        else if (localName == "surfaceChart" || localName == "surface3DChart") data.ChartType = "Surface";
                         else data.ChartType = "Column_Clustered";
 
                         XmlNodeList serNodes = chartTypeNode.SelectNodes("./*[local-name()='ser']");
@@ -2273,7 +2670,7 @@ namespace GenOffice.Format
 
                                 if (s == 0)
                                 {
-                                    XmlNode catNode = serNode.SelectSingleNode("./*[local-name()='cat']");
+                                    XmlNode catNode = serNode.SelectSingleNode("./*[local-name()='cat']") ?? serNode.SelectSingleNode("./*[local-name()='xVal']");
                                     if (catNode != null)
                                     {
                                         XmlNodeList ptNodes = catNode.SelectNodes(".//*[local-name()='pt']");
@@ -2289,7 +2686,7 @@ namespace GenOffice.Format
                                 }
 
                                 List<double> valList = new List<double>();
-                                XmlNode valNode = serNode.SelectSingleNode("./*[local-name()='val']");
+                                XmlNode valNode = serNode.SelectSingleNode("./*[local-name()='val']") ?? serNode.SelectSingleNode("./*[local-name()='yVal']");
                                 if (valNode != null)
                                 {
                                     XmlNodeList ptNodes = valNode.SelectNodes(".//*[local-name()='pt']");

@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Windows.Forms;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
-using GenOffice.UI;
+using ZenQOffice.UI;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     /// <summary>
     /// Model strongly-typed biểu diễn một nút trong cấu trúc SmartArt của Microsoft Office (OpenXML dgm:pt).

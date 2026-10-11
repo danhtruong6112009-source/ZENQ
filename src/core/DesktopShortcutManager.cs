@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public static class DesktopShortcutManager
     {

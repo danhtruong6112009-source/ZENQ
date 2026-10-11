@@ -2,7 +2,7 @@
 #include "SlidePresenter.hpp"
 #include <string>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 static AppWindow* g_pAppWindow = nullptr;
 
@@ -197,4 +197,4 @@ LRESULT AppWindow::handleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     /// <summary>
     /// Bộ máy tự động sửa lỗi gõ tiếng Việt (Telex & VNI Auto-Correction)

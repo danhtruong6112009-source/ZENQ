@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public enum BufferType
     {

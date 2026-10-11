@@ -6,9 +6,9 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.Format
+namespace ZenQOffice.Format
 {
     public static class OcrHandler
     {

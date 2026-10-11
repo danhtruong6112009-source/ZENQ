@@ -4,11 +4,11 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
-using GenOffice.Core;
-using GenOffice.Format;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
 using System.Text;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class RecentDocItem
     {
@@ -196,6 +196,7 @@ namespace GenOffice.UI
                     if (SubFilter == 11 && item.Mode != OfficeAppMode.Calc) continue;
                     if (SubFilter == 12 && item.Mode != OfficeAppMode.Slides) continue;
                     if (SubFilter == 13 && item.Mode != OfficeAppMode.Pdf) continue;
+                    if (SubFilter == 15 && item.Mode != OfficeAppMode.Photo) continue;
                 }
 
                 if (!string.IsNullOrEmpty(kw))
@@ -449,12 +450,12 @@ namespace GenOffice.UI
 
         public RectangleF GetCardBounds(int index, int width, int windowHeight = 0)
         {
-            if (index < 0 || index >= 4) return new RectangleF(-1000, -1000, 0, 0);
+            if (index < 0 || index >= 5) return new RectangleF(-1000, -1000, 0, 0);
             float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
             GetCenterContentMetrics(width, out startX, out contentW, out bannerH, out cardY, out fileListY, out colHeaderY, out listTopY);
-            float cardGap = 14f;
-            float cardW = Math.Min(148f, (contentW - 3 * cardGap) / 4f);
-            if (cardW < 110f) cardW = 110f;
+            float cardGap = 12f;
+            float cardW = Math.Min(148f, (contentW - 4 * cardGap) / 5f);
+            if (cardW < 100f) cardW = 100f;
             return new RectangleF(startX + index * (cardW + cardGap), cardY, cardW, 84f);
         }
 
@@ -743,6 +744,7 @@ namespace GenOffice.UI
                         if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") mode = OfficeAppMode.Calc;
                         else if (ext == ".pptx" || ext == ".ppt") mode = OfficeAppMode.Slides;
                         else if (ext == ".pdf") mode = OfficeAppMode.Pdf;
+                        else if (ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") mode = OfficeAppMode.Photo;
 
                         string dateStr = (fi.LastWriteTime.Date == DateTime.Today)
                             ? "Hôm nay, " + fi.LastWriteTime.ToString("HH:mm")
@@ -914,6 +916,11 @@ namespace GenOffice.UI
                 baseCol = Color.FromArgb(249, 115, 22);
                 darkCol = Color.FromArgb(217, 70, 239);
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                baseCol = Color.FromArgb(99, 102, 241);
+                darkCol = Color.FromArgb(79, 70, 229);
+            }
             else // PDF
             {
                 baseCol = Color.FromArgb(220, 38, 38);
@@ -996,7 +1003,7 @@ namespace GenOffice.UI
                     g.FillRectangle(barB, sInner.Left + 20, sInner.Top + 11, 6, 3);
                 }
             }
-            else // PDF
+            else if (mode == OfficeAppMode.Pdf)
             {
                 using (GraphicsPath pdfP = CreateRoundedRectanglePath(inner, 3f))
                 {
@@ -1018,6 +1025,24 @@ namespace GenOffice.UI
                     g.DrawString("PDF", pdfFont, pdfTxt, inner.Left + 2, inner.Top + 8);
                 }
             }
+            else if (mode == OfficeAppMode.Photo)
+            {
+                using (GraphicsPath photoP = CreateRoundedRectanglePath(inner, 3f))
+                {
+                    g.FillPath(Brushes.White, photoP);
+                }
+                RectangleF pInner = new RectangleF(inner.Left + 2, inner.Top + 2, inner.Width - 4, inner.Height - 4);
+                using (LinearGradientBrush pBg = new LinearGradientBrush(pInner, Color.FromArgb(238, 242, 255), Color.FromArgb(224, 231, 255), 45f))
+                {
+                    g.FillRectangle(pBg, pInner);
+                }
+                using (Font psFont = new Font("Segoe UI", Math.Max(7f, size * 0.32f), FontStyle.Bold))
+                using (SolidBrush psTxt = new SolidBrush(Color.FromArgb(99, 102, 241)))
+                {
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString("Ps", psFont, psTxt, pInner, sf);
+                }
+            }
         }
 
         private void DrawVectorDocumentRowIcon(Graphics g, float x, float y, float w, float h, OfficeAppMode mode)
@@ -1025,7 +1050,8 @@ namespace GenOffice.UI
             RectangleF rect = new RectangleF(x, y, w, h);
             Color col = (mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
                         ((mode == OfficeAppMode.Calc) ? Color.FromArgb(5, 150, 105) :
-                        ((mode == OfficeAppMode.Slides) ? Color.FromArgb(234, 88, 12) : Color.FromArgb(220, 38, 38)));
+                        ((mode == OfficeAppMode.Slides) ? Color.FromArgb(234, 88, 12) :
+                        ((mode == OfficeAppMode.Photo) ? Color.FromArgb(99, 102, 241) : Color.FromArgb(220, 38, 38))));
 
             using (GraphicsPath page = new GraphicsPath())
             using (SolidBrush pageBrush = new SolidBrush(Color.White))
@@ -1673,6 +1699,8 @@ namespace GenOffice.UI
                 accentColor = Color.FromArgb(16, 185, 129);
             else if (mode == OfficeAppMode.Slides)
                 accentColor = Color.FromArgb(249, 115, 22);
+            else if (mode == OfficeAppMode.Photo)
+                accentColor = Color.FromArgb(99, 102, 241);
             else
                 accentColor = Color.FromArgb(220, 38, 38);
 
@@ -1799,7 +1827,7 @@ namespace GenOffice.UI
             );
         }
 
-        private string EnsureTemplateLeaveRequest()
+        public string EnsureTemplateLeaveRequest()
         {
             try
             {
@@ -1854,7 +1882,7 @@ namespace GenOffice.UI
             catch { return null; }
         }
 
-        private string EnsureTemplateProjectReport()
+        public string EnsureTemplateProjectReport()
         {
             try
             {
@@ -1902,7 +1930,7 @@ namespace GenOffice.UI
             catch { return null; }
         }
 
-        private string EnsureTemplateBusinessPlan()
+        public string EnsureTemplateBusinessPlan()
         {
             try
             {
@@ -1983,7 +2011,7 @@ namespace GenOffice.UI
             catch { return null; }
         }
 
-        private string EnsureTemplateTimesheet()
+        public string EnsureTemplateTimesheet()
         {
             try
             {
@@ -2274,6 +2302,7 @@ namespace GenOffice.UI
             DrawSidebarAppNavItem(g, GetAppNavBounds(1, width, height), "Bảng tính", OfficeAppMode.Calc, HoverSidebarApp == 1);
             DrawSidebarAppNavItem(g, GetAppNavBounds(2, width, height), "Thuyết trình", OfficeAppMode.Slides, HoverSidebarApp == 2);
             DrawSidebarAppNavItem(g, GetAppNavBounds(3, width, height), "PDF", OfficeAppMode.Pdf, HoverSidebarApp == 3);
+            DrawSidebarAppNavItem(g, GetAppNavBounds(4, width, height), "Đồ họa & Ảnh", OfficeAppMode.Photo, HoverSidebarApp == 4);
 
             // 2.4 Settings at bottom
             float sepY = height - 56f;
@@ -2384,13 +2413,14 @@ namespace GenOffice.UI
                             g.DrawString("Bắt đầu công việc của bạn với các công cụ văn phòng mạnh mẽ và linh hoạt.", bannerSubFont, bannerSubBrush, startX + 28f, 128f);
                         }
                     }
-                    // Floating icons (All 4 formats)
-                    float iconBlockX = bannerRect.Right - 204f;
+                    // Floating icons (All 5 formats)
+                    float iconBlockX = bannerRect.Right - 238f;
                     float iconBlockY = bannerRect.Y + 28f;
                     AppIconRenderer.DrawAppIcon(g, iconBlockX, iconBlockY, 50f, OfficeAppMode.Writer);
                     AppIconRenderer.DrawAppIcon(g, iconBlockX + 44f, iconBlockY + 14f, 50f, OfficeAppMode.Calc);
                     AppIconRenderer.DrawAppIcon(g, iconBlockX + 88f, iconBlockY - 6f, 50f, OfficeAppMode.Slides);
                     AppIconRenderer.DrawAppIcon(g, iconBlockX + 132f, iconBlockY + 16f, 46f, OfficeAppMode.Pdf);
+                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 176f, iconBlockY - 2f, 48f, OfficeAppMode.Photo);
                 }
             }
 
@@ -2401,10 +2431,12 @@ namespace GenOffice.UI
                 RectangleF c1 = GetCardBounds(1, width, height);
                 RectangleF c2 = GetCardBounds(2, width, height);
                 RectangleF c3 = GetCardBounds(3, width, height);
+                RectangleF c4 = GetCardBounds(4, width, height);
                 DrawCreationCard(g, c0, "Tạo tài liệu", "Soạn thảo văn bản", OfficeAppMode.Writer, HoverCardIndex == 0);
                 DrawCreationCard(g, c1, "Tạo bảng tính", "Xử lý dữ liệu", OfficeAppMode.Calc, HoverCardIndex == 1);
                 DrawCreationCard(g, c2, "Tạo thuyết trình", "Trình bày ý tưởng", OfficeAppMode.Slides, HoverCardIndex == 2);
                 DrawCreationCard(g, c3, "Tạo từ PDF", "Chỉnh sửa, chuyển đổi", OfficeAppMode.Pdf, HoverCardIndex == 3);
+                DrawCreationCard(g, c4, "Đồ họa & Ảnh", "Thiết kế lớp & PSD", OfficeAppMode.Photo, HoverCardIndex == 4);
             }
 
             // 6. MAIN CONTENT AREA
@@ -2491,8 +2523,8 @@ namespace GenOffice.UI
 
                     // Filter pills
                     MyDocsFilterPills.Clear();
-                    string[] labels = new string[] { "Tất cả", "Gần đây", "Đã gắn sao ⭐", "Văn bản (.docx)", "Bảng tính (.xlsx)", "Thuyết trình (.pptx)", "PDF (.pdf)" };
-                    int[] ids = new int[] { 0, 1, 2, 10, 11, 12, 13 };
+                    string[] labels = new string[] { "Tất cả", "Gần đây", "Đã gắn sao ⭐", "Văn bản (.docx)", "Bảng tính (.xlsx)", "Thuyết trình (.pptx)", "PDF (.pdf)", "Đồ họa (.psd)" };
+                    int[] ids = new int[] { 0, 1, 2, 10, 11, 12, 13, 15 };
                     float curPillX = startX;
                     float pillY = fileListY + 48f;
                     using (Font pillFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
@@ -2634,7 +2666,8 @@ namespace GenOffice.UI
 
                             Color accentColor = (doc.Mode == OfficeAppMode.Writer) ? Color.FromArgb(37, 99, 235) :
                                                 ((doc.Mode == OfficeAppMode.Calc) ? Color.FromArgb(16, 185, 129) :
-                                                ((doc.Mode == OfficeAppMode.Slides) ? Color.FromArgb(249, 115, 22) : Color.FromArgb(220, 38, 38)));
+                                                ((doc.Mode == OfficeAppMode.Slides) ? Color.FromArgb(249, 115, 22) :
+                                                ((doc.Mode == OfficeAppMode.Photo) ? Color.FromArgb(99, 102, 241) : Color.FromArgb(220, 38, 38))));
 
                             if (isRowHover)
                             {
@@ -2672,7 +2705,8 @@ namespace GenOffice.UI
                             // Type badge pill
                             string modeName = (doc.Mode == OfficeAppMode.Writer) ? "Tài liệu" :
                                               ((doc.Mode == OfficeAppMode.Calc) ? "Bảng tính" :
-                                              ((doc.Mode == OfficeAppMode.Slides) ? "Thuyết trình" : "PDF"));
+                                              ((doc.Mode == OfficeAppMode.Slides) ? "Thuyết trình" :
+                                              ((doc.Mode == OfficeAppMode.Photo) ? "Đồ họa PSD" : "PDF")));
                             SizeF badgeSz = g.MeasureString(modeName, badgeFont);
                             float badgeW = badgeSz.Width + 16f;
                             RectangleF badgeRect = new RectangleF(startX + contentW * 0.50f - 4f, rowRect.Y + 17f, badgeW, 22f);
@@ -3315,7 +3349,7 @@ namespace GenOffice.UI
             else if (trashTab.Contains(x, y)) HoverTabIndex = 1;
             else if (settingsTab.Contains(x, y)) HoverTabIndex = 2;
 
-            for (int a = 0; a < 4; a++)
+            for (int a = 0; a < 5; a++)
             {
                 if (GetAppNavBounds(a, width, height).Contains(x, y))
                 {
@@ -3359,7 +3393,7 @@ namespace GenOffice.UI
             HoverCardIndex = -1;
             if (ActiveTab == 0)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     RectangleF cb = GetCardBounds(i, width, height);
                     if (cb.Contains(x, y))
@@ -3492,7 +3526,7 @@ namespace GenOffice.UI
             // Creation cards (Chỉ có ở Trang chủ)
             if (ActiveTab == 0)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     RectangleF cb = GetCardBounds(i, width, height);
                     if (cb.Contains(x, y))
@@ -3502,6 +3536,7 @@ namespace GenOffice.UI
                         if (i == 1) { docTitle = "Bảng tính Mới.xlsx"; return OfficeAppMode.Calc; }
                         if (i == 2) { docTitle = "Trình chiếu Mới.pptx"; return OfficeAppMode.Slides; }
                         if (i == 3) { docTitle = "Tài liệu PDF Mới.pdf"; return OfficeAppMode.Pdf; }
+                        if (i == 4) { docTitle = "Thiết kế Mới 1.psd"; return OfficeAppMode.Photo; }
                     }
                 }
             }
@@ -3573,6 +3608,12 @@ namespace GenOffice.UI
                 docTitle = "Tài liệu PDF Mới.pdf";
                 openFilePath = null;
                 return OfficeAppMode.Pdf;
+            }
+            if (GetAppNavBounds(4, width, height).Contains(x, y))
+            {
+                docTitle = "Thiết kế Mới 1.psd";
+                openFilePath = null;
+                return OfficeAppMode.Photo;
             }
 
             // Right Panel Clicks
@@ -3673,7 +3714,7 @@ namespace GenOffice.UI
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
                         ofd.Title = "Mở tài liệu văn phòng - ZENQ OFFICE";
-                        ofd.Filter = "Tất cả tài liệu văn phòng (*.docx;*.xlsx;*.pptx;*.pdf)|*.docx;*.xlsx;*.pptx;*.pdf|Word (*.docx)|*.docx|Excel (*.xlsx)|*.xlsx|PowerPoint (*.pptx)|*.pptx|PDF (*.pdf)|*.pdf|Tất cả tệp (*.*)|*.*";
+                        ofd.Filter = "Tất cả tài liệu & Thiết kế (*.docx;*.xlsx;*.pptx;*.pdf;*.psd;*.png;*.jpg;*.jpeg)|*.docx;*.xlsx;*.pptx;*.pdf;*.psd;*.png;*.jpg;*.jpeg|Photoshop & Hình ảnh (*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff)|*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff|Word (*.docx)|*.docx|Excel (*.xlsx)|*.xlsx|PowerPoint (*.pptx)|*.pptx|PDF (*.pdf)|*.pdf|Tất cả tệp (*.*)|*.*";
                         ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                         if (ofd.ShowDialog() == DialogResult.OK)
                         {
@@ -3683,6 +3724,7 @@ namespace GenOffice.UI
                             if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") chosenMode = OfficeAppMode.Calc;
                             else if (ext == ".pptx" || ext == ".ppt") chosenMode = OfficeAppMode.Slides;
                             else if (ext == ".pdf") chosenMode = OfficeAppMode.Pdf;
+                            else if (ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") chosenMode = OfficeAppMode.Photo;
 
                             AddRecentDocument(chosenPath, chosenMode);
                             docTitle = Path.GetFileName(chosenPath);

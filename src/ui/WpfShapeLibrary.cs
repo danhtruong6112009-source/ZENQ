@@ -8,7 +8,7 @@ using WpfStreamGeometry = System.Windows.Media.StreamGeometry;
 using WpfSize = System.Windows.Size;
 using WpfSweepDirection = System.Windows.Media.SweepDirection;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class ShapePresetItem
     {
@@ -62,7 +62,10 @@ namespace GenOffice.UI
 
         public static IReadOnlyList<ShapeCategoryGroup> Categories
         {
-            get { EnsureInitialized(); return _categories; }
+            get { 
+                EnsureInitialized(); 
+                lock (_categories) { return new List<ShapeCategoryGroup>(_categories); }
+            }
         }
 
         public static int TotalPresetCount
@@ -312,19 +315,19 @@ namespace GenOffice.UI
         private static void PopulateOnlineGraphics()
         {
             try {
-                GenOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (catResp) => {
+                ZenQOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (catResp) => {
                     if (catResp != null) AddOnlineCategories(catResp);
                 };
 
-                var catalog = GenOffice.Core.OnlineGraphicsManager.GetCatalogCached();
+                var catalog = ZenQOffice.Core.OnlineGraphicsManager.GetCatalogCached();
                 if (catalog != null) {
                     AddOnlineCategories(catalog);
                 }
-                GenOffice.Core.OnlineGraphicsManager.RefreshCatalogAsync();
+                ZenQOffice.Core.OnlineGraphicsManager.RefreshCatalogAsync();
             } catch { }
         }
 
-        public static void AddOnlineCategories(GenOffice.Core.OnlineGraphicsResponse catalog)
+        public static void AddOnlineCategories(ZenQOffice.Core.OnlineGraphicsResponse catalog)
         {
             if (catalog == null || catalog.categories == null) return;
             lock (_categories)
@@ -343,8 +346,8 @@ namespace GenOffice.UI
                     if (c.items == null || c.items.Count == 0) continue;
                     if (c.name == "Vector Shapes") continue;
 
-                    string key = "Online_" + c.name;
-                    var cat = new ShapeCategoryGroup { Key = key, Title = c.name };
+                    string key = "Online_" + (c.name ?? "Unnamed");
+                    var cat = new ShapeCategoryGroup { Key = key, Title = c.name ?? "Unnamed" };
                     _categories.Add(cat);
 
                     foreach (var item in c.items) {

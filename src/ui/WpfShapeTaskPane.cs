@@ -21,7 +21,7 @@ using WpfPenLineJoin = System.Windows.Media.PenLineJoin;
 using WpfStreamGeometry = System.Windows.Media.StreamGeometry;
 using WpfSweepDirection = System.Windows.Media.SweepDirection;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public enum ShapePaneMode
     {
@@ -37,11 +37,14 @@ namespace GenOffice.UI
     public class WpfShapeTaskPane
     {
         private static readonly Dictionary<string, Bitmap> _thumbCache = new Dictionary<string, Bitmap>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _loadingThumbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _thumbLock = new object();
 
         public ShapePaneMode Mode { get; set; } = ShapePaneMode.ShapesOnly;
 
         public int ScrollY { get; set; } = 0;
+        public float SmoothScrollY { get; set; } = 0f;
+        public float TargetScrollY { get; set; } = 0f;
         public int MaxScrollY { get; private set; } = 0;
         public string SearchText { get; set; } = "";
         public string ExpandedCategoryKey { get; set; } = null; // null: xem tất cả danh mục, khác null: xem chi tiết 1 danh mục
@@ -51,6 +54,8 @@ namespace GenOffice.UI
         // Tọa độ click hit-test
         public Rectangle BtnBackBounds = Rectangle.Empty;
         public Rectangle BtnCloseBounds = Rectangle.Empty;
+        public Rectangle BtnTabShapesBounds = Rectangle.Empty;
+        public Rectangle BtnTabGraphicsBounds = Rectangle.Empty;
         public Rectangle SearchBoxBounds = Rectangle.Empty;
         public Rectangle ScrollbarTrackBounds = Rectangle.Empty;
         public Rectangle ScrollbarThumbBounds = Rectangle.Empty;
@@ -83,6 +88,8 @@ namespace GenOffice.UI
                 {
                     return cached;
                 }
+
+                if (_loadingThumbs.Contains(cacheKey)) return null;
             }
 
             int scale = 2; // SSAA 2x Super-Sampling for ultra-sharp, anti-aliased curves
@@ -90,16 +97,28 @@ namespace GenOffice.UI
 
             if (item.IsOnlineImage) 
             {
-                try 
+                lock (_thumbLock) { _loadingThumbs.Add(cacheKey); }
+                System.Threading.Thread t = new System.Threading.Thread(() => 
                 {
-                    Bitmap onlineBmp = GenOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(item.Id, item.ImageUrl, pixelSize);
-                    if (onlineBmp != null) 
+                    try 
                     {
-                        lock (_thumbLock) { _thumbCache[cacheKey] = onlineBmp; }
+                        Bitmap onlineBmp = ZenQOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(item.Id, item.ImageUrl, pixelSize);
+                        if (onlineBmp != null) 
+                        {
+                            lock (_thumbLock) { _thumbCache[cacheKey] = onlineBmp; }
+                            ZenQOffice.Core.OnlineGraphicsManager.TriggerImageDownloaded();
+                        }
+                    } 
+                    catch { }
+                    finally
+                    {
+                        lock (_thumbLock) { _loadingThumbs.Remove(cacheKey); }
                     }
-                    return onlineBmp;
-                } 
-                catch { return null; }
+                });
+                t.IsBackground = true;
+                t.SetApartmentState(System.Threading.ApartmentState.STA);
+                t.Start();
+                return null;
             }
 
             WpfDrawingVisual dv = new WpfDrawingVisual();
@@ -470,9 +489,70 @@ namespace GenOffice.UI
                 }
             }
 
+            // 2b. Tab switcher: [ 🔷 Hình dạng ]  [ 🎨 Đồ họa ]
+            int tabsH = 34;
+            int tabW = (w - 28) / 2;
+            BtnTabShapesBounds = new Rectangle(x + 12, y + headerH + 6, tabW, 28);
+            BtnTabGraphicsBounds = new Rectangle(x + 12 + tabW + 4, y + headerH + 6, tabW, 28);
+
+            bool isShapes = (Mode == ShapePaneMode.ShapesOnly);
+            bool isGraphics = (Mode == ShapePaneMode.GraphicsOnly);
+
+            using (Font tabFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (StringFormat sfTab = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                // Tab Hình dạng
+                using (GraphicsPath pShapes = CreateRoundedRectPath(BtnTabShapesBounds, 4))
+                {
+                    if (isShapes)
+                    {
+                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
+                        {
+                            g.FillPath(actBg, pShapes);
+                            g.DrawString("🔷 Hình dạng", tabFont, Brushes.White, BtnTabShapesBounds, sfTab);
+                        }
+                    }
+                    else
+                    {
+                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                        {
+                            g.FillPath(inactBg, pShapes);
+                            g.DrawPath(inactBorder, pShapes);
+                            g.DrawString("🔷 Hình dạng", tabFont, inactTxt, BtnTabShapesBounds, sfTab);
+                        }
+                    }
+                }
+
+                // Tab Đồ họa
+                using (GraphicsPath pGraphics = CreateRoundedRectPath(BtnTabGraphicsBounds, 4))
+                {
+                    if (isGraphics)
+                    {
+                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
+                        {
+                            g.FillPath(actBg, pGraphics);
+                            g.DrawString("🎨 Đồ họa", tabFont, Brushes.White, BtnTabGraphicsBounds, sfTab);
+                        }
+                    }
+                    else
+                    {
+                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                        {
+                            g.FillPath(inactBg, pGraphics);
+                            g.DrawPath(inactBorder, pGraphics);
+                            g.DrawString("🎨 Đồ họa", tabFont, inactTxt, BtnTabGraphicsBounds, sfTab);
+                        }
+                    }
+                }
+            }
+
             // 3. Search Bar: Ô tìm kiếm hiện đại
             int searchH = 40;
-            SearchBoxBounds = new Rectangle(x + 12, y + headerH + 8, w - 24, 30);
+            SearchBoxBounds = new Rectangle(x + 12, y + headerH + tabsH + 8, w - 24, 30);
             using (SolidBrush sbBg = new SolidBrush(Color.White))
             using (Pen sbPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
             using (Font sFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
@@ -503,8 +583,8 @@ namespace GenOffice.UI
             }
 
             // 4. Nội dung danh sách hình dạng với khả năng cuộn mượt
-            int contentY = y + headerH + searchH + 12;
-            int contentH = h - (headerH + searchH + 16);
+            int contentY = y + headerH + tabsH + searchH + 12;
+            int contentH = h - (headerH + tabsH + searchH + 16);
             Rectangle contentClip = new Rectangle(x, contentY, w, contentH);
 
             Region oldClip = g.Clip;
@@ -622,11 +702,16 @@ namespace GenOffice.UI
             using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(37, 99, 235)))
             {
-                g.DrawString(cat.Title, catFont, titleBrush, rx, ry);
-
                 string seeAllText = "Xem tất cả ›";
                 SizeF seeAllSize = g.MeasureString(seeAllText, seeAllFont);
                 Rectangle seeAllRect = new Rectangle((int)(rx + rw - seeAllSize.Width - 4), ry, (int)seeAllSize.Width + 8, (int)seeAllSize.Height + 4);
+
+                using (StringFormat sfTitle = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                {
+                    Rectangle titleRect = new Rectangle(rx, ry, (int)(rw - seeAllSize.Width - 12), (int)(seeAllSize.Height + 4));
+                    g.DrawString(cat.Title, catFont, titleBrush, titleRect, sfTitle);
+                }
+
                 g.DrawString(seeAllText, seeAllFont, linkBrush, seeAllRect.X, seeAllRect.Y);
                 CategorySeeAllBounds.Add(new Tuple<Rectangle, string>(seeAllRect, cat.Key));
             }
@@ -637,14 +722,18 @@ namespace GenOffice.UI
             int cols = Math.Max(1, (rw + cardSpacing) / (cardSize + cardSpacing));
             int displayCount = Math.Min(cols, cat.Items.Count);
 
+            RectangleF clip = g.ClipBounds;
+
             for (int i = 0; i < displayCount; i++)
             {
                 ShapePresetItem item = cat.Items[i];
                 int cx = rx + i * (cardSize + cardSpacing);
                 Rectangle cardRect = new Rectangle(cx, itemY, cardSize, cardSize);
 
-                DrawShapeCard(g, cardRect, item);
+                if (cardRect.Bottom < clip.Top || cardRect.Top > clip.Bottom) continue;
+
                 ItemClickBounds.Add(new Tuple<Rectangle, string>(cardRect, item.Id));
+                DrawShapeCard(g, cardRect, item);
             }
 
             return itemY + cardSize;
@@ -675,8 +764,21 @@ namespace GenOffice.UI
             int cardSize = 46;
             int cardSpacing = 6;
             int cols = Math.Max(1, (rw + cardSpacing) / (cardSize + cardSpacing));
+            int totalRows = (items.Count + cols - 1) / cols;
+            
+            RectangleF clip = g.ClipBounds;
 
-            for (int i = 0; i < items.Count; i++)
+            // Mathematical culling
+            int startRow = 0;
+            if (ry < clip.Top) startRow = Math.Max(0, (int)((clip.Top - ry) / (cardSize + cardSpacing)));
+            int endRow = totalRows - 1;
+            if (ry + totalRows * (cardSize + cardSpacing) > clip.Bottom)
+                endRow = Math.Min(totalRows - 1, (int)((clip.Bottom - ry) / (cardSize + cardSpacing)) + 1);
+
+            int startIndex = startRow * cols;
+            int endIndex = Math.Min(items.Count - 1, (endRow + 1) * cols - 1);
+
+            for (int i = startIndex; i <= endIndex; i++)
             {
                 ShapePresetItem item = items[i];
                 int c = i % cols;
@@ -685,11 +787,13 @@ namespace GenOffice.UI
                 int cy = ry + r * (cardSize + cardSpacing);
 
                 Rectangle cardRect = new Rectangle(cx, cy, cardSize, cardSize);
-                DrawShapeCard(g, cardRect, item);
+                
+                if (cardRect.Bottom < clip.Top || cardRect.Top > clip.Bottom) continue;
+
                 ItemClickBounds.Add(new Tuple<Rectangle, string>(cardRect, item.Id));
+                DrawShapeCard(g, cardRect, item);
             }
 
-            int totalRows = (items.Count + cols - 1) / cols;
             return ry + totalRows * (cardSize + cardSpacing);
         }
 
@@ -720,7 +824,25 @@ namespace GenOffice.UI
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
                 Rectangle dstRect = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
-                g.DrawImage(thumb, dstRect);
+                
+                float thumbAspect = (float)thumb.Width / thumb.Height;
+                float dstW = dstRect.Width;
+                float dstH = dstRect.Height;
+
+                if (thumbAspect > 1f)
+                {
+                    dstH = dstRect.Width / thumbAspect;
+                }
+                else
+                {
+                    dstW = dstRect.Height * thumbAspect;
+                }
+
+                float dstX = dstRect.X + (dstRect.Width - dstW) / 2f;
+                float dstY = dstRect.Y + (dstRect.Height - dstH) / 2f;
+
+                RectangleF propRect = new RectangleF(dstX, dstY, dstW, dstH);
+                g.DrawImage(thumb, propRect);
 
                 g.InterpolationMode = prevInterp;
                 g.SmoothingMode = prevSmooth;
@@ -755,6 +877,8 @@ namespace GenOffice.UI
                 {
                     ExpandedCategoryKey = null; // Quay lại xem tất cả danh mục
                     ScrollY = 0;
+                    SmoothScrollY = 0f;
+                    TargetScrollY = 0f;
                     action = "Refresh";
                     return true;
                 }
@@ -769,6 +893,36 @@ namespace GenOffice.UI
                 return true;
             }
 
+            // Tab Switcher [ Hình dạng ] / [ Đồ họa ]
+            if (BtnTabShapesBounds.Contains(pt))
+            {
+                if (Mode != ShapePaneMode.ShapesOnly)
+                {
+                    Mode = ShapePaneMode.ShapesOnly;
+                    ExpandedCategoryKey = null;
+                    SearchText = "";
+                    ScrollY = 0;
+                    SmoothScrollY = 0f;
+                    TargetScrollY = 0f;
+                    action = "SwitchMode";
+                    return true;
+                }
+            }
+            if (BtnTabGraphicsBounds.Contains(pt))
+            {
+                if (Mode != ShapePaneMode.GraphicsOnly)
+                {
+                    Mode = ShapePaneMode.GraphicsOnly;
+                    ExpandedCategoryKey = null;
+                    SearchText = "";
+                    ScrollY = 0;
+                    SmoothScrollY = 0f;
+                    TargetScrollY = 0f;
+                    action = "SwitchMode";
+                    return true;
+                }
+            }
+
             // Nút "Xem tất cả" của một danh mục
             foreach (var seeAll in CategorySeeAllBounds)
             {
@@ -776,6 +930,8 @@ namespace GenOffice.UI
                 {
                     ExpandedCategoryKey = seeAll.Item2;
                     ScrollY = 0;
+                    SmoothScrollY = 0f;
+                    TargetScrollY = 0f;
                     action = "ExpandCategory";
                     targetId = seeAll.Item2;
                     return true;
@@ -803,14 +959,17 @@ namespace GenOffice.UI
                 IsDraggingScrollbar = true;
                 _dragStartMouseY = pt.Y;
                 _dragStartScrollY = ScrollY;
+                SmoothScrollY = ScrollY;
+                TargetScrollY = ScrollY;
                 return true;
             }
             if (MaxScrollY > 0 && ScrollbarTrackBounds.Contains(pt))
             {
                 if (pt.Y < ScrollbarThumbBounds.Top)
-                    ScrollY = Math.Max(0, ScrollY - 200);
+                    TargetScrollY = Math.Max(0, TargetScrollY - 240);
                 else if (pt.Y > ScrollbarThumbBounds.Bottom)
-                    ScrollY = Math.Min(MaxScrollY, ScrollY + 200);
+                    TargetScrollY = Math.Min(MaxScrollY, TargetScrollY + 240);
+                UpdateSmoothScroll();
                 return true;
             }
             return false;
@@ -827,6 +986,8 @@ namespace GenOffice.UI
                 {
                     float ratio = (float)deltaY / travelH;
                     ScrollY = Math.Max(0, Math.Min(MaxScrollY, _dragStartScrollY + (int)(ratio * MaxScrollY)));
+                    SmoothScrollY = ScrollY;
+                    TargetScrollY = ScrollY;
                 }
                 return true;
             }
@@ -838,6 +999,8 @@ namespace GenOffice.UI
             if (IsDraggingScrollbar)
             {
                 IsDraggingScrollbar = false;
+                SmoothScrollY = ScrollY;
+                TargetScrollY = ScrollY;
                 return true;
             }
             return false;
@@ -850,8 +1013,26 @@ namespace GenOffice.UI
 
         public void HandleMouseWheel(int delta)
         {
-            int scrollStep = (delta > 0) ? -80 : 80;
-            ScrollY = Math.Max(0, Math.Min(MaxScrollY, ScrollY + scrollStep));
+            int scrollStep = (delta > 0) ? -100 : 100;
+            TargetScrollY = Math.Max(0, Math.Min(MaxScrollY, TargetScrollY + scrollStep));
+        }
+
+        public bool UpdateSmoothScroll()
+        {
+            float diff = TargetScrollY - SmoothScrollY;
+            if (Math.Abs(diff) > 0.5f)
+            {
+                SmoothScrollY += diff * 0.35f;
+                ScrollY = (int)Math.Round(SmoothScrollY);
+                return true;
+            }
+            else if (ScrollY != (int)TargetScrollY)
+            {
+                SmoothScrollY = TargetScrollY;
+                ScrollY = (int)TargetScrollY;
+                return true;
+            }
+            return false;
         }
     }
 }

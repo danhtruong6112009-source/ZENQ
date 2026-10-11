@@ -7,10 +7,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using GenOffice.Core;
-using GenOffice.Format;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public class DocInkStroke
     {
@@ -96,6 +96,32 @@ namespace GenOffice.UI
             Marker = "1";
             Text = "";
             IsEndnote = false;
+        }
+    }
+
+    public enum LineNumberingMode
+    {
+        None = 0,
+        Continuous = 1,
+        RestartEachPage = 2,
+        RestartEachSection = 3
+    }
+
+    public class DropCapInfo
+    {
+        public int Lines { get; set; } = 3;
+        public bool InMargin { get; set; } = false;
+
+        public DropCapInfo()
+        {
+            Lines = 3;
+            InMargin = false;
+        }
+
+        public DropCapInfo(int lines, bool inMargin)
+        {
+            Lines = lines;
+            InMargin = inMargin;
         }
     }
 
@@ -1235,6 +1261,13 @@ namespace GenOffice.UI
         }
 
         public bool ShowTableGridlines = true;
+        public bool ShowDocumentGridlines = false;
+        public LineNumberingMode LineNumberMode = LineNumberingMode.None;
+        public bool IsHyphenationEnabled = false;
+        public Image WatermarkImage = null;
+        public float WatermarkImageScale = 0f;
+        public bool WatermarkWashout = true;
+        public Dictionary<int, DropCapInfo> ParagraphDropCaps = new Dictionary<int, DropCapInfo>();
 
         // Inner Gridline Dragging
         public bool IsDraggingColGridline = false;
@@ -1299,7 +1332,7 @@ namespace GenOffice.UI
             public float Width;
         }
 
-        public static void DrawTableCellBorder(Graphics g, float x1, float y1, float x2, float y2, string style, float widthPt, Color color, float zoomLevel, bool isTopOrLeft)
+        public static void DrawTableCellBorder(D2DGraphics g, float x1, float y1, float x2, float y2, string style, float widthPt, Color color, float zoomLevel, bool isTopOrLeft)
         {
             if (widthPt <= 0f || color == Color.Transparent || color == Color.Empty) return;
             string s = (style ?? "single").ToLowerInvariant();
@@ -1453,7 +1486,17 @@ namespace GenOffice.UI
             return true;
         }
 
+        public static List<CellLineInfo> BreakCellTextIntoLines(D2DGraphics g, string text, Font font, float maxWidth)
+        {
+            return BreakCellTextIntoLinesInternal(s => (g != null ? g.MeasureString(s, font, Point.Empty, StringFormat.GenericTypographic).Width : (s.Length * (font?.SizeInPoints ?? 11f) * 0.6f)), text, font, maxWidth);
+        }
+
         public static List<CellLineInfo> BreakCellTextIntoLines(Graphics g, string text, Font font, float maxWidth)
+        {
+            return BreakCellTextIntoLinesInternal(s => (g != null ? g.MeasureString(s, font, Point.Empty, StringFormat.GenericTypographic).Width : (s.Length * (font?.SizeInPoints ?? 11f) * 0.6f)), text, font, maxWidth);
+        }
+
+        private static List<CellLineInfo> BreakCellTextIntoLinesInternal(Func<string, float> measureFunc, string text, Font font, float maxWidth)
         {
             List<CellLineInfo> lines = new List<CellLineInfo>();
             if (string.IsNullOrEmpty(text))
@@ -1542,7 +1585,7 @@ namespace GenOffice.UI
 
                     int len = Math.Max(0, endIdx - curIdx);
                     string lineStr = text.Substring(curIdx, len).TrimEnd();
-                    float lineW = g.MeasureString(lineStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                    float lineW = measureFunc(lineStr);
                     res.Add(new CellLineInfo
                     {
                         Text = lineStr,
@@ -1576,7 +1619,7 @@ namespace GenOffice.UI
                     if (text[scan] == '\n')
                     {
                         string lineStr = text.Substring(lineStart, scan - lineStart);
-                        float lineW = g.MeasureString(lineStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                        float lineW = measureFunc(lineStr);
                         lines.Add(new CellLineInfo { Text = lineStr, StartIndex = lineStart, Length = lineStr.Length, Width = lineW });
                         idx = scan + 1;
                         goto nextLine;
@@ -1590,14 +1633,14 @@ namespace GenOffice.UI
 
                     int curLen = scan - lineStart + 1;
                     string curStr = text.Substring(lineStart, curLen);
-                    float curW = g.MeasureString(curStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                    float curW = measureFunc(curStr);
 
                     if (curW > maxWidth && curLen > 1)
                     {
                         if (lastWrapBreak > lineStart)
                         {
                             string lineStr = text.Substring(lineStart, lastWrapLen);
-                            float lineW = g.MeasureString(lineStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                            float lineW = measureFunc(lineStr);
                             lines.Add(new CellLineInfo { Text = lineStr, StartIndex = lineStart, Length = lineStr.Length, Width = lineW });
                             int nextStart = lastWrapBreak;
                             while (nextStart < textLen && (text[nextStart] == ' ' || text[nextStart] == '\t')) nextStart++;
@@ -1607,7 +1650,7 @@ namespace GenOffice.UI
                         else
                         {
                             string lineStr = text.Substring(lineStart, curLen - 1);
-                            float lineW = g.MeasureString(lineStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                            float lineW = measureFunc(lineStr);
                             lines.Add(new CellLineInfo { Text = lineStr, StartIndex = lineStart, Length = lineStr.Length, Width = lineW });
                             idx = scan;
                             goto nextLine;
@@ -1620,7 +1663,7 @@ namespace GenOffice.UI
                 if (scan > lineStart)
                 {
                     string lineStr = text.Substring(lineStart, scan - lineStart);
-                    float lineW = g.MeasureString(lineStr, font, Point.Empty, StringFormat.GenericTypographic).Width;
+                    float lineW = measureFunc(lineStr);
                     lines.Add(new CellLineInfo { Text = lineStr, StartIndex = lineStart, Length = lineStr.Length, Width = lineW });
                     idx = scan;
                 }
@@ -5956,7 +5999,7 @@ namespace GenOffice.UI
         {
             try
             {
-                var pdfDoc = new GenOffice.Core.PdfDocument(System.IO.Path.GetFileName(filePath));
+                var pdfDoc = new ZenQOffice.Core.PdfDocument(System.IO.Path.GetFileName(filePath));
                 pdfDoc.Pages.Clear();
 
                 float pw = (ribbon != null && ribbon.IsLandscape) ? 841.89f : 595.28f;
@@ -5966,7 +6009,7 @@ namespace GenOffice.UI
                 float marginY = 54f;
                 float usableW = pw - marginX * 2;
 
-                var page = new GenOffice.Core.PdfPageModel(1, pw, ph);
+                var page = new ZenQOffice.Core.PdfPageModel(1, pw, ph);
                 pdfDoc.Pages.Add(page);
 
                 string fullText = PieceTable.GetText();
@@ -5981,7 +6024,7 @@ namespace GenOffice.UI
 
                     if (curY + lineH > ph - marginY)
                     {
-                        page = new GenOffice.Core.PdfPageModel(pdfDoc.Pages.Count + 1, pw, ph);
+                        page = new ZenQOffice.Core.PdfPageModel(pdfDoc.Pages.Count + 1, pw, ph);
                         pdfDoc.Pages.Add(page);
                         curY = marginY;
                     }
@@ -5997,7 +6040,7 @@ namespace GenOffice.UI
                     bool isBold = isHeading;
                     Color txtColor = isHeading ? Color.FromArgb(43, 87, 154) : Color.FromArgb(30, 41, 59);
 
-                    var txtElem = new GenOffice.Core.PdfTextElement(line, new RectangleF(marginX, curY, usableW, lineH), "Helvetica", fSize);
+                    var txtElem = new ZenQOffice.Core.PdfTextElement(line, new RectangleF(marginX, curY, usableW, lineH), "Helvetica", fSize);
                     txtElem.TextColor = txtColor;
                     txtElem.IsBold = isBold;
                     page.TextElements.Add(txtElem);
@@ -6007,10 +6050,10 @@ namespace GenOffice.UI
 
                 if (pdfDoc.Pages.Count == 0)
                 {
-                    pdfDoc.Pages.Add(new GenOffice.Core.PdfPageModel(1, pw, ph));
+                    pdfDoc.Pages.Add(new ZenQOffice.Core.PdfPageModel(1, pw, ph));
                 }
 
-                return GenOffice.Format.PdfHandler.SavePdf(pdfDoc, filePath);
+                return ZenQOffice.Format.PdfHandler.SavePdf(pdfDoc, filePath);
             }
             catch (Exception ex)
             {
@@ -6827,6 +6870,71 @@ namespace GenOffice.UI
 
         public int CurrentCaseMode = 0; // 0 = UPPERCASE, 1 = Sentence case, 2 = lowercase, 3 = Title Case
 
+        public void ApplyCase(int mode)
+        {
+            SaveUndoState();
+            string full = PieceTable.GetText();
+            int min = Math.Min(SelectionStart, SelectionEnd);
+            int len = Math.Abs(SelectionEnd - SelectionStart);
+
+            int targetStart = min;
+            int targetLen = len;
+
+            if (targetLen == 0)
+            {
+                int curPos = CursorPosition;
+                int lineStart = (curPos > 0 && full.Length >= curPos) ? full.LastIndexOf('\n', Math.Max(0, curPos - 1)) + 1 : 0;
+                if (lineStart < 0) lineStart = 0;
+                int lineEnd = full.IndexOf('\n', lineStart);
+                if (lineEnd < 0) lineEnd = full.Length;
+
+                targetStart = lineStart;
+                targetLen = lineEnd - lineStart;
+            }
+
+            if (targetLen > 0 && targetStart >= 0 && targetStart + targetLen <= full.Length)
+            {
+                string target = full.Substring(targetStart, targetLen);
+                string res = target;
+
+                CurrentCaseMode = mode;
+
+                if (mode == 0)
+                {
+                    res = ToSentenceCase(target);
+                }
+                else if (mode == 1)
+                {
+                    res = target.ToLower();
+                }
+                else if (mode == 2)
+                {
+                    res = target.ToUpper();
+                }
+                else if (mode == 3)
+                {
+                    res = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(target.ToLower());
+                }
+                else if (mode == 4)
+                {
+                    char[] tc = target.ToCharArray();
+                    for (int i = 0; i < tc.Length; i++)
+                    {
+                        if (char.IsUpper(tc[i])) tc[i] = char.ToLower(tc[i]);
+                        else if (char.IsLower(tc[i])) tc[i] = char.ToUpper(tc[i]);
+                    }
+                    res = new string(tc);
+                }
+
+                PieceTable.Remove(targetStart, targetLen);
+                PieceTable.Insert(targetStart, res);
+                SelectionStart = targetStart;
+                SelectionEnd = targetStart + res.Length;
+                CursorPosition = SelectionEnd;
+                Invalidate();
+            }
+        }
+
         public void ChangeCaseCycle()
         {
             SaveUndoState();
@@ -7354,6 +7462,29 @@ namespace GenOffice.UI
                     ParagraphSpacingsBefore[pStart] = 12f;
                 }
             }
+        }
+
+        public void ToggleDropCap(int lines = 3, bool inMargin = false)
+        {
+            SaveUndoState();
+            var targetPStarts = GetSelectedOrCurrentParagraphStarts();
+            foreach (int pStart in targetPStarts)
+            {
+                if (lines <= 0)
+                {
+                    ParagraphDropCaps.Remove(pStart);
+                }
+                else if (ParagraphDropCaps.ContainsKey(pStart) && ParagraphDropCaps[pStart].Lines == lines && ParagraphDropCaps[pStart].InMargin == inMargin)
+                {
+                    ParagraphDropCaps.Remove(pStart);
+                }
+                else
+                {
+                    ParagraphDropCaps[pStart] = new DropCapInfo(lines, inMargin);
+                }
+            }
+            _paraLayoutCache.Clear();
+            this.Invalidate();
         }
 
         public void SetHangingIndent(bool increase)
@@ -7895,7 +8026,7 @@ namespace GenOffice.UI
             return true;
         }
 
-        public void DrawNavigationPane(Graphics g, int width, int height, RibbonBar ribbon)
+        public void DrawNavigationPane(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             int paneW = 280;
             int paneTop = 155;
@@ -8407,7 +8538,7 @@ namespace GenOffice.UI
             SelectionPaneScrollY = Math.Max(0, Math.Min(maxScroll, SelectionPaneScrollY - (delta > 0 ? 30 : -30)));
         }
 
-        public void DrawSelectionPane(Graphics g, int width, int height, RibbonBar ribbon)
+        public void DrawSelectionPane(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             int paneW = 260;
             int paneTop = 155;
@@ -8576,7 +8707,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawShapeMiniIcon(Graphics g, int x, int y, string shapeType)
+        private void DrawShapeMiniIcon(D2DGraphics g, int x, int y, string shapeType)
         {
             using (Pen iconPen = new Pen(Color.FromArgb(43, 87, 154), 1.2f))
             {
@@ -8605,7 +8736,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawChartMiniIcon(Graphics g, int x, int y)
+        private void DrawChartMiniIcon(D2DGraphics g, int x, int y)
         {
             using (SolidBrush b1 = new SolidBrush(Color.FromArgb(43, 87, 154)))
             using (SolidBrush b2 = new SolidBrush(Color.FromArgb(217, 119, 6)))
@@ -8617,7 +8748,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawEyeVector(Graphics g, int x, int y, bool isVisible)
+        private void DrawEyeVector(D2DGraphics g, int x, int y, bool isVisible)
         {
             using (Pen pen = new Pen(isVisible ? Color.FromArgb(70, 70, 70) : Color.FromArgb(160, 160, 160), 1.3f))
             {
@@ -8663,7 +8794,7 @@ namespace GenOffice.UI
             return f;
         }
 
-        private float MeasureSubstringWidth(Graphics g, string lineText, int lineStartIndex, int subStart, int subLen, float extraSpaceW = 0)
+        private float MeasureSubstringWidth(D2DGraphics g, string lineText, int lineStartIndex, int subStart, int subLen, float extraSpaceW = 0)
         {
             if (subLen <= 0 || string.IsNullOrEmpty(lineText)) return 0;
 
@@ -8759,7 +8890,7 @@ namespace GenOffice.UI
             return totalW;
         }
 
-        private void FillRoundedRectangle(Graphics g, Brush brush, RectangleF rect, float radius)
+        private void FillRoundedRectangle(D2DGraphics g, Brush brush, RectangleF rect, float radius)
         {
             if (radius <= 0)
             {
@@ -8778,7 +8909,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawRoundedRectangle(Graphics g, Pen pen, RectangleF rect, float radius)
+        private void DrawRoundedRectangle(D2DGraphics g, Pen pen, RectangleF rect, float radius)
         {
             if (radius <= 0)
             {
@@ -9001,7 +9132,7 @@ namespace GenOffice.UI
             if (_wordMeasureCache != null) _wordMeasureCache.Clear();
         }
 
-        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int textX, int maxTextW, Graphics g, RibbonBar ribbon)
+        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int textX, int maxTextW, D2DGraphics g, RibbonBar ribbon)
         {
             float pBefore = (ParagraphSpacingsBefore.ContainsKey(paraStartIndex)) ? ParagraphSpacingsBefore[paraStartIndex] : (ribbon != null ? ribbon.ParagraphSpacingBefore : 0f);
             if (pBefore > 0)
@@ -9085,10 +9216,30 @@ namespace GenOffice.UI
                 return result;
             }
 
+            DropCapInfo dcInfo = null;
+            float dcIndentW = 0f;
+            if (ParagraphDropCaps.TryGetValue(paraStartIndex, out dcInfo) && dcInfo != null && dcInfo.Lines > 1 && !string.IsNullOrEmpty(para))
+            {
+                char dcChar = para[0];
+                float baseFS = TypingFontSize;
+                if (FormattedRuns != null && FormattedRuns.Count > 0)
+                {
+                    for (int ri = 0; ri < FormattedRuns.Count; ri++)
+                    {
+                        if (FormattedRuns[ri].StartIndex <= paraStartIndex && FormattedRuns[ri].StartIndex + FormattedRuns[ri].Length >= paraStartIndex)
+                        {
+                            if (FormattedRuns[ri].FontSize > 0) { baseFS = FormattedRuns[ri].FontSize; break; }
+                        }
+                    }
+                }
+                float dcFS = baseFS * (dcInfo.Lines - 0.2f);
+                dcIndentW = MeasureSubstringWidth(g, dcChar.ToString(), paraStartIndex, 0, 1) * (dcFS / Math.Max(1f, baseFS)) + 8f;
+            }
+
             // 1. Fast tokenization into word tokens with exact character offsets
             List<string> tokens = new List<string>();
             List<int> tokenStarts = new List<int>();
-            int pPos = 0;
+            int pPos = (dcInfo != null && para.Length > 0) ? 1 : 0;
             while (pPos < para.Length)
             {
                 int tStart = pPos;
@@ -9146,6 +9297,14 @@ namespace GenOffice.UI
                 // First line uses (pLeft + pFirstLine), following lines use (pLeft + pHanging)
                 int effStartX = (result.Count == 0) ? textX + (int)((pLeft + pFirstLine) * ZoomLevel) : textX + (int)((pLeft + pHanging) * ZoomLevel);
                 int effMaxW = (result.Count == 0) ? Math.Max(40, maxTextW - (int)((pLeft + pFirstLine + pRight) * ZoomLevel)) : Math.Max(40, maxTextW - (int)((pLeft + pHanging + pRight) * ZoomLevel));
+
+                // Indent lines that wrap alongside the Drop Cap
+                if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines)
+                {
+                    effStartX += (int)(dcIndentW * ZoomLevel);
+                    effMaxW = Math.Max(30, effMaxW - (int)(dcIndentW * ZoomLevel));
+                }
+
                 float logicalMaxW = effMaxW / Math.Max(0.01f, ZoomLevel);
 
                 // Step 1: Scan which tokens ACTUALLY fit on this line!
@@ -9162,6 +9321,44 @@ namespace GenOffice.UI
 
                     if (logicalCurW + logicalTokW > logicalMaxW && endTok > startTok)
                     {
+                        bool effHyphen = (ribbon != null && ribbon.IsHyphenationEnabled) || IsHyphenationEnabled;
+                        if (effHyphen && tok.Length >= 6 && !tok.StartsWith("![") && !tok.Contains(" "))
+                        {
+                            float remainW = logicalMaxW - logicalCurW;
+                            int bestSplit = -1;
+                            float bestSplitW = 0f;
+                            for (int sLen = tok.Length - 2; sLen >= 3; sLen--)
+                            {
+                                string headPart = tok.Substring(0, sLen) + "-";
+                                float headW = MeasureSubstringWidth(g, headPart, tokenStarts[endTok], 0, headPart.Length);
+                                if (headW <= remainW)
+                                {
+                                    bestSplit = sLen;
+                                    bestSplitW = headW;
+                                    break;
+                                }
+                            }
+                            if (bestSplit >= 3)
+                            {
+                                string headTok = tok.Substring(0, bestSplit) + "-";
+                                string tailTok = tok.Substring(bestSplit);
+                                tokens[endTok] = headTok;
+                                tokenLogicalWidths[endTok] = bestSplitW;
+                                logicalCurW += bestSplitW;
+                                endTok++;
+                                tokens.Insert(endTok, tailTok);
+                                tokenStarts.Insert(endTok, tokenStarts[endTok - 1] + bestSplit);
+                                var newW = new float[tokens.Count];
+                                var newFS = new float[tokens.Count];
+                                for (int k = 0; k < endTok; k++) { newW[k] = tokenLogicalWidths[k]; newFS[k] = tokenMaxFontSizes[k]; }
+                                newW[endTok] = MeasureSubstringWidth(g, tailTok, tokenStarts[endTok], 0, tailTok.Length);
+                                newFS[endTok] = tokenMaxFontSizes[endTok - 1];
+                                for (int k = endTok + 1; k < tokens.Count; k++) { newW[k] = tokenLogicalWidths[k - 1]; newFS[k] = tokenMaxFontSizes[k - 1]; }
+                                tokenLogicalWidths = newW;
+                                tokenMaxFontSizes = newFS;
+                                break;
+                            }
+                        }
                         break; // Does not fit on this line; wrap to next line!
                     }
 
@@ -9195,7 +9392,7 @@ namespace GenOffice.UI
                 if (endTok == startTok) endTok = startTok + 1;
 
                 // Step 2: Calculate line height strictly from the tokens that are ON THIS LINE!
-                float lH = Math.Max(Math.Max(16.0f * ZoomLevel, lineMaxFS * 1.4f * ZoomLevel) * pLineSpacing, 
+                float lH = Math.Max(Math.Max(13.5f * ZoomLevel, lineMaxFS * 1.333333f * ZoomLevel) * pLineSpacing, 
                                     lineMaxShapeH > 0 ? (lineMaxShapeH + 4 * ZoomLevel) : 0);
 
                 // Step 3: Check pagination and floating obstacles for this line height
@@ -9544,7 +9741,7 @@ namespace GenOffice.UI
             pageX = navOffset + Math.Max(40, (effectiveCanvasW - pageW) / 2);
         }
 
-        public void DrawInteractiveRuler(Graphics g, int pageX, int pageW, int marginX, int rightMarginX, int canvasW, int canvasH, RibbonBar ribbon)
+        public void DrawInteractiveRuler(D2DGraphics g, int pageX, int pageW, int marginX, int rightMarginX, int canvasW, int canvasH, RibbonBar ribbon)
         {
             int rulerH = 24;
             int rulerY = 156; // Fixed directly below Ribbon (Y: 156..180), pinned at top, NOT moving with ScrollY!
@@ -9785,7 +9982,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawTabGlyph(Graphics g, float cx, float cy, TabStopType type, Color col, float penWidth)
+        private void DrawTabGlyph(D2DGraphics g, float cx, float cy, TabStopType type, Color col, float penWidth)
         {
             using (Pen p = new Pen(col, penWidth))
             using (SolidBrush b = new SolidBrush(col))
@@ -9816,7 +10013,7 @@ namespace GenOffice.UI
             }
         }
 
-        public void DrawVerticalRuler(Graphics g, int pageX, int pageW, int pageH, int marginY, int bottomMarginY, int canvasW, int canvasH, RibbonBar ribbon)
+        public void DrawVerticalRuler(D2DGraphics g, int pageX, int pageW, int pageH, int marginY, int bottomMarginY, int canvasW, int canvasH, RibbonBar ribbon)
         {
             int navOffset = ShowNavigationPane ? 280 : 0;
             int vRulerW = 22;
@@ -10060,6 +10257,14 @@ namespace GenOffice.UI
         }
 
         public void Draw(Graphics g, int width, int height, RibbonBar ribbon)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height, ribbon);
+            }
+        }
+
+        public void Draw(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
@@ -10411,6 +10616,10 @@ namespace GenOffice.UI
             }
 
             DocParagraphGaps.Add(new ParagraphGap { ScreenY = (int)Math.Round(currentY), CharIndex = 0, VirtualEntersNeeded = 0 });
+
+            int docLineNumber = 0;
+            int lastLinePage = -1;
+            int pageLineNumber = 0;
 
             using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(180, 213, 254)))
             {
@@ -11636,7 +11845,7 @@ namespace GenOffice.UI
                                                 if (cp.Italic) pStyle |= FontStyle.Italic;
                                                 Font pFont = GetCachedFont(cp.FontName ?? "Times New Roman", pSize, pStyle);
                                                 var pLines = BreakCellTextIntoLines(g, cp.Text ?? "", pFont, txtRect.Width);
-                                                float lineH = pFont.GetHeight(g) * (cp.LineSpacing > 0 ? cp.LineSpacing : 1.0f);
+                                                float lineH = pFont.GetHeight(g) * (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
                                                 if (lineH <= 0) lineH = pSize * 1.35f;
                                                 totalCellContentH += pLines.Count * lineH;
                                                 if (cp.SpacingAfterPt > 0) totalCellContentH += cp.SpacingAfterPt * 1.333333f * ZoomLevel;
@@ -11668,7 +11877,7 @@ namespace GenOffice.UI
                                             for (int pi = 0; pi < cellData.Paragraphs.Count; pi++)
                                             {
                                                 var cellPara = cellData.Paragraphs[pi];
-                                                if (cellPara.SpacingBeforePt > 0)
+                                                if (pi > 0 && cellPara.SpacingBeforePt > 0)
                                                 {
                                                     curParaY += cellPara.SpacingBeforePt * 1.333333f * ZoomLevel;
                                                 }
@@ -11725,7 +11934,7 @@ namespace GenOffice.UI
                                                 if (!string.IsNullOrEmpty(txtToRender))
                                                 {
                                                     var pLines = BreakCellTextIntoLines(g, txtToRender, pFont, txtRect.Width);
-                                                    float lineH = pFont.GetHeight(g) * (cellPara.LineSpacing > 0 ? cellPara.LineSpacing : 1.0f);
+                                                    float lineH = pFont.GetHeight(g) * (cellPara.LineSpacing > 0 ? cellPara.LineSpacing : 1.15f);
                                                     if (lineH <= 0) lineH = pSize * 1.35f;
 
                                                     for (int li = 0; li < pLines.Count; li++)
@@ -11971,7 +12180,7 @@ namespace GenOffice.UI
                                                         for (int li = 0; li < pLines.Count; li++)
                                                         {
                                                             var l = pLines[li];
-                                                            if (offInPara <= l.StartIndex + l.Length)
+                                                            if (offInPara < l.StartIndex + l.Length || li == pLines.Count - 1)
                                                             {
                                                                 targetLineIdx = li;
                                                                 break;
@@ -12143,11 +12352,70 @@ namespace GenOffice.UI
                     }
 
                     var wrappedLines = LayoutParagraphLines(para, paraStartIndex, ref currentY, ref currentPage, startPageY, pageH, marginY, textX, maxTextW, g, ribbon);
-                    foreach (var line in wrappedLines)
+
+                    // Render Drop Cap letter if enabled on this paragraph
+                    if (ParagraphDropCaps.ContainsKey(paraStartIndex) && wrappedLines.Count > 0 && !string.IsNullOrEmpty(para))
                     {
+                        DropCapInfo dcInfo = ParagraphDropCaps[paraStartIndex];
+                        if (dcInfo != null && dcInfo.Lines > 1)
+                        {
+                            char dcChar = para[0];
+                            float baseFS = TypingFontSize;
+                            if (FormattedRuns != null && FormattedRuns.Count > 0)
+                            {
+                                for (int ri = 0; ri < FormattedRuns.Count; ri++)
+                                {
+                                    if (FormattedRuns[ri].StartIndex <= paraStartIndex && FormattedRuns[ri].StartIndex + FormattedRuns[ri].Length >= paraStartIndex)
+                                    {
+                                        if (FormattedRuns[ri].FontSize > 0) { baseFS = FormattedRuns[ri].FontSize; break; }
+                                    }
+                                }
+                            }
+                            float dcFS = baseFS * (dcInfo.Lines - 0.2f) * ZoomLevel;
+                            float dcLetterW = (MeasureSubstringWidth(g, dcChar.ToString(), paraStartIndex, 0, 1) * (dcInfo.Lines - 0.2f) + 8f) * ZoomLevel;
+                            float dcDrawX = dcInfo.InMargin ? (textX - dcLetterW) : textX;
+                            float dcDrawY = wrappedLines[0].LineY;
+
+                            using (Font dcFont = new Font("Segoe UI", Math.Max(18f, dcFS), FontStyle.Bold))
+                            using (SolidBrush dcBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+                            {
+                                g.DrawString(dcChar.ToString(), dcFont, dcBrush, dcDrawX, dcDrawY);
+                            }
+                        }
+                    }
+
+                    for (int lIdx = 0; lIdx < wrappedLines.Count; lIdx++)
+                    {
+                        var line = wrappedLines[lIdx];
                         float dynamicLineHeight = line.LineHeight;
                         bool isLineVisible = (line.LineY + dynamicLineHeight >= 155 && line.LineY <= height - 26);
                         bool hasCursor = (CursorPosition >= line.StartIndex && CursorPosition <= line.StartIndex + line.Length);
+
+                        docLineNumber++;
+                        int linePage = Math.Max(0, (int)((line.LineY - startPageY) / (pageH + 30)));
+                        if (linePage != lastLinePage)
+                        {
+                            lastLinePage = linePage;
+                            pageLineNumber = 0;
+                        }
+                        pageLineNumber++;
+
+                        LineNumberingMode effLineMode = (ribbon != null && ribbon.LineNumberMode != LineNumberingMode.None) ? ribbon.LineNumberMode : LineNumberMode;
+                        if (effLineMode != LineNumberingMode.None && isLineVisible)
+                        {
+                            int displayNum = (effLineMode == LineNumberingMode.RestartEachPage) ? pageLineNumber :
+                                             ((effLineMode == LineNumberingMode.RestartEachSection) ? (lIdx + 1) : docLineNumber);
+                            float lnFontSize = Math.Max(6.5f, Math.Min(9.0f, line.MaxFontSize * 0.7f)) * ZoomLevel;
+                            using (Font lnFont = new Font("Segoe UI", lnFontSize, FontStyle.Regular))
+                            using (SolidBrush lnBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                            {
+                                string numStr = displayNum.ToString();
+                                SizeF lnSz = g.MeasureString(numStr, lnFont);
+                                float lnX = textX - lnSz.Width - (12.0f * ZoomLevel);
+                                g.DrawString(numStr, lnFont, lnBrush, lnX, line.LineY);
+                            }
+                        }
+
                         if (!isLineVisible && !hasCursor) continue;
 
                         float lineStartX = line.StartX;
@@ -12188,7 +12456,7 @@ namespace GenOffice.UI
 
                         float pLineSpacing = ribbon != null ? ribbon.LineSpacingFactor : 1.15f;
                         if (ParagraphLineSpacings.ContainsKey(paraStartIndex)) pLineSpacing = ParagraphLineSpacings[paraStartIndex];
-                        int textLineHeight = (int)(Math.Max(16.0f * ZoomLevel, line.MaxFontSize * 1.4f * ZoomLevel) * pLineSpacing);
+                        int textLineHeight = (int)(Math.Max(13.5f * ZoomLevel, line.MaxFontSize * 1.333333f * ZoomLevel) * pLineSpacing);
                         
                         float yTextOffset = 0;
                         bool lineHasShape = line.Text.IndexOf("![IMAGE:") >= 0 || line.Text.IndexOf("![SHAPE:") >= 0;
@@ -12938,7 +13206,7 @@ namespace GenOffice.UI
             DrawWordScrollBar(g, width, height, ribbon);
         }
 
-        private void DrawInkStroke(Graphics g, DocInkStroke stroke, int pageX, int pageY, float zoom)
+        private void DrawInkStroke(D2DGraphics g, DocInkStroke stroke, int pageX, int pageY, float zoom)
         {
             if (stroke == null || stroke.Points == null || stroke.Points.Count == 0) return;
             if (stroke.Points.Count == 1)
@@ -12974,7 +13242,79 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawDocumentComments(Graphics g, int pageX, int pageW, int startPageY, int pageH, int pageCount, RibbonBar ribbon)
+        private void TryStraightenStroke(DocInkStroke stroke)
+        {
+            if (stroke == null || stroke.Points == null || stroke.Points.Count < 3) return;
+
+            PointF pStart = stroke.Points[0];
+            PointF pEnd = stroke.Points[stroke.Points.Count - 1];
+
+            float dx = pEnd.X - pStart.X;
+            float dy = pEnd.Y - pStart.Y;
+            float chordLen = (float)Math.Sqrt(dx * dx + dy * dy);
+
+            // Ignore tiny strokes (< 16 px in document units)
+            if (chordLen < 16f) return;
+
+            // Compute total arc/path length
+            float pathLen = 0f;
+            for (int i = 1; i < stroke.Points.Count; i++)
+            {
+                float segDx = stroke.Points[i].X - stroke.Points[i - 1].X;
+                float segDy = stroke.Points[i].Y - stroke.Points[i - 1].Y;
+                pathLen += (float)Math.Sqrt(segDx * segDx + segDy * segDy);
+            }
+
+            // If the path deviates too much from chord length (e.g., circle, loop, letter), do not straighten
+            if (pathLen > chordLen * 1.35f) return;
+
+            // Check maximum perpendicular distance from intermediate points to chord line
+            float maxDist = 0f;
+            for (int i = 1; i < stroke.Points.Count - 1; i++)
+            {
+                PointF p = stroke.Points[i];
+                float dist = Math.Abs(dy * p.X - dx * p.Y + pEnd.X * pStart.Y - pEnd.Y * pStart.X) / chordLen;
+                if (dist > maxDist) maxDist = dist;
+            }
+
+            // Allow moderate hand wobble (max perpendicular distance <= 24% of chordLen or <= 28 px)
+            if (maxDist > chordLen * 0.24f || maxDist > 28f) return;
+
+            // Determine snap direction
+            float absDx = Math.Abs(dx);
+            float absDy = Math.Abs(dy);
+
+            PointF finalStart = pStart;
+            PointF finalEnd = pEnd;
+
+            if (absDy <= chordLen * 0.16f)
+            {
+                // Near horizontal (e.g. highlighting a line of text, underlining) -> Snap to exact horizontal line!
+                float avgY = (pStart.Y + pEnd.Y) / 2.0f;
+                finalStart = new PointF(pStart.X, avgY);
+                finalEnd = new PointF(pEnd.X, avgY);
+            }
+            else if (absDx <= chordLen * 0.16f)
+            {
+                // Near vertical -> Snap to exact vertical line!
+                float avgX = (pStart.X + pEnd.X) / 2.0f;
+                finalStart = new PointF(avgX, pStart.Y);
+                finalEnd = new PointF(avgX, pEnd.Y);
+            }
+
+            // Reconstruct points along the straightened line segment (8 evenly spaced points for smooth eraser hit test)
+            stroke.Points.Clear();
+            int numSteps = 8;
+            for (int s = 0; s <= numSteps; s++)
+            {
+                float t = (float)s / numSteps;
+                float sx = finalStart.X + (finalEnd.X - finalStart.X) * t;
+                float sy = finalStart.Y + (finalEnd.Y - finalStart.Y) * t;
+                stroke.Points.Add(new PointF(sx, sy));
+            }
+        }
+
+        private void DrawDocumentComments(D2DGraphics g, int pageX, int pageW, int startPageY, int pageH, int pageCount, RibbonBar ribbon)
         {
             if (Comments == null || Comments.Count == 0) return;
 
@@ -13215,7 +13555,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawReplyVectorIcon(Graphics g, int x, int y, Color col)
+        private void DrawReplyVectorIcon(D2DGraphics g, int x, int y, Color col)
         {
             using (Pen pBubble = new Pen(Color.FromArgb(100, 116, 139), 1.1f))
             using (Pen pArrow = new Pen(col, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
@@ -13236,7 +13576,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawResolveVectorIcon(Graphics g, int x, int y, Color col)
+        private void DrawResolveVectorIcon(D2DGraphics g, int x, int y, Color col)
         {
             using (Pen pBubble = new Pen(Color.FromArgb(100, 116, 139), 1.1f))
             using (Pen pCheck = new Pen(col, 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
@@ -13256,7 +13596,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawPageCanvas(Graphics g, int x, int y, int w, int h, RibbonBar ribbon, int pageNumber = 1, int totalPages = 1)
+        private void DrawPageCanvas(D2DGraphics g, int x, int y, int w, int h, RibbonBar ribbon, int pageNumber = 1, int totalPages = 1)
         {
             bool isEvenPage = (pageNumber % 2 == 0);
 
@@ -13692,6 +14032,80 @@ namespace GenOffice.UI
                 }
             }
 
+            // Document Gridlines (Lưới căn chỉnh ô vuông trang giấy chuẩn Word)
+            bool effGrid = ShowDocumentGridlines || (ribbon != null && ribbon.ShowGridlines);
+            if (effGrid)
+            {
+                int leftM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int rightM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int topM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int botM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+
+                int gridX1 = x + leftM;
+                int gridX2 = x + w - rightM;
+                int gridY1 = y + topM;
+                int gridY2 = y + h - botM;
+
+                if (gridX2 > gridX1 && gridY2 > gridY1)
+                {
+                    float cellSize = 18.0f * ZoomLevel;
+                    using (Pen gridPen = new Pen(Color.FromArgb(226, 232, 240), 1.0f) { DashStyle = DashStyle.Dot })
+                    {
+                        for (float gx = gridX1; gx <= gridX2; gx += cellSize)
+                        {
+                            g.DrawLine(gridPen, gx, gridY1, gx, gridY2);
+                        }
+                        for (float gy = gridY1; gy <= gridY2; gy += cellSize)
+                        {
+                            g.DrawLine(gridPen, gridX1, gy, gridX2, gy);
+                        }
+                    }
+                }
+            }
+
+            Image effWmImg = WatermarkImage ?? (ribbon != null ? ribbon.WatermarkImage : null);
+            if (effWmImg != null)
+            {
+                GraphicsState state = g.Save();
+                g.SetClip(new Rectangle(x, y, w, h));
+
+                float scale = (WatermarkImageScale > 0) ? WatermarkImageScale : (ribbon != null && ribbon.WatermarkImageScale > 0 ? ribbon.WatermarkImageScale : 0f);
+                bool washout = (ribbon != null) ? ribbon.WatermarkWashout : WatermarkWashout;
+
+                float imgW, imgH;
+                if (scale > 0)
+                {
+                    imgW = effWmImg.Width * scale * ZoomLevel;
+                    imgH = effWmImg.Height * scale * ZoomLevel;
+                }
+                else
+                {
+                    float maxW = w * 0.70f;
+                    float maxH = h * 0.70f;
+                    float ratio = Math.Min(maxW / Math.Max(1, effWmImg.Width), maxH / Math.Max(1, effWmImg.Height));
+                    imgW = effWmImg.Width * ratio;
+                    imgH = effWmImg.Height * ratio;
+                }
+
+                float drawX = x + (w - imgW) / 2f;
+                float drawY = y + (h - imgH) / 2f;
+
+                float alpha = washout ? 0.22f : 0.85f;
+                using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                {
+                    System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix();
+                    cm.Matrix33 = alpha;
+                    if (washout)
+                    {
+                        cm.Matrix00 = 0.8f; cm.Matrix11 = 0.8f; cm.Matrix22 = 0.8f;
+                        cm.Matrix40 = 0.2f; cm.Matrix41 = 0.2f; cm.Matrix42 = 0.2f;
+                    }
+                    ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                    g.DrawImage(effWmImg, new Rectangle((int)drawX, (int)drawY, (int)imgW, (int)imgH), 0, 0, effWmImg.Width, effWmImg.Height, GraphicsUnit.Pixel, ia);
+                }
+                g.Restore(state);
+            }
+
             if (ribbon != null && !string.IsNullOrEmpty(ribbon.WatermarkText))
             {
                 GraphicsState state = g.Save();
@@ -13767,7 +14181,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawBandedHeaderBanner(Graphics g, int x, int y, int w, int h, RibbonBar ribbon)
+        private void DrawBandedHeaderBanner(D2DGraphics g, int x, int y, int w, int h, RibbonBar ribbon)
         {
             int leftM = (int)(ribbon.GetEffectiveLeftMarginInches() * 54.0f * ZoomLevel);
             int rightM = (int)(ribbon.GetEffectiveRightMarginInches() * 54.0f * ZoomLevel);
@@ -13913,18 +14327,14 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawVectorArch(Graphics g, Pen archPen, float x, float y, float w, float h)
+        private void DrawVectorArch(D2DGraphics g, Pen archPen, float x, float y, float w, float h)
         {
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                path.AddArc(x, y, w, h, 180, 180);
-                path.AddLine(x + w, y + h / 2, x + w, y + h);
-                path.AddLine(x, y + h / 2, x, y + h);
-                g.DrawPath(archPen, path);
-            }
+            if (g == null || archPen == null) return;
+            g.DrawArc(archPen, x, y, w, h, 180, 180);
+            g.DrawLine(archPen, x, y + h / 2, x + w, y + h / 2);
         }
 
-        private void DrawVectorWrapCard(Graphics g, int wrapMode, Rectangle box, bool isSelected)
+        private void DrawVectorWrapCard(D2DGraphics g, int wrapMode, Rectangle box, bool isSelected)
         {
             if (isSelected)
             {
@@ -14016,7 +14426,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawVectorRadioButton(Graphics g, int x, int y, bool isChecked, string label, Font font)
+        private void DrawVectorRadioButton(D2DGraphics g, int x, int y, bool isChecked, string label, Font font)
         {
             Rectangle rCircle = new Rectangle(x, y + 2, 12, 12);
             using (Pen rPen = new Pen(isChecked ? Color.FromArgb(0, 120, 215) : Color.FromArgb(140, 145, 150), 1.2f))
@@ -14033,7 +14443,7 @@ namespace GenOffice.UI
             g.DrawString(label, font, isChecked ? new SolidBrush(Color.FromArgb(20, 20, 20)) : new SolidBrush(Color.FromArgb(70, 70, 70)), x + 16, y);
         }
 
-        private void DrawVectorInfoIcon(Graphics g, int x, int y)
+        private void DrawVectorInfoIcon(D2DGraphics g, int x, int y)
         {
             Rectangle infoCircle = new Rectangle(x, y, 11, 11);
             using (Pen infoPen = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
@@ -14044,7 +14454,7 @@ namespace GenOffice.UI
             }
         }
 
-        public void DrawDocumentChart(Graphics g, DocChartObject chart, int chartX, int chartY, int chartW, int chartH, RibbonBar ribbon)
+        public void DrawDocumentChart(D2DGraphics g, DocChartObject chart, int chartX, int chartY, int chartW, int chartH, RibbonBar ribbon)
         {
             chart.LastBounds = new Rectangle(chartX, chartY, chartW, chartH);
             ActiveChartLastBounds = chart.LastBounds;
@@ -14393,7 +14803,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawChartFloatingButtons(Graphics g, DocChartObject chart, Rectangle chartRect)
+        private void DrawChartFloatingButtons(D2DGraphics g, DocChartObject chart, Rectangle chartRect)
         {
             int btnSize = 22;
             int btnX = chartRect.Right + 6;
@@ -14444,7 +14854,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawChartWrapMenu(Graphics g, DocChartObject chart)
+        private void DrawChartWrapMenu(D2DGraphics g, DocChartObject chart)
         {
             if (LayoutBtnChartRect.IsEmpty) return;
             int popW = 185;
@@ -14510,7 +14920,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawChartElementsMenu(Graphics g, DocChartObject chart)
+        private void DrawChartElementsMenu(D2DGraphics g, DocChartObject chart)
         {
             if (PlusBtnChartRect.IsEmpty) return;
             int popW = 160;
@@ -14556,7 +14966,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawChartStylesMenu(Graphics g, DocChartObject chart)
+        private void DrawChartStylesMenu(D2DGraphics g, DocChartObject chart)
         {
             if (StyleBtnChartRect.IsEmpty) return;
             int popW = 180;
@@ -14616,7 +15026,7 @@ namespace GenOffice.UI
             }
         }
 
-        public void DrawTableLayoutOptionsPopup(Graphics g, int tableIdx, int canvasWidth, float zoomLevel)
+        public void DrawTableLayoutOptionsPopup(D2DGraphics g, int tableIdx, int canvasWidth, float zoomLevel)
         {
             if (tableIdx < 0 || tableIdx >= MoveHandleRects.Count) return;
             int tX = (tableIdx < TableBoundsList.Count) ? TableBoundsList[tableIdx].Left : (MoveHandleRects[tableIdx].Left + 18);
@@ -16124,7 +16534,7 @@ namespace GenOffice.UI
             {
                 if (ribbon.ActiveDrawTool == 6) // Eraser
                 {
-                    Cursor.Current = Cursors.Hand;
+                    Cursor.Current = OfficeDrawingCursorHelper.GetEraserCursor();
                     if (Control.MouseButtons == MouseButtons.Left && DocumentInkStrokes != null && DocumentInkStrokes.Count > 0)
                     {
                         int pageX_e, pageW_e, pageH_e, marginX_e, rightMarginX_e, marginY_e;
@@ -16161,9 +16571,20 @@ namespace GenOffice.UI
                     }
                     return;
                 }
-                else // Pens
+                else // Pens & Highlighters
                 {
-                    Cursor.Current = Cursors.Cross;
+                    bool isHighlighter = (ribbon.ActiveDrawTool == 4 || ribbon.ActiveDrawTool == 5 || (ribbon.ActiveDrawTool == 7 && ribbon.CustomPenIsHighlighter));
+                    Color penCol = Color.Black;
+                    if (ribbon.ActiveDrawTool == 1) penCol = Color.Black;
+                    else if (ribbon.ActiveDrawTool == 2) penCol = Color.FromArgb(220, 38, 38);
+                    else if (ribbon.ActiveDrawTool == 3) penCol = Color.FromArgb(37, 99, 235);
+                    else if (ribbon.ActiveDrawTool == 4) penCol = Color.FromArgb(250, 204, 21);
+                    else if (ribbon.ActiveDrawTool == 5) penCol = Color.FromArgb(34, 197, 94);
+                    else if (ribbon.ActiveDrawTool == 7) penCol = ribbon.CustomPenColor;
+
+                    Cursor.Current = isHighlighter
+                        ? OfficeDrawingCursorHelper.GetHighlighterCursor(penCol)
+                        : OfficeDrawingCursorHelper.GetPenCursor(penCol);
                     if (_currentInkStroke != null)
                     {
                         int pageX_p, pageW_p, pageH_p, marginX_p, rightMarginX_p, marginY_p;
@@ -17698,6 +18119,10 @@ namespace GenOffice.UI
             {
                 if (_currentInkStroke.Points != null && _currentInkStroke.Points.Count >= 1)
                 {
+                    if (AppSettings.Instance.AutoStraightenInk && _currentInkStroke.Points.Count >= 3)
+                    {
+                        TryStraightenStroke(_currentInkStroke);
+                    }
                     if (DocumentInkStrokes == null) DocumentInkStrokes = new List<DocInkStroke>();
                     DocumentInkStrokes.Add(_currentInkStroke);
                     SaveUndoState();
@@ -19893,7 +20318,7 @@ namespace GenOffice.UI
             return false;
         }
 
-        private float MeasureInCellLinePrefixWidth(Graphics g, string lineText, int charCount, Font font, float spaceW)
+        private float MeasureInCellLinePrefixWidth(D2DGraphics g, string lineText, int charCount, Font font, float spaceW)
         {
             if (charCount <= 0 || string.IsNullOrEmpty(lineText)) return 0;
             string sub = lineText.Substring(0, Math.Min(charCount, lineText.Length));
@@ -19941,7 +20366,9 @@ namespace GenOffice.UI
                                 if (cp.Italic) pStyle |= FontStyle.Italic;
                                 Font pFont = GetCachedFont(cp.FontName ?? "Times New Roman", pSize, pStyle);
                                 var pLines = BreakCellTextIntoLines(g, cp.Text ?? "", pFont, hit.TextRect.Width);
-                                float lineH = pFont.GetHeight(g) * (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
+                                float lineH = 16f;
+                                try { lineH = (pFont != null ? pFont.GetHeight(g) : pSize * 1.35f); } catch { lineH = pSize * 1.35f; }
+                                lineH *= (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
                                 if (lineH <= 0) lineH = pSize * 1.35f;
                                 totalContentH += pLines.Count * lineH;
                                 if (cp.SpacingAfterPt > 0) totalContentH += cp.SpacingAfterPt * 1.333333f * ZoomLevel;
@@ -19964,7 +20391,9 @@ namespace GenOffice.UI
                                 if (cp.Italic) pStyle |= FontStyle.Italic;
                                 Font pFont = GetCachedFont(cp.FontName ?? "Times New Roman", pSize, pStyle);
                                 var pLines = BreakCellTextIntoLines(g, cp.Text ?? "", pFont, hit.TextRect.Width);
-                                float lineH = pFont.GetHeight(g) * (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
+                                float lineH = 16f;
+                                try { lineH = (pFont != null ? pFont.GetHeight(g) : pSize * 1.35f); } catch { lineH = pSize * 1.35f; }
+                                lineH *= (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
                                 if (lineH <= 0) lineH = pSize * 1.35f;
                                 totalContentH += pLines.Count * lineH;
                                 if (cp.SpacingAfterPt > 0) totalContentH += cp.SpacingAfterPt * 1.333333f * ZoomLevel;
@@ -19993,7 +20422,9 @@ namespace GenOffice.UI
                             string pText = cp.Text ?? "";
                             int pLen = pText.Length;
                             var pLines = BreakCellTextIntoLines(g, pText, pFont, hit.TextRect.Width);
-                            float lineH = pFont.GetHeight(g) * (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
+                            float lineH = 16f;
+                            try { lineH = (pFont != null ? pFont.GetHeight(g) : pSize * 1.35f); } catch { lineH = pSize * 1.35f; }
+                            lineH *= (cp.LineSpacing > 0 ? cp.LineSpacing : 1.15f);
                             if (lineH <= 0) lineH = pSize * 1.35f;
 
                             float paraH = pLines.Count * lineH;
@@ -20083,7 +20514,8 @@ namespace GenOffice.UI
                     else
                     {
                         var lines = BreakCellTextIntoLines(g, hit.CellText, hit.CellFont, hit.TextRect.Width);
-                        float lineH = hit.CellFont.GetHeight(g);
+                        float lineH = 16f;
+                        try { lineH = (hit.CellFont != null ? hit.CellFont.GetHeight() : 16f); } catch { lineH = 16f; }
                         if (lineH <= 0) lineH = 16f;
                         float totalTextH = lines.Count * lineH;
                         float yStart = hit.TextRect.Y;
@@ -20254,7 +20686,7 @@ namespace GenOffice.UI
 
         private Dictionary<WordMeasureKey, SizeF> _wordMeasureCache = new Dictionary<WordMeasureKey, SizeF>();
 
-        private float MeasureStringOrColorSymbols(Graphics g, string str, Font font)
+        private float MeasureStringOrColorSymbols(D2DGraphics g, string str, Font font)
         {
             if (string.IsNullOrEmpty(str)) return 0;
             if (!HasColorSymbol(str))
@@ -20297,7 +20729,7 @@ namespace GenOffice.UI
             return curAdv;
         }
 
-        private SizeF MeasureStringWithTabs(Graphics g, string str, Font font, float zoomLevel)
+        private SizeF MeasureStringWithTabs(D2DGraphics g, string str, Font font, float zoomLevel)
         {
             if (string.IsNullOrEmpty(str)) return SizeF.Empty;
 
@@ -20355,7 +20787,7 @@ namespace GenOffice.UI
             return c == '\u2714' || c == '\u2713' || c == '\u2705' || c == '\u2611' || c == '\u274C' || c == '\u2B50' || c == '\u2764' || c == '\u26A0';
         }
 
-        public void DrawTextOrColorSymbols(Graphics g, string str, Font font, Brush brush, float x, float y, float zoomLevel)
+        public void DrawTextOrColorSymbols(D2DGraphics g, string str, Font font, Brush brush, float x, float y, float zoomLevel)
         {
             if (!HasColorSymbol(str))
             {
@@ -20403,7 +20835,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawStringWithTabs(Graphics g, string str, Font font, Brush brush, float x, float y, float zoomLevel)
+        private void DrawStringWithTabs(D2DGraphics g, string str, Font font, Brush brush, float x, float y, float zoomLevel)
         {
             if (string.IsNullOrEmpty(str)) return;
 
@@ -20459,7 +20891,7 @@ namespace GenOffice.UI
             }
         }
 
-        private void DrawFormattingMarksForString(Graphics g, string str, Font font, float curX, float y, float zoomLevel)
+        private void DrawFormattingMarksForString(D2DGraphics g, string str, Font font, float curX, float y, float zoomLevel)
         {
             using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(120, 140, 165)))
             {
@@ -20726,6 +21158,161 @@ namespace GenOffice.UI
             return text.Substring(start, pos - start);
         }
 
+        private static readonly Dictionary<string, string> SmartSymbolReplacements = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "-->", "→" },
+            { "<--", "←" },
+            { "==>", "⇒" },
+            { "<==", "⇐" },
+            { "<=>", "⇔" },
+            { "<==>", "⇔" },
+            { "->", "→" },
+            { "<-", "←" },
+            { "...", "…" },
+            { "+-", "±" },
+            { "-+", "∓" },
+            { "!=", "≠" },
+            { "<=", "≤" },
+            { ">=", "≥" },
+            { "~=", "≈" },
+            { @"\alpha", "α" },
+            { @"\beta", "β" },
+            { @"\gamma", "γ" },
+            { @"\delta", "δ" },
+            { @"\epsilon", "ε" },
+            { @"\zeta", "ζ" },
+            { @"\eta", "η" },
+            { @"\theta", "θ" },
+            { @"\iota", "ι" },
+            { @"\kappa", "κ" },
+            { @"\lambda", "λ" },
+            { @"\mu", "μ" },
+            { @"\nu", "ν" },
+            { @"\xi", "ξ" },
+            { @"\pi", "π" },
+            { @"\rho", "ρ" },
+            { @"\sigma", "σ" },
+            { @"\tau", "τ" },
+            { @"\upsilon", "υ" },
+            { @"\phi", "φ" },
+            { @"\chi", "χ" },
+            { @"\psi", "ψ" },
+            { @"\omega", "ω" },
+            { @"\Gamma", "Γ" },
+            { @"\Delta", "Δ" },
+            { @"\Theta", "Θ" },
+            { @"\Lambda", "Λ" },
+            { @"\Xi", "Ξ" },
+            { @"\Pi", "Π" },
+            { @"\Sigma", "Σ" },
+            { @"\Phi", "Φ" },
+            { @"\Psi", "Ψ" },
+            { @"\Omega", "Ω" },
+            { @"\sum", "∑" },
+            { @"\prod", "∏" },
+            { @"\sqrt", "√" },
+            { @"\infty", "∞" },
+            { @"\int", "∫" },
+            { @"\iint", "∬" },
+            { @"\oint", "∮" },
+            { @"\partial", "∂" },
+            { @"\pm", "±" },
+            { @"\times", "×" },
+            { @"\div", "÷" },
+            { @"\cdot", "·" },
+            { @"\approx", "≈" },
+            { @"\neq", "≠" },
+            { @"\leq", "≤" },
+            { @"\geq", "≥" },
+            { @"\in", "∈" },
+            { @"\notin", "∉" },
+            { @"\subset", "⊂" },
+            { @"\subseteq", "⊆" },
+            { @"\cup", "∪" },
+            { @"\cap", "∩" },
+            { @"\forall", "∀" },
+            { @"\exists", "∃" },
+            { @"\deg", "°" }
+        };
+
+        private bool TryApplySmartSymbolAutoCorrect(string text, ref string fullText, ref int curPos)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+
+            // 1. Parenthesized symbols when ')' is typed: (c) -> ©, (r) -> ®, (tm) -> ™
+            if (text == ")")
+            {
+                if (curPos >= 2)
+                {
+                    string p2 = fullText.Substring(curPos - 2, 2);
+                    if (string.Equals(p2, "(c", StringComparison.OrdinalIgnoreCase))
+                    {
+                        PieceTable.Remove(curPos - 2, 2);
+                        AdjustFormattedRunsOnDelete(curPos - 2, 2);
+                        PieceTable.Insert(curPos - 2, "©");
+                        AdjustFormattedRunsOnInsert(curPos - 2, 1);
+                        CursorPosition = curPos - 1;
+                        SelectionStart = CursorPosition;
+                        SelectionEnd = CursorPosition;
+                        return true;
+                    }
+                    if (string.Equals(p2, "(r", StringComparison.OrdinalIgnoreCase))
+                    {
+                        PieceTable.Remove(curPos - 2, 2);
+                        AdjustFormattedRunsOnDelete(curPos - 2, 2);
+                        PieceTable.Insert(curPos - 2, "®");
+                        AdjustFormattedRunsOnInsert(curPos - 2, 1);
+                        CursorPosition = curPos - 1;
+                        SelectionStart = CursorPosition;
+                        SelectionEnd = CursorPosition;
+                        return true;
+                    }
+                }
+                if (curPos >= 3)
+                {
+                    string p3 = fullText.Substring(curPos - 3, 3);
+                    if (string.Equals(p3, "(tm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        PieceTable.Remove(curPos - 3, 3);
+                        AdjustFormattedRunsOnDelete(curPos - 3, 3);
+                        PieceTable.Insert(curPos - 3, "™");
+                        AdjustFormattedRunsOnInsert(curPos - 3, 1);
+                        CursorPosition = curPos - 2;
+                        SelectionStart = CursorPosition;
+                        SelectionEnd = CursorPosition;
+                        return true;
+                    }
+                }
+            }
+
+            // 2. Math and symbol replacements when space or punctuation is typed
+            if (text == " " || text == "\t" || text == "\n")
+            {
+                int checkLen = Math.Min(16, curPos);
+                if (checkLen > 0)
+                {
+                    string tail = fullText.Substring(curPos - checkLen, checkLen);
+                    foreach (var kvp in SmartSymbolReplacements)
+                    {
+                        if (tail.EndsWith(kvp.Key, StringComparison.Ordinal))
+                        {
+                            int wordStart = curPos - kvp.Key.Length;
+                            PieceTable.Remove(wordStart, kvp.Key.Length);
+                            AdjustFormattedRunsOnDelete(wordStart, kvp.Key.Length);
+                            PieceTable.Insert(wordStart, kvp.Value);
+                            AdjustFormattedRunsOnInsert(wordStart, kvp.Value.Length);
+                            curPos = wordStart + kvp.Value.Length;
+                            CursorPosition = curPos;
+                            fullText = PieceTable.GetText();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         public void InsertTextWithAutoFormat(string text)
         {
             SaveUndoState();
@@ -20733,6 +21320,13 @@ namespace GenOffice.UI
 
             string fullText = PieceTable.GetText();
             int curPos = CursorPosition;
+
+            // Check Smart Math & Symbol AutoCorrect first
+            if (TryApplySmartSymbolAutoCorrect(text, ref fullText, ref curPos))
+            {
+                return;
+            }
+
             int lineStart = (curPos > 0 && fullText.Length >= curPos) ? fullText.LastIndexOf('\n', Math.Max(0, curPos - 1)) + 1 : 0;
             if (lineStart < 0) lineStart = 0;
             string currentLineUpToCursor = (curPos >= lineStart && curPos <= fullText.Length) ? fullText.Substring(lineStart, curPos - lineStart) : "";
@@ -21886,7 +22480,7 @@ namespace GenOffice.UI
         private int _scrollBarDragStartMouseY = 0;
         private float _scrollBarDragStartScrollY = 0;
 
-        public void DrawWordScrollBar(Graphics g, int width, int height, RibbonBar ribbon)
+        public void DrawWordScrollBar(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             if (ViewMode == 0) return;
 
@@ -22063,7 +22657,7 @@ namespace GenOffice.UI
             return false;
         }
 
-        public void DrawQuickPageNavigator(Graphics g, int width, int height, RibbonBar ribbon)
+        public void DrawQuickPageNavigator(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
         }
 

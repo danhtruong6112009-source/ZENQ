@@ -25,7 +25,7 @@ using WpfRect = System.Windows.Rect;
 using WpfPenLineCap = System.Windows.Media.PenLineCap;
 using WpfPenLineJoin = System.Windows.Media.PenLineJoin;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Danh mục tất cả biểu tượng vector của phân hệ ZenQ Slides (PowerPoint)
@@ -189,7 +189,7 @@ namespace GenOffice.UI
         public static readonly GdiColor DefaultLightGray = GdiColor.FromArgb(148, 163, 184);   // Slate 400
 
         /// <summary>
-        /// Lấy hoặc tạo mới Bitmap kết xuất vector từ WPF cho một Icon chỉ định.
+        /// Lấy hoặc tạo mới Bitmap kết xuất vector Segoe Fluent Icons cho một Icon chỉ định.
         /// </summary>
         public static GdiBitmap GetIconBitmap(
             SlideIconKind kind,
@@ -1025,25 +1025,41 @@ namespace GenOffice.UI
             dc.DrawEllipse(whiteBrush, accPen, new WpfPoint(w * 0.65, h * 0.6), sz * 0.52, sz * 0.52);
         }
 
-        // 15. Fluent Sparkle Icon (Biểu tượng Icons MS 365)
+        // 15. Fluent Sparkle Icon (Biểu tượng Icons MS 365 - Ngôi sao 4 cánh thanh lịch không màu lòe loẹt)
         private static void DrawFluentSparkleIcon(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfBrush accBrush)
         {
             double cx = w / 2.0;
             double cy = h / 2.0;
-            double r = Math.Min(w, h) * 0.42;
+            double r = Math.Min(w, h) * 0.40;
 
+            // Ngôi sao 4 cánh chính - viền vector thanh lịch phong cách Microsoft 365 Fluent
             WpfStreamGeometry star = new WpfStreamGeometry();
             using (var ctx = star.Open())
             {
-                ctx.BeginFigure(new WpfPoint(cx, cy - r), true, true);
-                ctx.QuadraticBezierTo(new WpfPoint(cx + r * 0.25, cy - r * 0.25), new WpfPoint(cx + r, cy), true, true);
-                ctx.QuadraticBezierTo(new WpfPoint(cx + r * 0.25, cy + r * 0.25), new WpfPoint(cx, cy + r), true, true);
-                ctx.QuadraticBezierTo(new WpfPoint(cx - r * 0.25, cy + r * 0.25), new WpfPoint(cx - r, cy), true, true);
-                ctx.QuadraticBezierTo(new WpfPoint(cx - r * 0.25, cy - r * 0.25), new WpfPoint(cx, cy - r), true, true);
+                ctx.BeginFigure(new WpfPoint(cx, cy - r), true, false);
+                ctx.QuadraticBezierTo(new WpfPoint(cx + r * 0.22, cy - r * 0.22), new WpfPoint(cx + r, cy), true, false);
+                ctx.QuadraticBezierTo(new WpfPoint(cx + r * 0.22, cy + r * 0.22), new WpfPoint(cx, cy + r), true, false);
+                ctx.QuadraticBezierTo(new WpfPoint(cx - r * 0.22, cy + r * 0.22), new WpfPoint(cx - r, cy), true, false);
+                ctx.QuadraticBezierTo(new WpfPoint(cx - r * 0.22, cy - r * 0.22), new WpfPoint(cx, cy - r), true, false);
             }
-            dc.DrawGeometry(accBrush, priPen, star);
+            dc.DrawGeometry(null, priPen, star);
+
+            // Ngôi sao phụ nhỏ tinh tế ở góc trên phải (Fluent sparkle)
+            double r2 = r * 0.38;
+            double cx2 = cx + r * 0.62;
+            double cy2 = cy - r * 0.58;
+            WpfStreamGeometry star2 = new WpfStreamGeometry();
+            using (var ctx2 = star2.Open())
+            {
+                ctx2.BeginFigure(new WpfPoint(cx2, cy2 - r2), true, false);
+                ctx2.QuadraticBezierTo(new WpfPoint(cx2 + r2 * 0.22, cy2 - r2 * 0.22), new WpfPoint(cx2 + r2, cy2), true, false);
+                ctx2.QuadraticBezierTo(new WpfPoint(cx2 + r2 * 0.22, cy2 + r2 * 0.22), new WpfPoint(cx2, cy2 + r2), true, false);
+                ctx2.QuadraticBezierTo(new WpfPoint(cx2 - r2 * 0.22, cy2 + r2 * 0.22), new WpfPoint(cx2 - r2, cy2), true, false);
+                ctx2.QuadraticBezierTo(new WpfPoint(cx2 - r2 * 0.22, cy2 - r2 * 0.22), new WpfPoint(cx2, cy2 - r2), true, false);
+            }
+            dc.DrawGeometry(null, priPen, star2);
         }
 
         // 16. Model 3D (Mô hình 3D - Khối lập phương xanh lam Isometric chuẩn MS 365 Image 2)
@@ -1053,7 +1069,7 @@ namespace GenOffice.UI
             double cy = h / 2.0;
             double r = Math.Min(w, h) * 0.38;
 
-            WpfPen bluePen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(0, 120, 212)), 1.3);
+            WpfPen bluePen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(71, 85, 105)), 1.3);
 
             WpfPoint topCenter = new WpfPoint(cx, cy - r);
             WpfPoint center = new WpfPoint(cx, cy);
@@ -1080,61 +1096,75 @@ namespace GenOffice.UI
             dc.DrawLine(bluePen, center, rightBottom);
         }
 
-        // 17. SmartArt (Mũi tên Chevron xanh lá + khối layout chuẩn MS 365 Image 2)
+        // 17. SmartArt (Sơ đồ cấu trúc / phân cấp nhánh thanh lịch chuẩn Microsoft 365)
         private static void DrawSmartArt(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfPen accPen, WpfBrush accBrush, WpfBrush whiteBrush)
         {
             double pad = Math.Max(2, w * 0.12);
-            WpfBrush greenBrush = new WpfSolidColorBrush(WpfColor.FromRgb(16, 124, 65));
-            WpfStreamGeometry chevron = new WpfStreamGeometry();
-            using (var ctx = chevron.Open())
-            {
-                ctx.BeginFigure(new WpfPoint(pad, pad + 2), true, true);
-                ctx.LineTo(new WpfPoint(w * 0.65, pad + 2), true, true);
-                ctx.LineTo(new WpfPoint(w - pad, h * 0.50), true, true);
-                ctx.LineTo(new WpfPoint(w * 0.65, h - pad - 2), true, true);
-                ctx.LineTo(new WpfPoint(pad, h - pad - 2), true, true);
-                ctx.LineTo(new WpfPoint(pad + w * 0.18, h * 0.50), true, true);
-            }
-            dc.DrawGeometry(greenBrush, null, chevron);
+            double cx = w / 2.0;
 
-            dc.DrawRoundedRectangle(whiteBrush, null, new WpfRect(pad + w * 0.22, h * 0.35, w * 0.35, h * 0.30), 1, 1);
+            // Khối nút trên cùng (Top node)
+            double topW = w * 0.44;
+            double topH = h * 0.28;
+            WpfRect topRect = new WpfRect(cx - topW / 2.0, pad, topW, topH);
+            dc.DrawRoundedRectangle(whiteBrush, priPen, topRect, 2, 2);
+
+            // Đường nối từ nút trên xuống
+            double midY = pad + topH + (h - pad * 2 - topH * 2) * 0.5;
+            dc.DrawLine(priPen, new WpfPoint(cx, pad + topH), new WpfPoint(cx, midY));
+
+            // Nhánh nối ngang
+            double botY = h - pad - topH;
+            double leftNodeCx = pad + (topW * 0.85) / 2.0;
+            double rightNodeCx = w - pad - (topW * 0.85) / 2.0;
+            dc.DrawLine(priPen, new WpfPoint(leftNodeCx, midY), new WpfPoint(rightNodeCx, midY));
+            dc.DrawLine(priPen, new WpfPoint(leftNodeCx, midY), new WpfPoint(leftNodeCx, botY));
+            dc.DrawLine(priPen, new WpfPoint(rightNodeCx, midY), new WpfPoint(rightNodeCx, botY));
+
+            // Hai khối nút dưới (Sub-nodes)
+            double subW = topW * 0.88;
+            WpfRect leftRect = new WpfRect(pad, botY, subW, topH);
+            WpfRect rightRect = new WpfRect(w - pad - subW, botY, subW, topH);
+            dc.DrawRoundedRectangle(whiteBrush, priPen, leftRect, 2, 2);
+            dc.DrawRoundedRectangle(whiteBrush, priPen, rightRect, 2, 2);
         }
 
-        // 18. Chart (Biểu đồ 3 cột: Xanh lam, Cam, Xanh lá chuẩn MS 365 Image 2)
+        // 18. Chart (Biểu đồ 3 cột thanh lịch, tone màu nhã nhặn đồng bộ PowerPoint 365)
         private static void DrawChart(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfPen accPen, WpfBrush accBrush)
         {
             double pad = Math.Max(2, w * 0.14);
             double baseLine = h - pad;
-
             double barW = (w - pad * 2 - 6) / 3.0;
-            // Cột 1: Xanh lam (#0078D4)
-            dc.DrawRoundedRectangle(new WpfSolidColorBrush(WpfColor.FromRgb(0, 120, 212)), null, new WpfRect(pad, baseLine - h * 0.35, barW, h * 0.35), 1, 1);
-            // Cột 2: Cam đất (#ED7D31)
-            dc.DrawRoundedRectangle(new WpfSolidColorBrush(WpfColor.FromRgb(237, 125, 49)), null, new WpfRect(pad + barW + 3, baseLine - h * 0.65, barW, h * 0.65), 1, 1);
-            // Cột 3: Xanh lá (#107C41)
-            dc.DrawRoundedRectangle(new WpfSolidColorBrush(WpfColor.FromRgb(16, 124, 65)), null, new WpfRect(pad + (barW + 3) * 2, baseLine - h * 0.48, barW, h * 0.48), 1, 1);
+
+            // 3 Cột biểu đồ tông màu xám slate chuyển sắc sang trọng (Executive Monochromatic)
+            WpfBrush slate1 = new WpfSolidColorBrush(WpfColor.FromRgb(148, 163, 184)); // Slate 400
+            WpfBrush slate2 = new WpfSolidColorBrush(WpfColor.FromRgb(71, 85, 105));   // Slate 600
+            WpfBrush slate3 = new WpfSolidColorBrush(WpfColor.FromRgb(100, 116, 139)); // Slate 500
+
+            dc.DrawRoundedRectangle(slate1, priPen, new WpfRect(pad, baseLine - h * 0.35, barW, h * 0.35), 1, 1);
+            dc.DrawRoundedRectangle(slate2, priPen, new WpfRect(pad + barW + 3, baseLine - h * 0.65, barW, h * 0.65), 1, 1);
+            dc.DrawRoundedRectangle(slate3, priPen, new WpfRect(pad + (barW + 3) * 2, baseLine - h * 0.48, barW, h * 0.48), 1, 1);
 
             // Đường trục tọa độ đáy
             dc.DrawLine(priPen, new WpfPoint(pad - 1, baseLine), new WpfPoint(w - pad + 1, baseLine));
         }
 
-        // 19. Link (Liên kết - Chuỗi mắt xích đan cài 45 độ)
+        // 19. Link (Liên kết - Chuỗi mắt xích đan cài tinh tế không điểm đỏ)
         private static void DrawLink(WpfDrawingContext dc, int w, int h, WpfPen priPen, WpfPen accPen)
         {
             double cx = w / 2.0;
             double cy = h / 2.0;
             double len = Math.Min(w, h) * 0.28;
 
-            dc.DrawLine(accPen, new WpfPoint(cx - len * 0.5, cy - len * 0.5), new WpfPoint(cx + len * 0.5, cy + len * 0.5));
+            dc.DrawLine(priPen, new WpfPoint(cx - len * 0.4, cy - len * 0.4), new WpfPoint(cx + len * 0.4, cy + len * 0.4));
             dc.DrawEllipse(null, priPen, new WpfPoint(cx - len * 0.6, cy - len * 0.6), len * 0.6, len * 0.35);
             dc.DrawEllipse(null, priPen, new WpfPoint(cx + len * 0.6, cy + len * 0.6), len * 0.6, len * 0.35);
         }
 
-        // 20. Comment (Nhận xét - Bong bóng hội thoại + dấu cộng xanh lá chuẩn MS 365 Image 2)
+        // 20. Comment (Nhận xét - Bong bóng hội thoại thanh lịch kèm dòng văn bản)
         private static void DrawComment(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfPen lightPen, WpfBrush whiteBrush)
@@ -1144,8 +1174,8 @@ namespace GenOffice.UI
             using (var ctx = bubble.Open())
             {
                 ctx.BeginFigure(new WpfPoint(pad, pad + 2), true, true);
-                ctx.LineTo(new WpfPoint(w - pad - 3, pad + 2), true, true);
-                ctx.LineTo(new WpfPoint(w - pad - 3, h * 0.68), true, true);
+                ctx.LineTo(new WpfPoint(w - pad, pad + 2), true, true);
+                ctx.LineTo(new WpfPoint(w - pad, h * 0.68), true, true);
                 ctx.LineTo(new WpfPoint(w * 0.45, h * 0.68), true, true);
                 ctx.LineTo(new WpfPoint(pad + 2, h - pad), true, true);
                 ctx.LineTo(new WpfPoint(pad + 4, h * 0.68), true, true);
@@ -1153,20 +1183,12 @@ namespace GenOffice.UI
             }
             dc.DrawGeometry(whiteBrush, priPen, bubble);
 
-            // Dấu cộng xanh lá ở góc trên phải
-            WpfPen greenPen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(16, 124, 65)), 1.4)
-            {
-                StartLineCap = System.Windows.Media.PenLineCap.Round,
-                EndLineCap = System.Windows.Media.PenLineCap.Round
-            };
-            double gx = w - pad - 1;
-            double gy = pad + 3;
-            // 2 dòng text bên trong
-            dc.DrawLine(lightPen, new WpfPoint(pad + 4, h * 0.32), new WpfPoint(w - pad - 6, h * 0.32));
-            dc.DrawLine(lightPen, new WpfPoint(pad + 4, h * 0.48), new WpfPoint(w - pad - 9, h * 0.48));
+            // 2 dòng text bên trong đồng bộ thanh nhã
+            dc.DrawLine(lightPen, new WpfPoint(pad + 4, h * 0.32), new WpfPoint(w - pad - 4, h * 0.32));
+            dc.DrawLine(lightPen, new WpfPoint(pad + 4, h * 0.48), new WpfPoint(w - pad - 7, h * 0.48));
         }
 
-        // 21. Text Box (Hộp văn bản chữ A xanh lam chuẩn MS 365 Image 2)
+        // 21. Text Box (Hộp văn bản chữ A sắc nét, màu sắc tối giản)
         private static void DrawTextBox(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfBrush accBrush, WpfBrush whiteBrush)
@@ -1175,23 +1197,21 @@ namespace GenOffice.UI
             WpfRect rect = new WpfRect(pad, pad, w - pad * 2, h - pad * 2);
             dc.DrawRoundedRectangle(whiteBrush, priPen, rect, 2, 2);
 
-            // Chữ A màu xanh lam (#0078D4)
+            // Chữ A sắc nét tông slate đồng bộ ribbon
             double cx = w / 2.0;
             double cy = h / 2.0;
-            WpfBrush blueBrush = new WpfSolidColorBrush(WpfColor.FromRgb(0, 120, 212));
-            WpfPen bluePen = new WpfPen(blueBrush, 1.8) { StartLineCap = System.Windows.Media.PenLineCap.Round, EndLineCap = System.Windows.Media.PenLineCap.Round };
             WpfStreamGeometry letterA = new WpfStreamGeometry();
             using (var ctx = letterA.Open())
             {
-                ctx.BeginFigure(new WpfPoint(cx - 5, cy + 6), false, false);
-                ctx.LineTo(new WpfPoint(cx, cy - 6), true, true);
-                ctx.LineTo(new WpfPoint(cx + 5, cy + 6), true, true);
+                ctx.BeginFigure(new WpfPoint(cx - 4.5, cy + 5.5), false, false);
+                ctx.LineTo(new WpfPoint(cx, cy - 5.5), true, true);
+                ctx.LineTo(new WpfPoint(cx + 4.5, cy + 5.5), true, true);
             }
-            dc.DrawGeometry(null, bluePen, letterA);
-            dc.DrawLine(new WpfPen(blueBrush, 1.6), new WpfPoint(cx - 3, cy + 2), new WpfPoint(cx + 3, cy + 2));
+            dc.DrawGeometry(null, priPen, letterA);
+            dc.DrawLine(priPen, new WpfPoint(cx - 2.5, cy + 1.8), new WpfPoint(cx + 2.5, cy + 1.8));
         }
 
-        // 22. Header & Footer (Đầu trang & Chân trang)
+        // 22. Header & Footer (Đầu trang & Chân trang - Bản mẫu tài liệu thanh nhã)
         private static void DrawHeaderFooter(
             WpfDrawingContext dc, int w, int h,
             WpfPen priPen, WpfBrush accBrush, WpfBrush whiteBrush)
@@ -1200,26 +1220,36 @@ namespace GenOffice.UI
             WpfRect doc = new WpfRect(pad, pad, w - pad * 2, h - pad * 2);
             dc.DrawRoundedRectangle(whiteBrush, priPen, doc, 2, 2);
 
-            // Dải đầu trang cam đất
-            dc.DrawRoundedRectangle(new WpfSolidColorBrush(WpfColor.FromRgb(210, 71, 38)), null, new WpfRect(doc.Left + 2, doc.Top + 2, doc.Width - 4, 3), 1, 1);
-            // Dải chân trang cam đất
-            dc.DrawRoundedRectangle(new WpfSolidColorBrush(WpfColor.FromRgb(210, 71, 38)), null, new WpfRect(doc.Left + 2, doc.Bottom - 5, doc.Width - 4, 3), 1, 1);
+            // Dải đầu trang & chân trang thanh lịch
+            WpfBrush headerBrush = new WpfSolidColorBrush(WpfColor.FromRgb(100, 116, 139));
+            dc.DrawRoundedRectangle(headerBrush, null, new WpfRect(doc.Left + 3, doc.Top + 3, doc.Width - 6, 2.5), 1, 1);
+            dc.DrawRoundedRectangle(headerBrush, null, new WpfRect(doc.Left + 3, doc.Bottom - 5.5, doc.Width - 6, 2.5), 1, 1);
         }
 
-        // 23. WordArt (Chữ A nghiêng xanh lam rỗng viền chuẩn MS 365 Image 2)
+        // 23. WordArt (Chữ A nghiêng nghệ thuật phong cách PowerPoint WordArt thực thụ)
         private static void DrawWordArt(WpfDrawingContext dc, int w, int h, WpfPen priPen, WpfBrush accBrush)
         {
             double cx = w / 2.0;
             double cy = h / 2.0;
-            WpfPen bluePen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(0, 120, 212)), 2.0)
+
+            // Nét bóng đổ WordArt thanh lịch
+            WpfPen shadowPen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromArgb(100, 148, 163, 184)), 2.2)
             {
-                StartLineCap = System.Windows.Media.PenLineCap.Round,
-                EndLineCap = System.Windows.Media.PenLineCap.Round
+                StartLineCap = WpfPenLineCap.Round,
+                EndLineCap = WpfPenLineCap.Round
             };
-            // Nét chữ chính A nghiêng
-            dc.DrawLine(bluePen, new WpfPoint(cx - 5, cy + 7), new WpfPoint(cx + 1, cy - 7));
-            dc.DrawLine(bluePen, new WpfPoint(cx + 1, cy - 7), new WpfPoint(cx + 7, cy + 7));
-            dc.DrawLine(new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(0, 120, 212)), 1.6), new WpfPoint(cx - 2, cy + 2), new WpfPoint(cx + 5, cy + 2));
+            dc.DrawLine(shadowPen, new WpfPoint(cx - 3.5, cy + 8), new WpfPoint(cx + 2.5, cy - 6));
+            dc.DrawLine(shadowPen, new WpfPoint(cx + 2.5, cy - 6), new WpfPoint(cx + 8.5, cy + 8));
+
+            // Nét chữ chính A nghiêng có viền & rỗng kiểu chữ nghệ thuật PPT
+            WpfPen waPen = new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(30, 41, 59)), 2.0)
+            {
+                StartLineCap = WpfPenLineCap.Round,
+                EndLineCap = WpfPenLineCap.Round
+            };
+            dc.DrawLine(waPen, new WpfPoint(cx - 5, cy + 7), new WpfPoint(cx + 1, cy - 7));
+            dc.DrawLine(waPen, new WpfPoint(cx + 1, cy - 7), new WpfPoint(cx + 7, cy + 7));
+            dc.DrawLine(new WpfPen(new WpfSolidColorBrush(WpfColor.FromRgb(2, 132, 199)), 1.8), new WpfPoint(cx - 2, cy + 2), new WpfPoint(cx + 5, cy + 2));
         }
 
         // 24. Equation (Phương trình Pi - π)

@@ -18,3 +18,9 @@ C:\Users\Danh\Desktop\genofficepy\scratch\obj\Debug\net10.0-windows\refint\Visua
 C:\Users\Danh\Desktop\genofficepy\scratch\obj\Debug\net10.0-windows\VisualVerification.pdb
 C:\Users\Danh\Desktop\genofficepy\scratch\obj\Debug\net10.0-windows\VisualVerification.genruntimeconfig.cache
 C:\Users\Danh\Desktop\genofficepy\scratch\obj\Debug\net10.0-windows\ref\VisualVerification.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\Vortice.Direct2D1.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\Vortice.Mathematics.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\Vortice.DirectX.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\SharpGen.Runtime.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\SharpGen.Runtime.COM.dll
+C:\Users\Danh\Desktop\genofficepy\scratch\bin\Debug\net10.0-windows\Vortice.DXGI.dll

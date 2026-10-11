@@ -22,6 +22,30 @@
           }
         }
       },
+      "Vortice.Direct2D1/3.8.3.0": {
+        "runtime": {
+          "Vortice.Direct2D1.dll": {
+            "assemblyVersion": "3.8.3.0",
+            "fileVersion": "3.8.3.0"
+          }
+        }
+      },
+      "Vortice.DirectX/3.8.3.0": {
+        "runtime": {
+          "Vortice.DirectX.dll": {
+            "assemblyVersion": "3.8.3.0",
+            "fileVersion": "3.8.3.0"
+          }
+        }
+      },
+      "Vortice.Mathematics/2.1.1.0": {
+        "runtime": {
+          "Vortice.Mathematics.dll": {
+            "assemblyVersion": "2.1.1.0",
+            "fileVersion": "2.1.1.0"
+          }
+        }
+      },
       "PdfSharp/1.50.5147.0": {
         "runtime": {
           "PdfSharp.dll": {
@@ -35,6 +59,30 @@
           "PdfiumViewer.dll": {
             "assemblyVersion": "2.13.0.0",
             "fileVersion": "2.13.0.0"
+          }
+        }
+      },
+      "SharpGen.Runtime/2.4.2.0": {
+        "runtime": {
+          "SharpGen.Runtime.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "SharpGen.Runtime.COM/2.4.2.0": {
+        "runtime": {
+          "SharpGen.Runtime.COM.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "Vortice.DXGI/3.8.3.0": {
+        "runtime": {
+          "Vortice.DXGI.dll": {
+            "assemblyVersion": "3.8.3.0",
+            "fileVersion": "3.8.3.0"
           }
         }
       }
@@ -51,12 +99,42 @@
       "serviceable": false,
       "sha512": ""
     },
+    "Vortice.Direct2D1/3.8.3.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.DirectX/3.8.3.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.Mathematics/2.1.1.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
     "PdfSharp/1.50.5147.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
     "PdfiumViewer/2.13.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SharpGen.Runtime/2.4.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SharpGen.Runtime.COM/2.4.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.DXGI/3.8.3.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""

@@ -6,9 +6,9 @@ using System.Drawing.Imaging;
 using System.Windows.Forms;
 using System.Diagnostics;
 using System.Threading;
-using GenOffice.Core;
+using ZenQOffice.Core;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Màn hình khởi động phong cách Microsoft Office tối giản, thanh lịch với tông màu trắng (Clean White).
@@ -289,7 +289,7 @@ namespace GenOffice.UI
                 g.DrawString("© 2026 NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sf);
 
                 StringFormat sfLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                g.DrawString("Phiên bản 3.5", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
+                g.DrawString("Phiên bản 4.0", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
             }
         }
 

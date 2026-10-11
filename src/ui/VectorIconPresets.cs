@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     public static class VectorIconPresets
     {

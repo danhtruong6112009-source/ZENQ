@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace GenOffice.Core
+namespace ZenQOffice.Core
 {
     public static class SpeechHelper
     {

@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Bảng gợi ý từ ngữ thông minh dạng popup nổi (IDE-style IntelliSense Autocomplete Box).

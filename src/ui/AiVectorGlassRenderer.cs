@@ -5,7 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace GenOffice.UI
+namespace ZenQOffice.UI
 {
     /// <summary>
     /// Bộ vẽ Vector & Nút bấm / Input Liquid Glass cao cấp chuẩn VisionOS / macOS / GenOffice Theme.

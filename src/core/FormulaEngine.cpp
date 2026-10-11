@@ -5,7 +5,7 @@
 #include <cmath>
 #include <iostream>
 
-namespace GenOffice {
+namespace ZenQOffice {
 
 static std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
@@ -248,4 +248,4 @@ void FormulaEngine::evaluateSheet(SparseMatrix& sheet) {
     }
 }
 
-} // namespace GenOffice
+} // namespace ZenQOffice
