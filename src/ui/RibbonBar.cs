@@ -2945,7 +2945,9 @@ namespace ZenQOffice.UI
             RibbonTopHeight = ribbonTop;
             int tabHeight = ribbonTop;
             int homeTabWidth = (int)Math.Round(120f * dpiScale);
-            int captionButtonsWidth = (int)Math.Round(214f * dpiScale);
+            int btnW = (int)Math.Round(46f * dpiScale);
+            int utilBtnW = (int)Math.Round(38f * dpiScale);
+            int captionButtonsWidth = 3 * btnW + 3 * utilBtnW + (int)Math.Round(8f * dpiScale);
             int docAreaX = homeTabWidth;
             int docAreaW = Math.Max(10, width - docAreaX - captionButtonsWidth - 10);
 

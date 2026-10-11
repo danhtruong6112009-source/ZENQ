@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Net;
@@ -20,10 +21,11 @@ namespace ZenQOffice.Core
     /// ZenQ Connect Server: Máy chủ kết nối không dây PC - Mobile thuần C# siêu nhẹ.
     /// Cho phép bất kỳ điện thoại thông minh nào (iOS Safari, Android Chrome) qua mạng Wi-Fi nội bộ:
     /// 1. Điều khiển chuột / Touchpad đa điểm toàn diện (Click, Right-Click, Double-Click, Scroll, Drag-and-Drop).
-    /// 2. Điều khiển trình chiếu Slide chuyên nghiệp (Next, Prev, Timer, Ghi chú diễn giả live, Màn hình đen/trắng).
-    /// 3. Bút Laser ảo thời gian thực (chiếu điểm laser đỏ trên màn hình máy chiếu từ màn hình cảm ứng điện thoại).
-    /// 4. Bàn vẽ chữ ký số & phác thảo (chèn tức thì 1-chạm vào văn bản Word/Writer, Slide PPTX, hoặc Bảng tính Calc).
-    /// 5. Bàn phím số NumPad & Hộp nhập văn bản tiếng Việt từ xa.
+    /// 2. Xem trực tiếp & chia sẻ màn hình PC trên điện thoại thời gian thực (Screen Mirroring) và chạm điều khiển.
+    /// 3. Điều khiển trình chiếu Slide chuyên nghiệp (Next, Prev, Timer, Ghi chú diễn giả live, Màn hình đen/trắng).
+    /// 4. Bút Laser ảo thời gian thực (chiếu điểm laser đỏ trên màn hình máy chiếu từ màn hình cảm ứng điện thoại).
+    /// 5. Bàn vẽ chữ ký số & phác thảo (chèn tức thì 1-chạm vào văn bản Word/Writer, Slide PPTX, hoặc Bảng tính Calc).
+    /// 6. Bàn phím số NumPad & Hộp nhập văn bản tiếng Việt từ xa.
     /// </summary>
     public class ZenQConnectServer
     {
@@ -51,6 +53,28 @@ namespace ZenQOffice.Core
 
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CURSORINFO
+        {
+            public int cbSize;
+            public int flags;
+            public IntPtr hCursor;
+            public POINT ptScreenPos;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorInfo(out CURSORINFO pci);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetCursorPos(int X, int Y);
 
         private const uint MOUSEEVENTF_MOVE = 0x0001;
         private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
@@ -215,6 +239,103 @@ namespace ZenQOffice.Core
             return ZenQMiniQr.GenerateQr(ActiveUrl, size);
         }
 
+        #region Screen Mirroring
+        private static readonly object _screenCaptureLock = new object();
+        private static byte[] _lastScreenBytes = null;
+        private static DateTime _lastCaptureTime = DateTime.MinValue;
+
+        private static ImageCodecInfo GetEncoder(ImageFormat format)
+        {
+            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
+            foreach (ImageCodecInfo codec in codecs)
+            {
+                if (codec.FormatID == format.Guid)
+                {
+                    return codec;
+                }
+            }
+            return null;
+        }
+
+        public static byte[] CaptureScreenJpeg(int targetW = 960, int targetH = 540, long quality = 60L)
+        {
+            lock (_screenCaptureLock)
+            {
+                // Cache 35ms để phục vụ mượt mà ~20 FPS mà không làm nặng CPU
+                if (_lastScreenBytes != null && (DateTime.UtcNow - _lastCaptureTime).TotalMilliseconds < 35)
+                {
+                    return _lastScreenBytes;
+                }
+
+                try
+                {
+                    Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
+                    using (Bitmap bmpScreen = new Bitmap(screenBounds.Width, screenBounds.Height, PixelFormat.Format32bppRgb))
+                    {
+                        using (Graphics gScreen = Graphics.FromImage(bmpScreen))
+                        {
+                            gScreen.CopyFromScreen(screenBounds.X, screenBounds.Y, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
+
+                            // Vẽ con trỏ chuột thật của Windows lên ảnh
+                            try
+                            {
+                                CURSORINFO pci;
+                                pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
+                                if (GetCursorInfo(out pci) && pci.flags == 1 /* CURSOR_SHOWING */)
+                                {
+                                    using (Icon icon = Icon.FromHandle(pci.hCursor))
+                                    {
+                                        Point cursorPt = new Point(pci.ptScreenPos.x - screenBounds.X, pci.ptScreenPos.y - screenBounds.Y);
+                                        gScreen.DrawIcon(icon, cursorPt.X, cursorPt.Y);
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // Giữ tỉ lệ co giãn màn hình PC
+                        int outW = targetW;
+                        int outH = targetH;
+                        if (outW <= 0 || outH <= 0)
+                        {
+                            outW = 960;
+                            outH = 540;
+                        }
+                        float ratio = Math.Min((float)outW / screenBounds.Width, (float)outH / screenBounds.Height);
+                        int finalW = Math.Max(100, (int)(screenBounds.Width * ratio));
+                        int finalH = Math.Max(100, (int)(screenBounds.Height * ratio));
+
+                        using (Bitmap scaledBmp = new Bitmap(finalW, finalH, PixelFormat.Format24bppRgb))
+                        {
+                            using (Graphics gScaled = Graphics.FromImage(scaledBmp))
+                            {
+                                gScaled.InterpolationMode = InterpolationMode.Bilinear;
+                                gScaled.DrawImage(bmpScreen, 0, 0, finalW, finalH);
+                            }
+
+                            ImageCodecInfo jpgEncoder = GetEncoder(ImageFormat.Jpeg);
+                            using (EncoderParameters encParams = new EncoderParameters(1))
+                            {
+                                encParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+                                using (MemoryStream ms = new MemoryStream())
+                                {
+                                    scaledBmp.Save(ms, jpgEncoder, encParams);
+                                    _lastScreenBytes = ms.ToArray();
+                                    _lastCaptureTime = DateTime.UtcNow;
+                                    return _lastScreenBytes;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    return _lastScreenBytes;
+                }
+            }
+        }
+        #endregion
+
         private async Task AcceptClientsLoop(CancellationToken token)
         {
             while (!token.IsCancellationRequested && IsRunning)
@@ -295,6 +416,43 @@ namespace ZenQOffice.Core
                     byte[] headerBytes = Encoding.UTF8.GetBytes(header);
                     await stream.WriteAsync(headerBytes, 0, headerBytes.Length, token);
                     await stream.WriteAsync(pngBytes, 0, pngBytes.Length, token);
+                }
+                tcpClient.Close();
+                return;
+            }
+
+            // 2.5. Phục vụ hình ảnh chia sẻ màn hình PC trực tiếp: /screen.jpg
+            if (path == "/screen.jpg" || path.StartsWith("/screen.jpg?"))
+            {
+                int targetW = 960;
+                int targetH = 540;
+                long quality = 60L;
+                if (path.Contains("q=hd"))
+                {
+                    targetW = 1280;
+                    targetH = 720;
+                    quality = 72L;
+                }
+                else if (path.Contains("q=fast"))
+                {
+                    targetW = 720;
+                    targetH = 405;
+                    quality = 48L;
+                }
+                byte[] jpegBytes = CaptureScreenJpeg(targetW, targetH, quality);
+                if (jpegBytes != null && jpegBytes.Length > 0)
+                {
+                    string header = "HTTP/1.1 200 OK\r\n" +
+                                   "Content-Type: image/jpeg\r\n" +
+                                   $"Content-Length: {jpegBytes.Length}\r\n" +
+                                   "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                                   "Pragma: no-cache\r\n" +
+                                   "Expires: 0\r\n" +
+                                   "Access-Control-Allow-Origin: *\r\n" +
+                                   "Connection: close\r\n\r\n";
+                    byte[] headerBytes = Encoding.UTF8.GetBytes(header);
+                    await stream.WriteAsync(headerBytes, 0, headerBytes.Length, token);
+                    await stream.WriteAsync(jpegBytes, 0, jpegBytes.Length, token);
                 }
                 tcpClient.Close();
                 return;
@@ -654,6 +812,18 @@ namespace ZenQOffice.Core
                         string dir = dict.ContainsKey("dir") ? dict["dir"]?.ToString() : "in";
                         HandleShortcutCommand(dir == "in" ? "zoom_in" : "zoom_out");
                         break;
+
+                    case "screen_click":
+                        double scX = GetDouble(dict, "x", 0.5);
+                        double scY = GetDouble(dict, "y", 0.5);
+                        string scBtn = dict.ContainsKey("button") ? dict["button"]?.ToString() : "left";
+                        Rectangle pBounds = Screen.PrimaryScreen.Bounds;
+                        int targetX = pBounds.X + (int)Math.Round(scX * pBounds.Width);
+                        int targetY = pBounds.Y + (int)Math.Round(scY * pBounds.Height);
+                        SetCursorPos(targetX, targetY);
+                        Thread.Sleep(10);
+                        MouseClickSim(scBtn);
+                        break;
                 }
             }
             catch { }
@@ -708,8 +878,12 @@ namespace ZenQOffice.Core
 
         private static void ScrollMouseSim(double dx, double dy)
         {
-            int v = (int)Math.Round(dy * 1.5);
-            int h = (int)Math.Round(dx * 1.5);
+            // Tinh chỉnh độ nhạy cuộn: giảm gia tốc và kẹp biên độ tối đa per-event
+            // để tránh bị trôi đi quá xa khi cuộn trên các vùng có smooth animation
+            int v = (int)Math.Round(dy * 0.85);
+            int h = (int)Math.Round(dx * 0.85);
+            v = Math.Max(-120, Math.Min(120, v));
+            h = Math.Max(-120, Math.Min(120, h));
             if (v != 0) mouse_event(MOUSEEVENTF_WHEEL, 0, 0, (uint)v, UIntPtr.Zero);
             if (h != 0) mouse_event(MOUSEEVENTF_HWHEEL, 0, 0, (uint)h, UIntPtr.Zero);
         }
@@ -813,21 +987,28 @@ namespace ZenQOffice.Core
 <title>ZenQ Connect - Điều khiển PC</title>
 <style>
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-body {
+html, body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
     background-color: #0b0f19;
     color: #f1f5f9;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    height: 100vh;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    touch-action: pan-y;
 }
 /* Top Header */
 .header {
     background: #111827;
     border-bottom: 1px solid #1f2937;
-    padding: 10px 14px;
+    padding: 0 12px;
+    height: 42px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -838,12 +1019,12 @@ body {
     align-items: center;
     gap: 8px;
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
     letter-spacing: 0.3px;
 }
 .dot {
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #ef4444;
     transition: background 0.3s;
@@ -859,7 +1040,7 @@ body {
     border-radius: 12px;
     color: #94a3b8;
     border: 1px solid #334155;
-    max-width: 140px;
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -869,51 +1050,61 @@ body {
 .quick-bar {
     background: #0f172a;
     display: flex;
-    padding: 6px 10px;
+    height: 36px;
+    padding: 4px 8px;
     gap: 6px;
     border-bottom: 1px solid #1e293b;
     flex-shrink: 0;
     overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
+.quick-bar::-webkit-scrollbar { display: none; }
 .qbtn {
     background: #1e293b;
     color: #cbd5e1;
     border: 1px solid #334155;
     border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 0 9px;
+    height: 26px;
+    font-size: 11.5px;
     font-weight: 500;
-    white-space: nowrap;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 .qbtn:active { background: #2563eb; color: #fff; transform: scale(0.96); }
 
 /* Main Content Area */
 .tab-content {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     display: none;
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    width: 100%;
 }
 .tab-content.active { display: flex; }
 
 /* TAB 1: TOUCHPAD */
 .touchpad-container {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     display: flex;
-    padding: 10px;
-    gap: 10px;
+    padding: 8px;
+    gap: 8px;
     overflow: hidden;
 }
 .touchpad-pad {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
     border: 1px solid #334155;
-    border-radius: 14px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -929,147 +1120,247 @@ body {
     width: 44px;
     background: #1e293b;
     border: 1px solid #334155;
-    border-radius: 14px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 0;
+    padding: 10px 0;
     color: #94a3b8;
     font-size: 11px;
     font-weight: 600;
     touch-action: none;
+    flex-shrink: 0;
 }
 .scroll-strip:active { background: #2563eb; color: #fff; }
 
 .touchpad-buttons {
     display: flex;
-    padding: 8px 10px 10px 10px;
-    gap: 10px;
+    padding: 6px 8px 8px 8px;
+    gap: 8px;
     flex-shrink: 0;
 }
 .btn-mouse {
     flex: 1;
-    height: 52px;
+    height: 46px;
     border-radius: 10px;
     border: 1px solid #334155;
     background: #1e293b;
     color: #f1f5f9;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 .btn-mouse:active { background: #2563eb; transform: scale(0.98); }
 
-/* TAB 2: SLIDES & LASER */
-.slides-container {
-    flex: 1;
+/* TAB 2: LIVE SCREEN MIRROR */
+.screen-container {
+    flex: 1 1 0%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 12px;
-    gap: 10px;
+    background: #020617;
+    overflow: hidden;
+}
+.screen-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+    flex-shrink: 0;
+}
+.screen-stat {
+    font-size: 11px;
+    font-weight: 600;
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.sbtn {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.sbtn:active { background: #2563eb; color: #fff; }
+.screen-viewport {
+    flex: 1 1 0%;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+}
+#screenLiveImg {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    cursor: crosshair;
+}
+.screen-touch-hint {
+    position: absolute;
+    bottom: 6px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+.screen-bottom-bar {
+    display: flex;
+    padding: 5px 8px;
+    gap: 6px;
+    background: #0f172a;
+    border-top: 1px solid #1e293b;
+    flex-shrink: 0;
+}
+.btn-screen-click {
+    flex: 1;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #f1f5f9;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-screen-click:active { background: #2563eb; }
+
+/* TAB 3: SLIDES & LASER */
+.slides-container {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 8px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 .slide-status-card {
     background: #1e293b;
     border: 1px solid #334155;
-    border-radius: 12px;
-    padding: 10px 14px;
+    border-radius: 10px;
+    padding: 8px 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
 }
-.slide-num { font-size: 18px; font-weight: 700; color: #38bdf8; }
-.slide-timer { font-size: 14px; font-weight: 600; color: #a78bfa; font-variant-numeric: tabular-nums; }
+.slide-num { font-size: 16px; font-weight: 700; color: #38bdf8; }
+.slide-timer { font-size: 13px; font-weight: 600; color: #a78bfa; font-variant-numeric: tabular-nums; }
 .notes-card {
     background: #162032;
     border: 1px solid #2d3b55;
-    border-radius: 12px;
-    padding: 10px 14px;
-    max-height: 110px;
+    border-radius: 10px;
+    padding: 8px 12px;
+    max-height: 90px;
     overflow-y: auto;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.4;
     color: #cbd5e1;
     user-select: text;
     -webkit-user-select: text;
+    flex-shrink: 0;
 }
-.notes-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+.notes-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; }
 .slide-nav-buttons {
     display: flex;
-    gap: 10px;
-    height: 90px;
+    gap: 8px;
+    height: 75px;
+    flex-shrink: 0;
 }
 .btn-slide-nav {
     flex: 1;
-    border-radius: 14px;
+    border-radius: 12px;
     border: none;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
 }
 .btn-prev { background: #334155; color: #f8fafc; }
 .btn-next { background: #2563eb; color: #fff; }
 .btn-slide-nav:active { transform: scale(0.97); }
 
 .laser-pad {
-    height: 130px;
+    height: 110px;
     background: radial-gradient(circle at center, #2d1515 0%, #150a0a 100%);
     border: 2px dashed #ef4444;
-    border-radius: 14px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     color: #fca5a5;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     touch-action: none;
     position: relative;
-    box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+    flex-shrink: 0;
 }
 .laser-pad:active {
     background: radial-gradient(circle at center, #451010 0%, #1a0808 100%);
     border-style: solid;
-    box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
 }
 
 .slide-controls-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    flex-shrink: 0;
 }
 .btn-ctrl {
     flex: 1;
-    padding: 10px 4px;
+    padding: 8px 4px;
     background: #1e293b;
     border: 1px solid #334155;
     border-radius: 8px;
     color: #cbd5e1;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
 }
 .btn-ctrl:active { background: #3b82f6; color: #fff; }
 
-/* TAB 3: SIGNATURE */
+/* TAB 4: SIGNATURE */
 .sign-container {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 10px;
-    gap: 10px;
+    padding: 8px;
+    gap: 8px;
+    overflow: hidden;
 }
 .canvas-wrapper {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     background: #ffffff;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
     touch-action: none;
     position: relative;
@@ -1087,10 +1378,10 @@ body {
     flex-shrink: 0;
     gap: 6px;
 }
-.palette { display: flex; gap: 8px; }
+.palette { display: flex; gap: 6px; }
 .color-dot {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: 2px solid transparent;
     cursor: pointer;
@@ -1100,9 +1391,9 @@ body {
     background: #10b981;
     color: #fff;
     border: none;
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 14px;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     flex: 1;
@@ -1110,17 +1401,19 @@ body {
 }
 .btn-sign-insert:active { transform: scale(0.97); }
 
-/* TAB 4: NUMPAD */
+/* TAB 5: NUMPAD */
 .numpad-container {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 10px;
-    gap: 8px;
+    padding: 8px;
+    gap: 6px;
+    overflow: hidden;
 }
 .text-input-box {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
 }
 .text-input-box input {
@@ -1128,9 +1421,9 @@ body {
     background: #1e293b;
     border: 1px solid #334155;
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     color: #fff;
-    font-size: 15px;
+    font-size: 14px;
     outline: none;
     user-select: text;
     -webkit-user-select: text;
@@ -1140,23 +1433,24 @@ body {
     color: #fff;
     border: none;
     border-radius: 8px;
-    padding: 0 16px;
+    padding: 0 14px;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
 }
 .numpad-grid {
-    flex: 1;
+    flex: 1 1 0%;
+    min-height: 0;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(5, 1fr);
-    gap: 8px;
+    gap: 6px;
 }
 .npbtn {
     background: #1e293b;
     border: 1px solid #334155;
-    border-radius: 10px;
+    border-radius: 8px;
     color: #f1f5f9;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -1165,17 +1459,17 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.25);
 }
 .npbtn:active { background: #3b82f6; transform: scale(0.96); }
-.npbtn.accent { background: #334155; color: #38bdf8; font-size: 17px; }
-.npbtn.enter { background: #2563eb; color: #fff; }
+.npbtn.accent { background: #334155; color: #38bdf8; font-size: 16px; }
+.npbtn.enter { background: #2563eb; color: #fff; font-size: 14px; }
 
 /* Bottom Tab Bar */
 .tab-bar {
     background: #111827;
     border-top: 1px solid #1f2937;
     display: flex;
-    height: 58px;
+    height: 52px;
     flex-shrink: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .tab-item {
     flex: 1;
@@ -1183,15 +1477,15 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     color: #64748b;
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 600;
     cursor: pointer;
     transition: color 0.2s;
 }
 .tab-item.active { color: #38bdf8; }
-.tab-icon { font-size: 20px; }
+.tab-icon { font-size: 17px; }
 </style>
 </head>
 <body>
@@ -1218,9 +1512,9 @@ body {
 <div class=""tab-content active"" id=""tab1"">
     <div class=""touchpad-container"">
         <div class=""touchpad-pad"" id=""touchpadPad"">
-            <span style=""font-size: 28px; margin-bottom: 8px;"">👆</span>
-            <span>Rê ngón tay để di chuyển chuột</span>
-            <span style=""font-size: 11px; margin-top: 4px; color: #475569;"">Chạm 1 ngón = Trái • 2 ngón = Phải & Cuộn</span>
+            <span style=""font-size: 26px; margin-bottom: 6px;"">👆</span>
+            <span>Rê ngón tay để di chuột</span>
+            <span style=""font-size: 11px; margin-top: 3px; color: #475569;"">Chạm 1 ngón = Trái • 2 ngón = Cuộn mượt</span>
         </div>
         <div class=""scroll-strip"" id=""scrollStrip"">
             <span>▲</span>
@@ -1234,16 +1528,39 @@ body {
     </div>
 </div>
 
-<!-- TAB 2: SLIDES & LASER -->
+<!-- TAB 2: LIVE SCREEN MIRROR -->
 <div class=""tab-content"" id=""tab2"">
+    <div class=""screen-container"">
+        <div class=""screen-toolbar"">
+            <div class=""screen-stat"" id=""screenStatBadge"">● LIVE 15 FPS</div>
+            <div style=""display:flex; gap:5px;"">
+                <button class=""sbtn"" id=""btnToggleStream"" onclick=""toggleScreenStream()"">⏸ Dừng</button>
+                <button class=""sbtn"" id=""btnQuality"" onclick=""cycleScreenQuality()"">⚡ Chuẩn</button>
+                <button class=""sbtn"" onclick=""toggleFullscreen()"">⛶ Toàn màn hình</button>
+            </div>
+        </div>
+        <div class=""screen-viewport"" id=""screenViewport"">
+            <img id=""screenLiveImg"" alt=""Màn hình PC..."" />
+            <div class=""screen-touch-hint"">👆 Chạm màn hình để điều khiển PC</div>
+        </div>
+        <div class=""screen-bottom-bar"">
+            <button class=""btn-screen-click"" onclick=""sendScreenClick('left')"">🖱️ Nhấp Trái</button>
+            <button class=""btn-screen-click"" onclick=""sendScreenClick('double')"">🖱️ Nhấp Đúp</button>
+            <button class=""btn-screen-click"" onclick=""sendScreenClick('right')"">🖱️ Nhấp Phải</button>
+        </div>
+    </div>
+</div>
+
+<!-- TAB 3: SLIDES & LASER -->
+<div class=""tab-content"" id=""tab3"">
     <div class=""slides-container"">
         <div class=""slide-status-card"">
             <div>
-                <div style=""font-size: 11px; color: #94a3b8;"">SLIDE HIỆN TẠI</div>
+                <div style=""font-size: 10px; color: #94a3b8;"">SLIDE HIỆN TẠI</div>
                 <div class=""slide-num"" id=""slideNumText"">Slide 1 / 1</div>
             </div>
             <div style=""text-align: right;"">
-                <div style=""font-size: 11px; color: #94a3b8;"">THỜI GIAN</div>
+                <div style=""font-size: 10px; color: #94a3b8;"">THỜI GIAN</div>
                 <div class=""slide-timer"" id=""slideTimerText"">00:00</div>
             </div>
         </div>
@@ -1265,9 +1582,9 @@ body {
         </div>
 
         <div class=""laser-pad"" id=""laserPad"">
-            <span style=""font-size: 26px; margin-bottom: 4px;"">🔴</span>
+            <span style=""font-size: 24px; margin-bottom: 3px;"">🔴</span>
             <span>BÚT LASER ẢO</span>
-            <span style=""font-size: 11px; opacity: 0.8;"">Giữ & rê ngón tay để chiếu tia đỏ lên PC</span>
+            <span style=""font-size: 10.5px; opacity: 0.8;"">Giữ & rê ngón tay để chiếu tia đỏ lên PC</span>
         </div>
 
         <div class=""slide-controls-row"">
@@ -1278,8 +1595,8 @@ body {
     </div>
 </div>
 
-<!-- TAB 3: SIGNATURE & DRAWING -->
-<div class=""tab-content"" id=""tab3"">
+<!-- TAB 4: SIGNATURE & DRAWING -->
+<div class=""tab-content"" id=""tab4"">
     <div class=""sign-container"">
         <div class=""canvas-wrapper"" id=""canvasWrapper"">
             <canvas id=""signCanvas""></canvas>
@@ -1296,8 +1613,8 @@ body {
     </div>
 </div>
 
-<!-- TAB 4: NUMPAD & INPUT -->
-<div class=""tab-content"" id=""tab4"">
+<!-- TAB 5: NUMPAD & INPUT -->
+<div class=""tab-content"" id=""tab5"">
     <div class=""numpad-container"">
         <div class=""text-input-box"">
             <input type=""text"" id=""typeInput"" placeholder=""Nhập văn bản gửi sang PC..."" autocomplete=""off"">
@@ -1339,14 +1656,18 @@ body {
         <span>Touchpad</span>
     </div>
     <div class=""tab-item"" onclick=""switchTab(2)"">
+        <div class=""tab-icon"">🖥️</div>
+        <span>Màn Hình</span>
+    </div>
+    <div class=""tab-item"" onclick=""switchTab(3)"">
         <div class=""tab-icon"">📽️</div>
         <span>Trình Chiếu</span>
     </div>
-    <div class=""tab-item"" onclick=""switchTab(3)"">
+    <div class=""tab-item"" onclick=""switchTab(4)"">
         <div class=""tab-icon"">✍️</div>
         <span>Chữ Ký</span>
     </div>
-    <div class=""tab-item"" onclick=""switchTab(4)"">
+    <div class=""tab-item"" onclick=""switchTab(5)"">
         <div class=""tab-icon"">🔢</div>
         <span>Bàn Phím</span>
     </div>
@@ -1355,6 +1676,7 @@ body {
 <script>
 let ws = null;
 let isConnected = false;
+let currentTab = 1;
 
 function vibe(ms = 20) {
     if (navigator.vibrate) {
@@ -1373,7 +1695,6 @@ function connectWs() {
         document.getElementById('modeBadge').textContent = 'Đã kết nối PC';
         vibe(30);
 
-        // Gửi thông tin thiết bị
         let device = navigator.userAgent.includes('iPhone') ? 'iPhone' :
                     (navigator.userAgent.includes('iPad') ? 'iPad' :
                     (navigator.userAgent.includes('Android') ? 'Android' : 'Mobile Web'));
@@ -1440,13 +1761,19 @@ function sendTypedText() {
 // Chuyển Tab
 function switchTab(idx) {
     vibe(15);
+    currentTab = idx;
     document.querySelectorAll('.tab-content').forEach((el, i) => {
         el.classList.toggle('active', i === idx - 1);
     });
     document.querySelectorAll('.tab-item').forEach((el, i) => {
         el.classList.toggle('active', i === idx - 1);
     });
-    if (idx === 3) initCanvasSize();
+    if (idx === 2) {
+        startScreenStream();
+    } else {
+        stopScreenStream();
+    }
+    if (idx === 4) initCanvasSize();
 }
 
 // Cập nhật trạng thái trình chiếu & app
@@ -1486,13 +1813,17 @@ function updateAppStatus(data) {
     }
 }
 
-// Xử lý Touchpad
+// ============================================
+// TOUCHPAD & CHUỘT CẢM ỨNG (KHẮC PHỤC NHẢY CHUỘT & CUỘN QUÁ NHANH)
+// ============================================
 const pad = document.getElementById('touchpadPad');
 let lastTouchX = 0, lastTouchY = 0;
+let lastTouchCount = 0;
 let touchStartTime = 0;
 let isTouchMoved = false;
 
 pad.addEventListener('touchstart', (e) => {
+    lastTouchCount = e.touches.length;
     if (e.touches.length === 1) {
         lastTouchX = e.touches[0].clientX;
         lastTouchY = e.touches[0].clientY;
@@ -1506,6 +1837,20 @@ pad.addEventListener('touchstart', (e) => {
 
 pad.addEventListener('touchmove', (e) => {
     e.preventDefault();
+    // Nếu số ngón tay thay đổi (ví dụ từ 2 ngón về 1 ngón hoặc ngược lại):
+    // Cập nhật lại tọa độ mốc ngay lập tức, không sinh delta để tránh chuột bị văng xa
+    if (e.touches.length !== lastTouchCount) {
+        lastTouchCount = e.touches.length;
+        if (e.touches.length === 1) {
+            lastTouchX = e.touches[0].clientX;
+            lastTouchY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            lastTouchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            lastTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
+        return;
+    }
+
     if (e.touches.length === 1) {
         const cx = e.touches[0].clientX;
         const cy = e.touches[0].clientY;
@@ -1514,15 +1859,18 @@ pad.addEventListener('touchmove', (e) => {
         lastTouchX = cx;
         lastTouchY = cy;
 
-        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        // Bỏ qua nhiễu micro-jitter < 0.4px
+        if (Math.abs(dx) > 0.4 || Math.abs(dy) > 0.4) {
             isTouchMoved = true;
-            send({ type: 'mouse_move', dx: dx, dy: dy, sens: 1.8 });
+            send({ type: 'mouse_move', dx: dx, dy: dy, sens: 1.6 });
         }
     } else if (e.touches.length === 2) {
         const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         const dy = cy - lastTouchY;
         lastTouchY = cy;
-        send({ type: 'mouse_scroll', dx: 0, dy: dy * 1.5 });
+        // Dịu tốc độ cuộn: dùng hệ số dịu 0.55 và kẹp biên độ tối đa để tránh bay xa ở vùng animation
+        let clampedDy = Math.max(-25, Math.min(25, dy * 0.55));
+        send({ type: 'mouse_scroll', dx: 0, dy: clampedDy });
     }
 }, { passive: false });
 
@@ -1532,6 +1880,13 @@ pad.addEventListener('touchend', (e) => {
         if (!isTouchMoved && duration < 250) {
             sendClick('left');
         }
+        lastTouchCount = 0;
+    } else if (e.touches.length === 1) {
+        // Vẫn còn 1 ngón trên màn hình: reset mốc tọa độ ngay về ngón này
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+        lastTouchCount = 1;
+        isTouchMoved = true;
     }
 });
 
@@ -1546,10 +1901,116 @@ strip.addEventListener('touchmove', (e) => {
     const cy = e.touches[0].clientY;
     const dy = cy - lastStripY;
     lastStripY = cy;
-    send({ type: 'mouse_scroll', dx: 0, dy: dy * 2.2 });
+    // Giảm tốc độ và kẹp biên độ tối đa
+    let clampedDy = Math.max(-28, Math.min(28, dy * 0.7));
+    send({ type: 'mouse_scroll', dx: 0, dy: clampedDy });
 }, { passive: false });
 
-// Bút Laser Ảo
+// ============================================
+// CHIA SẺ MÀN HÌNH PC TRỰC TIẾP (SCREEN MIRRORING)
+// ============================================
+let screenStreaming = false;
+let screenQualityMode = 'normal'; // normal, fast, hd
+let screenFps = 15;
+let screenRafId = null;
+const screenImg = document.getElementById('screenLiveImg');
+
+function toggleScreenStream() {
+    vibe(20);
+    const btn = document.getElementById('btnToggleStream');
+    if (screenStreaming) {
+        stopScreenStream();
+        btn.textContent = '▶ Tiếp tục';
+        document.getElementById('screenStatBadge').textContent = '⏸ Tạm dừng';
+        document.getElementById('screenStatBadge').style.color = '#f59e0b';
+    } else {
+        startScreenStream();
+        btn.textContent = '⏸ Dừng';
+        document.getElementById('screenStatBadge').textContent = '● LIVE 15 FPS';
+        document.getElementById('screenStatBadge').style.color = '#10b981';
+    }
+}
+
+function cycleScreenQuality() {
+    vibe(20);
+    const btn = document.getElementById('btnQuality');
+    if (screenQualityMode === 'normal') {
+        screenQualityMode = 'hd';
+        btn.textContent = '🌟 HD 720p';
+        screenFps = 12;
+    } else if (screenQualityMode === 'hd') {
+        screenQualityMode = 'fast';
+        btn.textContent = '⚡ Siêu nhanh';
+        screenFps = 20;
+    } else {
+        screenQualityMode = 'normal';
+        btn.textContent = '⚡ Chuẩn';
+        screenFps = 15;
+    }
+}
+
+function toggleFullscreen() {
+    vibe(20);
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(()=>{});
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+    }
+}
+
+function startScreenStream() {
+    if (screenStreaming) return;
+    screenStreaming = true;
+    requestNextScreenFrame();
+}
+
+function stopScreenStream() {
+    screenStreaming = false;
+    if (screenRafId) {
+        clearTimeout(screenRafId);
+        screenRafId = null;
+    }
+}
+
+function requestNextScreenFrame() {
+    if (!screenStreaming || currentTab !== 2) return;
+    const nextImg = new Image();
+    const t = Date.now();
+    let qParam = (screenQualityMode === 'hd') ? 'hd' : ((screenQualityMode === 'fast') ? 'fast' : 'normal');
+
+    nextImg.onload = function() {
+        if (screenStreaming && currentTab === 2) {
+            screenImg.src = nextImg.src;
+            screenRafId = setTimeout(requestNextScreenFrame, 1000 / screenFps);
+        }
+    };
+    nextImg.onerror = function() {
+        if (screenStreaming && currentTab === 2) {
+            screenRafId = setTimeout(requestNextScreenFrame, 500);
+        }
+    };
+    nextImg.src = '/screen.jpg?q=' + qParam + '&t=' + t;
+}
+
+// Chạm trực tiếp vào ảnh màn hình PC để điều khiển chuột từ xa
+screenImg.addEventListener('click', (e) => {
+    vibe(25);
+    const rect = screenImg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const ny = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    send({ type: 'screen_click', x: nx, y: ny, button: 'left' });
+});
+
+function sendScreenClick(button) {
+    vibe(25);
+    // Nhấp chuột tại vị trí hiện tại
+    send({ type: 'mouse_click', button: button });
+}
+
+// ============================================
+// BÚT LASER ẢO & TRÌNH CHIẾU
+// ============================================
 const laserPad = document.getElementById('laserPad');
 laserPad.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -1570,7 +2031,9 @@ function sendLaser(touch, active) {
     send({ type: 'laser_pointer', active: active, x: normX, y: normY });
 }
 
-// Chữ Ký & Vẽ Tay Canvas
+// ============================================
+// CHỮ KÝ & VẼ TAY CANVAS
+// ============================================
 const canvas = document.getElementById('signCanvas');
 const ctx = canvas.getContext('2d');
 let drawing = false;
@@ -1578,6 +2041,7 @@ let penColor = '#0f4c81';
 
 function initCanvasSize() {
     const wrapper = document.getElementById('canvasWrapper');
+    if (!wrapper) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = wrapper.clientWidth * dpr;
     canvas.height = wrapper.clientHeight * dpr;

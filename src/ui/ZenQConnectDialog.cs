@@ -28,7 +28,7 @@ namespace ZenQOffice.UI
         public ZenQConnectDialog()
         {
             Text = "ZenQ Connect - Điều khiển Không dây từ Mobile";
-            ClientSize = new Size(660, 560);
+            ClientSize = new Size(660, 585);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -117,13 +117,13 @@ namespace ZenQOffice.UI
             Panel body = new Panel
             {
                 Location = new Point(0, 52),
-                Size = new Size(660, 448),
+                Size = new Size(660, 472),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
             Controls.Add(body);
 
             // Cột Trái: Mã QR & Liên kết (Rộng 280)
-            Panel cardQr = CreateCard(new Point(16, 12), new Size(270, 424));
+            Panel cardQr = CreateCard(new Point(16, 12), new Size(270, 448));
             body.Controls.Add(cardQr);
 
             Label lblQrHeader = new Label
@@ -197,7 +197,7 @@ namespace ZenQOffice.UI
             cardQr.Controls.Add(lblQrNote);
 
             // Cột Phải: Cấu hình Mạng & Tính năng Toàn năng (Rộng 340)
-            Panel cardConfig = CreateCard(new Point(296, 12), new Size(348, 424));
+            Panel cardConfig = CreateCard(new Point(296, 12), new Size(348, 448));
             body.Controls.Add(cardConfig);
 
             // Nhóm 1: Trạng thái & Card mạng
@@ -292,24 +292,27 @@ namespace ZenQOffice.UI
                 Text = "TÍNH NĂNG ĐIỀU KHIỂN TOÀN DIỆN (TOÀN ỨNG DỤNG)",
                 Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(14, 114),
+                Location = new Point(14, 112),
                 AutoSize = true
             };
             cardConfig.Controls.Add(lblFeaturesHeader);
 
-            int itemY = 136;
+            int itemY = 134;
             itemY = AddFeatureRow(cardConfig, itemY, '\uE962', Color.FromArgb(14, 165, 233), Color.FromArgb(240, 249, 255),
                 "Touchpad & Chuột cảm ứng",
-                "Rê chuột mượt mà, chạm 1 ngón = Nhấp trái, 2 ngón = Nhấp phải & Cuộn trang trong Writer, Calc, Slides.");
+                "Rê chuột mượt mà, chạm 1 ngón = Trái, 2 ngón = Cuộn mượt chống giật nhảy con trỏ.");
+            itemY = AddFeatureRow(cardConfig, itemY, '\uE7F4', Color.FromArgb(37, 99, 235), Color.FromArgb(239, 246, 255),
+                "Màn hình PC trực tiếp (Screen Mirror)",
+                "Xem trực tiếp màn hình PC trên điện thoại (15-20 FPS) và chạm để điều khiển từ xa.");
             itemY = AddFeatureRow(cardConfig, itemY, '\uE714', Color.FromArgb(234, 88, 12), Color.FromArgb(255, 247, 237),
                 "Diễn giả Slide & Bút Laser",
-                "Chuyển slide, đọc Ghi chú diễn giả trực tiếp trên điện thoại, đồng hồ đếm giờ và chiếu Bút Laser đỏ thời gian thực.");
+                "Chuyển slide, đọc Ghi chú diễn giả live, đồng hồ đếm giờ và chiếu Bút Laser đỏ.");
             itemY = AddFeatureRow(cardConfig, itemY, '\uED5F', Color.FromArgb(16, 185, 129), Color.FromArgb(236, 253, 245),
                 "Chữ ký số & Bản vẽ tay",
-                "Ký tên hoặc vẽ phác thảo trên màn hình điện thoại và bấm 'Chèn vào PC' để chèn tức thì vào tài liệu đang mở.");
+                "Ký tên hoặc vẽ trên điện thoại và bấm 'Chèn vào PC' để chèn tức thì vào tài liệu.");
             itemY = AddFeatureRow(cardConfig, itemY, '\uE765', Color.FromArgb(147, 51, 234), Color.FromArgb(250, 245, 255),
                 "Bàn phím số NumPad & Gõ chữ",
-                "Bàn phím số cho bảng tính Calc và hộp nhập liệu tiếng Việt Unicode gửi trực tiếp vào văn bản PC.");
+                "Bàn phím số cho Calc và nhập liệu tiếng Việt Unicode gửi trực tiếp vào PC.");
 
             // 3. Footer Bar
             Panel footer = new Panel
@@ -394,11 +397,11 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 8f),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(54, y + 20),
-                Size = new Size(280, 36)
+                Size = new Size(280, 32)
             };
             parent.Controls.Add(lblDesc);
 
-            return y + 62;
+            return y + 58;
         }
 
         private static GraphicsPath CreateRoundedRectanglePath(Rectangle rect, int radius)
