@@ -2687,7 +2687,7 @@ namespace ZenQOffice.UI
                 SizeF statusSz = g.MeasureString(isModified ? " • Đã sửa đổi" : " - Đã lưu", titleFont);
                 float totalW = titleSz.Width + statusSz.Width;
                 float startX = (width - totalW) / 2;
-                int maxRight = width - (int)Math.Round(214f * dpiScale) - 10;
+                int maxRight = width - (int)Math.Round(252f * dpiScale) - 10;
                 if (startX > curX && startX + totalW < maxRight)
                 {
                     float tY = (ribbonTop - titleSz.Height) / 2;

@@ -998,29 +998,72 @@ namespace ZenQOffice.UI
                 try
                 {
                     bool is32Rgb = (bmp.PixelFormat == System.Drawing.Imaging.PixelFormat.Format32bppRgb);
-                    var lockFormat = is32Rgb
-                        ? System.Drawing.Imaging.PixelFormat.Format32bppRgb
-                        : System.Drawing.Imaging.PixelFormat.Format32bppPArgb;
-                    var alphaMode = is32Rgb ? AlphaMode.Ignore : AlphaMode.Premultiplied;
-
-                    var data = bmp.LockBits(
-                        new Rectangle(0, 0, bmp.Width, bmp.Height),
-                        System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                        lockFormat
-                    );
-                    try
+                    if (is32Rgb)
                     {
-                        var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, alphaMode));
-                        createdBmp = _renderTarget.CreateBitmap(
-                            new Vortice.Mathematics.SizeI(bmp.Width, bmp.Height),
-                            data.Scan0,
-                            (uint)data.Stride,
-                            props
-                        );
+                        using (var clone = new Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                        {
+                            var srcData = bmp.LockBits(
+                                new Rectangle(0, 0, bmp.Width, bmp.Height),
+                                System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                                System.Drawing.Imaging.PixelFormat.Format32bppRgb
+                            );
+                            var dstData = clone.LockBits(
+                                new Rectangle(0, 0, clone.Width, clone.Height),
+                                System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                                System.Drawing.Imaging.PixelFormat.Format32bppPArgb
+                            );
+                            try
+                            {
+                                unsafe
+                                {
+                                    int w = bmp.Width;
+                                    int h = bmp.Height;
+                                    for (int y = 0; y < h; y++)
+                                    {
+                                        uint* pSrc = (uint*)IntPtr.Add(srcData.Scan0, y * srcData.Stride);
+                                        uint* pDst = (uint*)IntPtr.Add(dstData.Scan0, y * dstData.Stride);
+                                        for (int x = 0; x < w; x++)
+                                        {
+                                            pDst[x] = pSrc[x] | 0xFF000000;
+                                        }
+                                    }
+                                }
+                                var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
+                                createdBmp = _renderTarget.CreateBitmap(
+                                    new Vortice.Mathematics.SizeI(clone.Width, clone.Height),
+                                    dstData.Scan0,
+                                    (uint)dstData.Stride,
+                                    props
+                                );
+                            }
+                            finally
+                            {
+                                bmp.UnlockBits(srcData);
+                                clone.UnlockBits(dstData);
+                            }
+                        }
                     }
-                    finally
+                    else
                     {
-                        bmp.UnlockBits(data);
+                        var data = bmp.LockBits(
+                            new Rectangle(0, 0, bmp.Width, bmp.Height),
+                            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                            System.Drawing.Imaging.PixelFormat.Format32bppPArgb
+                        );
+                        try
+                        {
+                            var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
+                            createdBmp = _renderTarget.CreateBitmap(
+                                new Vortice.Mathematics.SizeI(bmp.Width, bmp.Height),
+                                data.Scan0,
+                                (uint)data.Stride,
+                                props
+                            );
+                        }
+                        finally
+                        {
+                            bmp.UnlockBits(data);
+                        }
                     }
                 }
                 catch

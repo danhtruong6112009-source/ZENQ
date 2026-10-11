@@ -3038,7 +3038,36 @@ namespace ZenQOffice.UI
                 Cursor = Cursors.Default;
                 Cursor.Current = Cursors.Default;
 
-                if (e.Y <= 155 && Ribbon.CurrentMode != OfficeAppMode.Home)
+                if (Ribbon != null)
+                {
+                    if ((!Ribbon.CaptionCloseBounds.IsEmpty && Ribbon.CaptionCloseBounds.Contains(e.Location)) ||
+                        (!Ribbon.CaptionMaxBounds.IsEmpty && Ribbon.CaptionMaxBounds.Contains(e.Location)) ||
+                        (!Ribbon.CaptionMinBounds.IsEmpty && Ribbon.CaptionMinBounds.Contains(e.Location)) ||
+                        (!Ribbon.CaptionTouchModeBounds.IsEmpty && Ribbon.CaptionTouchModeBounds.Contains(e.Location)) ||
+                        (!Ribbon.CaptionPeripheralsBounds.IsEmpty && Ribbon.CaptionPeripheralsBounds.Contains(e.Location)) ||
+                        (!Ribbon.CaptionMobileConnectBounds.IsEmpty && Ribbon.CaptionMobileConnectBounds.Contains(e.Location)) ||
+                        (!Ribbon.DocTabScrollLeftBounds.IsEmpty && Ribbon.DocTabScrollLeftBounds.Contains(e.Location)) ||
+                        (!Ribbon.DocTabScrollRightBounds.IsEmpty && Ribbon.DocTabScrollRightBounds.Contains(e.Location)) ||
+                        (!Ribbon.DocTabPlusBounds.IsEmpty && Ribbon.DocTabPlusBounds.Contains(e.Location)))
+                    {
+                        Cursor = Cursors.Hand;
+                        Cursor.Current = Cursors.Hand;
+                    }
+                    else if (Ribbon.DocTabBounds != null)
+                    {
+                        for (int t = 0; t < Ribbon.DocTabBounds.Count; t++)
+                        {
+                            if (Ribbon.DocTabBounds[t].Contains(e.Location))
+                            {
+                                Cursor = Cursors.Hand;
+                                Cursor.Current = Cursors.Hand;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (e.Y <= 155 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
                 {
                     if ((!Ribbon.RibbonToggleStyleBounds.IsEmpty && Ribbon.RibbonToggleStyleBounds.Contains(e.Location)) ||
                         (!Ribbon.RibbonFileBtnBounds.IsEmpty && Ribbon.RibbonFileBtnBounds.Contains(e.Location)))
@@ -3181,6 +3210,15 @@ namespace ZenQOffice.UI
             {
                 Ribbon.CancelTabDrag();
             }
+
+            if (SlidesView != null && SlidesView.IsPresenting)
+            {
+                SlidesView.HandleMouseUp(e.Location, ClientSize.Width, ClientSize.Height);
+                Invalidate();
+                if (_audienceForm != null) _audienceForm.Invalidate();
+                return;
+            }
+
             if (Ribbon.CurrentMode == OfficeAppMode.Home)
             {
                 HomeView.HandleScrollBarMouseUp();

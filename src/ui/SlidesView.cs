@@ -22039,8 +22039,10 @@ namespace ZenQOffice.UI
                     IsEditingSpeakerNotes = false;
 
                     // Kiểm tra nhấp vào Thanh điều khiển Video nổi (Video Floating Playback Bar) trong Presenter View
-                    if (buttons == MouseButtons.Left && !LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && HoveredVideoShape != null)
+                    ShapeNode targetVideoInPres = HoveredVideoShape ?? SlideVideoPlayerManager.Instance.ActiveShape;
+                    if (buttons == MouseButtons.Left && !LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && targetVideoInPres != null)
                     {
+                        HoveredVideoShape = targetVideoInPres;
                         float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
                         float barW = LastVideoPlaybackBarBounds.Width;
                         float playBtnW = 32f;
@@ -22051,19 +22053,10 @@ namespace ZenQOffice.UI
 
                         if (relX < playBtnW)
                         {
-                            SlideVideoPlayerManager.Instance.TogglePlay(HoveredVideoShape, parentControl, default(Rectangle), true, () =>
+                            SlideVideoPlayerManager.Instance.TogglePlay(targetVideoInPres, parentControl, default(Rectangle), true, () =>
                             {
                                 if (InvalidateCallback != null) InvalidateCallback();
                             });
-                            if (parentControl != null) parentControl.Invalidate();
-                            return;
-                        }
-                        else if (relX >= scrubX && relX <= scrubX + scrubW)
-                        {
-                            IsDraggingVideoScrubber = true;
-                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
-                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
-                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
                             if (parentControl != null) parentControl.Invalidate();
                             return;
                         }
@@ -22073,6 +22066,16 @@ namespace ZenQOffice.UI
                             if (parentControl != null) parentControl.Invalidate();
                             return;
                         }
+                        else if (relX >= playBtnW && relX <= barW - volBtnW - (timeTextW > 0 ? timeTextW : 0f))
+                        {
+                            IsDraggingVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = targetVideoInPres.VideoTotalTime > 0 ? targetVideoInPres.VideoTotalTime : 120f;
+                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        return; // Prevent slide advance when clicking anywhere on the floating bar
                     }
 
                     // Kiểm tra nhấp vào Thanh điều khiển Âm thanh nổi (Audio Floating Playback Bar) trong Presenter View
@@ -22310,8 +22313,10 @@ namespace ZenQOffice.UI
                 if (buttons == MouseButtons.Left)
                 {
                     // Check if clicked the Video Floating Playback Bar in Presentation Mode
-                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && HoveredVideoShape != null)
+                    ShapeNode targetVideoInFs = HoveredVideoShape ?? SlideVideoPlayerManager.Instance.ActiveShape;
+                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && targetVideoInFs != null)
                     {
+                        HoveredVideoShape = targetVideoInFs;
                         float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
                         float barW = LastVideoPlaybackBarBounds.Width;
                         float playBtnW = 32f;
@@ -22322,19 +22327,10 @@ namespace ZenQOffice.UI
 
                         if (relX < playBtnW)
                         {
-                            SlideVideoPlayerManager.Instance.TogglePlay(HoveredVideoShape, parentControl, default(Rectangle), true, () =>
+                            SlideVideoPlayerManager.Instance.TogglePlay(targetVideoInFs, parentControl, default(Rectangle), true, () =>
                             {
                                 if (InvalidateCallback != null) InvalidateCallback();
                             });
-                            if (parentControl != null) parentControl.Invalidate();
-                            return;
-                        }
-                        else if (relX >= scrubX && relX <= scrubX + scrubW)
-                        {
-                            IsDraggingVideoScrubber = true;
-                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
-                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
-                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
                             if (parentControl != null) parentControl.Invalidate();
                             return;
                         }
@@ -22344,6 +22340,16 @@ namespace ZenQOffice.UI
                             if (parentControl != null) parentControl.Invalidate();
                             return;
                         }
+                        else if (relX >= playBtnW && relX <= barW - volBtnW - (timeTextW > 0 ? timeTextW : 0f))
+                        {
+                            IsDraggingVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = targetVideoInFs.VideoTotalTime > 0 ? targetVideoInFs.VideoTotalTime : 120f;
+                            SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                        return; // Prevent slide advance when clicking anywhere on the floating bar
                     }
 
                     // Check if clicked the Audio Floating Playback Bar in Fullscreen Presentation Mode
@@ -24279,21 +24285,25 @@ namespace ZenQOffice.UI
                         if (InvalidateCallback != null) InvalidateCallback();
                     }
                 }
-                else if (IsDraggingVideoScrubber && prevHoveredVideo != null && !LastVideoPlaybackBarBounds.IsEmpty)
+                else if (IsDraggingVideoScrubber && !LastVideoPlaybackBarBounds.IsEmpty)
                 {
-                    HoveredVideoShape = prevHoveredVideo;
-                    isOverMedia = true;
-                    float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
-                    float barW = LastVideoPlaybackBarBounds.Width;
-                    float playBtnW = 32f;
-                    float volBtnW = 32f;
-                    float timeTextW = (barW > 240f) ? 80f : 0f;
-                    float scrubX = playBtnW + 8f;
-                    float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
-                    float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
-                    float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
-                    SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
-                    if (InvalidateCallback != null) InvalidateCallback();
+                    ShapeNode targetVideo = HoveredVideoShape ?? prevHoveredVideo ?? SlideVideoPlayerManager.Instance.ActiveShape;
+                    if (targetVideo != null)
+                    {
+                        HoveredVideoShape = targetVideo;
+                        isOverMedia = true;
+                        float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
+                        float barW = LastVideoPlaybackBarBounds.Width;
+                        float playBtnW = 32f;
+                        float volBtnW = 32f;
+                        float timeTextW = (barW > 240f) ? 80f : 0f;
+                        float scrubX = playBtnW + 8f;
+                        float scrubW = Math.Max(20f, barW - scrubX - timeTextW - volBtnW - 8f);
+                        float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                        float totalSec = targetVideo.VideoTotalTime > 0 ? targetVideo.VideoTotalTime : 120f;
+                        SlideVideoPlayerManager.Instance.Seek(frac * totalSec);
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
                 }
                 else if (ActiveSlide != null && !LaserPointerMode && !AnnotationPenMode)
                 {
@@ -24302,9 +24312,10 @@ namespace ZenQOffice.UI
                     GetCurrentActiveSlidePresentationMetrics(width, height, out presSlideX, out presSlideY, out presSlideW, out presSlideH, out presScale);
 
                     // Check if mouse is hovering over the active video floating playback bar
-                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && prevHoveredVideo != null)
+                    ShapeNode barVideo = HoveredVideoShape ?? prevHoveredVideo ?? SlideVideoPlayerManager.Instance.ActiveShape;
+                    if (!LastVideoPlaybackBarBounds.IsEmpty && LastVideoPlaybackBarBounds.Contains(mousePos) && barVideo != null)
                     {
-                        HoveredVideoShape = prevHoveredVideo;
+                        HoveredVideoShape = barVideo;
                         isOverMedia = true;
                         float relX = mousePos.X - LastVideoPlaybackBarBounds.X;
                         float barW = LastVideoPlaybackBarBounds.Width;
@@ -24319,14 +24330,6 @@ namespace ZenQOffice.UI
                             HoveredVideoButton = 0;
                             IsHoveringVideoScrubber = false;
                         }
-                        else if (relX >= scrubX && relX <= scrubX + scrubW)
-                        {
-                            HoveredVideoButton = 1;
-                            IsHoveringVideoScrubber = true;
-                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
-                            float totalSec = HoveredVideoShape.VideoTotalTime > 0 ? HoveredVideoShape.VideoTotalTime : 120f;
-                            HoveredVideoScrubberTime = frac * totalSec;
-                        }
                         else if (relX >= barW - volBtnW)
                         {
                             HoveredVideoButton = 2;
@@ -24334,8 +24337,11 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            HoveredVideoButton = -1;
-                            IsHoveringVideoScrubber = false;
+                            HoveredVideoButton = 1;
+                            IsHoveringVideoScrubber = true;
+                            float frac = Math.Max(0f, Math.Min(1f, (relX - scrubX) / scrubW));
+                            float totalSec = barVideo.VideoTotalTime > 0 ? barVideo.VideoTotalTime : 120f;
+                            HoveredVideoScrubberTime = frac * totalSec;
                         }
                     }
                     else

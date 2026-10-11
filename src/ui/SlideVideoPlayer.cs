@@ -340,15 +340,18 @@ namespace ZenQOffice.UI
                                 BitmapData bData = targetBitmap.LockBits(
                                     new GdiRectangle(0, 0, targetBitmap.Width, targetBitmap.Height),
                                     ImageLockMode.WriteOnly,
-                                    PixelFormat.Format32bppRgb);
+                                    PixelFormat.Format32bppPArgb);
                                 try
                                 {
-                                    int safeCopyBytes = Math.Min(Math.Min(bData.Stride, Math.Abs(lPitch)), copyBytesPerRow);
+                                    int copyPixels = Math.Min(Math.Min(bData.Stride / 4, Math.Abs(lPitch) / 4), copyW);
                                     for (int y = 0; y < copyH; y++)
                                     {
-                                        IntPtr srcRow = IntPtr.Add(pbScanline0, y * lPitch);
-                                        IntPtr dstRow = IntPtr.Add(bData.Scan0, y * bData.Stride);
-                                        CopyMemory(dstRow, srcRow, (uint)safeCopyBytes);
+                                        uint* srcRow = (uint*)IntPtr.Add(pbScanline0, y * lPitch);
+                                        uint* dstRow = (uint*)IntPtr.Add(bData.Scan0, y * bData.Stride);
+                                        for (int x = 0; x < copyPixels; x++)
+                                        {
+                                            dstRow[x] = srcRow[x] | 0xFF000000;
+                                        }
                                     }
                                 }
                                 finally
@@ -385,15 +388,18 @@ namespace ZenQOffice.UI
                         BitmapData bData = targetBitmap.LockBits(
                             new GdiRectangle(0, 0, targetBitmap.Width, targetBitmap.Height),
                             ImageLockMode.WriteOnly,
-                            PixelFormat.Format32bppRgb);
+                            PixelFormat.Format32bppPArgb);
                         try
                         {
-                            int safeCopyBytes = Math.Min(Math.Min(bData.Stride, srcStride), copyBytesPerRow);
+                            int copyPixels = Math.Min(Math.Min(bData.Stride / 4, srcStride / 4), copyW);
                             for (int y = 0; y < copyH; y++)
                             {
-                                IntPtr srcRow = IntPtr.Add(pScan0, y * srcStride);
-                                IntPtr dstRow = IntPtr.Add(bData.Scan0, y * bData.Stride);
-                                CopyMemory(dstRow, srcRow, (uint)safeCopyBytes);
+                                uint* srcRow = (uint*)IntPtr.Add(pScan0, y * srcStride);
+                                uint* dstRow = (uint*)IntPtr.Add(bData.Scan0, y * bData.Stride);
+                                for (int x = 0; x < copyPixels; x++)
+                                {
+                                    dstRow[x] = srcRow[x] | 0xFF000000;
+                                }
                             }
                         }
                         finally
@@ -491,7 +497,7 @@ namespace ZenQOffice.UI
                     int w = dec.Width > 0 ? dec.Width : 640;
                     int h = dec.Height > 0 ? dec.Height : 360;
 
-                    GdiBitmap bmp = new GdiBitmap(w, h, PixelFormat.Format32bppRgb);
+                    GdiBitmap bmp = new GdiBitmap(w, h, PixelFormat.Format32bppPArgb);
                     double ts;
                     bool ok = dec.ReadNextFrame(bmp, out ts);
                     if (!ok)
@@ -521,7 +527,7 @@ namespace ZenQOffice.UI
 
                     dec.Seek(timeSec);
 
-                    GdiBitmap bmp = new GdiBitmap(w, h, PixelFormat.Format32bppRgb);
+                    GdiBitmap bmp = new GdiBitmap(w, h, PixelFormat.Format32bppPArgb);
                     double ts;
                     bool ok = dec.ReadNextFrame(bmp, out ts);
                     if (ok) return bmp;
@@ -627,6 +633,27 @@ namespace ZenQOffice.UI
                     {
                         GdiBitmap bmp = GdiImage.FromHbitmap(hBitmap);
                         DeleteObject(hBitmap);
+                        try
+                        {
+                            BitmapData bd = bmp.LockBits(new GdiRectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
+                            try
+                            {
+                                unsafe
+                                {
+                                    int totalPix = bd.Width * bd.Height;
+                                    uint* pPix = (uint*)bd.Scan0;
+                                    for (int i = 0; i < totalPix; i++)
+                                    {
+                                        pPix[i] |= 0xFF000000;
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                bmp.UnlockBits(bd);
+                            }
+                        }
+                        catch { }
                         return bmp;
                     }
                 }
@@ -677,6 +704,7 @@ namespace ZenQOffice.UI
         private bool _isRenderingFrame = false;
         private System.Diagnostics.Stopwatch _playbackStopwatch = new System.Diagnostics.Stopwatch();
         private double _playbackBaseOffsetSec = 0.0;
+        private DateTime _lastSeekTime = DateTime.MinValue;
 
         public bool IsPlaying
         {
@@ -717,6 +745,12 @@ namespace ZenQOffice.UI
             {
                 try
                 {
+                    // If recently seeked (within 0.6s), do NOT allow lagging MediaPlayer.Position to revert the seek!
+                    if ((DateTime.UtcNow - _lastSeekTime).TotalSeconds < 0.6)
+                    {
+                        return swSec;
+                    }
+
                     double audioSec = _mediaPlayer.Position.TotalSeconds;
                     if (audioSec > 0.05)
                     {
@@ -809,7 +843,7 @@ namespace ZenQOffice.UI
                 if (_frameBitmap == null || _frameBitmap.Width != targetW || _frameBitmap.Height != targetH)
                 {
                     if (_frameBitmap != null) { try { _frameBitmap.Dispose(); } catch { } }
-                    _frameBitmap = new GdiBitmap(targetW, targetH, PixelFormat.Format32bppRgb);
+                    _frameBitmap = new GdiBitmap(targetW, targetH, PixelFormat.Format32bppPArgb);
                 }
 
                 if (_decoder.DurationSeconds > 0)
@@ -975,7 +1009,7 @@ namespace ZenQOffice.UI
                 {
                     int fw = _decoder.Width > 0 ? _decoder.Width : 640;
                     int fh = _decoder.Height > 0 ? _decoder.Height : 360;
-                    _frameBitmap = new GdiBitmap(fw, fh, PixelFormat.Format32bppRgb);
+                    _frameBitmap = new GdiBitmap(fw, fh, PixelFormat.Format32bppPArgb);
                 }
 
                 double curClockSec = GetCurrentPlaybackClockSeconds();
@@ -1002,6 +1036,7 @@ namespace ZenQOffice.UI
                     _activeShape.CachedImage = _frameBitmap;
                     _activeShape.InvalidateFeatherCache();
                     _activeShape.InvalidateDisplayCache();
+                    D2DGraphics.InvalidateBitmapCache(_frameBitmap);
                     return true;
                 }
                 return false;
@@ -1067,6 +1102,10 @@ namespace ZenQOffice.UI
                 _activeShape.VideoCurrentTime = (float)startSec;
                 _activeShape = null;
             }
+            if (_frameBitmap != null)
+            {
+                D2DGraphics.InvalidateBitmapCache(_frameBitmap);
+            }
             _lastDecodedTimestamp = -1;
             TriggerInvalidate();
         }
@@ -1075,8 +1114,14 @@ namespace ZenQOffice.UI
         {
             double sec = Math.Max(0.0, seconds);
             _playbackBaseOffsetSec = sec;
+            _lastSeekTime = DateTime.UtcNow;
             if (_playbackStopwatch.IsRunning) _playbackStopwatch.Restart();
             else _playbackStopwatch.Reset();
+
+            if (_activeShape != null)
+            {
+                _activeShape.VideoCurrentTime = (float)sec;
+            }
 
             if (_mediaPlayer != null)
             {
@@ -1097,12 +1142,9 @@ namespace ZenQOffice.UI
                             _activeShape.InvalidateFeatherCache();
                             _activeShape.InvalidateDisplayCache();
                         }
+                        D2DGraphics.InvalidateBitmapCache(_frameBitmap);
                     }
                 }
-            }
-            if (_activeShape != null)
-            {
-                _activeShape.VideoCurrentTime = seconds;
             }
             TriggerInvalidate();
         }
