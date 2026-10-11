@@ -480,6 +480,9 @@ namespace ZenQOffice.Core
             string httpResponse = "HTTP/1.1 200 OK\r\n" +
                                  "Content-Type: text/html; charset=utf-8\r\n" +
                                  $"Content-Length: {htmlBytes.Length}\r\n" +
+                                 "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                                 "Pragma: no-cache\r\n" +
+                                 "Expires: 0\r\n" +
                                  "Connection: close\r\n\r\n";
             byte[] headerData = Encoding.UTF8.GetBytes(httpResponse);
             await stream.WriteAsync(headerData, 0, headerData.Length, token);
@@ -984,6 +987,9 @@ namespace ZenQOffice.Core
 <meta name=""viewport"" content=""width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"">
 <meta name=""apple-mobile-web-app-capable"" content=""yes"">
 <meta name=""apple-mobile-web-app-status-bar-style"" content=""black-translucent"">
+<meta http-equiv=""Cache-Control"" content=""no-cache, no-store, must-revalidate"">
+<meta http-equiv=""Pragma"" content=""no-cache"">
+<meta http-equiv=""Expires"" content=""0"">
 <title>ZenQ Connect - Điều khiển PC</title>
 <style>
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
@@ -1467,9 +1473,12 @@ html, body {
     background: #111827;
     border-top: 1px solid #1f2937;
     display: flex;
-    height: 52px;
+    min-height: 56px;
+    height: 56px;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 1000;
 }
 .tab-item {
     flex: 1;
@@ -1478,14 +1487,15 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 2px;
-    color: #64748b;
-    font-size: 9.5px;
+    color: #94a3b8;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.2s;
+    transition: color 0.2s, background-color 0.2s;
+    padding: 4px 2px;
 }
-.tab-item.active { color: #38bdf8; }
-.tab-icon { font-size: 17px; }
+.tab-item.active { color: #38bdf8; background: rgba(56, 189, 248, 0.08); border-radius: 8px; }
+.tab-icon { font-size: 19px; }
 </style>
 </head>
 <body>
@@ -1501,6 +1511,7 @@ html, body {
 
 <!-- Quick Actions -->
 <div class=""quick-bar"">
+    <div class=""qbtn"" style=""background:#2563eb; color:#fff; font-weight:700; border-color:#3b82f6;"" onclick=""switchTab(2)"">🖥️ Xem Màn Hình PC</div>
     <div class=""qbtn"" onclick=""sendShortcut('undo')"">↩ Hoàn tác</div>
     <div class=""qbtn"" onclick=""sendShortcut('redo')"">↪ Làm lại</div>
     <div class=""qbtn"" onclick=""sendShortcut('save')"">💾 Lưu</div>
@@ -1526,6 +1537,11 @@ html, body {
         <button class=""btn-mouse"" onclick=""sendClick('left')"">CHUỘT TRÁI</button>
         <button class=""btn-mouse"" onclick=""sendClick('right')"">CHUỘT PHẢI</button>
     </div>
+    <div style=""padding: 0 8px 6px 8px; display: flex; flex-shrink: 0;"">
+        <button onclick=""switchTab(2)"" style=""width: 100%; height: 38px; background: linear-gradient(135deg, #1e40af, #2563eb); color: #fff; border: 1px solid #3b82f6; border-radius: 8px; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(37,99,235,0.35);"">
+            🖥️ XEM TRỰC TIẾP MÀN HÌNH PC (LIVE STREAM)
+        </button>
+    </div>
 </div>
 
 <!-- TAB 2: LIVE SCREEN MIRROR -->
@@ -1534,6 +1550,7 @@ html, body {
         <div class=""screen-toolbar"">
             <div class=""screen-stat"" id=""screenStatBadge"">● LIVE 15 FPS</div>
             <div style=""display:flex; gap:5px;"">
+                <button class=""sbtn"" onclick=""switchTab(1)"" style=""background:#334155;"">🖱️ Touchpad</button>
                 <button class=""sbtn"" id=""btnToggleStream"" onclick=""toggleScreenStream()"">⏸ Dừng</button>
                 <button class=""sbtn"" id=""btnQuality"" onclick=""cycleScreenQuality()"">⚡ Chuẩn</button>
                 <button class=""sbtn"" onclick=""toggleFullscreen()"">⛶ Toàn màn hình</button>
