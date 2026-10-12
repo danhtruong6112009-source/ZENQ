@@ -62,7 +62,7 @@ namespace ZenQOffice.Core
         public bool AutoStraightenInk { get; set; } = true;
         public bool LaunchAsStandaloneBranch { get; set; } = true;
         public OfficeAppMode DefaultBranchApp { get; set; } = OfficeAppMode.Writer;
-        public bool RegisterFileAssociationsOnStartup { get; set; } = true;
+        public bool RegisterFileAssociationsOnStartup { get; set; } = false;
 
         public event EventHandler SettingsChanged;
 
@@ -91,7 +91,7 @@ namespace ZenQOffice.Core
             AutoStraightenInk = true;
             LaunchAsStandaloneBranch = true;
             DefaultBranchApp = OfficeAppMode.Writer;
-            RegisterFileAssociationsOnStartup = true;
+            RegisterFileAssociationsOnStartup = false;
         }
 
         public static string GetSettingsFilePath()

@@ -38,15 +38,6 @@ namespace ZenQOffice
                 }
                 try { SetCurrentProcessExplicitAppUserModelID(appId); } catch { }
 
-                // Tự động duy trì đăng ký định dạng tệp Office với Windows
-                if (AppSettings.Instance.RegisterFileAssociationsOnStartup)
-                {
-                    System.Threading.Tasks.Task.Run(() =>
-                    {
-                        try { FileAssociationManager.RegisterAllFileAssociations(); } catch { }
-                    });
-                }
-
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
@@ -79,6 +70,10 @@ namespace ZenQOffice
             catch (Exception ex)
             {
                 MessageBox.Show("Lỗi khởi động ZENQ OFFICE:\n" + ex.ToString(), "ZENQ OFFICE Crash Report", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                try { Environment.Exit(0); } catch { }
             }
         }
 

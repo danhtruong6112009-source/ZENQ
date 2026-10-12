@@ -991,26 +991,6 @@ namespace ZenQOffice.UI
             PeripheralDeviceManager.RefreshBaselineState();
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnSystemDisplaySettingsChanged;
 
-            // Auto-save open tabs and workspace session when user exits / clicks X
-            this.FormClosing += (s, e) =>
-            {
-                try
-                {
-                    Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnSystemDisplaySettingsChanged;
-                }
-                catch { }
-                try
-                {
-                    TimeEndPeriod(1);
-                }
-                catch { }
-                try
-                {
-                    SessionManager.SaveSession(this);
-                }
-                catch { }
-            };
-
             SetupMobileConnectServer();
         }
 
@@ -5957,6 +5937,24 @@ namespace ZenQOffice.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            try
+            {
+                Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnSystemDisplaySettingsChanged;
+            }
+            catch { }
+            try
+            {
+                TimeEndPeriod(1);
+            }
+            catch { }
+            try
+            {
+                if (Ribbon == null || !Ribbon.StandaloneMode)
+                {
+                    SessionManager.SaveSession(this);
+                }
+            }
+            catch { }
             try
             {
                 ZenQOffice.Core.ZenQConnectServer.Instance.Stop();
