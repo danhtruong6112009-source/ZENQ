@@ -1,6 +1,6 @@
 /**
  * ZENQ OFFICE - OFFICIAL BILINGUAL DICTIONARY (VI / EN)
- * Được biên soạn thủ công chuẩn xác ngữ nghĩa công nghệ & hành văn doanh nghiệp quốc tế.
+ * Biên soạn thủ công chuẩn xác ngữ nghĩa công nghệ & hành văn doanh nghiệp quốc tế.
  * Tuyệt đối không dùng máy dịch thô sơ.
  */
 
@@ -9,46 +9,56 @@ const DICTIONARY = {
     // Navigation
     nav_brand: "ZENQ OFFICE",
     nav_home: "Trang chủ",
-    nav_features: "Phân hệ ứng dụng",
-    nav_architecture: "Kiến trúc & Hiệu năng",
+    nav_features: "Ứng dụng",
+    nav_architecture: "Đặc điểm nổi bật",
     nav_about: "Về chúng tôi",
     nav_faq: "Hỏi & Đáp",
     nav_download: "Tải ứng dụng",
     nav_lang_btn: "English",
 
     // Hero Section
-    hero_badge: "Phiên bản v4.0 • Kiến trúc .NET 10 & Direct2D Siêu Tốc",
+    hero_badge: "Phiên bản chính thức v4.0 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới",
     hero_title_1: "Bộ Ứng Dụng Văn Phòng",
-    hero_title_accent: "Thế Hệ Mới Cho Windows",
-    hero_desc: "Tận hưởng tốc độ mở tệp trong chớp mắt 0.05 giây, công nghệ đồ họa Direct2D mượt mà 120 FPS, và bảo mật ngoại tuyến 100%. Tương thích hoàn hảo chuẩn tài liệu Microsoft Office mà không tiêu tốn tài nguyên hệ thống.",
+    hero_title_accent: "Hiện Đại Cho Windows",
+    hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu Microsoft Office và bảo mật ngoại tuyến 100%.",
     hero_cta_download: "Tải ZenQ Office Cho Windows",
     hero_cta_explore: "Khám Phá Tính Năng",
-    hero_subtext: "Miễn phí • Hoạt động độc lập không cần Internet • Dung lượng cài đặt ~77MB",
+    hero_subtext: "Miễn phí trọn đời • Hoạt động ngoại tuyến không cần Internet • Tối ưu cho Windows 10 & 11",
 
-    // Quick Stats Bar
-    stat_speed_val: "0.05s",
-    stat_speed_lbl: "Khởi động tức thì",
-    stat_speed_sub: "Nhanh hơn 10x so với MS Office",
-    stat_fps_val: "120 FPS",
-    stat_fps_lbl: "Mượt mà Direct2D",
-    stat_fps_sub: "Tăng tốc phần cứng GPU",
+    // Quick Highlights Bar
+    stat_apps_val: "4 Ứng dụng",
+    stat_apps_lbl: "Bộ công cụ toàn diện",
+    stat_apps_sub: "Writer, Calc, Slides và PDF",
+
+    stat_compat_val: "100%",
+    stat_compat_lbl: "Tương thích chuẩn Office",
+    stat_compat_sub: "Định dạng .docx, .xlsx, .pptx, .pdf",
+
     stat_privacy_val: "100%",
     stat_privacy_lbl: "Bảo mật ngoại tuyến",
-    stat_privacy_sub: "Không thu thập Telemetry",
-    stat_ram_val: "-85%",
-    stat_ram_lbl: "Tiết kiệm bộ nhớ",
-    stat_ram_sub: "Chỉ ~60MB RAM vận hành",
+    stat_privacy_sub: "Dữ liệu lưu an toàn trên máy bạn",
 
-    // Apps Showcase Section
-    apps_section_badge: "HỆ SINH THÁI ĐỒNG BỘ",
-    apps_section_title: "Bốn Phân Hệ Cốt Lõi. Một Nền Tảng Đột Phá.",
-    apps_section_desc: "ZenQ Office cho phép mở từng phân hệ độc lập từ lối tắt Desktop hoặc sử dụng chung trong giao diện Tab thông minh. Không cửa sổ thừa, không giật lag.",
+    stat_free_val: "Miễn phí",
+    stat_free_lbl: "Không quảng cáo phiền toái",
+    stat_free_sub: "Trải nghiệm làm việc thuần khiết",
+
+    // Mockup Sidebar
+    mockup_prop_format_lbl: "Định dạng tệp",
+    mockup_prop_format_val: "Chuẩn Microsoft Office",
+    mockup_prop_save_lbl: "Trạng thái lưu",
+    mockup_prop_save_val: "Đã lưu tự động an toàn",
+    mockup_prop_view_lbl: "Chế độ xem",
+    mockup_prop_view_val: "Khổ giấy in ấn A4 chuẩn",
+
+    // Apps Showcase Section (Only 4 Apps: Writer, Calc, Slides, PDF)
+    apps_section_badge: "BỘ ỨNG DỤNG VĂN PHÒNG",
+    apps_section_title: "Bốn Phân Hệ Cốt Lõi Cho Mọi Nhu Cầu Công Việc",
+    apps_section_desc: "ZenQ Office cho phép mở từng ứng dụng độc lập từ lối tắt Desktop hoặc sử dụng chung trong giao diện Tab thông minh. Thao tác tiện lợi, không cửa sổ thừa.",
     
     app_tab_writer: "ZenQ Writer",
     app_tab_calc: "ZenQ Calc",
     app_tab_slides: "ZenQ Slides",
     app_tab_pdf: "ZenQ PDF",
-    app_tab_mobile: "ZenQ Remote",
 
     // Writer Details
     writer_title: "ZenQ Writer — Soạn thảo văn bản chuẩn in ấn đỉnh cao",
@@ -59,106 +69,65 @@ const DICTIONARY = {
     writer_feat_4: "Tự động lưu bản thảo an toàn, phòng chống mất dữ liệu khi mất điện",
 
     // Calc Details
-    calc_title: "ZenQ Calc — Bảng tính điện tử triệu dòng mượt mà",
-    calc_desc: "Tải và tính toán các tập dữ liệu bảng tính .xlsx khổng lồ chỉ trong vài phần trăm giây. Hệ thống công thức tài chính, logic, tìm kiếm chuẩn mực kết hợp cùng bộ vẽ biểu đồ phân tích trực quan hóa dữ liệu hiện đại.",
-    calc_feat_1: "Đọc/ghi tệp .xlsx, .xls, .csv, .tsv với tốc độ cực đại",
+    calc_title: "ZenQ Calc — Bảng tính điện tử thông minh & mạnh mẽ",
+    calc_desc: "Xử lý các tập dữ liệu bảng tính .xlsx nhanh chóng và chính xác. Hệ thống công thức tài chính, logic, tìm kiếm chuẩn mực kết hợp cùng bộ vẽ biểu đồ phân tích trực quan hóa dữ liệu hiện đại.",
+    calc_feat_1: "Đọc và ghi tệp .xlsx, .xls, .csv, .tsv chuẩn xác",
     calc_feat_2: "Hơn 300+ hàm tính toán chuẩn Excel (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
     calc_feat_3: "Vẽ biểu đồ cột, tròn, đường nét và phân tán thời gian thực",
-    calc_feat_4: "Định dạng có điều kiện, cố định dòng cột và lọc dữ liệu tốc độ cao",
+    calc_feat_4: "Định dạng có điều kiện, cố định dòng cột và lọc dữ liệu thông minh",
 
     // Slides Details
-    slides_title: "ZenQ Slides — Thiết kế trình chiếu chuẩn PowerPoint 365",
-    slides_desc: "Bộ công cụ thiết kế bài thuyết trình mạnh mẽ với hiệu ứng hoạt họa mượt mà, chuyển trang tinh tế, hỗ trợ vector shape, bảng biểu biểu diễn và chế độ Người thuyết trình (Presenter View) toàn màn hình chuyên nghiệp.",
+    slides_title: "ZenQ Slides — Thiết kế bài thuyết trình chuyên nghiệp",
+    slides_desc: "Bộ công cụ thiết kế bài trình chiếu ấn tượng với chuyển động chuyển trang tinh tế, hỗ trợ vector shape, bảng biểu biểu diễn, chế độ Người thuyết trình 2 màn hình và hỗ trợ điều khiển từ xa bằng điện thoại.",
     slides_feat_1: "Mở và biên tập tệp .pptx, .ppt giữ nguyên bố cục và phông chữ",
-    slides_feat_2: "Chế độ Người thuyết trình 2 màn hình chuẩn mực (Ghi chú, đồng hồ đếm, slide kế tiếp)",
-    slides_feat_3: "Tăng tốc hiển thị hoạt họa slide bằng Direct2D không giật khung hình",
+    slides_feat_2: "Chế độ Người thuyết trình chuẩn mực (Ghi chú, đồng hồ đếm, xem trước slide kế tiếp)",
+    slides_feat_3: "Hiển thị chuyển động hoạt họa slide mượt mà, sắc nét từng chi tiết",
     slides_feat_4: "Bộ sưu tập hình khối chuẩn và công cụ căn chỉnh nam châm thông minh",
 
     // PDF Details
     pdf_title: "ZenQ PDF — Đọc & Biên tập tài liệu bảo mật tuyệt đối",
-    pdf_desc: "Mở các tệp tài liệu PDF dung lượng hàng ngàn trang ngay lập tức. Tích hợp công cụ tìm kiếm từ khóa, đánh dấu văn bản, xoay trang, xuất ảnh chất lượng cao và bảo vệ quyền riêng tư không gửi tệp lên máy chủ đám mây.",
-    pdf_feat_1: "Động cơ kết xuất PDFium chuyên dụng cho độ nét văn bản tối đa",
-    pdf_feat_2: "Tìm kiếm văn bản tức thì và xem trước thumbnail trang mượt mà",
-    pdf_feat_3: "Đăng ký ứng dụng đọc PDF mặc định Windows 10 & Windows 11 tiện lợi",
+    pdf_desc: "Mở các tệp tài liệu PDF dung lượng lớn nhanh chóng. Tích hợp công cụ tìm kiếm từ khóa, đánh dấu văn bản, xoay trang, xuất ảnh chất lượng cao và bảo vệ quyền riêng tư không gửi tệp lên máy chủ đám mây.",
+    pdf_feat_1: "Động cơ kết xuất PDF chuyên dụng cho độ nét văn bản tối đa",
+    pdf_feat_2: "Tìm kiếm từ khóa tức thì và xem trước thumbnail trang tiện lợi",
+    pdf_feat_3: "Đăng ký ứng dụng đọc PDF mặc định Windows 10 & Windows 11 dễ dàng",
     pdf_feat_4: "Bảo mật nội bộ 100%, không lo rò rỉ tài liệu nhạy cảm",
 
-    // Mobile Remote Details
-    mobile_title: "ZenQ Remote — Biến điện thoại thành bàn di chuột & bàn phím thông minh",
-    mobile_desc: "Kết nối điện thoại thông minh cùng mạng LAN để điều khiển slide từ xa, nhập văn bản từ xa, hỗ trợ cử chỉ vuốt chạm 2 ngón, con trỏ ảo, và phím tắt điều khiển thuyết trình tiện lợi.",
-    mobile_feat_1: "Quét mã QR kết nối tức thì, không cần cài đặt ứng dụng phức tạp",
-    mobile_feat_2: "Bàn di chuột cảm ứng mượt mà với chuột trái, phải và con lăn hai ngón",
-    mobile_feat_3: "Bàn phím ảo hỗ trợ đầy đủ phím Ctrl, Alt, Shift và chụp màn hình",
-    mobile_feat_4: "Tự động ẩn con trỏ chuột khi điều khiển cảm ứng để tránh nhiễu màn hình",
+    // Core Highlights Section (Thay thế bảng so sánh, ghi thẳng tên ZenQ Office)
+    highlights_section_badge: "TÍNH NĂNG VƯỢT TRỘI",
+    highlights_section_title: "Những Giá Trị Cốt Lõi Của ZenQ Office",
+    highlights_section_desc: "Được xây dựng với tiêu chuẩn cao nhất nhằm mang lại sự tiện nghi, an toàn và hiệu quả công việc tối đa cho bạn.",
 
-    // Engineering Architecture
-    arch_section_badge: "CÔNG NGHỆ LÕI",
-    arch_section_title: "Được Thiết Kế Vì Tốc Độ & Quyền Tự Chủ Kỹ Thuật",
-    arch_section_desc: "Không dùng Electron nặng nề, không đóng gói trình duyệt web cồng kềnh. ZenQ Office được xây dựng thuần túy bằng ngôn ngữ C# và .NET 10 tối ưu cấp nhị phân, giao tiếp trực tiếp với Windows API.",
+    feature_card1_title: "Tương Thích Tuyệt Đối Chuẩn Microsoft Office",
+    feature_card1_desc: "Đọc, chỉnh sửa và lưu các định dạng tệp .docx, .xlsx, .pptx, .pdf với bố cục, bảng biểu và phông chữ chuẩn xác. Dễ dàng trao đổi tài liệu với đồng nghiệp mà không lo lệch trang hay lỗi định dạng.",
 
-    arch_card1_title: "Tăng Tốc Phần Cứng Direct2D",
-    arch_card1_desc: "Tận dụng tối đa card đồ họa GPU để vẽ từng ký tự, nét vẽ vector và chuyển động slide ở tần số quét màn hình 60Hz - 120Hz mượt mà.",
-    arch_card2_title: "Khởi Chạy App Nhánh Độc Lập",
-    arch_card2_desc: "Mở thẳng tệp Word vào ZenQ Writer, Excel vào ZenQ Calc từ màn hình chính Desktop mà không phải tải toàn bộ App Mẹ cồng kềnh.",
-    arch_card3_title: "100% Ngoại Tuyến & Riêng Tư",
-    arch_card3_desc: "Không tài khoản bắt buộc, không gửi dữ liệu người dùng về máy chủ, không quảng cáo chen ngang. Tài liệu của bạn an toàn tuyệt đối trên máy tính của bạn.",
-    arch_card4_title: "Bộ Nhớ Tinh Gọn ~60MB RAM",
-    arch_card4_desc: "Thuật toán quản lý bộ nhớ đệm thông minh giải phóng RAM ngay khi đóng tệp, giữ cho máy tính luôn mát mẻ và mượt mà dù cấu hình khiêm tốn.",
+    feature_card2_title: "An Toàn Tuyệt Đối & 100% Ngoại Tuyến",
+    feature_card2_desc: "ZenQ Office hoạt động hoàn toàn cục bộ trên máy tính của bạn. Không bắt buộc đăng nhập tài khoản, không gửi tệp lên máy chủ bên thứ ba và không thu thập bất kỳ dữ liệu cá nhân nào.",
 
-    // Comparison Table
-    comp_section_badge: "BẢNG SO SÁNH",
-    comp_section_title: "ZenQ Office So Với Các Giải Pháp Khác",
-    comp_section_desc: "Xem sự khác biệt rõ rệt khi một bộ phần mềm văn phòng được tối ưu hóa chuẩn mực cho người dùng Windows.",
-    comp_th_feature: "Tiêu chí so sánh",
-    comp_th_zenq: "ZenQ Office 4.0",
-    comp_th_mso: "Microsoft 365",
-    comp_th_wps: "WPS Office",
-    comp_row1_title: "Thời gian khởi động",
-    comp_row1_zenq: "~0.05 giây (Tức thì)",
-    comp_row1_mso: "4 - 8 giây",
-    comp_row1_wps: "3 - 6 giây",
-    comp_row2_title: "RAM tiêu thụ trung bình",
-    comp_row2_zenq: "50 - 80 MB",
-    comp_row2_mso: "450 - 900 MB",
-    comp_row2_wps: "300 - 600 MB",
-    comp_row3_title: "Dung lượng bộ cài đặt",
-    comp_row3_zenq: "~77 MB",
-    comp_row3_mso: "3.5 GB - 5 GB",
-    comp_row3_wps: "250 - 400 MB",
-    comp_row4_title: "Chính sách quảng cáo",
-    comp_row4_zenq: "100% Không quảng cáo",
-    comp_row4_mso: "Mời mua gói trả phí",
-    comp_row4_wps: "Nhiều quảng cáo bật lên",
-    comp_row5_title: "Bảo mật ngoại tuyến",
-    comp_row5_zenq: "Ngoại tuyến tuyệt đối",
-    comp_row5_mso: "Bắt buộc đăng nhập đám mây",
-    comp_row5_wps: "Đồng bộ đám mây bên thứ ba",
-    comp_row6_title: "Chi phí bản quyền",
-    comp_row6_zenq: "Miễn phí vĩnh viễn",
-    comp_row6_mso: "1.490.000đ/năm",
-    comp_row6_wps: "Gói Pro tính phí định kỳ",
+    feature_card3_title: "Lối Tắt Ứng Dụng Nhánh & Giao Diện Tab",
+    feature_card3_desc: "Bạn có thể mở trực tiếp tài liệu Word vào ZenQ Writer hoặc bảng tính vào ZenQ Calc từ lối tắt ngoài Desktop mà không bị vướng bận, hoặc gộp chung tất cả trong một cửa sổ Tab làm việc thông minh.",
+
+    feature_card4_title: "Hoàn Toàn Miễn Phí & Không Quảng Cáo",
+    feature_card4_desc: "Cam kết phục vụ trọn đời cho học sinh, sinh viên, giáo viên và cộng đồng người dùng. Trải nghiệm làm việc thuần túy, sạch sẽ, không có bất kỳ quảng cáo chen ngang hay chi phí ẩn nào.",
 
     // About Us Page / Section
     about_section_badge: "VỀ CHÚNG TÔI",
     about_section_title: "Khát Vọng Phần Mềm Văn Phòng Việt Nam Vươn Tầm Quốc Tế",
-    about_lead: "Được sáng lập bởi đội ngũ NextGenEduSpace Studio, ZenQ Office ra đời từ một câu hỏi giản đơn nhưng đầy trăn trở: Tại sao người dùng phải chịu đựng những bộ phần mềm văn phòng nặng hàng gigabyte, khởi động chậm chạp và chứa đầy quảng cáo rác?",
+    about_lead: "Được sáng lập bởi đội ngũ NextGenEduSpace Studio, ZenQ Office ra đời từ một câu hỏi giản đơn nhưng đầy trăn trở: Tại sao người dùng phải chịu đựng những bộ phần mềm văn phòng cồng kềnh, ép buộc đăng ký tài khoản đám mây và chứa đầy quảng cáo phiền toái?",
     
     about_story_title: "Câu Chuyện Khởi Nguồn",
     about_story_p1: "Trong kỷ nguyên số, tài liệu là tri thức và công cụ làm việc cốt lõi của mỗi học sinh, sinh viên, giáo viên và chuyên gia. Tuy nhiên, các giải pháp hiện tại ngày càng trở nên nặng nề, phụ thuộc vào kết nối mạng liên tục và yêu cầu cấu hình máy tính đắt tiền.",
-    about_story_p2: "Chúng tôi bắt đầu dự án ZenQ Office với mục tiêu duy nhất: Tái định nghĩa trải nghiệm văn phòng trên Windows bằng công nghệ .NET 10 hiện đại, đưa tốc độ mở tài liệu về mốc tức thì (dưới 0.1 giây), đồng thời tôn trọng tuyệt đối quyền riêng tư của người sử dụng.",
+    about_story_p2: "Chúng tôi bắt đầu dự án ZenQ Office với mục tiêu duy nhất: Tái định nghĩa trải nghiệm văn phòng trên Windows bằng công nghệ hiện đại, mang lại sự mượt mà tối đa, đồng thời tôn trọng tuyệt đối quyền riêng tư và quyền tự chủ tài liệu của người sử dụng.",
     
     about_vision_title: "Tầm Nhìn & Sứ Mệnh",
-    about_vision_desc: "Trở thành bộ ứng dụng văn phòng bản địa hóa chuẩn mực cao nhất tại Việt Nam, cạnh tranh sòng phẳng về mặt hiệu năng với các tập đoàn công nghệ toàn cầu, và cung cấp giải pháp miễn phí trọn đời cho nền giáo dục nước nhà.",
+    about_vision_desc: "Trở thành bộ ứng dụng văn phòng bản địa hóa chuẩn mực cao nhất tại Việt Nam, mang đến giải pháp phần mềm độc lập, an toàn và hoàn toàn miễn phí trọn đời cho nền giáo dục nước nhà.",
 
     about_values_title: "Ba Trụ Cột Giá Trị Cốt Lõi",
-    about_val1_title: "1. Tốc Độ Không Thỏa Hiệp",
-    about_val1_desc: "Mọi tính năng được lập trình đều phải vượt qua bài kiểm tra hiệu năng nghiêm ngặt. Không một thao tác nào của người dùng bị hoãn lại bởi vòng xoay chờ đợi.",
+    about_val1_title: "1. Tiện Lợi & Mượt Mà",
+    about_val1_desc: "Mọi thao tác soạn thảo, tính toán và trình chiếu đều được tối ưu hóa để diễn ra liền mạch, phản hồi tức thì và không làm gián đoạn dòng suy nghĩ của bạn.",
     about_val2_title: "2. Quyền Riêng Tư Bất Khả Xâm Phạm",
     about_val2_desc: "Dữ liệu của bạn chỉ nằm trên máy của bạn. Chúng tôi không bao giờ cài cắm mã theo dõi hành vi, không bán quảng cáo và không yêu cầu đăng ký tài khoản bắt buộc.",
     about_val3_title: "3. Tinh Tế & Chuẩn Mực",
-    about_val3_desc: "Giao diện tuân thủ tiêu chuẩn Fluent Design của Windows 11, màu sắc hài hòa, thao tác trực quan quen thuộc giúp bạn làm việc ngay mà không mất thời gian học lại.",
-
-    about_team_title: "Đội Ngũ Kỹ Sư NextGenEduSpace",
-    about_team_desc: "Tập hợp những kỹ sư tâm huyết với kiến trúc hệ điều hành, đồ họa máy tính Direct2D/DirectX và khoa học dữ liệu. Chúng tôi tự hào tạo nên sản phẩm 100% làm chủ công nghệ tại Việt Nam.",
+    about_val3_desc: "Giao diện tuân thủ tiêu chuẩn thiết kế hiện đại, màu sắc hài hòa, thao tác trực quan quen thuộc giúp bạn làm việc ngay mà không mất thời gian học lại.",
 
     // FAQ Section
     faq_section_badge: "CÂU HỎI THƯỜNG GẶP",
@@ -169,7 +138,7 @@ const DICTIONARY = {
     faq_filter_install: "Cài đặt & Bản quyền",
     faq_filter_compat: "Định dạng & Tương thích",
     faq_filter_security: "Bảo mật & Quyền riêng tư",
-    faq_filter_perf: "Kỹ thuật & Hiệu năng",
+    faq_filter_perf: "Trải nghiệm & Tính năng",
 
     faq_q1: "ZenQ Office có thực sự miễn phí không? Có bị thu phí ẩn sau này không?",
     faq_a1: "ZenQ Office là phần mềm hoàn toàn miễn phí, không có bất kỳ khoản phí ẩn nào, không yêu cầu thẻ tín dụng và không giới hạn thời gian dùng thử. Chúng tôi cam kết duy trì phiên bản cốt lõi này miễn phí vĩnh viễn cho học sinh, sinh viên và cộng đồng người dùng.",
@@ -183,35 +152,35 @@ const DICTIONARY = {
     faq_q4: "ZenQ Office có an toàn không? Có thu thập dữ liệu cá nhân hay tài liệu không?",
     faq_a4: "An toàn tuyệt đối. ZenQ Office là ứng dụng chạy cục bộ ngoại tuyến 100%. Không có bất kỳ dòng lệnh nào gửi tệp hay nội dung tài liệu của bạn lên máy chủ internet. Bộ cài đặt đã được quét sạch virus và đáp ứng các tiêu chuẩn bảo mật khắt khe nhất của hệ điều hành Windows.",
 
-    faq_q5: "Máy tính cấu hình yếu hoặc máy cũ chạy Windows 10 có dùng mượt không?",
-    faq_a5: "Rất mượt mà! Nhờ vào kiến trúc tối ưu trên .NET 10 và Direct2D, ZenQ Office chỉ tiêu tốn từ 50MB đến 80MB RAM khi hoạt động, khởi động chỉ mất ~0.05 giây và vận hành trơn tru ngay cả trên các dòng laptop văn phòng đời cũ có cấu hình RAM 2GB - 4GB.",
+    faq_q5: "Máy tính cấu hình bình thường hoặc máy tính cũ dùng có mượt không?",
+    faq_a5: "Rất mượt mà! ZenQ Office được tối ưu hóa tinh gọn, vận hành trơn tru và nhẹ nhàng ngay cả trên các dòng máy tính, laptop văn phòng có cấu hình khiêm tốn.",
 
-    faq_q6: "Chức năng điều khiển bằng điện thoại (ZenQ Remote) hoạt động như thế nào?",
-    faq_a6: "Khi bạn mở một bài trình chiếu hoặc tài liệu trong ZenQ Office, bấm vào biểu tượng Kết nối điện thoại trên thanh tiêu đề. Quét mã QR hiển thị trên màn hình bằng điện thoại (cùng mạng Wi-Fi/LAN), giao diện điều khiển sẽ mở ngay trong trình duyệt điện thoại mà không cần cài thêm app. Bạn có thể vuốt chuyển slide, dùng trackpad ảo, bàn phím và các phím chức năng F5/Esc mượt mà.",
+    faq_q6: "ZenQ Office có hỗ trợ in ấn và xuất file PDF không?",
+    faq_a6: "Có. Cả ba phân hệ Writer, Calc và Slides đều tích hợp sẵn bộ xuất file chuẩn PDF chất lượng cao, đồng thời hỗ trợ hộp thoại in ấn tiêu chuẩn của Windows với đầy đủ tùy chọn khổ giấy A4, A3, in hai mặt và tỷ lệ trang.",
 
-    faq_q7: "ZenQ Office có hỗ trợ in ấn và xuất file PDF không?",
-    faq_a7: "Có. Cả ba phân hệ Writer, Calc và Slides đều tích hợp sẵn bộ xuất file chuẩn PDF chất lượng cao, đồng thời hỗ trợ hộp thoại in ấn tiêu chuẩn của Windows với đầy đủ tùy chọn khổ giấy A4, A3, in hai mặt và tỷ lệ trang.",
+    faq_q7: "Làm sao để cập nhật lên phiên bản ZenQ Office mới nhất?",
+    faq_a7: "ZenQ Office tích hợp sẵn cơ chế kiểm tra cập nhật thông minh. Bạn có thể nhấn vào nút Cập nhật ở góc dưới màn hình chính hoặc trong Cài đặt để nâng cấp phiên bản mới nhất một cách nhanh chóng.",
 
-    faq_q8: "Làm sao để cập nhật lên phiên bản ZenQ Office mới nhất?",
-    faq_a8: "ZenQ Office tích hợp sẵn cơ chế kiểm tra cập nhật thông minh. Bạn có thể nhấn vào biểu tượng Cập nhật hình Windows 11 ở góc dưới trang chủ hoặc trong Cài đặt. Nếu có bản phát hành mới, ứng dụng sẽ thông báo rõ ràng kèm nút 'Cập nhật ngay' để bạn nâng cấp nhanh chóng chỉ trong vài giây.",
-
-    // Download & Footer
+    // Download Section
     dl_section_badge: "TẢI VỀ NGAY",
-    dl_section_title: "Trải Nghiệm Sự Khác Biệt Cùng ZenQ Office",
-    dl_section_desc: "Tải bản cài đặt chính thức v4.0. Cài đặt chỉ trong 5 giây và bắt đầu làm việc hiệu quả ngay hôm nay.",
+    dl_section_title: "Trải Nghiệm ZenQ Office Cho Windows",
+    dl_section_desc: "Tải bản cài đặt chính thức v4.0. Cài đặt nhanh chóng và bắt đầu làm việc hiệu quả ngay hôm nay.",
     dl_btn_main: "Tải Bộ Cài Đặt (ZenQOffice-Setup.exe)",
     dl_btn_portable: "Tải Bản Portable (.zip)",
+    
     dl_meta_ver: "Phiên bản:",
-    dl_meta_size: "Dung lượng:",
     dl_meta_os: "Hệ điều hành:",
-    dl_meta_req: "Yêu cầu:",
-    dl_meta_req_val: "Windows 10 / 11 (64-bit), .NET 10 Runtime (tự động đính kèm)",
+    dl_meta_os_val: "Windows 10 / 11 (64-bit)",
+    dl_meta_formats: "Định dạng:",
+    dl_meta_formats_val: "DOCX, XLSX, PPTX, PDF",
+    dl_meta_license: "Bản quyền:",
+    dl_meta_license_val: "Miễn phí trọn đời",
 
-    footer_desc: "Bộ ứng dụng văn phòng thế hệ mới cho Windows. Tối ưu hiệu năng, bảo mật ngoại tuyến và miễn phí trọn đời.",
+    // Footer
+    footer_desc: "Bộ ứng dụng văn phòng thế hệ mới cho Windows. Tối ưu trải nghiệm, bảo mật ngoại tuyến và miễn phí trọn đời.",
     footer_col_products: "Sản phẩm",
     footer_col_resources: "Tài nguyên",
     footer_col_company: "Tổ chức",
-    footer_col_legal: "Pháp lý",
     footer_copy: "© 2026 NextGenEduSpace Studio. Đã đăng ký bản quyền. Được phát triển tự hào tại Việt Nam."
   },
 
@@ -219,209 +188,178 @@ const DICTIONARY = {
     // Navigation
     nav_brand: "ZENQ OFFICE",
     nav_home: "Home",
-    nav_features: "Suite Apps",
-    nav_architecture: "Architecture & Speed",
+    nav_features: "Applications",
+    nav_architecture: "Highlights",
     nav_about: "About Us",
     nav_faq: "FAQ",
     nav_download: "Download",
     nav_lang_btn: "Tiếng Việt",
 
     // Hero Section
-    hero_badge: "Release v4.0 • Built on .NET 10 & Direct2D Engine",
-    hero_title_1: "Next-Generation Office",
-    hero_title_accent: "Suite Built For Windows",
-    hero_desc: "Experience instantaneous 0.05-second launch times, fluid 120 FPS Direct2D hardware acceleration, and 100% offline privacy. True pixel-perfect compatibility with Microsoft Office documents without burning system resources.",
-    hero_cta_download: "Download for Windows",
-    hero_cta_explore: "Explore Features",
-    hero_subtext: "Free Forever • Fully Offline Autonomous • Lightweight ~77MB Installer",
+    hero_badge: "Official Release v4.0 • Next-Gen Office Suite",
+    hero_title_1: "Modern Office Suite",
+    hero_title_accent: "Crafted for Windows",
+    hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling. 100% offline and seamlessly compatible with Microsoft Office standard formats.",
+    hero_cta_download: "Download ZenQ Office for Windows",
+    hero_cta_explore: "Explore Applications",
+    hero_subtext: "Lifetime Free • 100% Offline with Zero Cloud Requirement • Optimized for Windows 10 & 11",
 
-    // Quick Stats Bar
-    stat_speed_val: "0.05s",
-    stat_speed_lbl: "Instant Cold Launch",
-    stat_speed_sub: "10x faster than traditional suites",
-    stat_fps_val: "120 FPS",
-    stat_fps_lbl: "Direct2D Fluidity",
-    stat_fps_sub: "GPU hardware-accelerated canvas",
+    // Quick Highlights Bar
+    stat_apps_val: "4 Core Apps",
+    stat_apps_lbl: "Complete Suite",
+    stat_apps_sub: "Writer, Calc, Slides & PDF",
+
+    stat_compat_val: "100%",
+    stat_compat_lbl: "Office Standard Ready",
+    stat_compat_sub: "Full DOCX, XLSX, PPTX & PDF support",
+
     stat_privacy_val: "100%",
-    stat_privacy_lbl: "Offline Privacy",
-    stat_privacy_sub: "Zero telemetry & tracking",
-    stat_ram_val: "-85%",
-    stat_ram_lbl: "Memory Efficiency",
-    stat_ram_sub: "Lightweight ~60MB RAM footprint",
+    stat_privacy_lbl: "Offline & Private",
+    stat_privacy_sub: "Your data stays securely on your PC",
 
-    // Apps Showcase Section
-    apps_section_badge: "UNIFIED ECOSYSTEM",
-    apps_section_title: "Four Core Applications. One Groundbreaking Platform.",
-    apps_section_desc: "ZenQ Office empowers you to launch each application independently from Desktop shortcuts or work unified within our multi-document tab hub. Zero clutter, zero lag.",
+    stat_free_val: "Free",
+    stat_free_lbl: "Zero Distracting Ads",
+    stat_free_sub: "Pure, focused workspace experience",
+
+    // Mockup Sidebar
+    mockup_prop_format_lbl: "File Format",
+    mockup_prop_format_val: "Microsoft Office Standard",
+    mockup_prop_save_lbl: "Save Status",
+    mockup_prop_save_val: "Safely Auto-Saved",
+    mockup_prop_view_lbl: "Page View",
+    mockup_prop_view_val: "Standard A4 Layout",
+
+    // Apps Showcase Section (Only 4 Apps: Writer, Calc, Slides, PDF)
+    apps_section_badge: "OFFICE APPLICATIONS",
+    apps_section_title: "Four Essential Apps for Every Workflow",
+    apps_section_desc: "Launch each application independently from Desktop shortcuts or work seamlessly in a unified tabbed interface. Convenient, uncluttered, and efficient.",
     
     app_tab_writer: "ZenQ Writer",
     app_tab_calc: "ZenQ Calc",
     app_tab_slides: "ZenQ Slides",
     app_tab_pdf: "ZenQ PDF",
-    app_tab_mobile: "ZenQ Remote",
 
     // Writer Details
-    writer_title: "ZenQ Writer — Master Typography & Print-Ready Formatting",
-    writer_desc: "Seamlessly process .docx, .doc, .rtf, and .txt documents with complete fidelity. Features multi-column pagination, automated tables, live word counting, and an intelligent bilingual text completion engine.",
-    writer_feat_1: "100% compliant with standard Microsoft Word OpenXML formats",
-    writer_feat_2: "Real-time bilingual predictive text autocomplete engine",
-    writer_feat_3: "Rich formula insertion, nested tables, and vector shape objects",
-    writer_feat_4: "Automated draft safeguards to prevent work loss during system outages",
+    writer_title: "ZenQ Writer — Professional Document Publishing",
+    writer_desc: "Process .docx, .doc, .rtf, and .txt files with fidelity. Features two-page layout, auto-fitting tables, real-time word counting, and bilingual predictive text to accelerate your typing workflow.",
+    writer_feat_1: "100% compatible with Microsoft Word OpenXML standard",
+    writer_feat_2: "Real-time bilingual Vietnamese - English smart word prediction",
+    writer_feat_3: "Insert mathematical formulas, complex tables, and vector graphics",
+    writer_feat_4: "Secure auto-save drafts to prevent data loss during unexpected power loss",
 
     // Calc Details
-    calc_title: "ZenQ Calc — Lightning-Fast Million-Row Spreadsheets",
-    calc_desc: "Open and calculate heavy .xlsx spreadsheets in fractions of a second. Comprehensive formula support for financial and statistical modeling, paired with dynamic real-time visualization charting.",
-    calc_feat_1: "High-throughput read/write for .xlsx, .xls, .csv, and .tsv formats",
-    calc_feat_2: "Over 300+ standard formulas (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
-    calc_feat_3: "Real-time bar, line, pie, and scatter analytics charting",
-    calc_feat_4: "Conditional formatting, pane freezing, and lightning data filtering",
+    calc_title: "ZenQ Calc — Smart & Powerful Spreadsheets",
+    calc_desc: "Open and analyze .xlsx datasets swiftly and accurately. Standard financial, logical, and lookup formulas paired with contemporary chart visualization tools.",
+    calc_feat_1: "Accurately read and write .xlsx, .xls, .csv, and .tsv formats",
+    calc_feat_2: "Over 300+ standard Excel functions (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
+    calc_feat_3: "Render bar, pie, line, and scatter charts in real time",
+    calc_feat_4: "Conditional formatting, freeze panes, and high-speed data filtering",
 
     // Slides Details
-    slides_title: "ZenQ Slides — Pro Presentations Built for PowerPoint 365",
-    slides_desc: "A presentation powerhouse with buttery-smooth animations, slide transitions, vector graphics, and a dedicated dual-screen Presenter View designed for stage and conference delivery.",
-    slides_feat_1: "Full support for .pptx and .ppt presentations preserving styling and layouts",
-    slides_feat_2: "Dual-monitor Presenter Mode with presenter notes, timer, and next slide peek",
-    slides_feat_3: "GPU-accelerated slide transitions via Direct2D with zero stutter",
-    slides_feat_4: "Comprehensive shape palette with smart magnetic alignment guides",
+    slides_title: "ZenQ Slides — Dynamic & Professional Presentations",
+    slides_desc: "Design impactful presentation decks with refined transition animations, vector shapes, table layouts, dual-monitor Presenter View, and smartphone remote control integration.",
+    slides_feat_1: "Open and edit .pptx and .ppt files preserving layout and typography",
+    slides_feat_2: "Dual-monitor Presenter View with speaker notes, timer, and next-slide preview",
+    slides_feat_3: "Fluid, high-fidelity slide transitions and vector graphic rendering",
+    slides_feat_4: "Standard shape library with smart magnetic alignment guides",
 
     // PDF Details
-    pdf_title: "ZenQ PDF — High-Performance Reader & Private Annotation",
-    pdf_desc: "Open multi-thousand-page PDF documents instantaneously. Built-in fast text searching, highlighting, document rotation, high-resolution rendering, and zero-cloud local security.",
-    pdf_feat_1: "Powered by a dedicated PDFium rendering engine for razor-sharp typography",
-    pdf_feat_2: "Instantaneous text lookup and smooth thumbnail navigation sidebar",
-    pdf_feat_3: "Official default PDF handler registration on Windows 10 & Windows 11",
-    pdf_feat_4: "100% on-device processing protecting confidential documents",
+    pdf_title: "ZenQ PDF — Secure Document Reader & Editor",
+    pdf_desc: "Open large PDF documents with ease. Built-in keyword search, text highlighting, page rotation, high-resolution image export, and privacy protection with zero cloud uploads.",
+    pdf_feat_1: "Dedicated PDF rendering engine for crisp text and line art",
+    pdf_feat_2: "Instant keyword search and smooth thumbnail page previews",
+    pdf_feat_3: "Convenient default PDF reader registration on Windows 10 & 11",
+    pdf_feat_4: "100% Local privacy with zero data transmission to external servers",
 
-    // Mobile Remote Details
-    mobile_title: "ZenQ Remote — Transform Your Smartphone into a Smart Trackpad & Keyboard",
-    mobile_desc: "Connect your mobile device over local Wi-Fi to advance slides wirelessly, input text remotely, execute two-finger scroll gestures, and access essential presentation shortcuts.",
-    mobile_feat_1: "Instant QR code pairing without installing mobile app stores software",
-    mobile_feat_2: "Fluid virtual trackpad with left/right clicks and dual-finger scrolling",
-    mobile_feat_3: "Full functional keyboard with Ctrl, Alt, Shift, and screenshot hotkeys",
-    mobile_feat_4: "Intelligent cursor auto-hiding during touch control to eliminate screen clutter",
+    // Core Highlights Section (Direct ZenQ Office capabilities)
+    highlights_section_badge: "CORE ADVANTAGES",
+    highlights_section_title: "The Pillars of ZenQ Office",
+    highlights_section_desc: "Engineered to deliver convenience, airtight security, and seamless daily productivity.",
 
-    // Engineering Architecture
-    arch_section_badge: "CORE ARCHITECTURE",
-    arch_section_title: "Engineered for Velocity & Sovereign Independence",
-    arch_section_desc: "No bloated Electron runtimes. No embedded heavy web browsers. ZenQ Office is purely authored in C# and .NET 10, executing directly against the native Windows API.",
+    feature_card1_title: "Full Microsoft Office Standard Compatibility",
+    feature_card1_desc: "Open, edit, and save .docx, .xlsx, .pptx, and .pdf documents with accurate layouts, tables, and fonts. Collaborate with colleagues effortlessly without formatting discrepancies.",
 
-    arch_card1_title: "Direct2D GPU Acceleration",
-    arch_card1_desc: "Harnesses your GPU to render every character glyph, vector shape, and slide transition at silky 60Hz - 120Hz monitor refresh rates.",
-    arch_card2_title: "Independent App-Branches",
-    arch_card2_desc: "Launch directly into ZenQ Writer for Word or ZenQ Calc for Excel straight from Desktop shortcuts without loading heavy hub shells.",
-    arch_card3_title: "100% Offline & Private",
-    arch_card3_desc: "No mandatory sign-ins, zero cloud telemetry collection, and no intrusive ads. Your documents remain strictly your property.",
-    arch_card4_title: "Ultra-Lean ~60MB RAM",
-    arch_card4_desc: "Intelligent buffer management immediately reclaims memory upon closing files, keeping your PC cool even on entry-level hardware.",
+    feature_card2_title: "100% Offline Security & Total Data Privacy",
+    feature_card2_desc: "ZenQ Office runs purely on your local machine. No mandatory accounts, no file telemetry to external servers, and zero collection of personal information.",
 
-    // Comparison Table
-    comp_section_badge: "FEATURE MATRIX",
-    comp_section_title: "ZenQ Office vs. Legacy Productivity Suites",
-    comp_section_desc: "See how ZenQ Office stands out when a productivity tool is purely engineered for speed, privacy, and user delight.",
-    comp_th_feature: "Evaluation Criteria",
-    comp_th_zenq: "ZenQ Office 4.0",
-    comp_th_mso: "Microsoft 365",
-    comp_th_wps: "WPS Office",
-    comp_row1_title: "Cold Startup Time",
-    comp_row1_zenq: "~0.05 seconds (Instant)",
-    comp_row1_mso: "4 - 8 seconds",
-    comp_row1_wps: "3 - 6 seconds",
-    comp_row2_title: "Average RAM Footprint",
-    comp_row2_zenq: "50 - 80 MB",
-    comp_row2_mso: "450 - 900 MB",
-    comp_row2_wps: "300 - 600 MB",
-    comp_row3_title: "Installer Package Size",
-    comp_row3_zenq: "~77 MB",
-    comp_row3_mso: "3.5 GB - 5 GB",
-    comp_row3_wps: "250 - 400 MB",
-    comp_row4_title: "Advertising Policy",
-    comp_row4_zenq: "100% Ad-Free Guarantee",
-    comp_row4_mso: "Subscription Upsells",
-    comp_row4_wps: "Intrusive Pop-ups & Ads",
-    comp_row5_title: "Offline Autonomy",
-    comp_row5_zenq: "Strictly On-Device",
-    comp_row5_mso: "Mandatory Cloud Sync",
-    comp_row5_wps: "Third-Party Cloud Storage",
-    comp_row6_title: "Licensing Model",
-    comp_row6_zenq: "Free Forever",
-    comp_row6_mso: "$69.99 / Year Subscription",
-    comp_row6_wps: "Freemium with Pro Paywall",
+    feature_card3_title: "Independent App Shortcuts or Tabbed Window",
+    feature_card3_desc: "Open Word files directly into ZenQ Writer or spreadsheets into ZenQ Calc from desktop shortcuts without unnecessary overhead, or combine them in a clean tabbed window.",
+
+    feature_card4_title: "Lifetime Free & 100% Ad-Free",
+    feature_card4_desc: "Committed to students, teachers, schools, and professionals forever. A pristine, distraction-free environment with zero popups and no hidden subscription costs.",
 
     // About Us Page / Section
     about_section_badge: "ABOUT US",
-    about_section_title: "Championing High-Performance Native Software from Vietnam",
-    about_lead: "Founded by the engineering team at NextGenEduSpace Studio, ZenQ Office arose from a fundamental frustration: Why should users be forced to tolerate multi-gigabyte office suites that crawl on startup and bombard them with adware?",
+    about_section_title: "Building Modern Office Software for the World",
+    about_lead: "Founded by NextGenEduSpace Studio, ZenQ Office was born from a fundamental question: Why should users tolerate bloated office software, forced cloud sign-ins, and intrusive advertisements?",
     
-    about_story_title: "The Genesis Story",
-    about_story_p1: "In today's digital landscape, documents embody knowledge and constitute the fundamental productivity bedrock for students, educators, and enterprise leaders. Yet prevailing software has become increasingly bloated, tethered to perpetual cloud dependencies, and demanding of costly hardware upgrades.",
-    about_story_p2: "We established the ZenQ Office initiative with a singular mission: Reimagine the desktop office experience on Windows with modern .NET 10, bringing document loading down to an instant sub-0.1s threshold while rigorously honoring user privacy.",
+    about_story_title: "The Origin Story",
+    about_story_p1: "In the digital era, documents represent knowledge and everyday productivity for students, educators, and professionals. Yet existing suites have grown increasingly complex, tied to constant online connections, and requiring expensive hardware.",
+    about_story_p2: "We established ZenQ Office with a singular focus: Redefine the Windows office experience with modern engineering, smooth workflows, and uncompromised respect for user privacy and document sovereignty.",
     
     about_vision_title: "Vision & Mission",
-    about_vision_desc: "To deliver the highest-caliber native desktop productivity suite from Vietnam, competing directly on execution speed and technical excellence with global software giants, while remaining permanently free for education.",
+    about_vision_desc: "Deliver high-standard localized office software in Vietnam that provides an independent, secure, and permanently free productivity foundation for education and communities.",
 
-    about_values_title: "Our Three Fundamental Pillars",
-    about_val1_title: "1. Uncompromising Velocity",
-    about_val1_desc: "Every algorithmic routine undergoes rigorous profiling. No user interaction is ever blocked by spinning progress circles or synthetic delays.",
-    about_val2_title: "2. Absolute Privacy Protection",
-    about_val2_desc: "Your files never leave your computer. We do not harvest behavioral telemetry, we never display ads, and we mandate zero forced account registrations.",
-    about_val3_title: "3. Precision & Refinement",
-    about_val3_desc: "Thoughtfully adhering to Windows 11 Fluent design principles, every control and layout is instinctively intuitive so you can be productive immediately.",
-
-    about_team_title: "The NextGenEduSpace Engineering Lab",
-    about_team_desc: "A passionate collective of systems software engineers, Direct2D/DirectX graphics architects, and algorithms researchers devoted to advancing sovereign native software.",
+    about_values_title: "Three Core Values",
+    about_val1_title: "1. Convenience & Fluidity",
+    about_val1_desc: "Writing, calculating, and presenting are optimized to feel natural, responsive, and uninterrupted.",
+    about_val2_title: "2. Inviolable Privacy",
+    about_val2_desc: "Your data belongs exclusively to you on your machine. We never inject telemetry trackers, display ads, or force account registrations.",
+    about_val3_title: "3. Elegance & Standards",
+    about_val3_desc: "A clean modern interface adhering to Windows standards with harmonious aesthetics and familiar workflows.",
 
     // FAQ Section
-    faq_section_badge: "FREQUENTLY ASKED QUESTIONS",
-    faq_section_title: "Clear Answers to Everything About ZenQ Office",
-    faq_section_desc: "Quick answers to licensing, format compatibility, installation, security, and technical specifications.",
+    faq_section_badge: "FAQ",
+    faq_section_title: "Frequently Asked Questions",
+    faq_section_desc: "Quick answers to common questions about licensing, compatibility, and features.",
     
     faq_filter_all: "All Questions",
-    faq_filter_install: "Setup & Licensing",
+    faq_filter_install: "Installation & License",
     faq_filter_compat: "Formats & Compatibility",
     faq_filter_security: "Security & Privacy",
-    faq_filter_perf: "Engineering & Speed",
+    faq_filter_perf: "Experience & Features",
 
-    faq_q1: "Is ZenQ Office genuinely free? Are there hidden fees or paywalls?",
-    faq_a1: "ZenQ Office is 100% free with zero hidden costs, no credit card requirements, and no trial period limits. We are committed to keeping this core desktop productivity suite perpetually free for students, educators, and the global computing community.",
+    faq_q1: "Is ZenQ Office truly free? Are there any hidden fees?",
+    faq_a1: "ZenQ Office is 100% free with no hidden fees, no credit card requirements, and no trial expiration. We are committed to keeping this core edition free forever for students, educators, and the community.",
 
-    faq_q2: "Can ZenQ Office open Microsoft Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) files?",
-    faq_a2: "Yes, with 100% native fidelity. ZenQ Office reads and writes ISO OpenXML international standard formats (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf). Layouts, typographic hierarchies, mathematical formulas, and presentation graphics remain fully preserved when shared with Microsoft Office users.",
+    faq_q2: "Can ZenQ Office open Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) files?",
+    faq_a2: "Yes, fully compatible. ZenQ Office reads and writes Microsoft Office OpenXML standards (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf), preserving formatting, tables, formulas, and slide layouts.",
 
-    faq_q3: "How do I configure ZenQ PDF or other ZenQ apps as the default handler on Windows?",
-    faq_a3: "Simply navigate to Settings -> Default Applications inside ZenQ Office and toggle the switch for your desired program (Writer, Calc, Slides, or PDF). On Windows 10/11, the app will trigger the official Windows Default Apps interface to confirm your association with a single click.",
+    faq_q3: "How do I set ZenQ PDF or other ZenQ apps as the default on Windows?",
+    faq_a3: "In ZenQ Office, navigate to Settings -> Default Apps, then toggle your preferred app (Writer, Calc, Slides, PDF). Windows Settings will guide you to confirm with a single click.",
 
-    faq_q4: "Is ZenQ Office secure? Does it upload my documents or collect telemetry?",
-    faq_a4: "It is strictly private and secure. ZenQ Office is an entirely autonomous offline application. Not a single line of code uploads your files or keystrokes to any remote server. The installer is clean, virus-free, and satisfies standard Windows enterprise deployment criteria.",
+    faq_q4: "Is ZenQ Office secure? Does it collect any personal data or documents?",
+    faq_a4: "Completely secure. ZenQ Office runs 100% locally offline. No code transmits your documents or personal information to the internet. The installer is clean and adheres to Windows security guidelines.",
 
-    faq_q5: "Can older or low-spec computers running Windows 10 run ZenQ Office smoothly?",
-    faq_a5: "Flawlessly. Thanks to native .NET 10 compilation and direct GPU rasterization via Direct2D, ZenQ Office consumes merely 50MB to 80MB of RAM, launches in ~0.05 seconds, and operates smoothly even on older laptops with 2GB - 4GB of system memory.",
+    faq_q5: "Does it run smoothly on standard or older PCs?",
+    faq_a5: "Yes, exceptionally smoothly. ZenQ Office is streamlined to operate quietly and responsively on standard office laptops and everyday PCs.",
 
-    faq_q6: "How does the ZenQ Remote smartphone controller feature work?",
-    faq_a6: "When presenting or viewing documents in ZenQ Office, click the mobile phone icon in the title bar. Scan the displayed QR code with any smartphone camera on the same local network (LAN/Wi-Fi). The remote controller runs in your mobile browser without installing third-party apps, providing slide triggers, a smooth virtual trackpad, and function keys.",
+    faq_q6: "Does ZenQ Office support printing and exporting to PDF?",
+    faq_a6: "Yes. Writer, Calc, and Slides all include high-quality PDF export and full Windows print dialog support for A4/A3 page sizes, duplex printing, and custom scaling.",
 
-    faq_q7: "Does ZenQ Office support printing and direct PDF document exporting?",
-    faq_a7: "Yes. All three authoring applications (Writer, Calc, and Slides) feature native high-resolution PDF export and integrate with the official Windows print subsystem, supporting standard A4, A3, landscape, duplex, and custom scaling options.",
+    faq_q7: "How do I update to the latest ZenQ Office release?",
+    faq_a7: "ZenQ Office includes an update checking mechanism. Click the Update button on the home screen or in Settings to quickly upgrade to the newest release.",
 
-    faq_q8: "How do I upgrade to the latest release of ZenQ Office?",
-    faq_a8: "ZenQ Office includes an automatic update verification utility. You can click the Windows 11 pill button on the home dashboard or check inside Settings. When a new release is available, a prompt will provide a one-click 'Update Now' button to upgrade smoothly within seconds.",
-
-    // Download & Footer
-    dl_section_badge: "GET STARTED",
-    dl_section_title: "Experience the Velocity of ZenQ Office",
-    dl_section_desc: "Download the official v4.0 Windows release. Installs in under 5 seconds and equips you for peak productivity immediately.",
+    // Download Section
+    dl_section_badge: "DOWNLOAD NOW",
+    dl_section_title: "Experience ZenQ Office for Windows",
+    dl_section_desc: "Download official release v4.0. Quick setup to start working productively today.",
     dl_btn_main: "Download Installer (ZenQOffice-Setup.exe)",
     dl_btn_portable: "Download Portable (.zip)",
+    
     dl_meta_ver: "Version:",
-    dl_meta_size: "File Size:",
-    dl_meta_os: "Supported OS:",
-    dl_meta_req: "Requirements:",
-    dl_meta_req_val: "Windows 10 / 11 (64-bit), self-contained .NET 10 engine",
+    dl_meta_os: "Operating System:",
+    dl_meta_os_val: "Windows 10 / 11 (64-bit)",
+    dl_meta_formats: "Supported Formats:",
+    dl_meta_formats_val: "DOCX, XLSX, PPTX, PDF",
+    dl_meta_license: "License:",
+    dl_meta_license_val: "Free for Lifetime",
 
-    footer_desc: "Next-generation office suite for Windows. Maximized velocity, absolute offline privacy, and permanently free.",
+    // Footer
+    footer_desc: "Next-generation office suite for Windows. Modern workflow, 100% offline security, and lifetime free.",
     footer_col_products: "Products",
     footer_col_resources: "Resources",
-    footer_col_company: "Company",
-    footer_col_legal: "Legal",
-    footer_copy: "© 2026 NextGenEduSpace Studio. All rights reserved. Proudly engineered in Vietnam."
+    footer_col_company: "Organization",
+    footer_copy: "© 2026 NextGenEduSpace Studio. All rights reserved. Developed proudly in Vietnam."
   }
 };
