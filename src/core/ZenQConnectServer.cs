@@ -257,10 +257,18 @@ namespace ZenQOffice.Core
             return null;
         }
 
-        public static byte[] CaptureScreenJpeg(int targetW = 960, int targetH = 540, long quality = 60L)
+        private static bool _lastShowCursor = false;
+
+        public static byte[] CaptureScreenJpeg(int targetW = 960, int targetH = 540, long quality = 60L, bool showCursor = false)
         {
             lock (_screenCaptureLock)
             {
+                if (showCursor != _lastShowCursor)
+                {
+                    _lastScreenBytes = null;
+                    _lastShowCursor = showCursor;
+                }
+
                 // Cache 35ms để phục vụ mượt mà ~20 FPS mà không làm nặng CPU
                 if (_lastScreenBytes != null && (DateTime.UtcNow - _lastCaptureTime).TotalMilliseconds < 35)
                 {
@@ -276,21 +284,24 @@ namespace ZenQOffice.Core
                         {
                             gScreen.CopyFromScreen(screenBounds.X, screenBounds.Y, 0, 0, screenBounds.Size, CopyPixelOperation.SourceCopy);
 
-                            // Vẽ con trỏ chuột thật của Windows lên ảnh
-                            try
+                            // Ẩn hoàn toàn con trỏ khi điều khiển cảm ứng. Chỉ vẽ nếu được bật cụ thể
+                            if (showCursor)
                             {
-                                CURSORINFO pci;
-                                pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
-                                if (GetCursorInfo(out pci) && pci.flags == 1 /* CURSOR_SHOWING */)
+                                try
                                 {
-                                    using (Icon icon = Icon.FromHandle(pci.hCursor))
+                                    CURSORINFO pci;
+                                    pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
+                                    if (GetCursorInfo(out pci) && pci.flags == 1 /* CURSOR_SHOWING */)
                                     {
-                                        Point cursorPt = new Point(pci.ptScreenPos.x - screenBounds.X, pci.ptScreenPos.y - screenBounds.Y);
-                                        gScreen.DrawIcon(icon, cursorPt.X, cursorPt.Y);
+                                        using (Icon icon = Icon.FromHandle(pci.hCursor))
+                                        {
+                                            Point cursorPt = new Point(pci.ptScreenPos.x - screenBounds.X, pci.ptScreenPos.y - screenBounds.Y);
+                                            gScreen.DrawIcon(icon, cursorPt.X, cursorPt.Y);
+                                        }
                                     }
                                 }
+                                catch { }
                             }
-                            catch { }
                         }
 
                         // Giữ tỉ lệ co giãn màn hình PC
@@ -439,7 +450,8 @@ namespace ZenQOffice.Core
                     targetH = 405;
                     quality = 48L;
                 }
-                byte[] jpegBytes = CaptureScreenJpeg(targetW, targetH, quality);
+                bool showCursor = path.Contains("show_cursor=1");
+                byte[] jpegBytes = CaptureScreenJpeg(targetW, targetH, quality, showCursor);
                 if (jpegBytes != null && jpegBytes.Length > 0)
                 {
                     string header = "HTTP/1.1 200 OK\r\n" +
@@ -856,8 +868,9 @@ namespace ZenQOffice.Core
                         break;
 
                     case "screen_scroll":
+                        double scrDx = GetDouble(dict, "dx", 0);
                         double scrDy = GetDouble(dict, "dy", 0);
-                        ScrollMouseSim(0, scrDy);
+                        ScrollMouseSim(scrDx, scrDy);
                         break;
 
                     case "key_down":
@@ -1354,6 +1367,9 @@ html, body {
     overflow: hidden;
     background: #000;
     touch-action: none;
+    cursor: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 #screenLiveImg {
     max-width: 100%;
@@ -1362,7 +1378,10 @@ html, body {
     height: auto;
     object-fit: contain;
     display: block;
-    cursor: crosshair;
+    cursor: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 .screen-touch-hint {
     position: absolute;
@@ -1842,6 +1861,7 @@ html, body {
             <button class=""os-key-btn"" id=""btnMod_alt"" onclick=""toggleStickyKey('alt')"">ALT</button>
             <button class=""os-key-btn"" id=""btnMod_shift"" onclick=""toggleStickyKey('shift')"">SHIFT</button>
             <button class=""os-key-btn"" id=""btnMod_win"" onclick=""toggleStickyKey('win')"">WIN</button>
+            <button class=""os-key-btn"" id=""btnToggleCursor"" onclick=""toggleScreenCursor()"">👁️ Con trỏ: Ẩn</button>
             <button class=""os-key-btn action"" onclick=""sendKeyPress('prtscn')"">📸 Chụp Màn Hình</button>
             <button class=""os-key-btn action"" id=""btnToggleKb"" onclick=""toggleScreenKeyboard()"">⌨️ Bàn Phím</button>
             <button class=""os-key-btn"" onclick=""sendKeyPress('esc')"">ESC</button>
@@ -2304,6 +2324,18 @@ function stopScreenStream() {
     }
 }
 
+let showCursorOnScreen = false;
+function toggleScreenCursor() {
+    showCursorOnScreen = !showCursorOnScreen;
+    const btn = document.getElementById('btnToggleCursor');
+    if (btn) {
+        btn.textContent = showCursorOnScreen ? '👁️ Con trỏ: Hiện' : '👁️ Con trỏ: Ẩn';
+        if (showCursorOnScreen) btn.classList.add('active'); else btn.classList.remove('active');
+    }
+    vibe(25);
+    requestNextScreenFrame();
+}
+
 function requestNextScreenFrame() {
     if (!screenStreaming || currentTab !== 2) return;
     const nextImg = new Image();
@@ -2321,7 +2353,7 @@ function requestNextScreenFrame() {
             screenRafId = setTimeout(requestNextScreenFrame, 500);
         }
     };
-    nextImg.src = '/screen.jpg?q=' + qParam + '&t=' + t;
+    nextImg.src = '/screen.jpg?q=' + qParam + (showCursorOnScreen ? '&show_cursor=1' : '') + '&t=' + t;
 }
 
 // ============================================
@@ -2376,7 +2408,6 @@ function sendScreenTextInput() {
 // TEAMVIEWER TOUCH GESTURE ENGINE CHO MÀN HÌNH PC
 // ============================================
 const sViewport = document.getElementById('screenViewport');
-let stCount = 0;
 let stStartX = 0, stStartY = 0;
 let stStartTime = 0;
 let stLastX = 0, stLastY = 0;
@@ -2387,7 +2418,11 @@ let stLastTapTime = 0;
 let stLastTapX = 0, stLastTapY = 0;
 let stSingleTapTimer = null;
 let stIsDoubleTapDragging = false;
-let stTwoFingerStartY = 0;
+
+// Quản lý riêng biệt và độc lập cho cử chỉ 2 ngón tay (Cuộn / Chuột phải)
+let stIsMultiTouchSession = false;
+let stMultiTouchEndTime = 0;
+let stTwoFingerStartX = 0, stTwoFingerStartY = 0;
 let stTwoFingerStartTime = 0;
 let stTwoFingerMoved = false;
 
@@ -2411,9 +2446,26 @@ function showTouchFeedback(clientX, clientY, text) {
 
 sViewport.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    stCount = e.touches.length;
+
+    // Nếu có từ 2 ngón tay trở lên: Ngay lập tức kích hoạt phiên Multi-Touch và hủy toàn bộ thao tác 1 ngón
+    if (e.touches.length >= 2) {
+        stIsMultiTouchSession = true;
+        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+        if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
+        stIsDoubleTapDragging = false;
+        stTwoFingerStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        stTwoFingerStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        stTwoFingerStartTime = Date.now();
+        stTwoFingerMoved = false;
+        return;
+    }
 
     if (e.touches.length === 1) {
+        // Nếu vừa kết thúc cử chỉ 2 ngón tay trong vòng 400ms: Bỏ qua ngón tay còn sót lại để tránh nhảy con trỏ/click
+        if (stIsMultiTouchSession || (Date.now() - stMultiTouchEndTime < 400)) {
+            return;
+        }
+
         const t = e.touches[0];
         stStartX = t.clientX;
         stStartY = t.clientY;
@@ -2423,7 +2475,7 @@ sViewport.addEventListener('touchstart', (e) => {
         stMoved = false;
         stIsLongPressed = false;
 
-        // Kiểm tra Nhấn đúp rồi kéo (Double-Tap & Drag - Kéo cửa sổ, bôi đen văn bản)
+        // Kiểm tra Nhấn đúp rồi kéo (Double-Tap & Drag - Kéo cửa sổ, bôi đen văn bản, di chuyển vật thể)
         const timeSinceLastTap = Date.now() - stLastTapTime;
         const distFromLastTap = Math.hypot(stStartX - stLastTapX, stStartY - stLastTapY);
         if (timeSinceLastTap < 350 && distFromLastTap < 30) {
@@ -2441,7 +2493,7 @@ sViewport.addEventListener('touchstart', (e) => {
         // Đếm nhấn giữ 450ms -> Chuột Phải (Long press Right click)
         if (stLongPressTimer) clearTimeout(stLongPressTimer);
         stLongPressTimer = setTimeout(() => {
-            if (!stMoved && stCount === 1) {
+            if (!stMoved && !stIsMultiTouchSession && (Date.now() - stMultiTouchEndTime >= 400)) {
                 stIsLongPressed = true;
                 vibe(45);
                 showTouchFeedback(stStartX, stStartY, '🖱️ Phải');
@@ -2449,20 +2501,38 @@ sViewport.addEventListener('touchstart', (e) => {
                 send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'right' });
             }
         }, 450);
-
-    } else if (e.touches.length === 2) {
-        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
-        if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
-        stIsDoubleTapDragging = false;
-        stTwoFingerStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        stTwoFingerStartTime = Date.now();
-        stTwoFingerMoved = false;
     }
 }, { passive: false });
 
 sViewport.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    stCount = e.touches.length;
+
+    // Xử lý cử chỉ 2 ngón tay: Cuộn trang (Scroll) mượt mà, KHÔNG di chuyển con trỏ chuột
+    if (e.touches.length >= 2) {
+        stIsMultiTouchSession = true;
+        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+        if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
+
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const dx = cx - stTwoFingerStartX;
+        const dy = cy - stTwoFingerStartY;
+        stTwoFingerStartX = cx;
+        stTwoFingerStartY = cy;
+
+        if (Math.abs(dy) > 1.2 || Math.abs(dx) > 1.5) {
+            stTwoFingerMoved = true;
+            let clampedDy = Math.max(-30, Math.min(30, dy * 0.75));
+            let clampedDx = Math.max(-30, Math.min(30, dx * 0.75));
+            send({ type: 'screen_scroll', dx: clampedDx, dy: clampedDy });
+        }
+        return;
+    }
+
+    // Nếu đang trong phiên 2 ngón hoặc vừa kết thúc 2 ngón: Chặn hoàn toàn không cho xử lý 1 ngón
+    if (stIsMultiTouchSession || (Date.now() - stMultiTouchEndTime < 400)) {
+        return;
+    }
 
     if (e.touches.length === 1) {
         const t = e.touches[0];
@@ -2476,23 +2546,10 @@ sViewport.addEventListener('touchmove', (e) => {
         stLastY = t.clientY;
         const norm = getScreenNorm(t.clientX, t.clientY);
 
+        // Chỉ gửi tọa độ di chuyển chuột KHI VÀ CHỈ KHI đang ở chế độ Kéo thả (Double-Tap Drag)
+        // Khi vuốt chạm thông thường, KHÔNG gửi screen_move để con trỏ chuột không bị chạy lung tung!
         if (stIsDoubleTapDragging) {
             send({ type: 'screen_move', x: norm.x, y: norm.y });
-        } else if (dist > 6) {
-            send({ type: 'screen_move', x: norm.x, y: norm.y });
-        }
-
-    } else if (e.touches.length === 2) {
-        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
-        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const dy = cy - stTwoFingerStartY;
-        stTwoFingerStartY = cy;
-
-        if (Math.abs(dy) > 1.5) {
-            stTwoFingerMoved = true;
-            // Cuộn 2 ngón tay dịu mượt, tránh giật trôi ở vùng animation
-            let clampedDy = Math.max(-28, Math.min(28, dy * 0.65));
-            send({ type: 'screen_scroll', dy: clampedDy });
         }
     }
 }, { passive: false });
@@ -2500,6 +2557,7 @@ sViewport.addEventListener('touchmove', (e) => {
 sViewport.addEventListener('touchend', (e) => {
     if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
 
+    // Nếu đang kéo thả (Double-Tap Drag)
     if (stIsDoubleTapDragging) {
         stIsDoubleTapDragging = false;
         const norm = getScreenNorm(stLastX, stLastY);
@@ -2508,29 +2566,48 @@ sViewport.addEventListener('touchend', (e) => {
         return;
     }
 
+    // Nếu còn ngón tay trên màn hình (ví dụ 1 ngón nhấc trước trong lúc dùng 2 ngón)
+    if (e.touches.length > 0) {
+        if (stIsMultiTouchSession) {
+            return; // Đợi tất cả các ngón nhấc hết, không coi ngón còn lại là click
+        }
+    }
+
     if (e.touches.length === 0) {
+        // Kết thúc phiên 2 ngón tay
+        if (stIsMultiTouchSession) {
+            stMultiTouchEndTime = Date.now();
+            stIsMultiTouchSession = false;
+            stSingleTapTimer = null;
+            stLastTapTime = 0;
+
+            // Nếu chỉ chạm 2 ngón nhanh rồi nhấc ra ngay (< 250ms, không cuộn) -> Chuột Phải
+            if (!stTwoFingerMoved && (Date.now() - stTwoFingerStartTime < 250)) {
+                vibe(35);
+                showTouchFeedback(stLastX, stLastY, '🖱️ Phải');
+                const norm = getScreenNorm(stLastX, stLastY);
+                send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'right' });
+            }
+            return;
+        }
+
+        // Bỏ qua nếu vừa kết thúc phiên 2 ngón tay trong vòng 400ms
+        if (Date.now() - stMultiTouchEndTime < 400) {
+            return;
+        }
+
         if (stIsLongPressed) {
             stLastTapTime = 0;
             return;
         }
 
-        // Chạm 2 ngón tay nhanh (< 280ms, không cuộn) = Chuột Phải
-        if (stCount === 2 && !stTwoFingerMoved && (Date.now() - stTwoFingerStartTime < 280)) {
-            vibe(35);
-            showTouchFeedback(stLastX, stLastY, '🖱️ Phải');
-            const norm = getScreenNorm(stLastX, stLastY);
-            send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'right' });
-            stLastTapTime = 0;
-            return;
-        }
-
-        // Chạm 1 ngón tay ngắn không di chuyển
+        // Thao tác chạm 1 ngón ngắn (Tap)
         if (!stMoved && (Date.now() - stStartTime < 280)) {
             const timeSinceLastTap = Date.now() - stLastTapTime;
             const distFromLastTap = Math.hypot(stStartX - stLastTapX, stStartY - stLastTapY);
 
             if (timeSinceLastTap < 300 && distFromLastTap < 25) {
-                // Nhấn đúp (Double Tap) = Double Click
+                // Nhấn đúp (Double Tap) = Nhấp đúp chuột
                 if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
                 vibe(35);
                 showTouchFeedback(stStartX, stStartY, '⚡ Nhấp đúp');
