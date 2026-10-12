@@ -36,14 +36,6 @@ namespace ZenQOffice
                         else appId = "ZenQOffice.Suite.Writer";
                     }
                 }
-                else if (AppSettings.Instance.LaunchAsStandaloneBranch)
-                {
-                    OfficeAppMode defApp = AppSettings.Instance.DefaultBranchApp;
-                    if (defApp == OfficeAppMode.Calc) appId = "ZenQOffice.Suite.Calc";
-                    else if (defApp == OfficeAppMode.Slides) appId = "ZenQOffice.Suite.Slides";
-                    else if (defApp == OfficeAppMode.Pdf) appId = "ZenQOffice.Suite.Pdf";
-                    else appId = "ZenQOffice.Suite.Writer";
-                }
                 try { SetCurrentProcessExplicitAppUserModelID(appId); } catch { }
 
                 // Tự động duy trì đăng ký định dạng tệp Office với Windows
@@ -486,11 +478,6 @@ namespace ZenQOffice
                 {
                     directFile = args[1];
                 }
-            }
-
-            if (!directMode.HasValue && AppSettings.Instance.LaunchAsStandaloneBranch)
-            {
-                directMode = AppSettings.Instance.DefaultBranchApp;
             }
 
             if (directMode.HasValue)

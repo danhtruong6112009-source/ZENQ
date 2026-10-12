@@ -193,6 +193,19 @@ namespace ZenQOffice.Core
             }
         }
 
+        public static void CreateMainHubShortcut()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string ico = Path.Combine(baseDir, "ZenQOffice.ico");
+            CreateShortcut("ZenQ Office", "", File.Exists(ico) ? "ZenQOffice.ico" : "ZenQOffice.ico", "ZenQ Office - Bộ ứng dụng văn phòng tích hợp đa năng");
+        }
+
+        public static void CreateAllShortcuts()
+        {
+            CreateMainHubShortcut();
+            CreateAllBranchShortcuts();
+        }
+
         public static void CreateAllBranchShortcuts()
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
