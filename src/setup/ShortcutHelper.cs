@@ -16,7 +16,7 @@ namespace ZenQOffice.Setup
             }
         }
 
-        public static void CreateShortcut(string targetExePath, string shortcutPath, string description, string iconPath = null)
+        public static void CreateShortcut(string targetExePath, string shortcutPath, string description, string iconPath = null, string arguments = null)
         {
             try
             {
@@ -30,6 +30,7 @@ namespace ZenQOffice.Setup
                     dynamic shell = Activator.CreateInstance(shellType);
                     dynamic shortcut = shell.CreateShortcut(shortcutPath);
                     shortcut.TargetPath = targetExePath;
+                    if (!string.IsNullOrEmpty(arguments)) shortcut.Arguments = arguments;
                     shortcut.WorkingDirectory = Path.GetDirectoryName(targetExePath);
                     shortcut.Description = description;
                     if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
@@ -53,16 +54,103 @@ namespace ZenQOffice.Setup
         {
             string exePath = Path.Combine(installDir, "ZenQOffice.exe");
             string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
+            string iconDir = Path.Combine(installDir, "icon");
+            string writerIco = Path.Combine(iconDir, "writer.ico");
+            string calcIco = Path.Combine(iconDir, "calc.ico");
+            string slidesIco = Path.Combine(iconDir, "present.ico");
+            string pdfIco = Path.Combine(iconDir, "pdf.ico");
 
-            // 1. Desktop Shortcut
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string desktopLnk = Path.Combine(desktop, "ZenQOffice.lnk");
-            CreateShortcut(exePath, desktopLnk, "ZenQOffice", icoPath);
-
-            // 2. Start Menu Shortcut
             string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
-            string startMenuLnk = Path.Combine(startMenu, "ZenQOffice.lnk");
-            CreateShortcut(exePath, startMenuLnk, "ZenQOffice", icoPath);
+
+            // 1. Tạo các lối tắt App Nhánh độc lập trên Desktop (Mở app nhánh, không chia tab, không mở app mẹ)
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Writer.lnk"), "ZenQ Writer - Soạn thảo văn bản độc lập", File.Exists(writerIco) ? writerIco : icoPath, "-word");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Calc.lnk"), "ZenQ Calc - Bảng tính điện tử độc lập", File.Exists(calcIco) ? calcIco : icoPath, "-calc");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Slides.lnk"), "ZenQ Slides - Thiết kế trình chiếu độc lập", File.Exists(slidesIco) ? slidesIco : icoPath, "-slides");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ PDF.lnk"), "ZenQ PDF - Trình đọc & biên tập PDF", File.Exists(pdfIco) ? pdfIco : icoPath, "-pdf");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQOffice.lnk"), "ZenQ Office Suite", icoPath, "");
+
+            // 2. Start Menu Shortcuts
+            CreateShortcut(exePath, Path.Combine(startMenu, "ZenQ Writer.lnk"), "ZenQ Writer", File.Exists(writerIco) ? writerIco : icoPath, "-word");
+            CreateShortcut(exePath, Path.Combine(startMenu, "ZenQ Calc.lnk"), "ZenQ Calc", File.Exists(calcIco) ? calcIco : icoPath, "-calc");
+            CreateShortcut(exePath, Path.Combine(startMenu, "ZenQ Slides.lnk"), "ZenQ Slides", File.Exists(slidesIco) ? slidesIco : icoPath, "-slides");
+            CreateShortcut(exePath, Path.Combine(startMenu, "ZenQ PDF.lnk"), "ZenQ PDF", File.Exists(pdfIco) ? pdfIco : icoPath, "-pdf");
+            CreateShortcut(exePath, Path.Combine(startMenu, "ZenQOffice.lnk"), "ZenQ Office Suite", icoPath, "");
+
+            // 3. Đăng ký nhận diện tệp với Windows Registry (File Associations)
+            RegisterFileAssociations(installDir);
+        }
+
+        public static void RegisterFileAssociations(string installDir)
+        {
+            try
+            {
+                string exePath = Path.Combine(installDir, "ZenQOffice.exe");
+                string iconDir = Path.Combine(installDir, "icon");
+                string mainIco = Path.Combine(installDir, "ZenQOffice.ico");
+
+                var types = new[]
+                {
+                    new { Ext = ".docx", ProgId = "ZenQOffice.Docx", Desc = "Tài liệu Microsoft Word (.docx)", Param = "-word", Icon = "writer.ico" },
+                    new { Ext = ".doc", ProgId = "ZenQOffice.Doc", Desc = "Tài liệu Word 97-2003 (.doc)", Param = "-word", Icon = "writer.ico" },
+                    new { Ext = ".rtf", ProgId = "ZenQOffice.Rtf", Desc = "Tài liệu Rich Text (.rtf)", Param = "-word", Icon = "writer.ico" },
+                    new { Ext = ".txt", ProgId = "ZenQOffice.Txt", Desc = "Tài liệu Văn bản (.txt)", Param = "-word", Icon = "writer.ico" },
+                    new { Ext = ".xlsx", ProgId = "ZenQOffice.Xlsx", Desc = "Bảng tính Microsoft Excel (.xlsx)", Param = "-calc", Icon = "calc.ico" },
+                    new { Ext = ".xls", ProgId = "ZenQOffice.Xls", Desc = "Bảng tính Excel 97-2003 (.xls)", Param = "-calc", Icon = "calc.ico" },
+                    new { Ext = ".csv", ProgId = "ZenQOffice.Csv", Desc = "Tệp dữ liệu CSV (.csv)", Param = "-calc", Icon = "calc.ico" },
+                    new { Ext = ".pptx", ProgId = "ZenQOffice.Pptx", Desc = "Bài trình chiếu PowerPoint (.pptx)", Param = "-slides", Icon = "present.ico" },
+                    new { Ext = ".ppt", ProgId = "ZenQOffice.Ppt", Desc = "Bài trình chiếu PowerPoint 97-2003 (.ppt)", Param = "-slides", Icon = "present.ico" },
+                    new { Ext = ".pdf", ProgId = "ZenQOffice.Pdf", Desc = "Tài liệu Adobe PDF (.pdf)", Param = "-pdf", Icon = "pdf.ico" }
+                };
+
+                foreach (var t in types)
+                {
+                    string ico = Path.Combine(iconDir, t.Icon);
+                    if (!File.Exists(ico)) ico = mainIco;
+
+                    using (RegistryKey pk = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + t.ProgId))
+                    {
+                        if (pk != null)
+                        {
+                            pk.SetValue("", t.Desc);
+                            pk.SetValue("FriendlyTypeName", t.Desc);
+                            using (RegistryKey ik = pk.CreateSubKey("DefaultIcon")) { if (ik != null) ik.SetValue("", ico + ",0"); }
+                            using (RegistryKey ck = pk.CreateSubKey(@"shell\open\command")) { if (ck != null) ck.SetValue("", "\"" + exePath + "\" " + t.Param + " \"%1\""); }
+                        }
+                    }
+
+                    using (RegistryKey ek = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + t.Ext))
+                    {
+                        if (ek != null)
+                        {
+                            ek.SetValue("", t.ProgId);
+                            using (RegistryKey ow = ek.CreateSubKey("OpenWithProgids")) { if (ow != null) ow.SetValue(t.ProgId, ""); }
+                        }
+                    }
+                }
+
+                using (RegistryKey reg = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications"))
+                {
+                    if (reg != null) reg.SetValue("ZenQOffice", @"Software\ZenQOffice\Capabilities");
+                }
+
+                using (RegistryKey cap = Registry.CurrentUser.CreateSubKey(@"Software\ZenQOffice\Capabilities"))
+                {
+                    if (cap != null)
+                    {
+                        cap.SetValue("ApplicationName", "ZenQ Office Suite");
+                        cap.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office");
+                        using (RegistryKey fa = cap.CreateSubKey("FileAssociations"))
+                        {
+                            if (fa != null)
+                            {
+                                foreach (var t in types) fa.SetValue(t.Ext, t.ProgId);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         public static void RemoveShortcuts()
@@ -70,16 +158,17 @@ namespace ZenQOffice.Setup
             try
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                string desktopLnk = Path.Combine(desktop, "ZenQOffice.lnk");
-                if (File.Exists(desktopLnk)) File.Delete(desktopLnk);
-                string oldDesktopLnk = Path.Combine(desktop, "ZenQOffice.lnk");
-                if (File.Exists(oldDesktopLnk)) File.Delete(oldDesktopLnk);
-
                 string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
-                string startMenuLnk = Path.Combine(startMenu, "ZenQOffice.lnk");
-                if (File.Exists(startMenuLnk)) File.Delete(startMenuLnk);
-                string oldStartMenuLnk = Path.Combine(startMenu, "ZenQOffice.lnk");
-                if (File.Exists(oldStartMenuLnk)) File.Delete(oldStartMenuLnk);
+
+                string[] lnkNames = { "ZenQ Writer.lnk", "ZenQ Calc.lnk", "ZenQ Slides.lnk", "ZenQ PDF.lnk", "ZenQOffice.lnk" };
+                foreach (string name in lnkNames)
+                {
+                    string dPath = Path.Combine(desktop, name);
+                    if (File.Exists(dPath)) File.Delete(dPath);
+
+                    string sPath = Path.Combine(startMenu, name);
+                    if (File.Exists(sPath)) File.Delete(sPath);
+                }
             }
             catch { }
         }

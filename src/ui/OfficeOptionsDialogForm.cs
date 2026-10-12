@@ -33,6 +33,12 @@ namespace ZenQOffice.UI
         private CheckBox _chkAiCopilot;
         private ComboBox _cboAiProvider;
 
+        // UI Controls - Mặc định & Khởi chạy
+        private RadioButton _rbLaunchStandalone;
+        private RadioButton _rbLaunchHub;
+        private ComboBox _cboDefaultBranch;
+        private CheckBox _chkRegOnStartup;
+
         // Navigation Panels
         private ListBox _navListBox;
         private Panel[] _contentPanels;
@@ -46,8 +52,8 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Tùy chọn - ZENQ OFFICE Suite 3.5";
-            this.Size = new Size(740, 530);
+            this.Text = "Tùy chọn - ZENQ OFFICE Suite 4.0";
+            this.Size = new Size(760, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -142,6 +148,7 @@ namespace ZenQOffice.UI
             _navListBox.Items.Add("💾 Lưu trữ & Tự động lưu");
             _navListBox.Items.Add("📐 Soạn thảo & Hiển thị");
             _navListBox.Items.Add("🤖 Trí tuệ nhân tạo (AI)");
+            _navListBox.Items.Add("📂 Mặc định & Khởi chạy");
             _navListBox.Items.Add("⌨ Phím tắt & Trợ giúp");
             _navListBox.SelectedIndex = 0;
 
@@ -178,8 +185,8 @@ namespace ZenQOffice.UI
             this.Controls.Add(contentHost);
             contentHost.BringToFront();
 
-            _contentPanels = new Panel[5];
-            for (int i = 0; i < 5; i++)
+            _contentPanels = new Panel[6];
+            for (int i = 0; i < 6; i++)
             {
                 _contentPanels[i] = new Panel
                 {
@@ -204,7 +211,8 @@ namespace ZenQOffice.UI
             BuildTabSave(_contentPanels[1]);
             BuildTabEditor(_contentPanels[2]);
             BuildTabAi(_contentPanels[3]);
-            BuildTabHelp(_contentPanels[4]);
+            BuildTabDefaultApps(_contentPanels[4]);
+            BuildTabHelp(_contentPanels[5]);
         }
 
         private void BuildTabAppearance(Panel p)
@@ -350,6 +358,186 @@ namespace ZenQOffice.UI
             p.Controls.Add(grpAi);
         }
 
+        private void BuildTabDefaultApps(Panel p)
+        {
+            int curY = 16;
+            Label lblTitle = new Label
+            {
+                Text = "Mặc định hệ thống & Khởi chạy Desktop",
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Location = new Point(10, curY),
+                AutoSize = true
+            };
+            p.Controls.Add(lblTitle);
+            curY += 36;
+
+            // Group 1: File Association
+            GroupBox grpAssoc = new GroupBox
+            {
+                Text = "Ứng dụng mặc định khi mở file (Windows File Association)",
+                Location = new Point(10, curY),
+                Size = new Size(490, 160),
+                Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(51, 65, 85)
+            };
+
+            Label lblAssocDesc = new Label
+            {
+                Text = "Đăng ký ZenQ Office làm ứng dụng mặc định cho các định dạng văn phòng (.docx, .doc, .xlsx, .xls, .csv, .pptx, .ppt, .pdf). Khi nhấn đúp chuột vào file trên máy tính, file sẽ tự động mở bằng ứng dụng nhánh tương ứng (ZenQ Writer, Calc, Slides, PDF) độc lập.",
+                Location = new Point(16, 24),
+                Size = new Size(460, 48),
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
+            grpAssoc.Controls.Add(lblAssocDesc);
+
+            _chkRegOnStartup = new CheckBox
+            {
+                Text = "Tự động duy trì đăng ký định dạng tệp với Windows mỗi khi khởi động",
+                Location = new Point(16, 76),
+                Size = new Size(460, 24),
+                Font = new Font("Segoe UI", 8.75f, FontStyle.Regular)
+            };
+            grpAssoc.Controls.Add(_chkRegOnStartup);
+
+            Button btnSetDefault = new Button
+            {
+                Text = "🔗 Đặt ZenQ Office làm mặc định ngay",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(37, 99, 235),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(240, 32),
+                Location = new Point(16, 110),
+                Cursor = Cursors.Hand
+            };
+            btnSetDefault.FlatAppearance.BorderSize = 0;
+            btnSetDefault.Click += (s, e) =>
+            {
+                try
+                {
+                    FileAssociationManager.RegisterAllFileAssociations();
+                    MessageBox.Show(this, "Đã đăng ký ZenQ Office làm ứng dụng mặc định cho các định dạng Word (.docx, .doc), Excel (.xlsx, .csv), PowerPoint (.pptx), PDF (.pdf) thành công!\nBiểu tượng tệp tin và menu ngữ cảnh Windows đã được cập nhật.", "Đăng ký mặc định thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Không thể đăng ký: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+            grpAssoc.Controls.Add(btnSetDefault);
+
+            Button btnOpenWinSettings = new Button
+            {
+                Text = "⚙ Mở Cài đặt Windows...",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(51, 65, 85),
+                BackColor = Color.FromArgb(241, 245, 249),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(180, 32),
+                Location = new Point(266, 110),
+                Cursor = Cursors.Hand
+            };
+            btnOpenWinSettings.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnOpenWinSettings.Click += (s, e) =>
+            {
+                FileAssociationManager.OpenWindowsDefaultAppsSettings();
+            };
+            grpAssoc.Controls.Add(btnOpenWinSettings);
+
+            p.Controls.Add(grpAssoc);
+            curY += 170;
+
+            // Group 2: Desktop & Launch Mode
+            GroupBox grpDesktop = new GroupBox
+            {
+                Text = "Khởi chạy từ Màn hình chính (Desktop & Taskbar)",
+                Location = new Point(10, curY),
+                Size = new Size(490, 190),
+                Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(51, 65, 85)
+            };
+
+            _rbLaunchStandalone = new RadioButton
+            {
+                Text = "Mở trực tiếp ứng dụng nhánh (Không mở App mẹ, không chia tab)",
+                Location = new Point(16, 24),
+                Size = new Size(460, 24),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                Checked = true
+            };
+            grpDesktop.Controls.Add(_rbLaunchStandalone);
+
+            Label lblBranchChoose = new Label
+            {
+                Text = "Ứng dụng nhánh mở khi nhấn icon tổng:",
+                Location = new Point(36, 52),
+                Size = new Size(230, 24),
+                Font = new Font("Segoe UI", 8.75f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
+            grpDesktop.Controls.Add(lblBranchChoose);
+
+            _cboDefaultBranch = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = new Point(270, 50),
+                Size = new Size(200, 24),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular)
+            };
+            _cboDefaultBranch.Items.AddRange(new object[]
+            {
+                "ZenQ Writer (Soạn thảo văn bản)",
+                "ZenQ Calc (Bảng tính Excel)",
+                "ZenQ Slides (Trình chiếu)",
+                "ZenQ PDF (Tài liệu PDF)"
+            });
+            _cboDefaultBranch.SelectedIndex = 0;
+            grpDesktop.Controls.Add(_cboDefaultBranch);
+
+            _rbLaunchHub = new RadioButton
+            {
+                Text = "Mở Hub tổng (Giao diện trung tâm chia tab nhiều tài liệu)",
+                Location = new Point(16, 86),
+                Size = new Size(460, 24),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular)
+            };
+            grpDesktop.Controls.Add(_rbLaunchHub);
+
+            _rbLaunchStandalone.CheckedChanged += (s, e) =>
+            {
+                _cboDefaultBranch.Enabled = _rbLaunchStandalone.Checked;
+            };
+
+            Button btnCreateBranchIcons = new Button
+            {
+                Text = "📌 Tạo lại các biểu tượng nhánh (Writer, Calc, Slides, PDF) ra Desktop",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                BackColor = Color.FromArgb(239, 246, 255),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(454, 34),
+                Location = new Point(16, 130),
+                Cursor = Cursors.Hand
+            };
+            btnCreateBranchIcons.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
+            btnCreateBranchIcons.Click += (s, e) =>
+            {
+                try
+                {
+                    DesktopShortcutManager.CreateAllBranchShortcuts();
+                    MessageBox.Show(this, "Đã tạo 4 biểu tượng lối tắt độc lập (ZenQ Writer, ZenQ Calc, ZenQ Slides, ZenQ PDF) trên Màn hình chính (Desktop)!\nBạn có thể khởi chạy thẳng từng ứng dụng nhánh riêng biệt.", "Tạo biểu tượng thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Không thể tạo biểu tượng: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+            grpDesktop.Controls.Add(btnCreateBranchIcons);
+
+            p.Controls.Add(grpDesktop);
+        }
+
         private void BuildTabHelp(Panel p)
         {
             int curY = 16;
@@ -441,6 +629,21 @@ namespace ZenQOffice.UI
             // AI
             _chkAiCopilot.Checked = s.AiCopilotEnabled;
             _cboAiProvider.SelectedIndex = Math.Max(0, Math.Min(3, s.SelectedAiProvider));
+
+            // Default Apps & Launch
+            if (s.LaunchAsStandaloneBranch) _rbLaunchStandalone.Checked = true;
+            else _rbLaunchHub.Checked = true;
+
+            switch (s.DefaultBranchApp)
+            {
+                case OfficeAppMode.Calc: _cboDefaultBranch.SelectedIndex = 1; break;
+                case OfficeAppMode.Slides: _cboDefaultBranch.SelectedIndex = 2; break;
+                case OfficeAppMode.Pdf: _cboDefaultBranch.SelectedIndex = 3; break;
+                default: _cboDefaultBranch.SelectedIndex = 0; break;
+            }
+            _cboDefaultBranch.Enabled = _rbLaunchStandalone.Checked;
+
+            _chkRegOnStartup.Checked = s.RegisterFileAssociationsOnStartup;
         }
 
         private void SaveSettings()
@@ -475,6 +678,26 @@ namespace ZenQOffice.UI
 
             s.AiCopilotEnabled = _chkAiCopilot.Checked;
             s.SelectedAiProvider = _cboAiProvider.SelectedIndex;
+
+            // Default Apps & Launch
+            s.LaunchAsStandaloneBranch = _rbLaunchStandalone.Checked;
+            switch (_cboDefaultBranch.SelectedIndex)
+            {
+                case 1: s.DefaultBranchApp = OfficeAppMode.Calc; break;
+                case 2: s.DefaultBranchApp = OfficeAppMode.Slides; break;
+                case 3: s.DefaultBranchApp = OfficeAppMode.Pdf; break;
+                default: s.DefaultBranchApp = OfficeAppMode.Writer; break;
+            }
+            s.RegisterFileAssociationsOnStartup = _chkRegOnStartup.Checked;
+
+            if (s.RegisterFileAssociationsOnStartup)
+            {
+                try
+                {
+                    FileAssociationManager.RegisterAllFileAssociations();
+                }
+                catch { }
+            }
 
             s.Save();
             s.NotifyChanged();

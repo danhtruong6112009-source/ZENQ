@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Xml;
+using ZenQOffice.UI;
 
 namespace ZenQOffice.Core
 {
@@ -59,6 +60,9 @@ namespace ZenQOffice.Core
         public bool CalcBarcodeScannerMode { get; set; }
         public bool PeripheralAutoNotify { get; set; }
         public bool AutoStraightenInk { get; set; } = true;
+        public bool LaunchAsStandaloneBranch { get; set; } = true;
+        public OfficeAppMode DefaultBranchApp { get; set; } = OfficeAppMode.Writer;
+        public bool RegisterFileAssociationsOnStartup { get; set; } = true;
 
         public event EventHandler SettingsChanged;
 
@@ -85,6 +89,9 @@ namespace ZenQOffice.Core
             CalcBarcodeScannerMode = false;
             PeripheralAutoNotify = true;
             AutoStraightenInk = true;
+            LaunchAsStandaloneBranch = true;
+            DefaultBranchApp = OfficeAppMode.Writer;
+            RegisterFileAssociationsOnStartup = true;
         }
 
         public static string GetSettingsFilePath()
@@ -191,6 +198,18 @@ namespace ZenQOffice.Core
                 elPeriphNotify.InnerText = PeripheralAutoNotify.ToString();
                 root.AppendChild(elPeriphNotify);
 
+                XmlElement elLaunchBranch = doc.CreateElement("LaunchAsStandaloneBranch");
+                elLaunchBranch.InnerText = LaunchAsStandaloneBranch.ToString();
+                root.AppendChild(elLaunchBranch);
+
+                XmlElement elBranchApp = doc.CreateElement("DefaultBranchApp");
+                elBranchApp.InnerText = ((int)DefaultBranchApp).ToString();
+                root.AppendChild(elBranchApp);
+
+                XmlElement elRegFiles = doc.CreateElement("RegisterFileAssociationsOnStartup");
+                elRegFiles.InnerText = RegisterFileAssociationsOnStartup.ToString();
+                root.AppendChild(elRegFiles);
+
                 doc.Save(path);
                 NotifyChanged();
             }
@@ -266,6 +285,15 @@ namespace ZenQOffice.Core
 
                         XmlNode nPeriphNotify = root.SelectSingleNode("PeripheralAutoNotify");
                         if (nPeriphNotify != null) { bool v; if (bool.TryParse(nPeriphNotify.InnerText, out v)) s.PeripheralAutoNotify = v; }
+
+                        XmlNode nLaunchBranch = root.SelectSingleNode("LaunchAsStandaloneBranch");
+                        if (nLaunchBranch != null) { bool v; if (bool.TryParse(nLaunchBranch.InnerText, out v)) s.LaunchAsStandaloneBranch = v; }
+
+                        XmlNode nBranchApp = root.SelectSingleNode("DefaultBranchApp");
+                        if (nBranchApp != null) { int v; if (int.TryParse(nBranchApp.InnerText, out v)) s.DefaultBranchApp = (OfficeAppMode)v; }
+
+                        XmlNode nRegFiles = root.SelectSingleNode("RegisterFileAssociationsOnStartup");
+                        if (nRegFiles != null) { bool v; if (bool.TryParse(nRegFiles.InnerText, out v)) s.RegisterFileAssociationsOnStartup = v; }
                     }
                 }
             }

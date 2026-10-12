@@ -32,6 +32,10 @@ if exist data\graphics.json (
     mkdir temp_dist\data >nul 2>&1
     copy /y data\graphics.json temp_dist\data\ >nul
 )
+if exist icon (
+    mkdir temp_dist\icon >nul 2>&1
+    copy /y icon\* temp_dist\icon\ >nul
+)
 
 powershell -Command "Compress-Archive -Path 'temp_dist\*' -DestinationPath 'payload.zip' -Force"
 rmdir /s /q temp_dist

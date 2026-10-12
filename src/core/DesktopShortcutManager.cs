@@ -192,5 +192,27 @@ namespace ZenQOffice.Core
                 return CreateShortcut(name, args, iconRelativePath, description);
             }
         }
+
+        public static void CreateAllBranchShortcuts()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string writerIco = Path.Combine(baseDir, "icon", "writer.ico");
+            string calcIco = Path.Combine(baseDir, "icon", "calc.ico");
+            string slidesIco = Path.Combine(baseDir, "icon", "present.ico");
+            string pdfIco = Path.Combine(baseDir, "icon", "pdf.ico");
+
+            CreateShortcut("ZenQ Writer", "-word", File.Exists(writerIco) ? "icon\\writer.ico" : "ZenQOffice.ico", "ZenQ Writer - Soạn thảo văn bản độc lập");
+            CreateShortcut("ZenQ Calc", "-calc", File.Exists(calcIco) ? "icon\\calc.ico" : "ZenQOffice.ico", "ZenQ Calc - Bảng tính điện tử độc lập");
+            CreateShortcut("ZenQ Slides", "-slides", File.Exists(slidesIco) ? "icon\\present.ico" : "ZenQOffice.ico", "ZenQ Slides - Thiết kế trình chiếu độc lập");
+            CreateShortcut("ZenQ PDF", "-pdf", File.Exists(pdfIco) ? "icon\\pdf.ico" : "ZenQOffice.ico", "ZenQ PDF - Đọc & biên tập tài liệu PDF");
+        }
+
+        public static void DeleteAllBranchShortcuts()
+        {
+            DeleteShortcut("ZenQ Writer");
+            DeleteShortcut("ZenQ Calc");
+            DeleteShortcut("ZenQ Slides");
+            DeleteShortcut("ZenQ PDF");
+        }
     }
 }

@@ -4,7 +4,7 @@ taskkill /f /im ZenQOffice.exe >nul 2>&1
 taskkill /f /im GenOffice.exe >nul 2>&1
 
 echo [BUILD] Compiling ZenQ Office on Modern .NET 10 (Release)...
-dotnet build ZenQOffice.csproj -c Release -v:m
+call dotnet build ZenQOffice.csproj -c Release -v:m
 
 if %ERRORLEVEL% EQU 0 (
     echo [DEPLOY] Copying binaries to root directory...
