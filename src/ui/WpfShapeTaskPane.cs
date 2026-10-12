@@ -98,7 +98,7 @@ namespace ZenQOffice.UI
             if (item.IsOnlineImage) 
             {
                 lock (_thumbLock) { _loadingThumbs.Add(cacheKey); }
-                System.Threading.Thread t = new System.Threading.Thread(() => 
+                System.Threading.ThreadPool.QueueUserWorkItem(_ => 
                 {
                     try 
                     {
@@ -115,9 +115,6 @@ namespace ZenQOffice.UI
                         lock (_thumbLock) { _loadingThumbs.Remove(cacheKey); }
                     }
                 });
-                t.IsBackground = true;
-                t.SetApartmentState(System.Threading.ApartmentState.STA);
-                t.Start();
                 return null;
             }
 

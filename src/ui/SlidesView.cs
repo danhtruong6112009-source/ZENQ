@@ -503,12 +503,10 @@ namespace ZenQOffice.UI
             IsEndSlideShowScreen = false;
             ZoomLevel = 1.0f;
             ZenQOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (cat) => {
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
             };
             ZenQOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
             };
 
             IsRemovingBackground = false;
@@ -1662,6 +1660,7 @@ namespace ZenQOffice.UI
         private int _cachedTransFromIdx = -1;
         private int _cachedTransToIdx = -1;
         private Size _cachedTransSize = Size.Empty;
+        private Bitmap _elementsDrawerBmp = null;
 
         public void ClearTransitionCache()
         {
@@ -4101,8 +4100,7 @@ namespace ZenQOffice.UI
                 IsElementsDrawerCollapsed = false;
             }
             ZoomToFit();
-            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void OpenGraphicsDrawer()
@@ -4112,6 +4110,12 @@ namespace ZenQOffice.UI
             if (isAlreadyOpen)
             {
                 IsElementsDrawerOpen = false;
+                if (_elementsDrawerBmp != null)
+                {
+                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                    try { _elementsDrawerBmp.Dispose(); } catch { }
+                    _elementsDrawerBmp = null;
+                }
             }
             else
             {
@@ -4127,8 +4131,7 @@ namespace ZenQOffice.UI
                 IsElementsDrawerCollapsed = false;
             }
             ZoomToFit();
-            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ToggleElementsDrawer(int targetTab = -1)
@@ -4138,6 +4141,12 @@ namespace ZenQOffice.UI
                 if (IsElementsDrawerOpen && ElementsDrawerSelectedTab == targetTab && !IsElementsDrawerCollapsed)
                 {
                     IsElementsDrawerOpen = false;
+                    if (_elementsDrawerBmp != null)
+                    {
+                        try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                        try { _elementsDrawerBmp.Dispose(); } catch { }
+                        _elementsDrawerBmp = null;
+                    }
                 }
                 else
                 {
@@ -4150,10 +4159,15 @@ namespace ZenQOffice.UI
             {
                 IsElementsDrawerOpen = !IsElementsDrawerOpen;
                 if (IsElementsDrawerOpen) IsElementsDrawerCollapsed = false;
+                else if (_elementsDrawerBmp != null)
+                {
+                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                    try { _elementsDrawerBmp.Dispose(); } catch { }
+                    _elementsDrawerBmp = null;
+                }
             }
             ZoomToFit();
-            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void CloseElementsDrawer()
@@ -4168,9 +4182,14 @@ namespace ZenQOffice.UI
             {
                 ShapeTaskPane.SearchText = "";
             }
+            if (_elementsDrawerBmp != null)
+            {
+                try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                try { _elementsDrawerBmp.Dispose(); } catch { }
+                _elementsDrawerBmp = null;
+            }
             ZoomToFit();
-            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ZoomToFit()
@@ -4485,14 +4504,24 @@ namespace ZenQOffice.UI
                     {
                         if (totalW > 0 && contentY + totalH > 0)
                         {
-                            using (Bitmap bmp = new Bitmap(totalW, contentY + totalH))
+                            int targetBmpH = contentY + totalH;
+                            if (_elementsDrawerBmp == null || _elementsDrawerBmp.Width != totalW || _elementsDrawerBmp.Height != targetBmpH)
                             {
-                                using (Graphics bmpG = Graphics.FromImage(bmp))
+                                if (_elementsDrawerBmp != null)
                                 {
-                                    ShapeTaskPane.Draw(bmpG, new Rectangle(0, contentY, totalW, totalH));
+                                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                                    try { _elementsDrawerBmp.Dispose(); } catch { }
                                 }
-                                g.DrawImage(bmp, 0, 0, totalW, contentY + totalH);
+                                _elementsDrawerBmp = new Bitmap(totalW, targetBmpH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                             }
+
+                            using (Graphics bmpG = Graphics.FromImage(_elementsDrawerBmp))
+                            {
+                                bmpG.Clear(Color.Transparent);
+                                ShapeTaskPane.Draw(bmpG, new Rectangle(0, contentY, totalW, totalH));
+                            }
+                            try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                            g.DrawImage(_elementsDrawerBmp, 0, 0, totalW, targetBmpH);
                         }
                     }
                     catch (Exception ex)
@@ -12983,7 +13012,12 @@ namespace ZenQOffice.UI
                     Image imageToDraw = shape.CachedImage;
                     RectangleF drawSrcRect = srcRect;
 
-                    if (isLargeImage && !hasFillRect && !IsCropping && bw > 300 && bh > 200)
+                    if (shape.DisplayCachedImage != null && !hasFillRect && !IsCropping && (bw <= 300 || bh <= 200))
+                    {
+                        imageToDraw = shape.DisplayCachedImage;
+                        drawSrcRect = new RectangleF(0, 0, shape.DisplayCachedW, shape.DisplayCachedH);
+                    }
+                    else if (isLargeImage && !hasFillRect && !IsCropping && bw > 300 && bh > 200)
                     {
                         if (shape.DisplayCachedImage == null ||
                             Math.Abs(shape.DisplayCachedW - bw) > 24 ||
@@ -24465,7 +24499,6 @@ namespace ZenQOffice.UI
                     if (InvalidateCallback != null) InvalidateCallback();
                 }
 
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -24480,8 +24513,7 @@ namespace ZenQOffice.UI
             {
                 if (ShapeTaskPane.HandleMouseMove(mousePos))
                 {
-                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
             }
@@ -24531,8 +24563,7 @@ namespace ZenQOffice.UI
                     ThumbScrollY = Math.Max(0, Math.Min(maxScroll, newScroll));
                     SmoothThumbScrollY = ThumbScrollY;
                     TargetThumbScrollY = ThumbScrollY;
-                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                 }
                 return;
             }
@@ -24543,7 +24574,6 @@ namespace ZenQOffice.UI
             _isHoverThumbScrollBar = !ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos);
             if (prevHoverThumb != _isHoverThumbScrollBarThumb || prevHoverTrack != _isHoverThumbScrollBar)
             {
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -24609,7 +24639,6 @@ namespace ZenQOffice.UI
                 {
                     HasColorPickHover = false;
                 }
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -24832,7 +24861,6 @@ namespace ZenQOffice.UI
                 ClampScroll(canvasW, contentH);
                 SmoothCanvasScrollX = CanvasScrollX;
                 TargetCanvasScrollX = CanvasScrollX;
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -24856,7 +24884,6 @@ namespace ZenQOffice.UI
                 ClampScroll(canvasW, contentH);
                 SmoothCanvasScrollY = CanvasScrollY;
                 TargetCanvasScrollY = CanvasScrollY;
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -24885,8 +24912,7 @@ namespace ZenQOffice.UI
 
                 if (oldHoverH != IsHoverHScrollBarThumb || oldHoverV != IsHoverVScrollBarThumb)
                 {
-                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                 }
             }
 
@@ -24991,7 +25017,6 @@ namespace ZenQOffice.UI
                 }
 
                 SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -25074,7 +25099,6 @@ namespace ZenQOffice.UI
                 int currIdx = GetTextCharIndexFromPoint(mousePos, EditingShape, slideX, slideY, scale);
                 TextSelectionLength = currIdx - TextSelectionStart;
                 CaretIndex = currIdx;
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -26113,7 +26137,6 @@ namespace ZenQOffice.UI
             if (ShapeTaskPane != null && ShapeTaskPane.IsDraggingScrollbar)
             {
                 ShapeTaskPane.HandleMouseUp(mousePos);
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -26132,7 +26155,6 @@ namespace ZenQOffice.UI
                     if (SelectedShapeIndices != null) SelectedShapeIndices.Clear();
                     EndInlineEditing();
                 }
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
 
@@ -26347,7 +26369,6 @@ namespace ZenQOffice.UI
             {
                 IsRubberbandSelecting = false;
                 _rubberbandInitialSelection.Clear();
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
             if (DragStartTransforms != null) DragStartTransforms.Clear();
@@ -27114,8 +27135,7 @@ namespace ZenQOffice.UI
                 {
                     IsColorPickingMode = false;
                     HasColorPickHover = false;
-                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
                 if (IsDrawingShapeMode || IsDrawingActive)
@@ -27157,8 +27177,7 @@ namespace ZenQOffice.UI
                         if (ActiveSlide.Shapes[i].IsVisible) SelectedShapeIndices.Add(i);
                     }
                     SelectedShapeIndex = SelectedShapeIndices.Count > 0 ? SelectedShapeIndices[SelectedShapeIndices.Count - 1] : -1;
-                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
-                if (InvalidateCallback != null) InvalidateCallback();
+                    if (InvalidateCallback != null) InvalidateCallback();
                     return;
                 }
             }
