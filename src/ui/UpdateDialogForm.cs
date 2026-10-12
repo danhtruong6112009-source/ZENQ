@@ -290,27 +290,34 @@ namespace ZenQOffice.UI
 
             if (info.HasUpdate)
             {
-                _lblNewVersion.Text = string.IsNullOrEmpty(info.TagName) ? "Bản mới" : info.TagName;
+                string newVer = string.IsNullOrEmpty(info.TagName) ? "Bản mới" : info.TagName;
+                _lblNewVersion.Text = newVer;
                 _lblNewVersion.ForeColor = Color.FromArgb(16, 185, 129); // Emerald green
-                _lblStatus.Text = "✨ Đã có bản cập nhật mới sẵn sàng tải xuống!";
+                _lblStatus.Text = "✨ Đã có bản cập nhật mới (" + newVer + ") sẵn sàng tải xuống!";
                 _lblStatus.ForeColor = Color.FromArgb(16, 185, 129);
                 _btnUpdate.Enabled = true;
+                _btnUpdate.Text = "Cập nhật ngay";
+                _btnUpdate.BackColor = Color.FromArgb(210, 71, 38);
             }
             else if (!string.IsNullOrEmpty(info.ErrorMessage))
             {
-                _lblNewVersion.Text = "Không rõ";
-                _lblNewVersion.ForeColor = Color.FromArgb(100, 116, 139);
-                _lblStatus.Text = "⚠️ " + info.ErrorMessage;
-                _lblStatus.ForeColor = Color.FromArgb(217, 119, 6);
+                _lblNewVersion.Text = UpdateManager.CURRENT_VERSION_TAG;
+                _lblNewVersion.ForeColor = Color.FromArgb(71, 85, 105);
+                _lblStatus.Text = "ℹ️ " + info.ErrorMessage;
+                _lblStatus.ForeColor = Color.FromArgb(100, 116, 139);
                 _btnUpdate.Enabled = false;
+                _btnUpdate.Text = "Đã mới nhất";
+                _btnUpdate.BackColor = Color.FromArgb(148, 163, 184);
             }
             else
             {
                 _lblNewVersion.Text = string.IsNullOrEmpty(info.TagName) ? UpdateManager.CURRENT_VERSION_TAG : info.TagName;
-                _lblNewVersion.ForeColor = Color.FromArgb(71, 85, 105);
-                _lblStatus.Text = "✅ Bạn đang sử dụng phiên bản mới nhất.";
+                _lblNewVersion.ForeColor = Color.FromArgb(16, 185, 129);
+                _lblStatus.Text = "✅ Ứng dụng của bạn đang ở phiên bản mới nhất (" + _lblNewVersion.Text + ").";
                 _lblStatus.ForeColor = Color.FromArgb(16, 185, 129);
                 _btnUpdate.Enabled = false;
+                _btnUpdate.Text = "Đã mới nhất";
+                _btnUpdate.BackColor = Color.FromArgb(148, 163, 184);
             }
         }
 

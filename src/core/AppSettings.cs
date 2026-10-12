@@ -63,6 +63,7 @@ namespace ZenQOffice.Core
         public bool LaunchAsStandaloneBranch { get; set; } = true;
         public OfficeAppMode DefaultBranchApp { get; set; } = OfficeAppMode.Writer;
         public bool RegisterFileAssociationsOnStartup { get; set; } = false;
+        public string LastNotifiedUpdateVersion { get; set; } = "";
 
         public event EventHandler SettingsChanged;
 
@@ -210,6 +211,10 @@ namespace ZenQOffice.Core
                 elRegFiles.InnerText = RegisterFileAssociationsOnStartup.ToString();
                 root.AppendChild(elRegFiles);
 
+                XmlElement elLastNotif = doc.CreateElement("LastNotifiedUpdateVersion");
+                elLastNotif.InnerText = LastNotifiedUpdateVersion ?? "";
+                root.AppendChild(elLastNotif);
+
                 doc.Save(path);
                 NotifyChanged();
             }
@@ -294,6 +299,9 @@ namespace ZenQOffice.Core
 
                         XmlNode nRegFiles = root.SelectSingleNode("RegisterFileAssociationsOnStartup");
                         if (nRegFiles != null) { bool v; if (bool.TryParse(nRegFiles.InnerText, out v)) s.RegisterFileAssociationsOnStartup = v; }
+
+                        XmlNode nLastNotif = root.SelectSingleNode("LastNotifiedUpdateVersion");
+                        if (nLastNotif != null) { s.LastNotifiedUpdateVersion = nLastNotif.InnerText ?? ""; }
                     }
                 }
             }

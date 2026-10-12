@@ -995,6 +995,52 @@ namespace ZenQOffice.UI
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnSystemDisplaySettingsChanged;
 
             SetupMobileConnectServer();
+            CheckAppUpdateOnStartup();
+        }
+
+        private void CheckAppUpdateOnStartup()
+        {
+            try
+            {
+                UpdateManager.CheckForUpdateAsync((release) =>
+                {
+                    if (this.IsDisposed) return;
+                    if (release != null && release.HasUpdate)
+                    {
+                        string newVer = release.TagName;
+                        // Chỉ thông báo 1 lần duy nhất khi vừa vào app cho phiên bản này:
+                        if (!string.IsNullOrEmpty(newVer) && !string.Equals(AppSettings.Instance.LastNotifiedUpdateVersion, newVer, StringComparison.OrdinalIgnoreCase))
+                        {
+                            AppSettings.Instance.LastNotifiedUpdateVersion = newVer;
+                            AppSettings.Instance.Save();
+
+                            if (this.IsHandleCreated)
+                            {
+                                this.BeginInvoke((MethodInvoker)delegate
+                                {
+                                    if (this.IsDisposed) return;
+                                    using (UpdateDialogForm dlg = new UpdateDialogForm(release))
+                                    {
+                                        dlg.ShowDialog(this);
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                    if (this.IsHandleCreated)
+                    {
+                        this.BeginInvoke((MethodInvoker)delegate
+                        {
+                            if (!this.IsDisposed && Ribbon.CurrentMode == OfficeAppMode.Home)
+                            {
+                                Invalidate();
+                            }
+                        });
+                    }
+                });
+            }
+            catch { }
         }
 
         private const int WM_NCCALCSIZE = 0x0083;

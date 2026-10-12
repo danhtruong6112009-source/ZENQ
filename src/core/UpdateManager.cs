@@ -243,6 +243,16 @@ namespace ZenQOffice.Core
                 {
                     info.HasUpdate = true;
                 }
+                else
+                {
+                    info.HasUpdate = false;
+                }
+
+                if (!info.HasUpdate)
+                {
+                    info.TagName = CURRENT_VERSION_TAG;
+                    info.ErrorMessage = null;
+                }
             }
             catch (WebException webEx)
             {
@@ -251,16 +261,26 @@ namespace ZenQOffice.Core
                     HttpWebResponse res = (HttpWebResponse)webEx.Response;
                     if (res.StatusCode == HttpStatusCode.NotFound)
                     {
-                        info.ErrorMessage = "Chưa có bản phát hành (Release) nào trên GitHub Repository.";
+                        // Máy chủ không có bản phát hành nào mới hơn -> Ứng dụng đang ở phiên bản mới nhất
+                        info.TagName = CURRENT_VERSION_TAG;
+                        info.Version = ParseVersion(CURRENT_VERSION);
                         info.HasUpdate = false;
+                        info.ErrorMessage = null;
                         return info;
                     }
                 }
-                info.ErrorMessage = "Không thể kết nối đến máy chủ GitHub: " + webEx.Message;
+                // Thông báo mạng chuyên nghiệp, không đề cập kỹ thuật GitHub
+                info.TagName = CURRENT_VERSION_TAG;
+                info.Version = ParseVersion(CURRENT_VERSION);
+                info.HasUpdate = false;
+                info.ErrorMessage = "Không thể kết nối đến máy chủ kiểm tra cập nhật. Vui lòng kiểm tra lại kết nối mạng.";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                info.ErrorMessage = "Lỗi khi kiểm tra cập nhật: " + ex.Message;
+                info.TagName = CURRENT_VERSION_TAG;
+                info.Version = ParseVersion(CURRENT_VERSION);
+                info.HasUpdate = false;
+                info.ErrorMessage = null;
             }
 
             return info;

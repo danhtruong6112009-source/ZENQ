@@ -53,6 +53,8 @@ namespace ZenQOffice.UI
         public int HoverRowStar = -1;
         public bool HoverMyDocsOpenFileBtn = false;
         public int HoverPillIndex = -1;
+        public bool HoverRightPanelUpdateBtn = false;
+        public RectangleF RightPanelUpdateBtnRect = RectangleF.Empty;
 
         public struct FilterPill
         {
@@ -78,7 +80,7 @@ namespace ZenQOffice.UI
                        HoverHelpBtn || HoverUpdateBtn || HoverSidebarDoc || HoverSidebarRecent ||
                        HoverSidebarStar || HoverSidebarApp >= 0 || HoverPromoBtn ||
                        HoverStorageManage || HoverTemplateIndex >= 0 || HoverRowStar >= 0 ||
-                       HoverMyDocsOpenFileBtn || HoverPillIndex >= 0;
+                       HoverMyDocsOpenFileBtn || HoverPillIndex >= 0 || HoverRightPanelUpdateBtn;
             }
         }
 
@@ -2248,6 +2250,34 @@ namespace ZenQOffice.UI
                     g.DrawString(features[i], featFont, featB, px + 18f, fy);
                 }
             }
+
+            // ── 5. Nút "Cập nhật ngay" ở góc dưới bên phải (dưới Tự động lưu bản thảo an toàn) ──
+            float btnY = featY + 22f + features.Length * 22f + 14f;
+            RightPanelUpdateBtnRect = new RectangleF(px, btnY, pw, 36f);
+
+            bool hasNewUpdate = (UpdateManager.LastReleaseInfo != null && UpdateManager.LastReleaseInfo.HasUpdate);
+            Color btnBg = hasNewUpdate ? Color.FromArgb(220, 38, 38) : (HoverRightPanelUpdateBtn ? Color.FromArgb(239, 246, 255) : Color.White);
+            Color btnBorder = hasNewUpdate ? Color.FromArgb(185, 28, 28) : (HoverRightPanelUpdateBtn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225));
+            Color btnText = hasNewUpdate ? Color.White : (HoverRightPanelUpdateBtn ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235));
+
+            using (GraphicsPath btnPath = CreateRoundedRectanglePath(RightPanelUpdateBtnRect, 6f))
+            using (SolidBrush bgB = new SolidBrush(btnBg))
+            using (Pen borderP = new Pen(btnBorder, 1.2f))
+            {
+                g.FillPath(bgB, btnPath);
+                g.DrawPath(borderP, btnPath);
+            }
+
+            string btnCaption = hasNewUpdate
+                ? ("🚀 Cập nhật ngay (" + UpdateManager.LastReleaseInfo.TagName + ")")
+                : "⚡ Cập nhật ngay";
+
+            using (Font btnF = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (SolidBrush textB = new SolidBrush(btnText))
+            {
+                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(btnCaption, btnF, textB, RightPanelUpdateBtnRect, sf);
+            }
         }
 
         public void Draw(Graphics g, int width, int height)
@@ -3417,6 +3447,7 @@ namespace ZenQOffice.UI
             bool prevStorage = HoverStorageManage;
             int prevTmpl = HoverTemplateIndex;
             int prevRowStar = HoverRowStar;
+            bool prevUpdBtn = HoverRightPanelUpdateBtn;
 
             HoverTabIndex = -1;
             HoverSidebarDoc = false;
@@ -3427,6 +3458,7 @@ namespace ZenQOffice.UI
             HoverStorageManage = false;
             HoverTemplateIndex = -1;
             HoverRowStar = -1;
+            HoverRightPanelUpdateBtn = false;
 
             RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
             RectangleF openDocNav = GetOpenDocNavBounds(width, height);
@@ -3471,6 +3503,7 @@ namespace ZenQOffice.UI
             {
                 HoverPromoBtn = GetPromoBtnBounds(width).Contains(x, y);
                 HoverStorageManage = GetStorageManageBounds(width).Contains(x, y);
+                HoverRightPanelUpdateBtn = RightPanelUpdateBtnRect.Contains(x, y);
                 for (int t = 0; t < 4; t++)
                 {
                     if (GetTemplateCardBounds(t, width).Contains(x, y))
@@ -3569,7 +3602,8 @@ namespace ZenQOffice.UI
                     prevHelp != HoverHelpBtn || prevUpdate != HoverUpdateBtn || prevSideDoc != HoverSidebarDoc ||
                     prevSideRec != HoverSidebarRecent || prevSideStar != HoverSidebarStar ||
                     prevSideApp != HoverSidebarApp || prevPromo != HoverPromoBtn ||
-                    prevStorage != HoverStorageManage || prevTmpl != HoverTemplateIndex || prevRowStar != HoverRowStar);
+                    prevStorage != HoverStorageManage || prevTmpl != HoverTemplateIndex || prevRowStar != HoverRowStar ||
+                    prevUpdBtn != HoverRightPanelUpdateBtn);
         }
 
         public OfficeAppMode? HandleClick(int x, int y, int width, int height, out string docTitle)
@@ -3801,6 +3835,16 @@ namespace ZenQOffice.UI
                         openFilePath = tPath;
                         return OfficeAppMode.Calc;
                     }
+                }
+
+                // Nút "Cập nhật ngay" ở góc dưới bên phải (dưới Tự động lưu bản thảo an toàn)
+                if (RightPanelUpdateBtnRect.Contains(x, y))
+                {
+                    using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
+                    {
+                        dlg.ShowDialog();
+                    }
+                    return null;
                 }
             }
 
