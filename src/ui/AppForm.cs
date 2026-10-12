@@ -558,6 +558,9 @@ namespace ZenQOffice.UI
         private FormBorderStyle _prevFormBorderStyle = FormBorderStyle.Sizable;
         private Rectangle _prevBounds = Rectangle.Empty;
         private SlideShowAudienceForm _audienceForm = null;
+        private bool _isCaptionClosePressed = false;
+        private bool _isCaptionMaxPressed = false;
+        private bool _isCaptionMinPressed = false;
 
         [System.Runtime.InteropServices.DllImport("winmm.dll", EntryPoint = "timeBeginPeriod", SetLastError = true)]
         private static extern uint TimeBeginPeriod(uint uMilliseconds);
@@ -2275,17 +2278,23 @@ namespace ZenQOffice.UI
                     {
                         if (!Ribbon.CaptionCloseBounds.IsEmpty && Ribbon.CaptionCloseBounds.Contains(e.X, e.Y))
                         {
-                            this.Close();
+                            _isCaptionClosePressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionCloseBounds);
                             return;
                         }
                         if (!Ribbon.CaptionMaxBounds.IsEmpty && Ribbon.CaptionMaxBounds.Contains(e.X, e.Y))
                         {
-                            this.WindowState = (this.WindowState == FormWindowState.Maximized) ? FormWindowState.Normal : FormWindowState.Maximized;
+                            _isCaptionMaxPressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionMaxBounds);
                             return;
                         }
                         if (!Ribbon.CaptionMinBounds.IsEmpty && Ribbon.CaptionMinBounds.Contains(e.X, e.Y))
                         {
-                            this.WindowState = FormWindowState.Minimized;
+                            _isCaptionMinPressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionMinBounds);
                             return;
                         }
                         if (!Ribbon.CaptionTouchModeBounds.IsEmpty && Ribbon.CaptionTouchModeBounds.Contains(e.X, e.Y))
@@ -2557,17 +2566,23 @@ namespace ZenQOffice.UI
                     {
                         if (!Ribbon.CaptionCloseBounds.IsEmpty && Ribbon.CaptionCloseBounds.Contains(e.X, e.Y))
                         {
-                            this.Close();
+                            _isCaptionClosePressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionCloseBounds);
                             return;
                         }
                         if (!Ribbon.CaptionMaxBounds.IsEmpty && Ribbon.CaptionMaxBounds.Contains(e.X, e.Y))
                         {
-                            this.WindowState = (this.WindowState == FormWindowState.Maximized) ? FormWindowState.Normal : FormWindowState.Maximized;
+                            _isCaptionMaxPressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionMaxBounds);
                             return;
                         }
                         if (!Ribbon.CaptionMinBounds.IsEmpty && Ribbon.CaptionMinBounds.Contains(e.X, e.Y))
                         {
-                            this.WindowState = FormWindowState.Minimized;
+                            _isCaptionMinPressed = true;
+                            this.Capture = true;
+                            Invalidate(Ribbon.CaptionMinBounds);
                             return;
                         }
                         if (!Ribbon.CaptionTouchModeBounds.IsEmpty && Ribbon.CaptionTouchModeBounds.Contains(e.X, e.Y))
@@ -3166,6 +3181,44 @@ namespace ZenQOffice.UI
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+
+            if (e.Button == MouseButtons.Left)
+            {
+                bool wasClose = _isCaptionClosePressed;
+                bool wasMax = _isCaptionMaxPressed;
+                bool wasMin = _isCaptionMinPressed;
+
+                _isCaptionClosePressed = false;
+                _isCaptionMaxPressed = false;
+                _isCaptionMinPressed = false;
+
+                if (this.Capture)
+                {
+                    this.Capture = false;
+                }
+
+                if (Ribbon != null)
+                {
+                    if (wasClose && !Ribbon.CaptionCloseBounds.IsEmpty && Ribbon.CaptionCloseBounds.Contains(e.X, e.Y))
+                    {
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            this.Close();
+                        }));
+                        return;
+                    }
+                    if (wasMax && !Ribbon.CaptionMaxBounds.IsEmpty && Ribbon.CaptionMaxBounds.Contains(e.X, e.Y))
+                    {
+                        this.WindowState = (this.WindowState == FormWindowState.Maximized) ? FormWindowState.Normal : FormWindowState.Maximized;
+                        return;
+                    }
+                    if (wasMin && !Ribbon.CaptionMinBounds.IsEmpty && Ribbon.CaptionMinBounds.Contains(e.X, e.Y))
+                    {
+                        this.WindowState = FormWindowState.Minimized;
+                        return;
+                    }
+                }
+            }
             IsDraggingZoomSlider = false;
             if (_isTouchPanningDrag)
             {
@@ -5953,6 +6006,16 @@ namespace ZenQOffice.UI
                 {
                     SessionManager.SaveSession(this);
                 }
+            }
+            catch { }
+            try
+            {
+                SlideVideoPlayerManager.Instance.Stop();
+            }
+            catch { }
+            try
+            {
+                SlideAudioPlayerManager.Instance.Stop();
             }
             catch { }
             try

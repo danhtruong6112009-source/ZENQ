@@ -480,7 +480,11 @@ namespace ZenQOffice
                 // MỞ THẲNG NGAY LẬP TỨC: Bỏ qua Splash Screen & toàn bộ animation
                 AppForm mainForm = new AppForm();
                 MainForm = mainForm;
-                mainForm.FormClosed += (s, e) => ExitThread();
+                mainForm.FormClosed += (s, e) =>
+                {
+                    ExitThread();
+                    try { Environment.Exit(0); } catch { }
+                };
 
                 mainForm.OpenDirectMode(directMode.Value, directFile);
 
@@ -497,7 +501,11 @@ namespace ZenQOffice
                 {
                     AppForm mainForm = new AppForm();
                     MainForm = mainForm;
-                    mainForm.FormClosed += (s, e) => ExitThread();
+                    mainForm.FormClosed += (s, e) =>
+                    {
+                        ExitThread();
+                        try { Environment.Exit(0); } catch { }
+                    };
 
                     // Show the form FIRST so Home tab renders immediately
                     mainForm.Show();
