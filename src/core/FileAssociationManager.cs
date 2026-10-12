@@ -207,6 +207,240 @@ namespace ZenQOffice.Core
         }
 
         /// <summary>
+        /// Kiểm tra xem ứng dụng cụ thể (-word, -calc, -slides, -pdf) hoặc tất cả có được đặt làm mặc định không
+        /// </summary>
+        public static bool IsAppAssociated(string appParam)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(appParam) || appParam.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    return IsAppAssociated("-word") && IsAppAssociated("-calc") &&
+                           IsAppAssociated("-slides") && IsAppAssociated("-pdf");
+                }
+
+                string primaryExt = ".docx";
+                if (string.Equals(appParam, "-calc", StringComparison.OrdinalIgnoreCase)) primaryExt = ".xlsx";
+                else if (string.Equals(appParam, "-slides", StringComparison.OrdinalIgnoreCase)) primaryExt = ".pptx";
+                else if (string.Equals(appParam, "-pdf", StringComparison.OrdinalIgnoreCase)) primaryExt = ".pdf";
+
+                string extKeyPath = $@"Software\Classes\{primaryExt}";
+                using (RegistryKey extKey = Registry.CurrentUser.OpenSubKey(extKeyPath))
+                {
+                    if (extKey != null)
+                    {
+                        object val = extKey.GetValue("");
+                        if (val != null && val.ToString().StartsWith("ZenQOffice.", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Đăng ký liên kết tệp mặc định cho từng ứng dụng cụ thể (-word, -calc, -slides, -pdf)
+        /// </summary>
+        public static bool RegisterApp(string appParam, string customExePath = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(appParam) || appParam.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RegisterAllFileAssociations(customExePath);
+                }
+
+                string exePath = !string.IsNullOrEmpty(customExePath) && File.Exists(customExePath)
+                    ? customExePath
+                    : Application.ExecutablePath;
+
+                string baseDir = Path.GetDirectoryName(exePath);
+                string mainIcoPath = Path.Combine(baseDir, "ZenQOffice.ico");
+                if (!File.Exists(mainIcoPath)) mainIcoPath = exePath;
+
+                foreach (var ft in SupportedFileTypes)
+                {
+                    if (!string.Equals(ft.AppParam, appParam, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string iconPath = Path.Combine(baseDir, ft.IconRelativePath);
+                    if (!File.Exists(iconPath)) iconPath = mainIcoPath;
+
+                    string progKeyPath = $@"Software\Classes\{ft.ProgId}";
+                    using (RegistryKey progKey = Registry.CurrentUser.CreateSubKey(progKeyPath))
+                    {
+                        if (progKey != null)
+                        {
+                            progKey.SetValue("", ft.Description);
+                            progKey.SetValue("FriendlyTypeName", ft.Description);
+
+                            using (RegistryKey iconKey = progKey.CreateSubKey("DefaultIcon"))
+                            {
+                                iconKey?.SetValue("", $"{iconPath},0");
+                            }
+
+                            using (RegistryKey cmdKey = progKey.CreateSubKey(@"shell\open\command"))
+                            {
+                                cmdKey?.SetValue("", $"\"{exePath}\" {ft.AppParam} \"%1\"");
+                            }
+
+                            using (RegistryKey openKey = progKey.CreateSubKey(@"shell\open"))
+                            {
+                                openKey?.SetValue("FriendlyAppName", "ZenQ Office");
+                            }
+                        }
+                    }
+
+                    string extKeyPath = $@"Software\Classes\{ft.Extension}";
+                    using (RegistryKey extKey = Registry.CurrentUser.CreateSubKey(extKeyPath))
+                    {
+                        if (extKey != null)
+                        {
+                            extKey.SetValue("", ft.ProgId);
+                            using (RegistryKey openWith = extKey.CreateSubKey("OpenWithProgids"))
+                            {
+                                openWith?.SetValue(ft.ProgId, string.Empty);
+                            }
+                        }
+                    }
+
+                    string capFaKeyPath = @"Software\ZenQOffice\Capabilities\FileAssociations";
+                    using (RegistryKey capKey = Registry.CurrentUser.CreateSubKey(capFaKeyPath))
+                    {
+                        capKey?.SetValue(ft.Extension, ft.ProgId);
+                    }
+                }
+
+                using (RegistryKey regKey = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications"))
+                {
+                    regKey?.SetValue("ZenQOffice", @"Software\ZenQOffice\Capabilities");
+                }
+
+                try
+                {
+                    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+                }
+                catch { }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("RegisterApp error: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gỡ bỏ liên kết tệp mặc định cho từng ứng dụng cụ thể (-word, -calc, -slides, -pdf)
+        /// </summary>
+        public static bool UnregisterApp(string appParam)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(appParam) || appParam.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    return UnregisterAllFileAssociations();
+                }
+
+                foreach (var ft in SupportedFileTypes)
+                {
+                    if (!string.Equals(ft.AppParam, appParam, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string extKeyPath = $@"Software\Classes\{ft.Extension}";
+                    try
+                    {
+                        using (RegistryKey extKey = Registry.CurrentUser.OpenSubKey(extKeyPath, true))
+                        {
+                            if (extKey != null)
+                            {
+                                object val = extKey.GetValue("");
+                                if (val != null && string.Equals(val.ToString(), ft.ProgId, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    extKey.DeleteValue("", false);
+                                }
+
+                                try
+                                {
+                                    using (RegistryKey owKey = extKey.OpenSubKey("OpenWithProgids", true))
+                                    {
+                                        owKey?.DeleteValue(ft.ProgId, false);
+                                    }
+                                }
+                                catch { }
+
+                                if (extKey.ValueCount == 0 && extKey.SubKeyCount == 0)
+                                {
+                                    Registry.CurrentUser.DeleteSubKey(extKeyPath, false);
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\{ft.ProgId}", false);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        using (RegistryKey capKey = Registry.CurrentUser.OpenSubKey(@"Software\ZenQOffice\Capabilities\FileAssociations", true))
+                        {
+                            capKey?.DeleteValue(ft.Extension, false);
+                        }
+                    }
+                    catch { }
+                }
+
+                try
+                {
+                    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+                }
+                catch { }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("UnregisterApp error: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gỡ bỏ toàn bộ liên kết tệp mặc định của ZenQ Office trong Windows Registry
+        /// </summary>
+        public static bool UnregisterAllFileAssociations()
+        {
+            bool res1 = UnregisterApp("-word");
+            bool res2 = UnregisterApp("-calc");
+            bool res3 = UnregisterApp("-slides");
+            bool res4 = UnregisterApp("-pdf");
+            return res1 && res2 && res3 && res4;
+        }
+
+        /// <summary>
+        /// Bật/Tắt liên kết tệp mặc định cho từng ứng dụng
+        /// </summary>
+        public static bool ToggleAppAssociation(string appParam)
+        {
+            if (IsAppAssociated(appParam))
+            {
+                return UnregisterApp(appParam);
+            }
+            else
+            {
+                return RegisterApp(appParam);
+            }
+        }
+
+        /// <summary>
         /// Kiểm tra xem ZenQ Office đã được liên kết với các định dạng chính (.docx, .xlsx, .pptx) hay chưa
         /// </summary>
         public static bool IsAssociated(string extension = ".docx")

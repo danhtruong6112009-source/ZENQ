@@ -109,6 +109,13 @@ namespace ZenQOffice.UI
         public RectangleF SettingShortcutCalcRect = RectangleF.Empty;
         public RectangleF SettingShortcutSlidesRect = RectangleF.Empty;
         public RectangleF SettingShortcutPdfRect = RectangleF.Empty;
+        public RectangleF SettingAssocWriterRect = RectangleF.Empty;
+        public RectangleF SettingAssocCalcRect = RectangleF.Empty;
+        public RectangleF SettingAssocSlidesRect = RectangleF.Empty;
+        public RectangleF SettingAssocPdfRect = RectangleF.Empty;
+        public RectangleF SettingAssocSetAllBtnRect = RectangleF.Empty;
+        public RectangleF SettingAssocUnsetAllBtnRect = RectangleF.Empty;
+        public RectangleF SettingAssocWinSettingsRect = RectangleF.Empty;
 
         // Sliding Indicator Animation Properties
         public float IndicatorCurrentX = -1f;
@@ -219,7 +226,7 @@ namespace ZenQOffice.UI
         {
             if (ActiveTab == 2)
             {
-                return 980;
+                return 1450;
             }
             else
             {
@@ -235,7 +242,7 @@ namespace ZenQOffice.UI
             int w = (width > 200) ? width : _lastWidth;
             if (ActiveTab == 2)
             {
-                int totalH = 1180;
+                int totalH = 1500;
                 int viewportH = Math.Max(100, h - 120);
                 return Math.Max(0, totalH - viewportH);
             }
@@ -2459,7 +2466,7 @@ namespace ZenQOffice.UI
                 if (maxScroll > 0)
                 {
                     float trackH = setViewport.Height - 16f;
-                    float thumbH = Math.Max(30f, Math.Min(trackH - 10f, trackH * (setViewport.Height / 980f)));
+                    float thumbH = Math.Max(30f, Math.Min(trackH - 10f, trackH * (setViewport.Height / 1480f)));
                     float thumbY = setViewport.Top + 8f + (currentScroll / (float)maxScroll) * (trackH - thumbH);
                     ScrollBarBounds = new RectangleF(startX + contentW - 10f, setViewport.Top + 4f, 10f, setViewport.Height - 8f);
                     ScrollBarThumbBounds = new RectangleF(startX + contentW - 7f, thumbY, 5f, thumbH);
@@ -3016,6 +3023,79 @@ namespace ZenQOffice.UI
 
                 curY += cardShortcutsH + 20f;
 
+                // ================= SECTION: ỨNG DỤNG MẶC ĐỊNH =================
+                DrawVectorDefaultAppIcon(g, startX, curY + 2f, 16f, Color.FromArgb(16, 185, 129));
+                g.DrawString("Ứng dụng mặc định", secFont, secBrush, startX + 22f, curY);
+                using (Font subSecFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (SolidBrush subSecBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString("— Tự động mở tệp văn phòng (.docx, .xlsx, .pptx, .pdf) bằng ZenQ Office", subSecFont, subSecBrush, startX + 160f, curY + 2f);
+                }
+                curY += 26f;
+
+                float cardAssocH = 258f;
+                RectangleF cardAssoc = new RectangleF(startX, curY, contentW, cardAssocH);
+                DrawWpsCardContainer(g, cardAssoc);
+
+                float asRowH = 52f;
+                float asRowY = cardAssoc.Y;
+
+                using (Font subExtFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+                using (SolidBrush subExtBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    // Row 1: Writer
+                    AppIconRenderer.DrawAppIcon(g, cardAssoc.X + 16f, asRowY + 10f, 32f, OfficeAppMode.Writer);
+                    g.DrawString("ZenQ Writer", rTitleFont, rTitleBrush, cardAssoc.X + 58f, asRowY + 8f);
+                    g.DrawString("Mặc định cho văn bản: .docx, .doc, .rtf, .txt, .dotx", subExtFont, subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
+                    SettingAssocWriterRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
+                    bool isWriterDef = FileAssociationManager.IsAppAssociated("-word");
+                    DrawWpsToggleSwitch(g, SettingAssocWriterRect, isWriterDef);
+                    g.DrawLine(sepPen, cardAssoc.X + 16f, asRowY + asRowH, cardAssoc.Right - 16f, asRowY + asRowH);
+                    asRowY += asRowH;
+
+                    // Row 2: Calc
+                    AppIconRenderer.DrawAppIcon(g, cardAssoc.X + 16f, asRowY + 10f, 32f, OfficeAppMode.Calc);
+                    g.DrawString("ZenQ Calc", rTitleFont, rTitleBrush, cardAssoc.X + 58f, asRowY + 8f);
+                    g.DrawString("Mặc định cho bảng tính: .xlsx, .xls, .csv, .tsv, .ods", subExtFont, subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
+                    SettingAssocCalcRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
+                    bool isCalcDef = FileAssociationManager.IsAppAssociated("-calc");
+                    DrawWpsToggleSwitch(g, SettingAssocCalcRect, isCalcDef);
+                    g.DrawLine(sepPen, cardAssoc.X + 16f, asRowY + asRowH, cardAssoc.Right - 16f, asRowY + asRowH);
+                    asRowY += asRowH;
+
+                    // Row 3: Slides
+                    AppIconRenderer.DrawAppIcon(g, cardAssoc.X + 16f, asRowY + 10f, 32f, OfficeAppMode.Slides);
+                    g.DrawString("ZenQ Slides", rTitleFont, rTitleBrush, cardAssoc.X + 58f, asRowY + 8f);
+                    g.DrawString("Mặc định cho trình chiếu: .pptx, .ppt, .ppsx, .potx", subExtFont, subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
+                    SettingAssocSlidesRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
+                    bool isSlidesDef = FileAssociationManager.IsAppAssociated("-slides");
+                    DrawWpsToggleSwitch(g, SettingAssocSlidesRect, isSlidesDef);
+                    g.DrawLine(sepPen, cardAssoc.X + 16f, asRowY + asRowH, cardAssoc.Right - 16f, asRowY + asRowH);
+                    asRowY += asRowH;
+
+                    // Row 4: PDF
+                    AppIconRenderer.DrawAppIcon(g, cardAssoc.X + 16f, asRowY + 10f, 32f, OfficeAppMode.Pdf);
+                    g.DrawString("ZenQ PDF", rTitleFont, rTitleBrush, cardAssoc.X + 58f, asRowY + 8f);
+                    g.DrawString("Mặc định cho tài liệu PDF: .pdf", subExtFont, subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
+                    SettingAssocPdfRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
+                    bool isPdfDef = FileAssociationManager.IsAppAssociated("-pdf");
+                    DrawWpsToggleSwitch(g, SettingAssocPdfRect, isPdfDef);
+                    g.DrawLine(sepPen, cardAssoc.X + 16f, asRowY + asRowH, cardAssoc.Right - 16f, asRowY + asRowH);
+                    asRowY += asRowH;
+
+                    // Row 5: Master Actions
+                    g.DrawString("Tác vụ hệ thống:", rTitleFont, rTitleBrush, cardAssoc.X + 16f, asRowY + 16f);
+                    SettingAssocSetAllBtnRect = new RectangleF(cardAssoc.Right - 475f, asRowY + 9f, 150f, 32f);
+                    SettingAssocUnsetAllBtnRect = new RectangleF(cardAssoc.Right - 315f, asRowY + 9f, 140f, 32f);
+                    SettingAssocWinSettingsRect = new RectangleF(cardAssoc.Right - 165f, asRowY + 9f, 150f, 32f);
+
+                    DrawWpsActionButton(g, SettingAssocSetAllBtnRect, "Đặt tất cả mặc định", Color.FromArgb(16, 185, 129), ctrlFont);
+                    DrawWpsActionButton(g, SettingAssocUnsetAllBtnRect, "Tắt tất cả mặc định", Color.FromArgb(100, 116, 139), ctrlFont);
+                    DrawWpsActionButton(g, SettingAssocWinSettingsRect, "⚙ Cài đặt Windows...", Color.FromArgb(37, 99, 235), ctrlFont);
+                }
+
+                curY += cardAssocH + 20f;
+
                 // ================= SECTION 3: HỆ THỐNG & SOẠN THẢO =================
                 DrawFluentSlidersIcon(g, startX, curY + 2f, 16f, Color.FromArgb(5, 150, 105));
                 g.DrawString("Hệ thống & Soạn thảo", secFont, secBrush, startX + 22f, curY);
@@ -3180,6 +3260,17 @@ namespace ZenQOffice.UI
                 g.DrawLine(p, x + size / 2f, y + size - 5f, x + size / 2f, y + size - 1f);
                 // Stand base
                 g.DrawLine(p, x + 3f, y + size - 1f, x + size - 3f, y + size - 1f);
+            }
+        }
+
+        private void DrawVectorDefaultAppIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen p = new Pen(color, 1.4f))
+            {
+                g.DrawRectangle(p, x + 1f, y + 1f, size - 2f, size - 2f);
+                g.DrawLine(p, x + 1f, y + 5f, x + size - 1f, y + 5f);
+                g.DrawLine(p, x + 4f, y + 9f, x + 6.5f, y + 12f);
+                g.DrawLine(p, x + 6.5f, y + 12f, x + 12f, y + 7f);
             }
         }
 
@@ -3463,7 +3554,14 @@ namespace ZenQOffice.UI
                                    SettingShortcutWriterRect.Contains(x, y) ||
                                    SettingShortcutCalcRect.Contains(x, y) ||
                                    SettingShortcutSlidesRect.Contains(x, y) ||
-                                   SettingShortcutPdfRect.Contains(x, y));
+                                   SettingShortcutPdfRect.Contains(x, y) ||
+                                   SettingAssocWriterRect.Contains(x, y) ||
+                                   SettingAssocCalcRect.Contains(x, y) ||
+                                   SettingAssocSlidesRect.Contains(x, y) ||
+                                   SettingAssocPdfRect.Contains(x, y) ||
+                                   SettingAssocSetAllBtnRect.Contains(x, y) ||
+                                   SettingAssocUnsetAllBtnRect.Contains(x, y) ||
+                                   SettingAssocWinSettingsRect.Contains(x, y));
                 HoverRowIndex = hovSetting ? 200 : -1;
             }
 
@@ -3880,6 +3978,13 @@ namespace ZenQOffice.UI
                 if (SettingShortcutCalcRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Calc", "-calc", "icon\\calc.ico", "Bảng tính ZenQ Calc"); DesktopShortcutManager.DeleteShortcut("GenOffice Calc"); return null; }
                 if (SettingShortcutSlidesRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Slides", "-slides", "icon\\present.ico", "Trình chiếu ZenQ Slides"); DesktopShortcutManager.DeleteShortcut("GenOffice Slides"); return null; }
                 if (SettingShortcutPdfRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ PDF", "-pdf", "icon\\pdf.ico", "Đọc và chỉnh sửa ZenQ PDF"); DesktopShortcutManager.DeleteShortcut("GenOffice PDF"); return null; }
+                if (SettingAssocWriterRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-word"); return null; }
+                if (SettingAssocCalcRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-calc"); return null; }
+                if (SettingAssocSlidesRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-slides"); return null; }
+                if (SettingAssocPdfRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-pdf"); return null; }
+                if (SettingAssocSetAllBtnRect.Contains(x, y)) { FileAssociationManager.RegisterAllFileAssociations(); return null; }
+                if (SettingAssocUnsetAllBtnRect.Contains(x, y)) { FileAssociationManager.UnregisterAllFileAssociations(); return null; }
+                if (SettingAssocWinSettingsRect.Contains(x, y)) { FileAssociationManager.OpenWindowsDefaultAppsSettings(); return null; }
             }
 
             return null;
