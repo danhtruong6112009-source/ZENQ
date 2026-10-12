@@ -20,7 +20,7 @@ const DICTIONARY = {
     hero_badge: "Phiên bản chính thức v4.0 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới",
     hero_title_1: "Bộ Ứng Dụng Văn Phòng",
     hero_title_accent: "Hiện Đại Cho Windows",
-    hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu Microsoft Office và bảo mật ngoại tuyến 100%.",
+    hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu OpenXML quốc tế và bảo mật ngoại tuyến 100%.",
     hero_cta_download: "Tải ZenQ Office Cho Windows",
     hero_cta_explore: "Khám Phá Tính Năng",
     hero_subtext: "Miễn phí trọn đời • Hoạt động ngoại tuyến không cần Internet • Tối ưu cho Windows 10 & 11",
@@ -44,7 +44,7 @@ const DICTIONARY = {
 
     // Mockup Sidebar
     mockup_prop_format_lbl: "Định dạng tệp",
-    mockup_prop_format_val: "Chuẩn Microsoft Office",
+    mockup_prop_format_val: "Chuẩn OpenXML (.docx)",
     mockup_prop_save_lbl: "Trạng thái lưu",
     mockup_prop_save_val: "Đã lưu tự động an toàn",
     mockup_prop_view_lbl: "Chế độ xem",
@@ -63,7 +63,7 @@ const DICTIONARY = {
     // Writer Details
     writer_title: "ZenQ Writer — Soạn thảo văn bản chuẩn in ấn đỉnh cao",
     writer_desc: "Xử lý định dạng .docx, .doc, .rtf, .txt với độ trung thực tuyệt đối. Hỗ trợ dàn trang hai mặt, bảng biểu tự động điều chỉnh, bộ đếm từ trực tiếp, và tính năng dự đoán từ thông minh giúp đẩy nhanh tốc độ gõ phím.",
-    writer_feat_1: "Tương thích 100% chuẩn OpenXML Microsoft Word",
+    writer_feat_1: "Tương thích 100% chuẩn OpenXML quốc tế (.docx)",
     writer_feat_2: "Dự đoán từ thông minh song ngữ Việt - Anh thời gian thực",
     writer_feat_3: "Hỗ trợ chèn công thức toán học, bảng biểu phức tạp và hình vẽ vector",
     writer_feat_4: "Tự động lưu bản thảo an toàn, phòng chống mất dữ liệu khi mất điện",
@@ -72,7 +72,7 @@ const DICTIONARY = {
     calc_title: "ZenQ Calc — Bảng tính điện tử thông minh & mạnh mẽ",
     calc_desc: "Xử lý các tập dữ liệu bảng tính .xlsx nhanh chóng và chính xác. Hệ thống công thức tài chính, logic, tìm kiếm chuẩn mực kết hợp cùng bộ vẽ biểu đồ phân tích trực quan hóa dữ liệu hiện đại.",
     calc_feat_1: "Đọc và ghi tệp .xlsx, .xls, .csv, .tsv chuẩn xác",
-    calc_feat_2: "Hơn 300+ hàm tính toán chuẩn Excel (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
+    calc_feat_2: "Hơn 300+ hàm tính toán chuẩn quốc tế (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
     calc_feat_3: "Vẽ biểu đồ cột, tròn, đường nét và phân tán thời gian thực",
     calc_feat_4: "Định dạng có điều kiện, cố định dòng cột và lọc dữ liệu thông minh",
 
@@ -97,14 +97,14 @@ const DICTIONARY = {
     highlights_section_title: "Những Giá Trị Cốt Lõi Của ZenQ Office",
     highlights_section_desc: "Được xây dựng với tiêu chuẩn cao nhất nhằm mang lại sự tiện nghi, an toàn và hiệu quả công việc tối đa cho bạn.",
 
-    feature_card1_title: "Tương Thích Tuyệt Đối Chuẩn Microsoft Office",
+    feature_card1_title: "Tương Thích Tuyệt Đối Chuẩn OpenXML Quốc Tế",
     feature_card1_desc: "Đọc, chỉnh sửa và lưu các định dạng tệp .docx, .xlsx, .pptx, .pdf với bố cục, bảng biểu và phông chữ chuẩn xác. Dễ dàng trao đổi tài liệu với đồng nghiệp mà không lo lệch trang hay lỗi định dạng.",
 
     feature_card2_title: "An Toàn Tuyệt Đối & 100% Ngoại Tuyến",
     feature_card2_desc: "ZenQ Office hoạt động hoàn toàn cục bộ trên máy tính của bạn. Không bắt buộc đăng nhập tài khoản, không gửi tệp lên máy chủ bên thứ ba và không thu thập bất kỳ dữ liệu cá nhân nào.",
 
     feature_card3_title: "Lối Tắt Ứng Dụng Nhánh & Giao Diện Tab",
-    feature_card3_desc: "Bạn có thể mở trực tiếp tài liệu Word vào ZenQ Writer hoặc bảng tính vào ZenQ Calc từ lối tắt ngoài Desktop mà không bị vướng bận, hoặc gộp chung tất cả trong một cửa sổ Tab làm việc thông minh.",
+    feature_card3_desc: "Bạn có thể mở trực tiếp tài liệu vào ZenQ Writer hoặc bảng tính vào ZenQ Calc từ lối tắt ngoài Desktop mà không bị vướng bận, hoặc gộp chung tất cả trong một cửa sổ Tab làm việc thông minh.",
 
     feature_card4_title: "Hoàn Toàn Miễn Phí & Không Quảng Cáo",
     feature_card4_desc: "Cam kết phục vụ trọn đời cho học sinh, sinh viên, giáo viên và cộng đồng người dùng. Trải nghiệm làm việc thuần túy, sạch sẽ, không có bất kỳ quảng cáo chen ngang hay chi phí ẩn nào.",
@@ -143,8 +143,8 @@ const DICTIONARY = {
     faq_q1: "ZenQ Office có thực sự miễn phí không? Có bị thu phí ẩn sau này không?",
     faq_a1: "ZenQ Office là phần mềm hoàn toàn miễn phí, không có bất kỳ khoản phí ẩn nào, không yêu cầu thẻ tín dụng và không giới hạn thời gian dùng thử. Chúng tôi cam kết duy trì phiên bản cốt lõi này miễn phí vĩnh viễn cho học sinh, sinh viên và cộng đồng người dùng.",
 
-    faq_q2: "ZenQ Office có mở được file Word (.docx), Excel (.xlsx), PowerPoint (.pptx) không?",
-    faq_a2: "Có, hoàn toàn tương thích 100%. ZenQ Office đọc và ghi chuẩn định dạng OpenXML quốc tế của Microsoft Office (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf). Bố cục văn bản, bảng biểu, công thức toán và định dạng slide được giữ nguyên vẹn khi bạn gửi tệp cho đối tác sử dụng Microsoft Office.",
+    faq_q2: "ZenQ Office có mở được tệp văn bản (.docx), bảng tính (.xlsx), bài trình chiếu (.pptx) không?",
+    faq_a2: "Có, hoàn toàn tương thích 100%. ZenQ Office đọc và ghi chuẩn định dạng OpenXML quốc tế (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf). Bố cục văn bản, bảng biểu, công thức toán và định dạng slide được giữ nguyên vẹn khi trao đổi tài liệu trên mọi nền tảng.",
 
     faq_q3: "Làm thế nào để đặt ZenQ PDF hoặc các ứng dụng ZenQ làm app mặc định trên Windows?",
     faq_a3: "Trong ZenQ Office, bạn chỉ cần vào menu Cài đặt -> Ứng dụng mặc định, sau đó gạt công tắc cho phân hệ mong muốn (Writer, Calc, Slides, PDF). Trên Windows 10/11, hệ thống sẽ mở hộp thoại hoặc trang Windows Settings chỉ định tới ZenQ Office để bạn xác nhận chỉ bằng một lần nhấp chuột.",
@@ -199,7 +199,7 @@ const DICTIONARY = {
     hero_badge: "Official Release v4.0 • Next-Gen Office Suite",
     hero_title_1: "Modern Office Suite",
     hero_title_accent: "Crafted for Windows",
-    hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling. 100% offline and seamlessly compatible with Microsoft Office standard formats.",
+    hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling. 100% offline and seamlessly compatible with international OpenXML standard formats.",
     hero_cta_download: "Download ZenQ Office for Windows",
     hero_cta_explore: "Explore Applications",
     hero_subtext: "Lifetime Free • 100% Offline with Zero Cloud Requirement • Optimized for Windows 10 & 11",
@@ -223,7 +223,7 @@ const DICTIONARY = {
 
     // Mockup Sidebar
     mockup_prop_format_lbl: "File Format",
-    mockup_prop_format_val: "Microsoft Office Standard",
+    mockup_prop_format_val: "Standard OpenXML (.docx)",
     mockup_prop_save_lbl: "Save Status",
     mockup_prop_save_val: "Safely Auto-Saved",
     mockup_prop_view_lbl: "Page View",
@@ -242,7 +242,7 @@ const DICTIONARY = {
     // Writer Details
     writer_title: "ZenQ Writer — Professional Document Publishing",
     writer_desc: "Process .docx, .doc, .rtf, and .txt files with fidelity. Features two-page layout, auto-fitting tables, real-time word counting, and bilingual predictive text to accelerate your typing workflow.",
-    writer_feat_1: "100% compatible with Microsoft Word OpenXML standard",
+    writer_feat_1: "100% compatible with international OpenXML standard (.docx)",
     writer_feat_2: "Real-time bilingual Vietnamese - English smart word prediction",
     writer_feat_3: "Insert mathematical formulas, complex tables, and vector graphics",
     writer_feat_4: "Secure auto-save drafts to prevent data loss during unexpected power loss",
@@ -251,7 +251,7 @@ const DICTIONARY = {
     calc_title: "ZenQ Calc — Smart & Powerful Spreadsheets",
     calc_desc: "Open and analyze .xlsx datasets swiftly and accurately. Standard financial, logical, and lookup formulas paired with contemporary chart visualization tools.",
     calc_feat_1: "Accurately read and write .xlsx, .xls, .csv, and .tsv formats",
-    calc_feat_2: "Over 300+ standard Excel functions (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
+    calc_feat_2: "Over 300+ standard calculation functions (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)",
     calc_feat_3: "Render bar, pie, line, and scatter charts in real time",
     calc_feat_4: "Conditional formatting, freeze panes, and high-speed data filtering",
 
@@ -276,14 +276,14 @@ const DICTIONARY = {
     highlights_section_title: "The Pillars of ZenQ Office",
     highlights_section_desc: "Engineered to deliver convenience, airtight security, and seamless daily productivity.",
 
-    feature_card1_title: "Full Microsoft Office Standard Compatibility",
+    feature_card1_title: "Full International OpenXML Standards Compatibility",
     feature_card1_desc: "Open, edit, and save .docx, .xlsx, .pptx, and .pdf documents with accurate layouts, tables, and fonts. Collaborate with colleagues effortlessly without formatting discrepancies.",
 
     feature_card2_title: "100% Offline Security & Total Data Privacy",
     feature_card2_desc: "ZenQ Office runs purely on your local machine. No mandatory accounts, no file telemetry to external servers, and zero collection of personal information.",
 
     feature_card3_title: "Independent App Shortcuts or Tabbed Window",
-    feature_card3_desc: "Open Word files directly into ZenQ Writer or spreadsheets into ZenQ Calc from desktop shortcuts without unnecessary overhead, or combine them in a clean tabbed window.",
+    feature_card3_desc: "Open documents directly into ZenQ Writer or spreadsheets into ZenQ Calc from desktop shortcuts without unnecessary overhead, or combine them in a clean tabbed window.",
 
     feature_card4_title: "Lifetime Free & 100% Ad-Free",
     feature_card4_desc: "Committed to students, teachers, schools, and professionals forever. A pristine, distraction-free environment with zero popups and no hidden subscription costs.",
@@ -322,8 +322,8 @@ const DICTIONARY = {
     faq_q1: "Is ZenQ Office truly free? Are there any hidden fees?",
     faq_a1: "ZenQ Office is 100% free with no hidden fees, no credit card requirements, and no trial expiration. We are committed to keeping this core edition free forever for students, educators, and the community.",
 
-    faq_q2: "Can ZenQ Office open Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) files?",
-    faq_a2: "Yes, fully compatible. ZenQ Office reads and writes Microsoft Office OpenXML standards (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf), preserving formatting, tables, formulas, and slide layouts.",
+    faq_q2: "Can ZenQ Office open documents (.docx), spreadsheets (.xlsx), and presentations (.pptx)?",
+    faq_a2: "Yes, fully compatible. ZenQ Office reads and writes international OpenXML standards (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf), preserving formatting, tables, formulas, and slide layouts across platforms.",
 
     faq_q3: "How do I set ZenQ PDF or other ZenQ apps as the default on Windows?",
     faq_a3: "In ZenQ Office, navigate to Settings -> Default Apps, then toggle your preferred app (Writer, Calc, Slides, PDF). Windows Settings will guide you to confirm with a single click.",
