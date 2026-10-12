@@ -2251,32 +2251,45 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // ── 5. Nút "Cập nhật ngay" ở góc dưới bên phải (dưới Tự động lưu bản thảo an toàn) ──
-            float btnY = featY + 22f + features.Length * 22f + 14f;
-            RightPanelUpdateBtnRect = new RectangleF(px, btnY, pw, 36f);
+            // ── 5. Nút "Cập nhật ngay" nhỏ gọn, bo tròn chuẩn Win11, xích xuống góc dưới cùng ──
+            float btnW = 126f;
+            float btnH = 26f;
+            float btnX = px + pw - btnW; // Xích sát góc phải
+            float btnY = Math.Max(featY + 22f + features.Length * 22f + 20f, height - 38f); // Xích sát góc đáy
+
+            RightPanelUpdateBtnRect = new RectangleF(btnX, btnY, btnW, btnH);
 
             bool hasNewUpdate = (UpdateManager.LastReleaseInfo != null && UpdateManager.LastReleaseInfo.HasUpdate);
-            Color btnBg = hasNewUpdate ? Color.FromArgb(220, 38, 38) : (HoverRightPanelUpdateBtn ? Color.FromArgb(239, 246, 255) : Color.White);
-            Color btnBorder = hasNewUpdate ? Color.FromArgb(185, 28, 28) : (HoverRightPanelUpdateBtn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225));
-            Color btnText = hasNewUpdate ? Color.White : (HoverRightPanelUpdateBtn ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235));
+            Color btnBg = hasNewUpdate 
+                ? (HoverRightPanelUpdateBtn ? Color.FromArgb(185, 28, 28) : Color.FromArgb(220, 38, 38))
+                : (HoverRightPanelUpdateBtn ? Color.FromArgb(239, 246, 255) : Color.FromArgb(248, 250, 252));
+            Color btnBorder = hasNewUpdate 
+                ? Color.FromArgb(185, 28, 28) 
+                : (HoverRightPanelUpdateBtn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240));
+            Color btnText = hasNewUpdate 
+                ? Color.White 
+                : (HoverRightPanelUpdateBtn ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235));
 
-            using (GraphicsPath btnPath = CreateRoundedRectanglePath(RightPanelUpdateBtnRect, 6f))
+            // Bo tròn dạng capsule / viên thuốc bo tròn 100%
+            using (GraphicsPath btnPath = CreateRoundedRectanglePath(RightPanelUpdateBtnRect, btnH / 2f))
             using (SolidBrush bgB = new SolidBrush(btnBg))
-            using (Pen borderP = new Pen(btnBorder, 1.2f))
+            using (Pen borderP = new Pen(btnBorder, HoverRightPanelUpdateBtn ? 1.2f : 1f))
             {
                 g.FillPath(bgB, btnPath);
                 g.DrawPath(borderP, btnPath);
             }
 
-            string btnCaption = hasNewUpdate
-                ? ("🚀 Cập nhật ngay (" + UpdateManager.LastReleaseInfo.TagName + ")")
-                : "⚡ Cập nhật ngay";
+            // Vẽ icon Win11 Fluent Update
+            float iconSize = 13f;
+            float iconX = btnX + 11f;
+            float iconY = btnY + (btnH - iconSize) / 2f;
+            DrawWin11UpdateIcon(g, iconX, iconY, iconSize, btnText);
 
-            using (Font btnF = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            // Chữ "Cập nhật ngay"
+            using (Font btnF = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (SolidBrush textB = new SolidBrush(btnText))
             {
-                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString(btnCaption, btnF, textB, RightPanelUpdateBtnRect, sf);
+                g.DrawString("Cập nhật ngay", btnF, textB, iconX + iconSize + 6f, btnY + 5f);
             }
         }
 
@@ -3427,6 +3440,37 @@ namespace ZenQOffice.UI
                     };
                     g.FillPolygon(b, arrow);
                 }
+            }
+        }
+
+        private void DrawWin11UpdateIcon(Graphics g, float x, float y, float size, Color color)
+        {
+            float stroke = Math.Max(1.2f, size * 0.11f);
+            using (Pen pen = new Pen(color, stroke))
+            using (SolidBrush b = new SolidBrush(color))
+            {
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+
+                float pad = size * 0.12f;
+                RectangleF arcR = new RectangleF(x + pad, y + pad, size - pad * 2f, size - pad * 2f);
+
+                g.DrawArc(pen, arcR, 205f, 130f);
+                g.DrawArc(pen, arcR, 25f, 130f);
+
+                PointF[] arr1 = new PointF[] {
+                    new PointF(arcR.Right - 0.5f, arcR.Y + 2.5f),
+                    new PointF(arcR.Right + 3.5f, arcR.Y - 1.5f),
+                    new PointF(arcR.Right + 3.5f, arcR.Y + 5.5f)
+                };
+                g.FillPolygon(b, arr1);
+
+                PointF[] arr2 = new PointF[] {
+                    new PointF(arcR.X + 0.5f, arcR.Bottom - 2.5f),
+                    new PointF(arcR.X - 3.5f, arcR.Bottom + 1.5f),
+                    new PointF(arcR.X - 3.5f, arcR.Bottom - 5.5f)
+                };
+                g.FillPolygon(b, arr2);
             }
         }
         #endregion
