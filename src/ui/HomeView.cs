@@ -3119,9 +3119,12 @@ namespace ZenQOffice.UI
                     // Row 4: PDF
                     AppIconRenderer.DrawAppIcon(g, cardAssoc.X + 16f, asRowY + 10f, 32f, OfficeAppMode.Pdf);
                     g.DrawString("ZenQ PDF", rTitleFont, rTitleBrush, cardAssoc.X + 58f, asRowY + 8f);
-                    g.DrawString("Mặc định cho tài liệu PDF: .pdf", subExtFont, subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
-                    SettingAssocPdfRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
                     bool isPdfDef = FileAssociationManager.IsAppAssociated("-pdf");
+                    string pdfDesc = isPdfDef
+                        ? "Đã đặt làm ứng dụng mặc định (.pdf)"
+                        : "Mặc định cho tài liệu PDF: .pdf (Nhấn để bật mặc định)";
+                    g.DrawString(pdfDesc, subExtFont, isPdfDef ? rTitleBrush : subExtBrush, cardAssoc.X + 58f, asRowY + 28f);
+                    SettingAssocPdfRect = new RectangleF(cardAssoc.Right - 95f, asRowY + 12f, 80f, 28f);
                     DrawWpsToggleSwitch(g, SettingAssocPdfRect, isPdfDef);
                     g.DrawLine(sepPen, cardAssoc.X + 16f, asRowY + asRowH, cardAssoc.Right - 16f, asRowY + asRowH);
                     asRowY += asRowH;
@@ -4069,10 +4072,26 @@ namespace ZenQOffice.UI
                 if (SettingAssocWriterRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-word"); return null; }
                 if (SettingAssocCalcRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-calc"); return null; }
                 if (SettingAssocSlidesRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-slides"); return null; }
-                if (SettingAssocPdfRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-pdf"); return null; }
-                if (SettingAssocSetAllBtnRect.Contains(x, y)) { FileAssociationManager.RegisterAllFileAssociations(); return null; }
+                if (SettingAssocPdfRect.Contains(x, y)) { 
+                    IntPtr hwnd = Form.ActiveForm != null ? Form.ActiveForm.Handle : IntPtr.Zero;
+                    FileAssociationManager.ToggleAppAssociation("-pdf", hwnd); 
+                    return null; 
+                }
+                if (SettingAssocSetAllBtnRect.Contains(x, y)) { 
+                    FileAssociationManager.RegisterAllFileAssociations(); 
+                    if (!FileAssociationManager.IsAppAssociated("-pdf"))
+                    {
+                        IntPtr hwnd = Form.ActiveForm != null ? Form.ActiveForm.Handle : IntPtr.Zero;
+                        FileAssociationManager.PromptWindowsDefaultApp(".pdf", hwnd);
+                        if (!FileAssociationManager.IsAppAssociated("-pdf"))
+                        {
+                            FileAssociationManager.OpenWindowsDefaultAppsSettings("ZenQOffice");
+                        }
+                    }
+                    return null; 
+                }
                 if (SettingAssocUnsetAllBtnRect.Contains(x, y)) { FileAssociationManager.UnregisterAllFileAssociations(); return null; }
-                if (SettingAssocWinSettingsRect.Contains(x, y)) { FileAssociationManager.OpenWindowsDefaultAppsSettings(); return null; }
+                if (SettingAssocWinSettingsRect.Contains(x, y)) { FileAssociationManager.OpenWindowsDefaultAppsSettings("ZenQOffice"); return null; }
             }
 
             return null;
