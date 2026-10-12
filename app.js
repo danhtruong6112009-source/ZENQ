@@ -31,18 +31,18 @@
   // =========================================================================
   const typewriterPhrases = {
     vi: [
-      "Khởi động 0.05s cực hạn",
-      "Bảo mật ngoại tuyến 100%",
-      "Chuẩn Office DOCX / XLSX / PPTX",
-      "Direct2D 120 FPS siêu mượt",
-      "Bộ nhớ tinh gọn ~60MB RAM"
+      "Soạn thảo văn bản chuẩn in ấn",
+      "Bảng tính thông minh, phân tích mạnh mẽ",
+      "Trình chiếu bài giảng & thuyết trình chuyên nghiệp",
+      "Đọc & xử lý tài liệu PDF bảo mật",
+      "Bảo mật ngoại tuyến 100% an toàn"
     ],
     en: [
-      "Instant 0.05s Startup",
-      "100% Offline & Private",
-      "Full Office DOCX / XLSX / PPTX",
-      "Silky Direct2D 120 FPS",
-      "Ultra-compact ~60MB RAM"
+      "Professional document authoring",
+      "Smart spreadsheets & powerful analysis",
+      "Captivating & dynamic slide presentations",
+      "Secure local PDF document reader",
+      "100% Offline & Private on Windows"
     ]
   };
 
@@ -130,7 +130,7 @@
   }
 
   // =========================================================================
-  // 3. SYNCHRONIZED APP SUITE SWITCHER
+  // 3. SYNCHRONIZED APP SUITE SWITCHER (4 Core Apps Only)
   // =========================================================================
   const appMockupConfig = {
     writer: {
@@ -166,7 +166,7 @@
           <div style="background: #e6f4ea; color: #1e8e3e; font-weight: 700; padding: 6px;">28,600,000</div>
         </div>
         <div style="margin-top: 14px; background: #fef7e0; border: 1px solid #feefc3; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; font-family: var(--font-mono); color: #b06000;">
-          Công thức: =SUM(D2:D100) • Tính toán: 0.0004s • 100% Khớp Excel 365
+          Công thức: =SUM(D2:D100) • Tự động tính toán • Chuẩn OpenXML Excel
         </div>
       `
     },
@@ -176,7 +176,7 @@
       html: `
         <div style="border: 2px dashed #dadce0; border-radius: 6px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafd; text-align: center; padding: 16px;">
           <h4 style="font-size: 1.25rem; font-weight: 800; color: #202124; margin-bottom: 6px;">Chiến Lược Tăng Tốc 2026</h4>
-          <p style="color: #5f6368; font-size: 0.88rem;">Khung hình: 1920x1080 (16:9) • Tốc độ: 120 FPS Direct2D</p>
+          <p style="color: #5f6368; font-size: 0.88rem;">Khung hình: 1920x1080 (16:9) • Trình chiếu chuyên nghiệp</p>
           <div style="margin-top: 14px; display: flex; gap: 8px;">
             <span style="background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 600;">Shape Vector</span>
             <span style="background: #fef7e0; color: #ea8600; padding: 4px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 600;">Presenter View</span>
@@ -200,21 +200,9 @@
           <div class="mockup-text-line w70"></div>
         </div>
       `
-    },
-    remote: {
-      title: "ZenQ Remote Session — 192.168.1.104",
-      icon: "icon/photo.png",
-      html: `
-        <div style="border-radius: 8px; background: #f3e8fd; border: 1px solid #e9d2fd; padding: 20px; text-align: center;">
-          <div style="font-weight: 700; color: #8430ce; margin-bottom: 6px;">Đã kết nối điện thoại thông minh</div>
-          <div style="color: #5f6368; font-size: 0.85rem; margin-bottom: 12px;">Độ trễ phản hồi: < 2ms (Mạng LAN Cục bộ)</div>
-          <div style="background: #ffffff; border-radius: 6px; height: 90px; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; color: #80868b; border: 1px dashed #dadce0;">
-            Bàn di chuột cảm ứng Trackpad ảo đang kích hoạt
-          </div>
-        </div>
-      `
     }
   };
+
 
   window.switchSuiteTab = function (targetApp) {
     if (!targetApp) return;
