@@ -18841,37 +18841,46 @@ namespace ZenQOffice.UI
                 SlideNode slide = ActiveSlide;
                 if (slide != null)
                 {
-                    DrawSlideBackground(g, slideRect, slide);
-                    foreach (ShapeNode shape in slide.Shapes)
+                    GraphicsState gsSlideClip = g.Save();
+                    g.IntersectClip(slideRect);
+                    try
                     {
-                        bool isVis;
-                        float offX, offY, scX, scY, rDelta, opMul;
-                        ShapeAnimation activeAnim;
-                        float activeP;
-                        GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
-
-                        if (isVis)
+                        DrawSlideBackground(g, slideRect, slide);
+                        foreach (ShapeNode shape in slide.Shapes)
                         {
-                            try
+                            bool isVis;
+                            float offX, offY, scX, scY, rDelta, opMul;
+                            ShapeAnimation activeAnim;
+                            float activeP;
+                            GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
+
+                            if (isVis)
                             {
-                                DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                try
+                                {
+                                    DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                }
+                                catch { }
                             }
-                            catch { }
+                        }
+
+                        // Draw Pen Strokes
+                        using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                        {
+                            foreach (List<Point> stroke in PenStrokes)
+                            {
+                                if (stroke.Count > 1) g.DrawLines(strokePen, stroke.ToArray());
+                            }
+                            if (CurrentStroke.Count > 1)
+                            {
+                                g.DrawLines(strokePen, CurrentStroke.ToArray());
+                            }
                         }
                     }
-                }
-            }
-
-            // Draw Pen Strokes
-            using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                foreach (List<Point> stroke in PenStrokes)
-                {
-                    if (stroke.Count > 1) g.DrawLines(strokePen, stroke.ToArray());
-                }
-                if (CurrentStroke.Count > 1)
-                {
-                    g.DrawLines(strokePen, CurrentStroke.ToArray());
+                    finally
+                    {
+                        g.Restore(gsSlideClip);
+                    }
                 }
             }
 
@@ -19259,45 +19268,54 @@ namespace ZenQOffice.UI
                 SlideNode slide = ActiveSlide;
                 if (slide != null)
                 {
-                    DrawSlideBackground(g, curSlideRect, slide);
-                    float scale = (float)curW / Presentation.CanvasWidth;
-                    foreach (ShapeNode shape in slide.Shapes)
+                    GraphicsState gsCurClip = g.Save();
+                    g.IntersectClip(curSlideRect);
+                    try
                     {
-                        bool isVis;
-                        float offX, offY, scX, scY, rDelta, opMul;
-                        ShapeAnimation activeAnim;
-                        float activeP;
-                        GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
-
-                        if (isVis)
+                        DrawSlideBackground(g, curSlideRect, slide);
+                        float scale = (float)curW / Presentation.CanvasWidth;
+                        foreach (ShapeNode shape in slide.Shapes)
                         {
-                            try
+                            bool isVis;
+                            float offX, offY, scX, scY, rDelta, opMul;
+                            ShapeAnimation activeAnim;
+                            float activeP;
+                            GetShapeAnimationTransform(shape, slide, CurrentAnimationStep, true, false, -1, AnimationProgress, out isVis, out offX, out offY, out scX, out scY, out rDelta, out opMul, out activeAnim, out activeP);
+
+                            if (isVis)
                             {
-                                DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                try
+                                {
+                                    DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                }
+                                catch { }
                             }
-                            catch { }
                         }
+
+                        // Vẽ nét bút và laser lên slide hiện tại trong presenter view
+                        using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth * ((float)curW / Presentation.CanvasWidth)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                        {
+                            float penScale = (float)curW / screenW;
+                            foreach (List<Point> stroke in PenStrokes)
+                            {
+                                if (stroke.Count > 1)
+                                {
+                                    Point[] miniPts = new Point[stroke.Count];
+                                    for (int k = 0; k < stroke.Count; k++) miniPts[k] = new Point(curX + (int)(stroke[k].X * penScale), curY + (int)(stroke[k].Y * penScale));
+                                    g.DrawLines(strokePen, miniPts);
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        g.Restore(gsCurClip);
                     }
                 }
             }
             using (Pen curBorder = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
             {
                 g.DrawRectangle(curBorder, curSlideRect);
-            }
-
-            // Vẽ nét bút và laser lên slide hiện tại trong presenter view
-            using (Pen strokePen = new Pen(AnnotationColor, AnnotationWidth * ((float)curW / Presentation.CanvasWidth)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                float penScale = (float)curW / screenW;
-                foreach (List<Point> stroke in PenStrokes)
-                {
-                    if (stroke.Count > 1)
-                    {
-                        Point[] miniPts = new Point[stroke.Count];
-                        for (int k = 0; k < stroke.Count; k++) miniPts[k] = new Point(curX + (int)(stroke[k].X * penScale), curY + (int)(stroke[k].Y * penScale));
-                        g.DrawLines(strokePen, miniPts);
-                    }
-                }
             }
 
             // Khung Phải Top: Slide Tiếp Theo (Next Slide Preview)
@@ -19324,15 +19342,24 @@ namespace ZenQOffice.UI
             if (ActiveSlideIndex + 1 < Presentation.Slides.Count)
             {
                 SlideNode nextSlide = Presentation.Slides[ActiveSlideIndex + 1];
-                DrawSlideBackground(g, nextRect, nextSlide);
-                float nextScale = (float)nextW / Presentation.CanvasWidth;
-                foreach (ShapeNode shape in nextSlide.Shapes)
+                GraphicsState gsNextClip = g.Save();
+                g.IntersectClip(nextRect);
+                try
                 {
-                    try
+                    DrawSlideBackground(g, nextRect, nextSlide);
+                    float nextScale = (float)nextW / Presentation.CanvasWidth;
+                    foreach (ShapeNode shape in nextSlide.Shapes)
                     {
-                        DrawShape(g, nextX, nextY, nextScale, shape, false);
+                        try
+                        {
+                            DrawShape(g, nextX, nextY, nextScale, shape, false);
+                        }
+                        catch { }
                     }
-                    catch { }
+                }
+                finally
+                {
+                    g.Restore(gsNextClip);
                 }
                 g.DrawRectangle(Pens.Gray, nextRect);
             }

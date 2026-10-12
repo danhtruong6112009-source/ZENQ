@@ -827,6 +827,53 @@ namespace ZenQOffice.Core
                         Thread.Sleep(10);
                         MouseClickSim(scBtn);
                         break;
+
+                    case "screen_move":
+                        double smX = GetDouble(dict, "x", 0.5);
+                        double smY = GetDouble(dict, "y", 0.5);
+                        Rectangle smBounds = Screen.PrimaryScreen.Bounds;
+                        SetCursorPos(smBounds.X + (int)Math.Round(smX * smBounds.Width), smBounds.Y + (int)Math.Round(smY * smBounds.Height));
+                        break;
+
+                    case "screen_mouse_down":
+                        double smdX = GetDouble(dict, "x", 0.5);
+                        double smdY = GetDouble(dict, "y", 0.5);
+                        string smdBtn = dict.ContainsKey("button") ? dict["button"]?.ToString() : "left";
+                        Rectangle smdBounds = Screen.PrimaryScreen.Bounds;
+                        SetCursorPos(smdBounds.X + (int)Math.Round(smdX * smdBounds.Width), smdBounds.Y + (int)Math.Round(smdY * smdBounds.Height));
+                        Thread.Sleep(10);
+                        MouseDownSim(smdBtn);
+                        break;
+
+                    case "screen_mouse_up":
+                        double smuX = GetDouble(dict, "x", 0.5);
+                        double smuY = GetDouble(dict, "y", 0.5);
+                        string smuBtn = dict.ContainsKey("button") ? dict["button"]?.ToString() : "left";
+                        Rectangle smuBounds = Screen.PrimaryScreen.Bounds;
+                        SetCursorPos(smuBounds.X + (int)Math.Round(smuX * smuBounds.Width), smuBounds.Y + (int)Math.Round(smuY * smuBounds.Height));
+                        Thread.Sleep(10);
+                        MouseUpSim(smuBtn);
+                        break;
+
+                    case "screen_scroll":
+                        double scrDy = GetDouble(dict, "dy", 0);
+                        ScrollMouseSim(0, scrDy);
+                        break;
+
+                    case "key_down":
+                        string kdKey = dict.ContainsKey("key") ? dict["key"]?.ToString() : "";
+                        SimulateKey(kdKey, isDown: true);
+                        break;
+
+                    case "key_up":
+                        string kuKey = dict.ContainsKey("key") ? dict["key"]?.ToString() : "";
+                        SimulateKey(kuKey, isDown: false);
+                        break;
+
+                    case "key_press":
+                        string kpKey = dict.ContainsKey("key") ? dict["key"]?.ToString() : "";
+                        SimulateKeyPress(kpKey);
+                        break;
                 }
             }
             catch { }
@@ -945,6 +992,106 @@ namespace ZenQOffice.Core
                 t.Join();
             }
             catch { }
+        }
+
+        private const byte VK_BACK = 0x08;
+        private const byte VK_TAB = 0x09;
+        private const byte VK_RETURN = 0x0D;
+        private const byte VK_SHIFT = 0x10;
+        private const byte VK_CONTROL = 0x11;
+        private const byte VK_MENU = 0x12; // Alt
+        private const byte VK_ESCAPE = 0x1B;
+        private const byte VK_SPACE = 0x20;
+        private const byte VK_SNAPSHOT = 0x2C; // Print Screen
+        private const byte VK_DELETE = 0x2E;
+        private const byte VK_LWIN = 0x5B;
+        private const byte VK_LEFT = 0x25;
+        private const byte VK_UP = 0x26;
+        private const byte VK_RIGHT = 0x27;
+        private const byte VK_DOWN = 0x28;
+        private const byte VK_F5 = 0x74;
+        private const byte VK_F11 = 0x7A;
+
+        private static byte GetVkCode(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return 0;
+            switch (key.ToLowerInvariant())
+            {
+                case "ctrl":
+                case "control":
+                    return VK_CONTROL;
+                case "alt":
+                    return VK_MENU;
+                case "shift":
+                    return VK_SHIFT;
+                case "win":
+                case "windows":
+                    return VK_LWIN;
+                case "esc":
+                case "escape":
+                    return VK_ESCAPE;
+                case "tab":
+                    return VK_TAB;
+                case "del":
+                case "delete":
+                    return VK_DELETE;
+                case "enter":
+                case "return":
+                    return VK_RETURN;
+                case "backspace":
+                    return VK_BACK;
+                case "space":
+                    return VK_SPACE;
+                case "prtscn":
+                case "printscreen":
+                case "screenshot":
+                    return VK_SNAPSHOT;
+                case "f5":
+                    return VK_F5;
+                case "f11":
+                    return VK_F11;
+                case "left":
+                    return VK_LEFT;
+                case "up":
+                    return VK_UP;
+                case "right":
+                    return VK_RIGHT;
+                case "down":
+                    return VK_DOWN;
+                default:
+                    if (key.Length == 1)
+                    {
+                        char c = char.ToUpperInvariant(key[0]);
+                        if (c >= 'A' && c <= 'Z') return (byte)c;
+                        if (c >= '0' && c <= '9') return (byte)c;
+                    }
+                    return 0;
+            }
+        }
+
+        private static void SimulateKey(string key, bool isDown)
+        {
+            byte vk = GetVkCode(key);
+            if (vk != 0)
+            {
+                uint flags = isDown ? 0 : KEYEVENTF_KEYUP;
+                keybd_event(vk, 0, flags, UIntPtr.Zero);
+            }
+        }
+
+        private static void SimulateKeyPress(string key)
+        {
+            byte vk = GetVkCode(key);
+            if (vk != 0)
+            {
+                keybd_event(vk, 0, 0, UIntPtr.Zero);
+                Thread.Sleep(25);
+                keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            }
+            else
+            {
+                try { SendKeys.SendWait(key); } catch { }
+            }
         }
 
         private void HandleSignatureInsert(string base64)
@@ -1220,13 +1367,145 @@ html, body {
 .screen-touch-hint {
     position: absolute;
     bottom: 6px;
-    background: rgba(15, 23, 42, 0.75);
-    backdrop-filter: blur(4px);
-    padding: 3px 10px;
-    border-radius: 10px;
-    font-size: 10.5px;
-    color: #94a3b8;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(6px);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #cbd5e1;
     pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    text-align: center;
+    max-width: 95%;
+}
+.os-keys-bar {
+    display: flex;
+    align-items: center;
+    background: #090d16;
+    border-bottom: 1px solid #1e293b;
+    padding: 4px 8px;
+    gap: 5px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+.os-keys-bar::-webkit-scrollbar { display: none; }
+.os-key-btn {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 0 8px;
+    height: 28px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.os-key-btn:active { transform: scale(0.95); }
+.os-key-btn.active {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.65);
+}
+.os-key-btn.action {
+    background: #1e293b;
+    color: #38bdf8;
+    border-color: #0284c7;
+}
+.os-key-btn.action:active { background: #0284c7; color: #fff; }
+.screen-kb-drawer {
+    display: none;
+    flex-direction: column;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+    padding: 6px 8px;
+    gap: 6px;
+    flex-shrink: 0;
+    animation: slideDown 0.2s ease-out;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.kb-input-row {
+    display: flex;
+    gap: 6px;
+}
+.kb-input-row input {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 7px;
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.kb-input-row input:focus { border-color: #38bdf8; }
+.btn-kb-send {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 0 12px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-kb-send:active { transform: scale(0.96); }
+.kb-quick-keys {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+}
+.kb-quick-keys::-webkit-scrollbar { display: none; }
+.kb-key {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.kb-key:active { background: #3b82f6; color: #fff; }
+.touch-ripple {
+    position: fixed;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.35);
+    border: 2px solid #38bdf8;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    animation: rippleAnim 0.5s ease-out forwards;
+    z-index: 9999;
+}
+@keyframes rippleAnim {
+    0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
 }
 .screen-bottom-bar {
     display: flex;
@@ -1556,14 +1835,50 @@ html, body {
                 <button class=""sbtn"" onclick=""toggleFullscreen()"">⛶ Toàn màn hình</button>
             </div>
         </div>
-        <div class=""screen-viewport"" id=""screenViewport"">
-            <img id=""screenLiveImg"" alt=""Màn hình PC..."" />
-            <div class=""screen-touch-hint"">👆 Chạm màn hình để điều khiển PC</div>
+
+        <!-- Sticky Modifier Keys & Action Bar (Hệ Điều Hành) -->
+        <div class=""os-keys-bar"">
+            <button class=""os-key-btn"" id=""btnMod_ctrl"" onclick=""toggleStickyKey('ctrl')"">CTRL</button>
+            <button class=""os-key-btn"" id=""btnMod_alt"" onclick=""toggleStickyKey('alt')"">ALT</button>
+            <button class=""os-key-btn"" id=""btnMod_shift"" onclick=""toggleStickyKey('shift')"">SHIFT</button>
+            <button class=""os-key-btn"" id=""btnMod_win"" onclick=""toggleStickyKey('win')"">WIN</button>
+            <button class=""os-key-btn action"" onclick=""sendKeyPress('prtscn')"">📸 Chụp Màn Hình</button>
+            <button class=""os-key-btn action"" id=""btnToggleKb"" onclick=""toggleScreenKeyboard()"">⌨️ Bàn Phím</button>
+            <button class=""os-key-btn"" onclick=""sendKeyPress('esc')"">ESC</button>
+            <button class=""os-key-btn"" onclick=""sendKeyPress('tab')"">TAB</button>
+            <button class=""os-key-btn"" onclick=""sendKeyPress('del')"">DEL</button>
         </div>
+
+        <!-- Inline Keyboard Drawer -->
+        <div class=""screen-kb-drawer"" id=""screenKbDrawer"">
+            <div class=""kb-input-row"">
+                <input type=""text"" id=""screenTextInput"" placeholder=""Nhập văn bản gửi vào PC..."" autocomplete=""off"">
+                <button class=""btn-kb-send"" onclick=""sendScreenTextInput()"">Gửi ↵</button>
+            </div>
+            <div class=""kb-quick-keys"">
+                <button class=""kb-key"" onclick=""sendKeyPress('enter')"">↵ Enter</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('backspace')"">⌫ Xóa</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('space')"">␣ Space</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('f5')"">⛶ F5</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('left')"">←</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('up')"">↑</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('down')"">↓</button>
+                <button class=""kb-key"" onclick=""sendKeyPress('right')"">→</button>
+            </div>
+        </div>
+
+        <!-- Touch Screen Viewport -->
+        <div class=""screen-viewport"" id=""screenViewport"">
+            <img id=""screenLiveImg"" alt=""Màn hình PC..."" draggable=""false"" />
+            <div class=""screen-touch-hint"">👆 1 chạm = Trái • 2 chạm = Đúp • Giữ / 2 ngón = Phải • Kéo đúp = Kéo thả • 2 ngón = Cuộn</div>
+        </div>
+
+        <!-- Bottom Quick Actions -->
         <div class=""screen-bottom-bar"">
             <button class=""btn-screen-click"" onclick=""sendScreenClick('left')"">🖱️ Nhấp Trái</button>
             <button class=""btn-screen-click"" onclick=""sendScreenClick('double')"">🖱️ Nhấp Đúp</button>
             <button class=""btn-screen-click"" onclick=""sendScreenClick('right')"">🖱️ Nhấp Phải</button>
+            <button class=""btn-screen-click"" onclick=""toggleScreenKeyboard()"" style=""background:#334155;"">⌨️ Bàn Phím</button>
         </div>
     </div>
 </div>
@@ -2009,19 +2324,237 @@ function requestNextScreenFrame() {
     nextImg.src = '/screen.jpg?q=' + qParam + '&t=' + t;
 }
 
-// Chạm trực tiếp vào ảnh màn hình PC để điều khiển chuột từ xa
-screenImg.addEventListener('click', (e) => {
+// ============================================
+// HỆ ĐIỀU HÀNH THU NHỎ & PHÍM TẮT DÍNH (STICKY KEYS)
+// ============================================
+const stickyKeys = { ctrl: false, alt: false, shift: false, win: false };
+
+function toggleStickyKey(key) {
     vibe(25);
+    stickyKeys[key] = !stickyKeys[key];
+    const btn = document.getElementById('btnMod_' + key);
+    if (stickyKeys[key]) {
+        if (btn) btn.classList.add('active');
+        send({ type: 'key_down', key: key });
+    } else {
+        if (btn) btn.classList.remove('active');
+        send({ type: 'key_up', key: key });
+    }
+}
+
+function sendKeyPress(key) {
+    vibe(20);
+    send({ type: 'key_press', key: key });
+}
+
+function toggleScreenKeyboard() {
+    vibe(20);
+    const drawer = document.getElementById('screenKbDrawer');
+    const btn = document.getElementById('btnToggleKb');
+    if (!drawer) return;
+    if (drawer.style.display === 'none' || !drawer.style.display) {
+        drawer.style.display = 'flex';
+        if (btn) btn.classList.add('active');
+        const inp = document.getElementById('screenTextInput');
+        if (inp) inp.focus();
+    } else {
+        drawer.style.display = 'none';
+        if (btn) btn.classList.remove('active');
+    }
+}
+
+function sendScreenTextInput() {
+    const inp = document.getElementById('screenTextInput');
+    if (inp && inp.value) {
+        vibe(25);
+        send({ type: 'type_text', text: inp.value });
+        inp.value = '';
+    }
+}
+
+// ============================================
+// TEAMVIEWER TOUCH GESTURE ENGINE CHO MÀN HÌNH PC
+// ============================================
+const sViewport = document.getElementById('screenViewport');
+let stCount = 0;
+let stStartX = 0, stStartY = 0;
+let stStartTime = 0;
+let stLastX = 0, stLastY = 0;
+let stMoved = false;
+let stLongPressTimer = null;
+let stIsLongPressed = false;
+let stLastTapTime = 0;
+let stLastTapX = 0, stLastTapY = 0;
+let stSingleTapTimer = null;
+let stIsDoubleTapDragging = false;
+let stTwoFingerStartY = 0;
+let stTwoFingerStartTime = 0;
+let stTwoFingerMoved = false;
+
+function getScreenNorm(clientX, clientY) {
     const rect = screenImg.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const ny = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    send({ type: 'screen_click', x: nx, y: ny, button: 'left' });
+    if (rect.width <= 0 || rect.height <= 0) return { x: 0.5, y: 0.5 };
+    const nx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const ny = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    return { x: nx, y: ny };
+}
+
+function showTouchFeedback(clientX, clientY, text) {
+    const fb = document.createElement('div');
+    fb.className = 'touch-ripple';
+    fb.textContent = text || '';
+    fb.style.left = clientX + 'px';
+    fb.style.top = clientY + 'px';
+    document.body.appendChild(fb);
+    setTimeout(() => { if (fb.parentNode) fb.parentNode.removeChild(fb); }, 550);
+}
+
+sViewport.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    stCount = e.touches.length;
+
+    if (e.touches.length === 1) {
+        const t = e.touches[0];
+        stStartX = t.clientX;
+        stStartY = t.clientY;
+        stLastX = t.clientX;
+        stLastY = t.clientY;
+        stStartTime = Date.now();
+        stMoved = false;
+        stIsLongPressed = false;
+
+        // Kiểm tra Nhấn đúp rồi kéo (Double-Tap & Drag - Kéo cửa sổ, bôi đen văn bản)
+        const timeSinceLastTap = Date.now() - stLastTapTime;
+        const distFromLastTap = Math.hypot(stStartX - stLastTapX, stStartY - stLastTapY);
+        if (timeSinceLastTap < 350 && distFromLastTap < 30) {
+            if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
+            stIsDoubleTapDragging = true;
+            vibe(30);
+            showTouchFeedback(stStartX, stStartY, '✊ Kéo');
+            const norm = getScreenNorm(stStartX, stStartY);
+            send({ type: 'screen_mouse_down', x: norm.x, y: norm.y, button: 'left' });
+            return;
+        }
+
+        stIsDoubleTapDragging = false;
+
+        // Đếm nhấn giữ 450ms -> Chuột Phải (Long press Right click)
+        if (stLongPressTimer) clearTimeout(stLongPressTimer);
+        stLongPressTimer = setTimeout(() => {
+            if (!stMoved && stCount === 1) {
+                stIsLongPressed = true;
+                vibe(45);
+                showTouchFeedback(stStartX, stStartY, '🖱️ Phải');
+                const norm = getScreenNorm(stStartX, stStartY);
+                send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'right' });
+            }
+        }, 450);
+
+    } else if (e.touches.length === 2) {
+        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+        if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
+        stIsDoubleTapDragging = false;
+        stTwoFingerStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        stTwoFingerStartTime = Date.now();
+        stTwoFingerMoved = false;
+    }
+}, { passive: false });
+
+sViewport.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    stCount = e.touches.length;
+
+    if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const dist = Math.hypot(t.clientX - stStartX, t.clientY - stStartY);
+        if (dist > 8) {
+            stMoved = true;
+            if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+        }
+
+        stLastX = t.clientX;
+        stLastY = t.clientY;
+        const norm = getScreenNorm(t.clientX, t.clientY);
+
+        if (stIsDoubleTapDragging) {
+            send({ type: 'screen_move', x: norm.x, y: norm.y });
+        } else if (dist > 6) {
+            send({ type: 'screen_move', x: norm.x, y: norm.y });
+        }
+
+    } else if (e.touches.length === 2) {
+        if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const dy = cy - stTwoFingerStartY;
+        stTwoFingerStartY = cy;
+
+        if (Math.abs(dy) > 1.5) {
+            stTwoFingerMoved = true;
+            // Cuộn 2 ngón tay dịu mượt, tránh giật trôi ở vùng animation
+            let clampedDy = Math.max(-28, Math.min(28, dy * 0.65));
+            send({ type: 'screen_scroll', dy: clampedDy });
+        }
+    }
+}, { passive: false });
+
+sViewport.addEventListener('touchend', (e) => {
+    if (stLongPressTimer) { clearTimeout(stLongPressTimer); stLongPressTimer = null; }
+
+    if (stIsDoubleTapDragging) {
+        stIsDoubleTapDragging = false;
+        const norm = getScreenNorm(stLastX, stLastY);
+        send({ type: 'screen_mouse_up', x: norm.x, y: norm.y, button: 'left' });
+        stLastTapTime = 0;
+        return;
+    }
+
+    if (e.touches.length === 0) {
+        if (stIsLongPressed) {
+            stLastTapTime = 0;
+            return;
+        }
+
+        // Chạm 2 ngón tay nhanh (< 280ms, không cuộn) = Chuột Phải
+        if (stCount === 2 && !stTwoFingerMoved && (Date.now() - stTwoFingerStartTime < 280)) {
+            vibe(35);
+            showTouchFeedback(stLastX, stLastY, '🖱️ Phải');
+            const norm = getScreenNorm(stLastX, stLastY);
+            send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'right' });
+            stLastTapTime = 0;
+            return;
+        }
+
+        // Chạm 1 ngón tay ngắn không di chuyển
+        if (!stMoved && (Date.now() - stStartTime < 280)) {
+            const timeSinceLastTap = Date.now() - stLastTapTime;
+            const distFromLastTap = Math.hypot(stStartX - stLastTapX, stStartY - stLastTapY);
+
+            if (timeSinceLastTap < 300 && distFromLastTap < 25) {
+                // Nhấn đúp (Double Tap) = Double Click
+                if (stSingleTapTimer) { clearTimeout(stSingleTapTimer); stSingleTapTimer = null; }
+                vibe(35);
+                showTouchFeedback(stStartX, stStartY, '⚡ Nhấp đúp');
+                const norm = getScreenNorm(stStartX, stStartY);
+                send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'double' });
+                stLastTapTime = 0;
+            } else {
+                stLastTapTime = Date.now();
+                stLastTapX = stStartX;
+                stLastTapY = stStartY;
+                const norm = getScreenNorm(stStartX, stStartY);
+                stSingleTapTimer = setTimeout(() => {
+                    vibe(20);
+                    showTouchFeedback(stLastTapX, stLastTapY, '');
+                    send({ type: 'screen_click', x: norm.x, y: norm.y, button: 'left' });
+                    stSingleTapTimer = null;
+                }, 190);
+            }
+        }
+    }
 });
 
 function sendScreenClick(button) {
     vibe(25);
-    // Nhấp chuột tại vị trí hiện tại
     send({ type: 'mouse_click', button: button });
 }
 
