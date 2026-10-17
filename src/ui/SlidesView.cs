@@ -1992,7 +1992,7 @@ namespace ZenQOffice.UI
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-                using (D2DGraphics d2d = new D2DGraphics(g, true))
+                using (D2DGraphics d2d = new D2DGraphics(g, targetW, targetH))
                 {
                     RectangleF targetRect = new RectangleF(0, 0, targetW, targetH);
                     float scale = (float)targetW / canvasW;
@@ -7340,6 +7340,14 @@ namespace ZenQOffice.UI
         #endregion
 
         #region Main Workspace Drawing Logic
+        public void Draw(Graphics g, int width, int height)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height);
+            }
+        }
+
         public void Draw(D2DGraphics g, int width, int height)
         {
             LastViewportWidth = width;
@@ -8778,7 +8786,10 @@ namespace ZenQOffice.UI
 
                 // Mini preview graphic on top
                 RectangleF previewRect = new RectangleF(cardRect.X + 8, cardRect.Y + 8, cardW - 16, 80);
-                idea.DrawMiniPreview?.Invoke(g.UnderlyingGraphics, previewRect);
+                if (idea.DrawMiniPreview != null)
+                {
+                    g.DrawGdi(dg => idea.DrawMiniPreview(dg, previewRect));
+                }
                 using (Pen pBorder = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
                 {
                     g.DrawRectangle(pBorder, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
@@ -14886,6 +14897,14 @@ namespace ZenQOffice.UI
                         g.DrawString(clean, font, txtBrush, bounds, StringFormat.GenericTypographic);
                         break;
                 }
+            }
+        }
+
+        public void DrawShape(Graphics g, float slideX, float slideY, float scale, ShapeNode shape, bool isSelected, float opacityMultiplier = 1.0f, float animOffsetX = 0f, float animOffsetY = 0f, float animScaleX = 1.0f, float animScaleY = 1.0f, float animRotDelta = 0f, ShapeAnimation activeAnim = null, float activeAnimProgress = 0f)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g))
+            {
+                DrawShape(d2d, slideX, slideY, scale, shape, isSelected, opacityMultiplier, animOffsetX, animOffsetY, animScaleX, animScaleY, animRotDelta, activeAnim, activeAnimProgress);
             }
         }
 

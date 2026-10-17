@@ -264,6 +264,14 @@ namespace ZenQOffice.UI
         #endregion
 
         #region 100% PURE Direct2D Rendering Loop
+        public void Draw(Graphics g, int width, int height, RibbonBar ribbon)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height, ribbon);
+            }
+        }
+
         public void Draw(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             if (Document == null) return;

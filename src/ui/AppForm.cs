@@ -1488,21 +1488,21 @@ namespace ZenQOffice.UI
 
                     if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, pureGdi: true))
+                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
                         {
                             WriterView.Draw(d2d, ClientSize.Width, ClientSize.Height, Ribbon);
                         }
                     }
                     else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, pureGdi: true))
+                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
                         {
                             CalcView.Draw(d2d, ClientSize.Width, ClientSize.Height);
                         }
                     }
                     else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, pureGdi: true))
+                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
                         {
                             SlidesView.Draw(d2d, ClientSize.Width, ClientSize.Height);
                         }
@@ -1513,7 +1513,7 @@ namespace ZenQOffice.UI
                     }
                     else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, pureGdi: true))
+                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
                         {
                             PhotoView.Draw(d2d, ClientSize.Width, ClientSize.Height, Ribbon);
                         }

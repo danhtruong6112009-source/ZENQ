@@ -106,6 +106,10 @@ namespace ZenQOffice.UI
 
         private ID2D1RenderTarget _renderTarget;
         private ID2D1HwndRenderTarget _hwndRenderTarget;
+        private ID2D1DCRenderTarget _dcRenderTarget;
+        private static ID2D1DCRenderTarget _sharedDcRenderTarget;
+        private static bool _sharedDcInUse = false;
+        private static readonly object _sharedDcLock = new object();
         private ID2D1GdiInteropRenderTarget _gdiInterop;
         private bool _isUsingSharedDc = false;
         private bool _inGdiDc = false;
@@ -119,23 +123,59 @@ namespace ZenQOffice.UI
         private float _dpiX = 96.0f;
         private float _dpiY = 96.0f;
 
+        private static ID2D1DCRenderTarget CreateDCRenderTargetInternal()
+        {
+            // 1. Try Hardware D3D11 Acceleration
+            try
+            {
+                var props = new RenderTargetProperties(
+                    RenderTargetType.Default,
+                    new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
+                    96.0f, 96.0f,
+                    RenderTargetUsage.GdiCompatible,
+                    FeatureLevel.Default
+                );
+                return _d2dFactory.CreateDCRenderTarget(props);
+            }
+            catch (Exception exHw)
+            {
+                System.Diagnostics.Debug.WriteLine("D2D Hardware DC target not available, activating Microsoft WARP: " + exHw.Message);
+            }
+
+            // 2. Fallback to Microsoft WARP (High-performance multi-threaded SIMD CPU rasterizer - MS Office Standard)
+            try
+            {
+                var warpProps = new RenderTargetProperties(
+                    RenderTargetType.Software,
+                    new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
+                    96.0f, 96.0f,
+                    RenderTargetUsage.GdiCompatible,
+                    FeatureLevel.Default
+                );
+                return _d2dFactory.CreateDCRenderTarget(warpProps);
+            }
+            catch (Exception exWarp)
+            {
+                System.Diagnostics.Debug.WriteLine("D2D WARP DC target creation failed: " + exWarp.Message);
+                return null;
+            }
+        }
+
         public D2DGraphics()
         {
         }
 
         public D2DGraphics(Graphics g, bool pureGdi)
+            : this(g, pureGdi, 0, 0)
         {
-            _gdiGraphics = g;
-            _ownsGraphics = false;
-            _ownsGdiHdc = false;
-            _renderTarget = null;
-            if (g != null)
-            {
-                try { _dpiX = g.DpiX; _dpiY = g.DpiY; } catch { }
-            }
         }
 
         public D2DGraphics(Graphics g, int viewportWidth = 0, int viewportHeight = 0)
+            : this(g, false, viewportWidth, viewportHeight)
+        {
+        }
+
+        public D2DGraphics(Graphics g, bool pureGdi, int viewportWidth, int viewportHeight)
         {
             _gdiGraphics = g;
             _ownsGraphics = false;
@@ -144,6 +184,100 @@ namespace ZenQOffice.UI
             if (g != null)
             {
                 try { _dpiX = g.DpiX; _dpiY = g.DpiY; } catch { }
+
+                if (!pureGdi)
+                {
+                    try
+                    {
+                        _gdiHdc = g.GetHdc();
+                        _ownsGdiHdc = true;
+
+                        int w = viewportWidth;
+                        int h = viewportHeight;
+
+                        if (w <= 0 || h <= 0)
+                        {
+                            IntPtr hBmp = GetCurrentObject(_gdiHdc, OBJ_BITMAP);
+                            if (hBmp != IntPtr.Zero && GetObject(hBmp, Marshal.SizeOf<BITMAP>(), out BITMAP bmpObj) > 0 && bmpObj.bmWidth > 0 && bmpObj.bmHeight > 0)
+                            {
+                                w = bmpObj.bmWidth;
+                                h = bmpObj.bmHeight;
+                            }
+                        }
+
+                        if (w <= 0 || h <= 0)
+                        {
+                            try
+                            {
+                                var clip = g.VisibleClipBounds;
+                                w = Math.Max(1, (int)Math.Ceiling(clip.Right));
+                                h = Math.Max(1, (int)Math.Ceiling(clip.Bottom));
+                            }
+                            catch { }
+                        }
+
+                        if (w <= 0 || h <= 0)
+                        {
+                            int devW = GetDeviceCaps(_gdiHdc, HORZRES);
+                            int devH = GetDeviceCaps(_gdiHdc, VERTRES);
+                            w = devW > 0 ? devW : 1920;
+                            h = devH > 0 ? devH : 1080;
+                        }
+
+                        w = Math.Max(1, w);
+                        h = Math.Max(1, h);
+
+                        lock (_sharedDcLock)
+                        {
+                            if (!_sharedDcInUse && _sharedDcRenderTarget != null)
+                            {
+                                _dcRenderTarget = _sharedDcRenderTarget;
+                                _isUsingSharedDc = true;
+                                _sharedDcInUse = true;
+                            }
+                        }
+
+                        if (_dcRenderTarget == null)
+                        {
+                            _dcRenderTarget = CreateDCRenderTargetInternal();
+                            if (!_isUsingSharedDc && _sharedDcRenderTarget == null && _dcRenderTarget != null)
+                            {
+                                lock (_sharedDcLock)
+                                {
+                                    if (_sharedDcRenderTarget == null)
+                                    {
+                                        _sharedDcRenderTarget = _dcRenderTarget;
+                                        _isUsingSharedDc = true;
+                                        _sharedDcInUse = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (_dcRenderTarget != null)
+                        {
+                            _dcRenderTarget.BindDC(_gdiHdc, new Vortice.Mathematics.RectI(0, 0, w, h));
+                            _renderTarget = _dcRenderTarget;
+                            try { _gdiInterop = _renderTarget.QueryInterface<ID2D1GdiInteropRenderTarget>(); } catch { }
+                            _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
+                            _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Cleartype;
+                            _renderTarget.BeginDraw();
+                            _isDrawing = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("D2D DC init fallback: " + ex.Message);
+                        if (_ownsGdiHdc && _gdiHdc != IntPtr.Zero)
+                        {
+                            try { g.ReleaseHdc(_gdiHdc); } catch { }
+                            _gdiHdc = IntPtr.Zero;
+                            _ownsGdiHdc = false;
+                        }
+                        _renderTarget = null;
+                        _dcRenderTarget = null;
+                    }
+                }
             }
         }
 
@@ -151,6 +285,14 @@ namespace ZenQOffice.UI
         {
             if (hwnd != IntPtr.Zero && width > 0 && height > 0)
             {
+                var hwndProps = new HwndRenderTargetProperties
+                {
+                    Hwnd = hwnd,
+                    PixelSize = new Vortice.Mathematics.SizeI(Math.Max(1, width), Math.Max(1, height)),
+                    PresentOptions = PresentOptions.Immediately
+                };
+
+                // 1. Try Hardware D3D11 Acceleration
                 try
                 {
                     var props = new RenderTargetProperties(
@@ -160,13 +302,37 @@ namespace ZenQOffice.UI
                         RenderTargetUsage.GdiCompatible,
                         FeatureLevel.Default
                     );
-                    var hwndProps = new HwndRenderTargetProperties
-                    {
-                        Hwnd = hwnd,
-                        PixelSize = new Vortice.Mathematics.SizeI(Math.Max(1, width), Math.Max(1, height)),
-                        PresentOptions = PresentOptions.Immediately
-                    };
                     _hwndRenderTarget = _d2dFactory.CreateHwndRenderTarget(props, hwndProps);
+                }
+                catch (Exception exHw)
+                {
+                    System.Diagnostics.Debug.WriteLine("D2D Hardware HWND target not available, activating Microsoft WARP: " + exHw.Message);
+                    _hwndRenderTarget = null;
+                }
+
+                // 2. Fallback to Microsoft WARP (Software SIMD Direct2D - MS Office Standard)
+                if (_hwndRenderTarget == null)
+                {
+                    try
+                    {
+                        var warpProps = new RenderTargetProperties(
+                            RenderTargetType.Software,
+                            new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
+                            96.0f, 96.0f,
+                            RenderTargetUsage.GdiCompatible,
+                            FeatureLevel.Default
+                        );
+                        _hwndRenderTarget = _d2dFactory.CreateHwndRenderTarget(warpProps, hwndProps);
+                    }
+                    catch (Exception exWarp)
+                    {
+                        System.Diagnostics.Debug.WriteLine("D2D WARP HWND target creation failed: " + exWarp.Message);
+                        _hwndRenderTarget = null;
+                    }
+                }
+
+                if (_hwndRenderTarget != null)
+                {
                     _renderTarget = _hwndRenderTarget;
                     try { _gdiInterop = _hwndRenderTarget.QueryInterface<ID2D1GdiInteropRenderTarget>(); } catch { }
                     _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
@@ -174,9 +340,8 @@ namespace ZenQOffice.UI
                     _renderTarget.BeginDraw();
                     _isDrawing = true;
                 }
-                catch (Exception ex)
+                else
                 {
-                    System.Diagnostics.Debug.WriteLine("D2D HWND fallback: " + ex.Message);
                     _gdiGraphics = Graphics.FromHwnd(hwnd);
                     _ownsGraphics = true;
                 }
@@ -288,6 +453,21 @@ namespace ZenQOffice.UI
                 _gdiInterop = null;
             }
 
+            if (_isUsingSharedDc)
+            {
+                lock (_sharedDcLock)
+                {
+                    _sharedDcInUse = false;
+                }
+                _dcRenderTarget = null;
+                _isUsingSharedDc = false;
+            }
+            else if (_dcRenderTarget != null)
+            {
+                try { _dcRenderTarget.Dispose(); } catch { }
+                _dcRenderTarget = null;
+            }
+
             if (_ownsGdiHdc && _gdiGraphics != null && _gdiHdc != IntPtr.Zero)
             {
                 try { _gdiGraphics.ReleaseHdc(_gdiHdc); } catch { }
@@ -325,7 +505,8 @@ namespace ZenQOffice.UI
         {
             get
             {
-                return _gdiGraphics;
+                if (_gdiGraphics != null && !_ownsGdiHdc) return _gdiGraphics;
+                return null;
             }
         }
 
