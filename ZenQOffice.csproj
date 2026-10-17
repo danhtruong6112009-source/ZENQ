@@ -17,6 +17,9 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <NoWarn>$(NoWarn);CA1416;CS1685;CS0168;CS0219;CS0414;CS0649;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;WFO1000;WFO5001;WFO5002</NoWarn>
     <WarningsNotAsErrors>WFO1000;WFO5001;WFO5002</WarningsNotAsErrors>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <PathMap Condition="'$(Configuration)' == 'Release'">$(MSBuildProjectDirectory)=.</PathMap>
   </PropertyGroup>
 
   <ItemGroup>
@@ -52,6 +55,9 @@
     <EmbeddedResource Include="icon\pdf.png">
       <LogicalName>icon_pdf.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="icon\vector.png">
+      <LogicalName>icon_vector.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="icon\banner.png">
       <LogicalName>banner.png</LogicalName>
     </EmbeddedResource>
@@ -85,11 +91,11 @@
   </ItemGroup>
 
   <Target Name="CopyToRoot" AfterTargets="Build">
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.exe" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.exe')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.dll" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.runtimeconfig.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.runtimeconfig.json')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.deps.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.deps.json')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.pdb" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Condition="Exists('$(TargetDir)ZenQOffice.pdb')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.exe" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.exe')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.dll" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.runtimeconfig.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.runtimeconfig.json')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.deps.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.deps.json')" />
+    <Copy SourceFiles="$(TargetDir)ZenQOffice.pdb" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.pdb')" />
   </Target>
 
 </Project>

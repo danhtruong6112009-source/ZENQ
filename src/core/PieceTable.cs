@@ -213,5 +213,13 @@ namespace ZenQOffice.Core
             _cachedTextVersion = Version;
             return _cachedText;
         }
+
+        public string GetSubstring(int start, int length)
+        {
+            if (length <= 0 || start < 0 || start >= Length) return "";
+            string full = GetText();
+            if (start + length > full.Length) length = full.Length - start;
+            return full.Substring(start, length);
+        }
     }
 }

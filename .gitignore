@@ -21,3 +21,11 @@ win-x64/
 *.txt
 *.log
 test_crash.cs
+ZenQOffice-Portable.zip
+__pycache__/
+rendered_out.png
+svg_suite/
+svg_suite_results/
+tests/bin_docx/
+tests/sample_doc.docx
+tiktok_dump.html

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -31,6 +32,7 @@ using WpfFillRule = System.Windows.Media.FillRule;
 using WpfMatrix = System.Windows.Media.Matrix;
 using WpfMatrixTransform = System.Windows.Media.MatrixTransform;
 using WpfDashStyle = System.Windows.Media.DashStyle;
+using WpfFormattedText = System.Windows.Media.FormattedText;
 
 namespace ZenQOffice.Core
 {
@@ -54,6 +56,13 @@ namespace ZenQOffice.Core
             public string StrokeLineJoin;
             public string StrokeDashArray;
             public string CurrentColor;
+            public string MaskId;
+            public string FontFamily;
+            public double FontSize;
+            public string FontWeight;
+            public string FontStyle;
+            public string TextAnchor;
+            public double StrokeMiterLimit;
 
             public static SvgRenderState CreateDefault()
             {
@@ -68,7 +77,14 @@ namespace ZenQOffice.Core
                     StrokeLineCap = "butt",
                     StrokeLineJoin = "miter",
                     StrokeDashArray = null,
-                    CurrentColor = "#1E293B"
+                    CurrentColor = "#1E293B",
+                    MaskId = null,
+                    FontFamily = "Arial, Segoe UI, sans-serif",
+                    FontSize = 16.0,
+                    FontWeight = "normal",
+                    FontStyle = "normal",
+                    TextAnchor = "start",
+                    StrokeMiterLimit = 4.0
                 };
             }
         }
@@ -120,13 +136,19 @@ namespace ZenQOffice.Core
                 if (vbW <= 0) vbW = 24;
                 if (vbH <= 0) vbH = 24;
 
+                if (targetWidth <= 0 || targetHeight <= 0)
+                {
+                    targetWidth = Math.Max(1, (int)Math.Ceiling(vbW));
+                    targetHeight = Math.Max(1, (int)Math.Ceiling(vbH));
+                }
+
                 double scale = Math.Min((double)targetWidth / vbW, (double)targetHeight / vbH);
                 int actualWidth = Math.Max(1, (int)Math.Ceiling(vbW * scale));
                 int actualHeight = Math.Max(1, (int)Math.Ceiling(vbH * scale));
 
                 // 2. Phân tích CSS <style> và lập chỉ mục các phần tử có id
                 Dictionary<string, Dictionary<string, string>> cssRules = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-                Dictionary<string, XElement> defsById = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, XElement> defsById = new Dictionary<string, XElement>(StringComparer.Ordinal);
 
                 foreach (XElement elem in root.Descendants())
                 {
@@ -142,7 +164,7 @@ namespace ZenQOffice.Core
                 }
 
                 // 3. Phân tích các định nghĩa Gradient trong toàn bộ tài liệu SVG
-                Dictionary<string, WpfBrush> defBrushes = new Dictionary<string, WpfBrush>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, WpfBrush> defBrushes = new Dictionary<string, WpfBrush>(StringComparer.Ordinal);
                 foreach (XElement defElem in root.Descendants())
                 {
                     string localName = defElem.Name.LocalName;
@@ -229,7 +251,8 @@ namespace ZenQOffice.Core
                 string.Equals(localName, "clipPath", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(localName, "mask", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(localName, "filter", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(localName, "font", StringComparison.OrdinalIgnoreCase))
+                string.Equals(localName, "font", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(localName, "symbol", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -270,7 +293,7 @@ namespace ZenQOffice.Core
                 string clipId = ExtractUrlId(clipPathStr);
                 if (!string.IsNullOrEmpty(clipId) && defsById.TryGetValue(clipId, out XElement clipElem))
                 {
-                    WpfGeometry clipGeom = BuildClipGeometry(clipElem, cssRules);
+                    WpfGeometry clipGeom = BuildClipGeometry(clipElem, cssRules, defsById);
                     if (clipGeom != null)
                     {
                         dc.PushClip(clipGeom);
@@ -288,6 +311,35 @@ namespace ZenQOffice.Core
                 {
                     dc.PushOpacity(elemOpacity);
                     pushedCount++;
+                }
+            }
+
+            // 4. Áp dụng Mask của phần tử / nhóm <g> (trừ khi là thẻ <image> có cơ chế kết hợp ảnh trực tiếp)
+            if (!string.Equals(localName, "image", StringComparison.OrdinalIgnoreCase) &&
+                attrs.TryGetValue("mask", out string maskAttrVal) && !string.IsNullOrWhiteSpace(maskAttrVal))
+            {
+                string maskId = ExtractUrlId(maskAttrVal);
+                if (!string.IsNullOrEmpty(maskId) && defsById.TryGetValue(maskId, out XElement maskElem))
+                {
+                    bool hasImageChild = elem.Descendants().Any(d => string.Equals(d.Name.LocalName, "image", StringComparison.OrdinalIgnoreCase));
+                    if (!hasImageChild)
+                    {
+                        double uniformMaskOpacity = ExtractMaskUniformOpacity(maskElem);
+                        if (uniformMaskOpacity < 0.999)
+                        {
+                            dc.PushOpacity(uniformMaskOpacity);
+                            pushedCount++;
+                        }
+                        else
+                        {
+                            var maskBrush = CreateMaskOpacityBrush(maskElem, defBrushes, defsById, cssRules);
+                            if (maskBrush != null)
+                            {
+                                dc.PushOpacityMask(maskBrush);
+                                pushedCount++;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -331,14 +383,125 @@ namespace ZenQOffice.Core
                         {
                             double ux = ParseDouble(GetAttrFromDict(attrs, "x"));
                             double uy = ParseDouble(GetAttrFromDict(attrs, "y"));
-                            bool pushedUseTranslate = false;
+                            double uw = ParseLength(GetAttrFromDict(attrs, "width"), 0);
+                            double uh = ParseLength(GetAttrFromDict(attrs, "height"), 0);
+
+                            int pushUse = 0;
                             if (Math.Abs(ux) > 1e-6 || Math.Abs(uy) > 1e-6)
                             {
                                 dc.PushTransform(new System.Windows.Media.TranslateTransform(ux, uy));
-                                pushedUseTranslate = true;
+                                pushUse++;
                             }
-                            RenderElementRecursive(dc, targetElem, state, defBrushes, defsById, cssRules, depth + 1);
-                            if (pushedUseTranslate) dc.Pop();
+
+                            if (string.Equals(targetElem.Name.LocalName, "symbol", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string vbStr = GetAttr(targetElem, "viewBox");
+                                if (!string.IsNullOrEmpty(vbStr) && uw > 0 && uh > 0)
+                                {
+                                    double[] vbParts = ParseNumberList(vbStr);
+                                    if (vbParts.Length >= 4 && vbParts[2] > 0 && vbParts[3] > 0)
+                                    {
+                                        double vx = vbParts[0], vy = vbParts[1], vw = vbParts[2], vh = vbParts[3];
+                                        string par = GetAttr(targetElem, "preserveAspectRatio") ?? "xMidYMid meet";
+                                        double sx = uw / vw;
+                                        double sy = uh / vh;
+                                        double tx = -vx * sx;
+                                        double ty = -vy * sy;
+
+                                        if (!par.Trim().StartsWith("none", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            double s = Math.Min(sx, sy);
+                                            tx = -vx * s + (uw - vw * s) / 2.0;
+                                            ty = -vy * s + (uh - vh * s) / 2.0;
+                                            sx = s;
+                                            sy = s;
+                                        }
+
+                                        WpfMatrix symMat = new WpfMatrix(sx, 0, 0, sy, tx, ty);
+                                        dc.PushTransform(new WpfMatrixTransform(symMat));
+                                        pushUse++;
+                                    }
+                                }
+
+                                foreach (XElement child in targetElem.Elements())
+                                {
+                                    RenderElementRecursive(dc, child, state, defBrushes, defsById, cssRules, depth + 1);
+                                }
+                            }
+                            else
+                            {
+                                RenderElementRecursive(dc, targetElem, state, defBrushes, defsById, cssRules, depth + 1);
+                            }
+
+                            for (int i = 0; i < pushUse; i++) dc.Pop();
+                        }
+                    }
+                    return;
+                }
+
+                // Nếu là thẻ <image .../>
+                if (string.Equals(localName, "image", StringComparison.OrdinalIgnoreCase))
+                {
+                    string href = GetAttrFromDict(attrs, "href");
+                    if (string.IsNullOrEmpty(href)) href = GetHrefAttribute(elem);
+
+                    if (!string.IsNullOrEmpty(href))
+                    {
+                        System.Windows.Media.ImageSource imgSource = LoadSvgImageSource(href);
+                        if (imgSource != null)
+                        {
+                            string maskId = null;
+                            if (attrs.TryGetValue("mask", out string elemMask))
+                                maskId = ExtractUrlId(elemMask);
+                            if (string.IsNullOrEmpty(maskId))
+                                maskId = state.MaskId;
+
+                            if (!string.IsNullOrEmpty(maskId) && defsById.TryGetValue(maskId, out XElement maskElem))
+                            {
+                                XElement maskImgElem = maskElem.Descendants().FirstOrDefault(d => string.Equals(d.Name.LocalName, "image", StringComparison.OrdinalIgnoreCase));
+                                if (maskImgElem != null)
+                                {
+                                    string maskHref = GetAttr(maskImgElem, "href") ?? GetHrefAttribute(maskImgElem);
+                                    if (!string.IsNullOrEmpty(maskHref))
+                                    {
+                                        System.Windows.Media.ImageSource maskSource = LoadSvgImageSource(maskHref);
+                                        if (maskSource != null)
+                                        {
+                                            var combinedSource = CombineImageWithAlphaMask(imgSource, maskSource);
+                                            if (combinedSource != null)
+                                            {
+                                                imgSource = combinedSource;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            double ix = ParseDouble(GetAttrFromDict(attrs, "x"));
+                            double iy = ParseDouble(GetAttrFromDict(attrs, "y"));
+                            double iw = ParseLength(GetAttrFromDict(attrs, "width"), imgSource.Width);
+                            double ih = ParseLength(GetAttrFromDict(attrs, "height"), imgSource.Height);
+                            if (iw <= 0) iw = imgSource.Width;
+                            if (ih <= 0) ih = imgSource.Height;
+
+                            string par = GetAttrFromDict(attrs, "preserveAspectRatio");
+                            bool preserveAspect = string.IsNullOrEmpty(par) || !par.Trim().StartsWith("none", StringComparison.OrdinalIgnoreCase);
+
+                            if (preserveAspect && imgSource.Width > 0 && imgSource.Height > 0 && iw > 0 && ih > 0)
+                            {
+                                double srcW = imgSource.Width;
+                                double srcH = imgSource.Height;
+                                double scaleImg = Math.Min(iw / srcW, ih / srcH);
+                                double renderW = srcW * scaleImg;
+                                double renderH = srcH * scaleImg;
+                                double drawX = ix + (iw - renderW) / 2.0;
+                                double drawY = iy + (ih - renderH) / 2.0;
+                                dc.DrawImage(imgSource, new WpfRect(drawX, drawY, renderW, renderH));
+                            }
+                            else
+                            {
+                                dc.DrawImage(imgSource, new WpfRect(ix, iy, iw, ih));
+                            }
                         }
                     }
                     return;
@@ -365,7 +528,8 @@ namespace ZenQOffice.Core
                             var geom = ParsePathGeometryWithFillRule(d, fillRule);
                             if (geom != null)
                             {
-                                dc.DrawGeometry(fillBrush, pen, geom);
+                                WpfBrush elemFill = AdaptBrushToBoundingBox(fillBrush, geom.Bounds);
+                                dc.DrawGeometry(elemFill, pen, geom);
                             }
                         }
                         catch { }
@@ -378,7 +542,8 @@ namespace ZenQOffice.Core
                     double r = ParseDouble(GetAttrFromDict(attrs, "r"));
                     if (r > 0)
                     {
-                        dc.DrawEllipse(fillBrush, pen, new WpfPoint(cx, cy), r, r);
+                        WpfBrush elemFill = AdaptBrushToBoundingBox(fillBrush, new WpfRect(cx - r, cy - r, 2 * r, 2 * r));
+                        dc.DrawEllipse(elemFill, pen, new WpfPoint(cx, cy), r, r);
                     }
                 }
                 else if (string.Equals(localName, "ellipse", StringComparison.OrdinalIgnoreCase))
@@ -389,7 +554,8 @@ namespace ZenQOffice.Core
                     double ry = ParseDouble(GetAttrFromDict(attrs, "ry"));
                     if (rx > 0 && ry > 0)
                     {
-                        dc.DrawEllipse(fillBrush, pen, new WpfPoint(cx, cy), rx, ry);
+                        WpfBrush elemFill = AdaptBrushToBoundingBox(fillBrush, new WpfRect(cx - rx, cy - ry, 2 * rx, 2 * ry));
+                        dc.DrawEllipse(elemFill, pen, new WpfPoint(cx, cy), rx, ry);
                     }
                 }
                 else if (string.Equals(localName, "rect", StringComparison.OrdinalIgnoreCase))
@@ -404,7 +570,38 @@ namespace ZenQOffice.Core
                         double ry = ParseDouble(GetAttrFromDict(attrs, "ry"));
                         if (rx <= 0 && ry > 0) rx = ry;
                         if (ry <= 0 && rx > 0) ry = rx;
-                        dc.DrawRoundedRectangle(fillBrush, pen, new WpfRect(x, y, w, h), rx, ry);
+
+                        WpfRect rectBounds = new WpfRect(x, y, w, h);
+                        WpfBrush elemFill = AdaptBrushToBoundingBox(fillBrush, rectBounds);
+                        WpfPen elemPen = pen;
+                        if (pen != null && pen.Brush is WpfLinearGradientBrush)
+                        {
+                            var adaptedPenBrush = AdaptBrushToBoundingBox(pen.Brush, rectBounds);
+                            if (adaptedPenBrush != pen.Brush)
+                            {
+                                elemPen = pen.Clone();
+                                elemPen.Brush = adaptedPenBrush;
+                                elemPen.Freeze();
+                            }
+                        }
+
+                        if (rx <= 0 && ry <= 0 && elemPen != null && (elemPen.LineJoin == WpfPenLineJoin.Round || elemPen.LineJoin == WpfPenLineJoin.Bevel))
+                        {
+                            var sg = new System.Windows.Media.StreamGeometry();
+                            using (var ctx = sg.Open())
+                            {
+                                ctx.BeginFigure(new WpfPoint(x, y), elemFill != null, true);
+                                ctx.LineTo(new WpfPoint(x + w, y), true, false);
+                                ctx.LineTo(new WpfPoint(x + w, y + h), true, false);
+                                ctx.LineTo(new WpfPoint(x, y + h), true, false);
+                            }
+                            sg.Freeze();
+                            dc.DrawGeometry(elemFill, elemPen, sg);
+                        }
+                        else
+                        {
+                            dc.DrawRoundedRectangle(elemFill, elemPen, rectBounds, rx, ry);
+                        }
                     }
                 }
                 else if (isLineElement)
@@ -430,11 +627,16 @@ namespace ZenQOffice.Core
                             var geom = BuildPolyGeometry(pts, isPolygon, fillRule);
                             if (geom != null)
                             {
-                                dc.DrawGeometry(fillBrush, pen, geom);
+                                WpfBrush elemFill = AdaptBrushToBoundingBox(fillBrush, geom.Bounds);
+                                dc.DrawGeometry(elemFill, pen, geom);
                             }
                         }
                         catch { }
                     }
+                }
+                else if (string.Equals(localName, "text", StringComparison.OrdinalIgnoreCase))
+                {
+                    RenderSvgTextElement(dc, elem, state, defBrushes, defsById, cssRules, fillBrush, pen, attrs);
                 }
             }
             finally
@@ -444,6 +646,235 @@ namespace ZenQOffice.Core
                     dc.Pop();
                 }
             }
+        }
+
+        private static void RenderSvgTextElement(
+            WpfDrawingContext dc,
+            XElement elem,
+            SvgRenderState state,
+            Dictionary<string, WpfBrush> defBrushes,
+            Dictionary<string, XElement> defsById,
+            Dictionary<string, Dictionary<string, string>> cssRules,
+            WpfBrush fillBrush,
+            WpfPen pen,
+            Dictionary<string, string> attrs)
+        {
+            double curX = ParseDouble(GetAttrFromDict(attrs, "x"));
+            double curY = ParseDouble(GetAttrFromDict(attrs, "y"));
+            curX += ParseDouble(GetAttrFromDict(attrs, "dx"));
+            curY += ParseDouble(GetAttrFromDict(attrs, "dy"));
+            string anchor = GetAttrFromDict(attrs, "text-anchor") ?? state.TextAnchor ?? "start";
+            double textLength = ParseLength(GetAttrFromDict(attrs, "textLength"), 0);
+            string lengthAdjust = GetAttrFromDict(attrs, "lengthAdjust") ?? "spacing";
+
+            bool hasTspan = elem.Elements().Any(e => string.Equals(e.Name.LocalName, "tspan", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasTspan)
+            {
+                string text = CleanSvgText(elem.Value, true);
+                if (string.IsNullOrEmpty(text)) return;
+
+                WpfFormattedText ft = CreateFormattedText(text, state, fillBrush);
+                DrawFormattedSvgText(dc, ft, curX, curY, anchor, fillBrush, pen, textLength, lengthAdjust, text, state);
+            }
+            else
+            {
+                foreach (XNode node in elem.Nodes())
+                {
+                    if (node is XText textNode)
+                    {
+                        string text = CleanSvgText(textNode.Value, false);
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            WpfFormattedText ft = CreateFormattedText(text, state, fillBrush);
+                            DrawFormattedSvgText(dc, ft, curX, curY, anchor, fillBrush, pen, 0, "spacing", text, state);
+                            curX += ft.WidthIncludingTrailingWhitespace;
+                        }
+                    }
+                    else if (node is XElement childElem && string.Equals(childElem.Name.LocalName, "tspan", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Dictionary<string, string> tAttrs = ResolveElementAttributes(childElem, cssRules);
+                        SvgRenderState tState = MergeRenderState(state, tAttrs);
+                        WpfBrush tFill = CreateFillBrush(tState, defBrushes);
+                        WpfPen tPen = CreateStrokePen(tState, defBrushes);
+
+                        if (tAttrs.TryGetValue("x", out string txStr) && !string.IsNullOrWhiteSpace(txStr))
+                            curX = ParseDouble(txStr);
+                        if (tAttrs.TryGetValue("y", out string tyStr) && !string.IsNullOrWhiteSpace(tyStr))
+                            curY = ParseDouble(tyStr);
+                        if (tAttrs.TryGetValue("dx", out string tdxStr) && !string.IsNullOrWhiteSpace(tdxStr))
+                            curX += ParseDouble(tdxStr);
+                        if (tAttrs.TryGetValue("dy", out string tdyStr) && !string.IsNullOrWhiteSpace(tdyStr))
+                            curY += ParseDouble(tdyStr);
+
+                        string tAnchor = GetAttrFromDict(tAttrs, "text-anchor") ?? tState.TextAnchor ?? anchor;
+                        double tLength = ParseLength(GetAttrFromDict(tAttrs, "textLength"), 0);
+                        string tLengthAdjust = GetAttrFromDict(tAttrs, "lengthAdjust") ?? lengthAdjust;
+
+                        string text = CleanSvgText(childElem.Value, false);
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            WpfFormattedText ft = CreateFormattedText(text, tState, tFill);
+                            DrawFormattedSvgText(dc, ft, curX, curY, tAnchor, tFill, tPen, tLength, tLengthAdjust, text, tState);
+                            curX += ft.WidthIncludingTrailingWhitespace;
+                        }
+                    }
+                }
+            }
+        }
+
+        private static WpfFormattedText CreateFormattedText(string text, SvgRenderState state, WpfBrush fillBrush)
+        {
+            string fontName = !string.IsNullOrWhiteSpace(state.FontFamily) ? state.FontFamily : "Arial, Segoe UI, sans-serif";
+            string normalizedFont;
+            if (fontName.IndexOf("sans", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                normalizedFont = fontName.Replace("sans-serif", "Arial, Segoe UI");
+                if (!normalizedFont.Contains("Arial")) normalizedFont += ", Arial, Segoe UI";
+            }
+            else if (fontName.IndexOf("mono", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                normalizedFont = fontName.Replace("monospace", "Consolas, Courier New");
+                if (!normalizedFont.Contains("Consolas")) normalizedFont += ", Consolas";
+            }
+            else
+            {
+                normalizedFont = fontName.Replace("serif", "Times New Roman");
+                if (!normalizedFont.Contains("Times New Roman")) normalizedFont += ", Times New Roman, Arial";
+            }
+
+            var fontFamily = new System.Windows.Media.FontFamily(normalizedFont);
+
+            System.Windows.FontWeight weight = System.Windows.FontWeights.Normal;
+            if (!string.IsNullOrEmpty(state.FontWeight))
+            {
+                if (state.FontWeight.Equals("bold", StringComparison.OrdinalIgnoreCase) ||
+                    state.FontWeight.Equals("bolder", StringComparison.OrdinalIgnoreCase) ||
+                    state.FontWeight.Equals("700") || state.FontWeight.Equals("800") || state.FontWeight.Equals("900"))
+                {
+                    weight = System.Windows.FontWeights.Bold;
+                }
+            }
+
+            System.Windows.FontStyle style = System.Windows.FontStyles.Normal;
+            if (!string.IsNullOrEmpty(state.FontStyle))
+            {
+                if (state.FontStyle.Equals("italic", StringComparison.OrdinalIgnoreCase) ||
+                    state.FontStyle.Equals("oblique", StringComparison.OrdinalIgnoreCase))
+                {
+                    style = System.Windows.FontStyles.Italic;
+                }
+            }
+
+            double fontSize = state.FontSize > 0 ? state.FontSize : 16.0;
+
+            var typeface = new System.Windows.Media.Typeface(fontFamily, style, weight, System.Windows.FontStretches.Normal);
+            WpfBrush fg = fillBrush ?? System.Windows.Media.Brushes.Black;
+
+            return new WpfFormattedText(
+                text,
+                CultureInfo.InvariantCulture,
+                System.Windows.FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                fg,
+                1.0);
+        }
+
+        private static void DrawFormattedSvgText(
+            WpfDrawingContext dc,
+            WpfFormattedText ft,
+            double x,
+            double y,
+            string anchor,
+            WpfBrush fillBrush,
+            WpfPen pen,
+            double textLength,
+            string lengthAdjust,
+            string rawText,
+            SvgRenderState state)
+        {
+            if (ft == null) return;
+
+            double drawX = x;
+            double drawY = y - ft.Baseline;
+
+            string a = (anchor ?? "start").ToLowerInvariant().Trim();
+            if (a == "middle")
+            {
+                drawX -= ft.Width / 2.0;
+            }
+            else if (a == "end")
+            {
+                drawX -= ft.Width;
+            }
+
+            if (textLength > 0 && ft.Width > 0 && Math.Abs(textLength - ft.Width) > 0.5)
+            {
+                if (string.Equals(lengthAdjust, "spacingAndGlyphs", StringComparison.OrdinalIgnoreCase))
+                {
+                    double xfactor = textLength / ft.Width;
+                    dc.PushTransform(new System.Windows.Media.ScaleTransform(xfactor, 1.0, drawX, drawY));
+                    try
+                    {
+                        DrawSingleFormattedSvgText(dc, ft, drawX, drawY, fillBrush, pen);
+                    }
+                    finally
+                    {
+                        dc.Pop();
+                    }
+                    return;
+                }
+                else if (!string.IsNullOrEmpty(rawText) && rawText.Length > 1)
+                {
+                    double delta = (textLength - ft.Width) / (rawText.Length - 1);
+                    double curCharX = drawX;
+                    for (int i = 0; i < rawText.Length; i++)
+                    {
+                        string ch = rawText[i].ToString();
+                        var charFt = CreateFormattedText(ch, state, fillBrush);
+                        DrawSingleFormattedSvgText(dc, charFt, curCharX, drawY, fillBrush, pen);
+                        curCharX += charFt.WidthIncludingTrailingWhitespace + delta;
+                    }
+                    return;
+                }
+            }
+
+            DrawSingleFormattedSvgText(dc, ft, drawX, drawY, fillBrush, pen);
+        }
+
+        private static void DrawSingleFormattedSvgText(
+            WpfDrawingContext dc,
+            WpfFormattedText ft,
+            double drawX,
+            double drawY,
+            WpfBrush fillBrush,
+            WpfPen pen)
+        {
+            if (pen == null && fillBrush is WpfSolidColorBrush)
+            {
+                dc.DrawText(ft, new WpfPoint(drawX, drawY));
+            }
+            else
+            {
+                var geom = ft.BuildGeometry(new WpfPoint(drawX, drawY));
+                if (geom != null)
+                {
+                    dc.DrawGeometry(fillBrush, pen, geom);
+                }
+                else if (fillBrush != null)
+                {
+                    dc.DrawText(ft, new WpfPoint(drawX, drawY));
+                }
+            }
+        }
+
+        private static string CleanSvgText(string input, bool isStandalone)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            string res = Regex.Replace(input, @"[\r\n\t]+", " ");
+            if (string.IsNullOrWhiteSpace(res)) return string.Empty;
+            return isStandalone ? res.Trim() : res;
         }
 
         private static WpfGeometry ParsePathGeometryWithFillRule(string d, WpfFillRule fillRule)
@@ -483,10 +914,28 @@ namespace ZenQOffice.Core
             return sg;
         }
 
-        private static WpfGeometry BuildClipGeometry(XElement clipElem, Dictionary<string, Dictionary<string, string>> cssRules)
+        private static WpfGeometry BuildClipGeometry(
+            XElement clipElem,
+            Dictionary<string, Dictionary<string, string>> cssRules,
+            Dictionary<string, XElement> defsById = null)
         {
             WpfGeometryGroup group = new WpfGeometryGroup { FillRule = WpfFillRule.Nonzero };
-            foreach (XElement child in clipElem.Elements())
+            ExtractClipChildren(clipElem, group, cssRules, defsById, 0);
+            if (group.Children.Count == 0) return null;
+            group.Freeze();
+            return group;
+        }
+
+        private static void ExtractClipChildren(
+            XElement parent,
+            WpfGeometryGroup group,
+            Dictionary<string, Dictionary<string, string>> cssRules,
+            Dictionary<string, XElement> defsById,
+            int depth)
+        {
+            if (parent == null || depth > 8) return;
+
+            foreach (XElement child in parent.Elements())
             {
                 var attrs = ResolveElementAttributes(child, cssRules);
                 string localName = child.Name.LocalName;
@@ -531,6 +980,33 @@ namespace ZenQOffice.Core
                         string pts = GetAttrFromDict(attrs, "points");
                         if (!string.IsNullOrEmpty(pts)) g = BuildPolyGeometry(pts, true, WpfFillRule.Nonzero);
                     }
+                    else if (string.Equals(localName, "use", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string href = GetHrefAttribute(child);
+                        if (!string.IsNullOrEmpty(href) && href.StartsWith("#") && defsById != null)
+                        {
+                            string refId = href.Substring(1).Trim();
+                            if (defsById.TryGetValue(refId, out XElement refElem))
+                            {
+                                WpfGeometryGroup subGroup = new WpfGeometryGroup { FillRule = WpfFillRule.Nonzero };
+                                ExtractClipChildren(new XElement("clipPath", refElem), subGroup, cssRules, defsById, depth + 1);
+                                if (subGroup.Children.Count > 0)
+                                {
+                                    double ux = ParseDouble(GetAttrFromDict(attrs, "x"));
+                                    double uy = ParseDouble(GetAttrFromDict(attrs, "y"));
+                                    if (Math.Abs(ux) > 1e-6 || Math.Abs(uy) > 1e-6)
+                                    {
+                                        subGroup.Transform = new System.Windows.Media.TranslateTransform(ux, uy);
+                                    }
+                                    g = subGroup;
+                                }
+                            }
+                        }
+                    }
+                    else if (string.Equals(localName, "g", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ExtractClipChildren(child, group, cssRules, defsById, depth + 1);
+                    }
 
                     if (g != null)
                     {
@@ -548,9 +1024,6 @@ namespace ZenQOffice.Core
                 }
                 catch { }
             }
-            if (group.Children.Count == 0) return null;
-            group.Freeze();
-            return group;
         }
 
         public static WpfMatrix ParseSvgTransform(string transformStr)
@@ -675,6 +1148,30 @@ namespace ZenQOffice.Core
             if (attrs.TryGetValue("stroke-dasharray", out string sda) && !string.IsNullOrWhiteSpace(sda))
                 s.StrokeDashArray = sda.Trim();
 
+            if (attrs.TryGetValue("mask", out string maskVal) && !string.IsNullOrWhiteSpace(maskVal))
+            {
+                string mid = ExtractUrlId(maskVal);
+                if (!string.IsNullOrEmpty(mid)) s.MaskId = mid;
+            }
+
+            if (attrs.TryGetValue("font-family", out string ff) && !string.IsNullOrWhiteSpace(ff))
+                s.FontFamily = ff.Trim();
+
+            if (attrs.TryGetValue("font-size", out string fs) && !string.IsNullOrWhiteSpace(fs))
+                s.FontSize = ParseLength(fs, s.FontSize);
+
+            if (attrs.TryGetValue("font-weight", out string fw) && !string.IsNullOrWhiteSpace(fw))
+                s.FontWeight = fw.Trim();
+
+            if (attrs.TryGetValue("font-style", out string fst) && !string.IsNullOrWhiteSpace(fst))
+                s.FontStyle = fst.Trim();
+
+            if (attrs.TryGetValue("text-anchor", out string ta) && !string.IsNullOrWhiteSpace(ta))
+                s.TextAnchor = ta.Trim();
+
+            if (attrs.TryGetValue("stroke-miterlimit", out string sml) && !string.IsNullOrWhiteSpace(sml))
+                s.StrokeMiterLimit = ParseDouble(sml);
+
             return s;
         }
 
@@ -786,10 +1283,26 @@ namespace ZenQOffice.Core
                 if (!mat.IsIdentity)
                 {
                     if (isUserSpace)
-                        lgb.Transform = new WpfMatrixTransform(mat);
+                    {
+                        lgb.StartPoint = mat.Transform(lgb.StartPoint);
+                        lgb.EndPoint = mat.Transform(lgb.EndPoint);
+                    }
                     else
+                    {
                         lgb.RelativeTransform = new WpfMatrixTransform(mat);
+                    }
                 }
+            }
+
+            string spread = GetInheritedAttr(chain, "spreadMethod");
+            if (!string.IsNullOrEmpty(spread))
+            {
+                if (string.Equals(spread, "reflect", StringComparison.OrdinalIgnoreCase))
+                    lgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Reflect;
+                else if (string.Equals(spread, "repeat", StringComparison.OrdinalIgnoreCase))
+                    lgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Repeat;
+                else
+                    lgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Pad;
             }
 
             PopulateGradientStops(lgb.GradientStops, chain);
@@ -829,6 +1342,17 @@ namespace ZenQOffice.Core
                     else
                         rgb.RelativeTransform = new WpfMatrixTransform(mat);
                 }
+            }
+
+            string rSpread = GetInheritedAttr(chain, "spreadMethod");
+            if (!string.IsNullOrEmpty(rSpread))
+            {
+                if (string.Equals(rSpread, "reflect", StringComparison.OrdinalIgnoreCase))
+                    rgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Reflect;
+                else if (string.Equals(rSpread, "repeat", StringComparison.OrdinalIgnoreCase))
+                    rgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Repeat;
+                else
+                    rgb.SpreadMethod = System.Windows.Media.GradientSpreadMethod.Pad;
             }
 
             PopulateGradientStops(rgb.GradientStops, chain);
@@ -940,7 +1464,8 @@ namespace ZenQOffice.Core
             {
                 StartLineCap = cap,
                 EndLineCap = cap,
-                LineJoin = join
+                LineJoin = join,
+                MiterLimit = state.StrokeMiterLimit > 0 ? state.StrokeMiterLimit : 4.0
             };
 
             if (!string.IsNullOrWhiteSpace(state.StrokeDashArray) &&
@@ -960,6 +1485,51 @@ namespace ZenQOffice.Core
 
             pen.Freeze();
             return pen;
+        }
+
+        private static WpfBrush AdaptBrushToBoundingBox(WpfBrush brush, WpfRect bbox)
+        {
+            if (brush is WpfLinearGradientBrush lgb && lgb.MappingMode == WpfBrushMappingMode.RelativeToBoundingBox)
+            {
+                if (bbox.Width > 0 && bbox.Height > 0)
+                {
+                    double x1 = lgb.StartPoint.X, y1 = lgb.StartPoint.Y;
+                    double x2 = lgb.EndPoint.X, y2 = lgb.EndPoint.Y;
+                    double dx = x2 - x1;
+                    double dy = y2 - y1;
+                    double L2 = dx * dx + dy * dy;
+                    if (L2 > 1e-9 && Math.Abs(dx) > 1e-5 && Math.Abs(dy) > 1e-5)
+                    {
+                        double A = dx / (bbox.Width * L2);
+                        double B = dy / (bbox.Height * L2);
+                        double denom = A * A + B * B;
+                        if (denom > 1e-9)
+                        {
+                            double dPx = A / denom;
+                            double dPy = B / denom;
+                            double P1x = bbox.X + x1 * bbox.Width;
+                            double P1y = bbox.Y + y1 * bbox.Height;
+
+                            var adapted = lgb.Clone();
+                            adapted.MappingMode = WpfBrushMappingMode.Absolute;
+                            adapted.StartPoint = new WpfPoint(P1x, P1y);
+                            adapted.EndPoint = new WpfPoint(P1x + dPx, P1y + dPy);
+                            adapted.Freeze();
+                            return adapted;
+                        }
+                    }
+                    else if (L2 > 1e-9)
+                    {
+                        var adapted = lgb.Clone();
+                        adapted.MappingMode = WpfBrushMappingMode.Absolute;
+                        adapted.StartPoint = new WpfPoint(bbox.X + x1 * bbox.Width, bbox.Y + y1 * bbox.Height);
+                        adapted.EndPoint = new WpfPoint(bbox.X + x2 * bbox.Width, bbox.Y + y2 * bbox.Height);
+                        adapted.Freeze();
+                        return adapted;
+                    }
+                }
+            }
+            return brush;
         }
 
         private static string GetAttr(XElement elem, string localName)
@@ -1000,6 +1570,153 @@ namespace ZenQOffice.Core
                 if (inner.StartsWith("#")) return inner.Substring(1).Trim();
             }
             return null;
+        }
+
+        private static System.Windows.Media.ImageSource LoadSvgImageSource(string href)
+        {
+            if (string.IsNullOrWhiteSpace(href)) return null;
+            try
+            {
+                href = href.Trim();
+                if (href.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    int base64Idx = href.IndexOf("base64,", StringComparison.OrdinalIgnoreCase);
+                    if (base64Idx >= 0)
+                    {
+                        string base64Str = href.Substring(base64Idx + 7).Trim();
+                        if (base64Str.Contains("%"))
+                        {
+                            base64Str = Uri.UnescapeDataString(base64Str);
+                        }
+                        byte[] bytes = Convert.FromBase64String(base64Str);
+                        using (var ms = new MemoryStream(bytes))
+                        {
+                            var bi = new System.Windows.Media.Imaging.BitmapImage();
+                            bi.BeginInit();
+                            bi.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                            bi.StreamSource = ms;
+                            bi.EndInit();
+                            bi.Freeze();
+                            return bi;
+                        }
+                    }
+                }
+                else
+                {
+                    string filePath = href;
+                    if (filePath.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filePath = filePath.Substring(8).Replace('/', '\\');
+                    }
+                    if (File.Exists(filePath))
+                    {
+                        var bi = new System.Windows.Media.Imaging.BitmapImage();
+                        bi.BeginInit();
+                        bi.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bi.UriSource = new Uri(filePath, UriKind.Absolute);
+                        bi.EndInit();
+                        bi.Freeze();
+                        return bi;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("LoadSvgImageSource error: " + ex.Message);
+            }
+            return null;
+        }
+
+        private static System.Windows.Media.Imaging.BitmapSource CombineImageWithAlphaMask(
+            System.Windows.Media.ImageSource colorSource,
+            System.Windows.Media.ImageSource maskSource)
+        {
+            try
+            {
+                var cbmp = colorSource as System.Windows.Media.Imaging.BitmapSource;
+                var mbmp = maskSource as System.Windows.Media.Imaging.BitmapSource;
+                if (cbmp == null || mbmp == null) return null;
+
+                int w = cbmp.PixelWidth;
+                int h = cbmp.PixelHeight;
+                if (w <= 0 || h <= 0) return null;
+
+                var colorFormatted = new System.Windows.Media.Imaging.FormatConvertedBitmap(cbmp, WpfPixelFormats.Bgra32, null, 0);
+                var maskFormatted = new System.Windows.Media.Imaging.FormatConvertedBitmap(mbmp, WpfPixelFormats.Bgra32, null, 0);
+
+                int stride = w * 4;
+                byte[] colorPixels = new byte[stride * h];
+                colorFormatted.CopyPixels(colorPixels, stride, 0);
+
+                byte[] maskPixels = new byte[stride * h];
+                if (maskFormatted.PixelWidth == w && maskFormatted.PixelHeight == h)
+                {
+                    maskFormatted.CopyPixels(maskPixels, stride, 0);
+                }
+                else
+                {
+                    var scaledMask = new System.Windows.Media.Imaging.TransformedBitmap(maskFormatted,
+                        new System.Windows.Media.ScaleTransform((double)w / maskFormatted.PixelWidth, (double)h / maskFormatted.PixelHeight));
+                    var scaledFormatted = new System.Windows.Media.Imaging.FormatConvertedBitmap(scaledMask, WpfPixelFormats.Bgra32, null, 0);
+                    scaledFormatted.CopyPixels(maskPixels, stride, 0);
+                }
+
+                byte[] resultPixels = new byte[stride * h];
+
+                bool isAlphaOnlyMask = true;
+                for (int i = 0; i < maskPixels.Length; i += 4)
+                {
+                    if (maskPixels[i] != 0 || maskPixels[i + 1] != 0 || maskPixels[i + 2] != 0)
+                    {
+                        isAlphaOnlyMask = false;
+                        break;
+                    }
+                }
+
+                for (int i = 0; i < colorPixels.Length; i += 4)
+                {
+                    byte b = colorPixels[i];
+                    byte g = colorPixels[i + 1];
+                    byte r = colorPixels[i + 2];
+                    byte origA = colorPixels[i + 3];
+
+                    // SVG mask luminance formula: Y = 0.2126 * R + 0.7152 * G + 0.0722 * B
+                    byte mb = maskPixels[i];
+                    byte mg = maskPixels[i + 1];
+                    byte mr = maskPixels[i + 2];
+                    byte ma = maskPixels[i + 3];
+
+                    int lum;
+                    if (isAlphaOnlyMask)
+                    {
+                        lum = ma;
+                    }
+                    else
+                    {
+                        lum = (int)(0.2126 * mr + 0.7152 * mg + 0.0722 * mb);
+                        if (lum > 255) lum = 255;
+                        lum = (lum * ma) / 255;
+                    }
+                    int finalAlpha = (lum * origA) / 255;
+                    if (finalAlpha > 255) finalAlpha = 255;
+
+                    byte pA = (byte)finalAlpha;
+                    resultPixels[i] = (byte)((b * pA) / 255);
+                    resultPixels[i + 1] = (byte)((g * pA) / 255);
+                    resultPixels[i + 2] = (byte)((r * pA) / 255);
+                    resultPixels[i + 3] = pA;
+                }
+
+                var resultBmp = System.Windows.Media.Imaging.BitmapSource.Create(
+                    w, h, 96, 96, WpfPixelFormats.Pbgra32, null, resultPixels, stride);
+                resultBmp.Freeze();
+                return resultBmp;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("CombineImageWithAlphaMask error: " + ex.Message);
+                return null;
+            }
         }
 
         private static double ParseDouble(string str)
@@ -1106,17 +1823,47 @@ namespace ZenQOffice.Core
                 return ApplyOpacity(WpfColor.FromRgb(108, 99, 255), opacity);
             }
 
-            // Hỗ trợ rgb(...) và rgba(...)
+            // Hỗ trợ rgb(...) và rgba(...) bao gồm cả đơn vị phần trăm rgb(100%, 0%, 0%)
             if (colorStr.StartsWith("rgb", StringComparison.OrdinalIgnoreCase))
             {
-                double[] nums = ParseNumberList(colorStr);
-                if (nums.Length >= 3)
+                int open = colorStr.IndexOf('(');
+                int close = colorStr.LastIndexOf(')');
+                if (open >= 0 && close > open)
                 {
-                    byte r = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(nums[0])));
-                    byte g = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(nums[1])));
-                    byte b = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(nums[2])));
-                    double a = (nums.Length >= 4) ? Math.Max(0.0, Math.Min(1.0, nums[3])) : 1.0;
-                    return ApplyOpacity(WpfColor.FromArgb(255, r, g, b), opacity * a);
+                    string inner = colorStr.Substring(open + 1, close - open - 1);
+                    string[] parts = inner.Split(new char[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3)
+                    {
+                        double rVal = ParseColorChannel(parts[0], 255.0);
+                        double gVal = ParseColorChannel(parts[1], 255.0);
+                        double bVal = ParseColorChannel(parts[2], 255.0);
+                        double aVal = (parts.Length >= 4) ? ParseAlphaChannel(parts[3]) : 1.0;
+                        byte r = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(rVal)));
+                        byte g = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(gVal)));
+                        byte b = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(bVal)));
+                        return ApplyOpacity(WpfColor.FromArgb(255, r, g, b), opacity * aVal);
+                    }
+                }
+            }
+
+            // Hỗ trợ hsl(...) và hsla(...)
+            if (colorStr.StartsWith("hsl", StringComparison.OrdinalIgnoreCase))
+            {
+                int open = colorStr.IndexOf('(');
+                int close = colorStr.LastIndexOf(')');
+                if (open >= 0 && close > open)
+                {
+                    string inner = colorStr.Substring(open + 1, close - open - 1);
+                    string[] parts = inner.Split(new char[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3)
+                    {
+                        double h = ParseColorChannel(parts[0], 360.0);
+                        double s = ParseAlphaChannel(parts[1]);
+                        double l = ParseAlphaChannel(parts[2]);
+                        double a = (parts.Length >= 4) ? ParseAlphaChannel(parts[3]) : 1.0;
+                        WpfColor rgb = HslToRgb(h, s, l);
+                        return ApplyOpacity(rgb, opacity * a);
+                    }
                 }
             }
 
@@ -1159,33 +1906,343 @@ namespace ZenQOffice.Core
             }
             catch { }
 
-            // Named colors chuẩn SVG / CSS
-            switch (colorStr.ToLowerInvariant())
+            // Named colors chuẩn SVG / CSS W3C (hỗ trợ tất cả 140 màu chuẩn)
+            try
             {
-                case "white": return ApplyOpacity(WpfColor.FromRgb(255, 255, 255), opacity);
-                case "black": return ApplyOpacity(WpfColor.FromRgb(0, 0, 0), opacity);
-                case "gold": return ApplyOpacity(WpfColor.FromRgb(255, 215, 0), opacity);
-                case "red": return ApplyOpacity(WpfColor.FromRgb(239, 68, 68), opacity);
-                case "blue": return ApplyOpacity(WpfColor.FromRgb(59, 130, 246), opacity);
-                case "green": return ApplyOpacity(WpfColor.FromRgb(16, 185, 129), opacity);
-                case "yellow": return ApplyOpacity(WpfColor.FromRgb(250, 204, 21), opacity);
-                case "crimson": return ApplyOpacity(WpfColor.FromRgb(158, 11, 15), opacity);
-                case "gray":
-                case "grey": return ApplyOpacity(WpfColor.FromRgb(128, 128, 128), opacity);
-                default:
-                    try
-                    {
-                        Color sysCol = Color.FromName(colorStr);
-                        if (sysCol.IsKnownColor)
-                        {
-                            return ApplyOpacity(WpfColor.FromArgb(sysCol.A, sysCol.R, sysCol.G, sysCol.B), opacity);
-                        }
-                    }
-                    catch { }
-                    break;
+                object converted = System.Windows.Media.ColorConverter.ConvertFromString(colorStr);
+                if (converted is WpfColor convColor)
+                {
+                    return ApplyOpacity(convColor, opacity);
+                }
             }
+            catch { }
+
+            try
+            {
+                Color sysCol = Color.FromName(colorStr);
+                if (sysCol.IsKnownColor)
+                {
+                    return ApplyOpacity(WpfColor.FromArgb(sysCol.A, sysCol.R, sysCol.G, sysCol.B), opacity);
+                }
+            }
+            catch { }
 
             return ApplyOpacity(WpfColor.FromArgb(255, 30, 41, 59), opacity);
+        }
+
+        private static double ParseColorChannel(string str, double maxVal)
+        {
+            if (string.IsNullOrWhiteSpace(str)) return 0;
+            str = str.Trim();
+            if (str.EndsWith("%"))
+            {
+                if (double.TryParse(str.Substring(0, str.Length - 1), NumberStyles.Any, CultureInfo.InvariantCulture, out double pct))
+                    return Math.Max(0, Math.Min(maxVal, pct / 100.0 * maxVal));
+            }
+            if (double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
+                return Math.Max(0, Math.Min(maxVal, val));
+            return 0;
+        }
+
+        private static double ParseAlphaChannel(string str)
+        {
+            if (string.IsNullOrWhiteSpace(str)) return 1.0;
+            str = str.Trim();
+            if (str.EndsWith("%"))
+            {
+                if (double.TryParse(str.Substring(0, str.Length - 1), NumberStyles.Any, CultureInfo.InvariantCulture, out double pct))
+                    return Math.Max(0.0, Math.Min(1.0, pct / 100.0));
+            }
+            if (double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
+                return Math.Max(0.0, Math.Min(1.0, val));
+            return 1.0;
+        }
+
+        private static WpfColor HslToRgb(double h, double s, double l)
+        {
+            h = (h % 360.0 + 360.0) % 360.0;
+            s = Math.Max(0.0, Math.Min(1.0, s));
+            l = Math.Max(0.0, Math.Min(1.0, l));
+
+            double r, g, b;
+            if (s <= 1e-6)
+            {
+                r = g = b = l;
+            }
+            else
+            {
+                double q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+                double p = 2.0 * l - q;
+                r = HueToRgb(p, q, h / 360.0 + 1.0 / 3.0);
+                g = HueToRgb(p, q, h / 360.0);
+                b = HueToRgb(p, q, h / 360.0 - 1.0 / 3.0);
+            }
+
+            byte R = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(r * 255.0)));
+            byte G = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(g * 255.0)));
+            byte B = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(b * 255.0)));
+            return WpfColor.FromArgb(255, R, G, B);
+        }
+
+        private static double HueToRgb(double p, double q, double t)
+        {
+            if (t < 0.0) t += 1.0;
+            if (t > 1.0) t -= 1.0;
+            if (t < 1.0 / 6.0) return p + (q - p) * 6.0 * t;
+            if (t < 1.0 / 2.0) return q;
+            if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+            return p;
+        }
+
+        private static double ExtractMaskUniformOpacity(XElement maskElem)
+        {
+            if (maskElem == null) return 1.0;
+            if (maskElem.Descendants().Any(d => string.Equals(d.Name.LocalName, "image", StringComparison.OrdinalIgnoreCase)))
+            {
+                return 1.0;
+            }
+
+            if (maskElem.Descendants().Any(d =>
+                string.Equals(d.Name.LocalName, "linearGradient", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(d.Name.LocalName, "radialGradient", StringComparison.OrdinalIgnoreCase)))
+            {
+                return 1.0;
+            }
+
+            var shapes = maskElem.Descendants().Where(d =>
+            {
+                string ln = d.Name.LocalName.ToLowerInvariant();
+                return ln == "rect" || ln == "path" || ln == "circle" || ln == "polygon";
+            }).ToList();
+
+            if (shapes.Count != 1) return 1.0;
+
+            XElement d = shapes[0];
+            string fill = GetAttr(d, "fill");
+            if (!string.IsNullOrEmpty(fill) && fill.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1.0;
+            }
+
+            double op = 1.0;
+            string fo = GetAttr(d, "fill-opacity");
+            if (!string.IsNullOrEmpty(fo)) op *= ParseCoordinate(fo, 1.0);
+
+            string o = GetAttr(d, "opacity");
+            if (!string.IsNullOrEmpty(o)) op *= ParseCoordinate(o, 1.0);
+
+            string so = GetAttr(d, "stroke-opacity");
+            if (!string.IsNullOrEmpty(so) && op >= 0.999) op = ParseCoordinate(so, 1.0);
+
+            if (op < 0.999) return Math.Max(0.0, Math.Min(1.0, op));
+            return 1.0;
+        }
+
+        private static System.Windows.Media.Brush CreateMaskOpacityBrush(
+            XElement maskElem,
+            Dictionary<string, WpfBrush> defBrushes,
+            Dictionary<string, XElement> defsById,
+            Dictionary<string, Dictionary<string, string>> cssRules)
+        {
+            if (maskElem == null) return null;
+            try
+            {
+                XElement maskImgElem = maskElem.Descendants().FirstOrDefault(d => string.Equals(d.Name.LocalName, "image", StringComparison.OrdinalIgnoreCase));
+                if (maskImgElem != null)
+                {
+                    string maskHref = GetAttr(maskImgElem, "href") ?? GetHrefAttribute(maskImgElem);
+                    if (!string.IsNullOrEmpty(maskHref))
+                    {
+                        var maskSource = LoadSvgImageSource(maskHref);
+                        if (maskSource != null)
+                        {
+                            var maskBmp = ConvertMaskToAlphaSource(maskSource);
+                            if (maskBmp != null)
+                            {
+                                double mx = ParseDouble(GetAttr(maskImgElem, "x"));
+                                double my = ParseDouble(GetAttr(maskImgElem, "y"));
+                                double mw = ParseLength(GetAttr(maskImgElem, "width"), maskBmp.PixelWidth);
+                                double mh = ParseLength(GetAttr(maskImgElem, "height"), maskBmp.PixelHeight);
+                                if (mw <= 0) mw = maskBmp.PixelWidth;
+                                if (mh <= 0) mh = maskBmp.PixelHeight;
+
+                                var maskBrush = new System.Windows.Media.ImageBrush(maskBmp)
+                                {
+                                    Viewbox = new WpfRect(0, 0, maskBmp.PixelWidth, maskBmp.PixelHeight),
+                                    ViewboxUnits = WpfBrushMappingMode.Absolute,
+                                    Viewport = new WpfRect(mx, my, mw, mh),
+                                    ViewportUnits = WpfBrushMappingMode.Absolute,
+                                    Stretch = System.Windows.Media.Stretch.Fill
+                                };
+
+                                WpfMatrix combinedMat = WpfMatrix.Identity;
+                                XElement cur = maskImgElem;
+                                while (cur != null && cur != maskElem)
+                                {
+                                    string tStr = GetAttr(cur, "transform");
+                                    if (!string.IsNullOrWhiteSpace(tStr))
+                                    {
+                                        WpfMatrix m = ParseSvgTransform(tStr);
+                                        if (!m.IsIdentity)
+                                        {
+                                            combinedMat.Append(m);
+                                        }
+                                    }
+                                    cur = cur.Parent;
+                                }
+
+                                if (!combinedMat.IsIdentity)
+                                {
+                                    maskBrush.Transform = new WpfMatrixTransform(combinedMat);
+                                }
+
+                                maskBrush.Freeze();
+                                return maskBrush;
+                            }
+                        }
+                    }
+                }
+
+                // Vector mask fallback: Render mask children into RenderTargetBitmap and convert luminance to alpha
+                double maskX = 0, maskY = 0, maskW = 0, maskH = 0;
+                string xStr = GetAttr(maskElem, "x");
+                string yStr = GetAttr(maskElem, "y");
+                string wStr = GetAttr(maskElem, "width");
+                string hStr = GetAttr(maskElem, "height");
+                if (!string.IsNullOrEmpty(xStr)) maskX = ParseDouble(xStr);
+                if (!string.IsNullOrEmpty(yStr)) maskY = ParseDouble(yStr);
+                if (!string.IsNullOrEmpty(wStr)) maskW = ParseDouble(wStr);
+                if (!string.IsNullOrEmpty(hStr)) maskH = ParseDouble(hStr);
+
+                if (maskW <= 0 || maskH <= 0)
+                {
+                    double minX = double.MaxValue, minY = double.MaxValue;
+                    double maxX = double.MinValue, maxY = double.MinValue;
+                    foreach (var d in maskElem.Descendants())
+                    {
+                        string ln = d.Name.LocalName.ToLowerInvariant();
+                        if (ln == "rect")
+                        {
+                            double rx = ParseDouble(GetAttr(d, "x"));
+                            double ry = ParseDouble(GetAttr(d, "y"));
+                            double rw = ParseDouble(GetAttr(d, "width"));
+                            double rh = ParseDouble(GetAttr(d, "height"));
+                            if (rw > 0 && rh > 0)
+                            {
+                                minX = Math.Min(minX, rx);
+                                minY = Math.Min(minY, ry);
+                                maxX = Math.Max(maxX, rx + rw);
+                                maxY = Math.Max(maxY, ry + rh);
+                            }
+                        }
+                    }
+                    if (maxX > minX && maxY > minY)
+                    {
+                        maskX = minX;
+                        maskY = minY;
+                        maskW = maxX - minX;
+                        maskH = maxY - minY;
+                    }
+                    else
+                    {
+                        maskX = 0; maskY = 0; maskW = 2000; maskH = 2000;
+                    }
+                }
+
+                int pw = (int)Math.Ceiling(maskW);
+                int ph = (int)Math.Ceiling(maskH);
+                if (pw <= 0 || ph <= 0) return null;
+
+                WpfDrawingVisual dv = new WpfDrawingVisual();
+                using (WpfDrawingContext dc = dv.RenderOpen())
+                {
+                    dc.PushTransform(new System.Windows.Media.TranslateTransform(-maskX, -maskY));
+                    foreach (XElement child in maskElem.Elements())
+                    {
+                        RenderElementRecursive(dc, child, SvgRenderState.CreateDefault(), defBrushes, defsById, cssRules, 0);
+                    }
+                    dc.Pop();
+                }
+
+                WpfRenderTargetBitmap rtb = new WpfRenderTargetBitmap(pw, ph, 96, 96, WpfPixelFormats.Pbgra32);
+                rtb.Render(dv);
+
+                var alphaBmp = ConvertMaskToAlphaSource(rtb);
+                if (alphaBmp == null) return null;
+
+                var resBrush = new System.Windows.Media.ImageBrush(alphaBmp)
+                {
+                    Viewbox = new WpfRect(0, 0, pw, ph),
+                    ViewboxUnits = WpfBrushMappingMode.Absolute,
+                    Viewport = new WpfRect(maskX, maskY, maskW, maskH),
+                    ViewportUnits = WpfBrushMappingMode.Absolute,
+                    Stretch = System.Windows.Media.Stretch.Fill
+                };
+                resBrush.Freeze();
+                return resBrush;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("CreateMaskOpacityBrush error: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static System.Windows.Media.Imaging.BitmapSource ConvertMaskToAlphaSource(System.Windows.Media.ImageSource maskSource)
+        {
+            var mbmp = maskSource as System.Windows.Media.Imaging.BitmapSource;
+            if (mbmp == null) return null;
+
+            var formatted = new System.Windows.Media.Imaging.FormatConvertedBitmap(mbmp, WpfPixelFormats.Bgra32, null, 0);
+            int w = formatted.PixelWidth;
+            int h = formatted.PixelHeight;
+            if (w <= 0 || h <= 0) return null;
+
+            int stride = w * 4;
+            byte[] pixels = new byte[stride * h];
+            formatted.CopyPixels(pixels, stride, 0);
+
+            bool isAlphaOnlyMask = true;
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                if (pixels[i] != 0 || pixels[i + 1] != 0 || pixels[i + 2] != 0)
+                {
+                    isAlphaOnlyMask = false;
+                    break;
+                }
+            }
+
+            byte[] outPixels = new byte[stride * h];
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                byte b = pixels[i];
+                byte g = pixels[i + 1];
+                byte r = pixels[i + 2];
+                byte a = pixels[i + 3];
+
+                int lum;
+                if (isAlphaOnlyMask)
+                {
+                    lum = a;
+                }
+                else
+                {
+                    lum = (int)(0.2126 * r + 0.7152 * g + 0.0722 * b);
+                    if (lum > 255) lum = 255;
+                    lum = (lum * a) / 255;
+                }
+                if (lum > 255) lum = 255;
+
+                outPixels[i] = 255;
+                outPixels[i + 1] = 255;
+                outPixels[i + 2] = 255;
+                outPixels[i + 3] = (byte)lum;
+            }
+
+            var res = System.Windows.Media.Imaging.BitmapSource.Create(
+                w, h, 96, 96, WpfPixelFormats.Bgra32, null, outPixels, stride);
+            res.Freeze();
+            return res;
         }
 
         private static WpfColor ApplyOpacity(WpfColor c, double opacity)

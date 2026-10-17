@@ -136,17 +136,44 @@ namespace ZenQOffice.UI
             int h = (windowHeight > 200) ? windowHeight : _lastHeight;
             int w = (windowWidth > 200) ? windowWidth : _lastWidth;
             int maxScroll = GetMaxScroll(h, w);
-            TargetScrollY = Math.Max(0, Math.Min(maxScroll, TargetScrollY));
+            TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(TargetScrollY)));
             bool isAnimating = false;
 
-            if (Math.Abs(TargetScrollY - SmoothScrollY) > 0.2f)
+            int prevInt = (int)Math.Round(SmoothScrollY);
+            int targetInt = (int)TargetScrollY;
+
+            if (prevInt == targetInt)
             {
-                SmoothScrollY += (TargetScrollY - SmoothScrollY) * 0.22f;
-                isAnimating = true;
+                if (SmoothScrollY != TargetScrollY)
+                {
+                    SmoothScrollY = TargetScrollY;
+                }
             }
-            else if (SmoothScrollY != TargetScrollY)
+            else
             {
-                SmoothScrollY = TargetScrollY;
+                float diff = TargetScrollY - SmoothScrollY;
+                float step = diff * 0.22f;
+                float maxStep = 80f;
+                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
+
+                float nextSmooth = SmoothScrollY + step;
+                int nextInt = (int)Math.Round(nextSmooth);
+
+                if (nextInt == prevInt)
+                {
+                    nextInt = prevInt + Math.Sign(diff);
+                    nextSmooth = nextInt;
+                }
+
+                if ((diff > 0 && nextInt >= targetInt) || (diff < 0 && nextInt <= targetInt))
+                {
+                    SmoothScrollY = TargetScrollY;
+                }
+                else
+                {
+                    SmoothScrollY = nextSmooth;
+                }
+                isAnimating = true;
             }
 
             // Animate Sliding Indicator Underline
@@ -753,7 +780,7 @@ namespace ZenQOffice.UI
                         if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") mode = OfficeAppMode.Calc;
                         else if (ext == ".pptx" || ext == ".ppt") mode = OfficeAppMode.Slides;
                         else if (ext == ".pdf") mode = OfficeAppMode.Pdf;
-                        else if (ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") mode = OfficeAppMode.Photo;
+                        else if (ext == ".svg" || ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") mode = OfficeAppMode.Photo;
 
                         string dateStr = (fi.LastWriteTime.Date == DateTime.Today)
                             ? "Hôm nay, " + fi.LastWriteTime.ToString("HH:mm")
@@ -1246,191 +1273,53 @@ namespace ZenQOffice.UI
 
         private void DrawVectorSparkleIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 16f;
-            using (SolidBrush b = new SolidBrush(color))
-            using (GraphicsPath p = new GraphicsPath())
-            {
-                p.AddPolygon(new PointF[] {
-                    new PointF(x + 8 * s, y + 1 * s),
-                    new PointF(x + 10 * s, y + 6 * s),
-                    new PointF(x + 15 * s, y + 8 * s),
-                    new PointF(x + 10 * s, y + 10 * s),
-                    new PointF(x + 8 * s, y + 15 * s),
-                    new PointF(x + 6 * s, y + 10 * s),
-                    new PointF(x + 1 * s, y + 8 * s),
-                    new PointF(x + 6 * s, y + 6 * s)
-                });
-                g.FillPath(b, p);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE781', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorFolderIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 24f;
-            using (SolidBrush b = new SolidBrush(color))
-            using (GraphicsPath p = new GraphicsPath())
-            {
-                p.AddPolygon(new PointF[] {
-                    new PointF(x + 2 * s, y + 4 * s),
-                    new PointF(x + 9 * s, y + 4 * s),
-                    new PointF(x + 11 * s, y + 7 * s),
-                    new PointF(x + 22 * s, y + 7 * s),
-                    new PointF(x + 22 * s, y + 20 * s),
-                    new PointF(x + 2 * s, y + 20 * s)
-                });
-                g.FillPath(b, p);
-
-                using (SolidBrush frontB = new SolidBrush(Color.FromArgb(Math.Min(255, color.R + 25), Math.Min(255, color.G + 25), Math.Min(255, color.B + 25))))
-                using (GraphicsPath frontP = new GraphicsPath())
-                {
-                    frontP.AddPolygon(new PointF[] {
-                        new PointF(x + 3 * s, y + 9 * s),
-                        new PointF(x + 21 * s, y + 9 * s),
-                        new PointF(x + 19 * s, y + 19 * s),
-                        new PointF(x + 1 * s, y + 19 * s)
-                    });
-                    g.FillPath(frontB, frontP);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE838', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorTrashIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 24f;
-            using (Pen p = new Pen(color, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                g.DrawLine(p, x + 4 * s, y + 6 * s, x + 20 * s, y + 6 * s);
-                g.DrawLine(p, x + 9 * s, y + 4 * s, x + 15 * s, y + 4 * s);
-
-                PointF[] body = new PointF[] {
-                    new PointF(x + 6 * s, y + 6 * s),
-                    new PointF(x + 7 * s, y + 19 * s),
-                    new PointF(x + 17 * s, y + 19 * s),
-                    new PointF(x + 18 * s, y + 6 * s)
-                };
-                g.DrawLines(p, body);
-
-                g.DrawLine(p, x + 10 * s, y + 9 * s, x + 10 * s, y + 16 * s);
-                g.DrawLine(p, x + 14 * s, y + 9 * s, x + 14 * s, y + 16 * s);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE74D', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorRestoreIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 20f;
-            using (Pen p = new Pen(color, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                g.DrawArc(p, x + 3 * s, y + 3 * s, 14 * s, 14 * s, 45, 270);
-                PointF[] arr = new PointF[] {
-                    new PointF(x + 7 * s, y + 2 * s),
-                    new PointF(x + 3 * s, y + 5 * s),
-                    new PointF(x + 7 * s, y + 8 * s)
-                };
-                g.FillPolygon(b, arr);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE777', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorCrossIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 16f;
-            using (Pen p = new Pen(color, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                g.DrawLine(p, x + 4 * s, y + 4 * s, x + 12 * s, y + 12 * s);
-                g.DrawLine(p, x + 12 * s, y + 4 * s, x + 4 * s, y + 12 * s);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE711', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorSearchIcon(Graphics g, float cx, float cy, float size, Color col)
         {
-            using (Pen p = new Pen(col, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                float r = size * 0.35f;
-                g.DrawEllipse(p, cx, cy, r * 2f, r * 2f);
-                float handleStart = r * 1.6f;
-                g.DrawLine(p, cx + handleStart, cy + handleStart, cx + size - 1, cy + size - 1);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE721', new RectangleF(cx, cy, size, size), col, size * 0.72f);
         }
 
         private void DrawVectorArrowRight(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 16f;
-            using (Pen p = new Pen(color, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            {
-                g.DrawLine(p, x + 3 * s, y + 8 * s, x + 12 * s, y + 8 * s);
-                g.DrawLine(p, x + 8 * s, y + 4 * s, x + 12 * s, y + 8 * s);
-                g.DrawLine(p, x + 8 * s, y + 12 * s, x + 12 * s, y + 8 * s);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE76C', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorStarIcon(Graphics g, float cx, float cy, float radius, Color color, bool isFilled)
         {
-            PointF[] points = new PointF[10];
-            double rx = radius;
-            double ry = radius * 0.42;
-            for (int i = 0; i < 10; i++)
-            {
-                double angle = i * Math.PI / 5.0 - Math.PI / 2.0;
-                double r = (i % 2 == 0) ? rx : ry;
-                points[i] = new PointF((float)(cx + r * Math.Cos(angle)), (float)(cy + r * Math.Sin(angle)));
-            }
-
-            if (isFilled)
-            {
-                using (SolidBrush b = new SolidBrush(color))
-                {
-                    g.FillPolygon(b, points);
-                }
-            }
-            using (Pen p = new Pen(color, 1.4f) { LineJoin = LineJoin.Round })
-            {
-                g.DrawPolygon(p, points);
-            }
+            char glyph = isFilled ? '\uE735' : '\uE734';
+            FluentIconRenderer.DrawGlyph(g, glyph, new RectangleF(cx - radius, cy - radius, radius * 2f, radius * 2f), color, radius * 1.5f);
         }
 
         private void DrawVectorQuestionIcon(Graphics g, float cx, float cy, float size, Color color)
         {
-            float s = size / 20f;
-            using (Pen p = new Pen(color, 2.2f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                g.DrawArc(p, cx - 4.5f * s, cy - 7.5f * s, 9f * s, 8f * s, 180, 200);
-
-                using (GraphicsPath stem = new GraphicsPath())
-                {
-                    stem.AddBezier(
-                        new PointF(cx + 4.5f * s, cy - 3.5f * s),
-                        new PointF(cx + 4.0f * s, cy + 0.5f * s),
-                        new PointF(cx, cy + 1.0f * s),
-                        new PointF(cx, cy + 3.5f * s)
-                    );
-                    g.DrawPath(p, stem);
-                }
-
-                float dotR = 1.4f * s;
-                g.FillEllipse(b, cx - dotR, cy + 6.5f * s - dotR, dotR * 2f, dotR * 2f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE897', new RectangleF(cx - size / 2f, cy - size / 2f, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorGearIcon(Graphics g, float cx, float cy, float size, Color color)
         {
-            float s = size / 18f;
-            float rOuter = 7.5f * s;
-            float rInner = 5.0f * s;
-            float rHole = 2.4f * s;
-            using (Pen p = new Pen(color, 1.6f * s) { LineJoin = LineJoin.Round })
-            {
-                g.DrawEllipse(p, cx - rInner, cy - rInner, rInner * 2, rInner * 2);
-                g.DrawEllipse(p, cx - rHole, cy - rHole, rHole * 2, rHole * 2);
-
-                for (int i = 0; i < 6; i++)
-                {
-                    double angle = i * Math.PI / 3.0;
-                    float cos = (float)Math.Cos(angle);
-                    float sin = (float)Math.Sin(angle);
-                    g.DrawLine(p, cx + cos * rInner, cy + sin * rInner, cx + cos * rOuter, cy + sin * rOuter);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE713', new RectangleF(cx - size / 2f, cy - size / 2f, size, size), color, size * 0.72f);
         }
 
         private void ShowHelpDialog()
@@ -1539,7 +1428,11 @@ namespace ZenQOffice.UI
 
                 Button btnUpdate = new Button
                 {
-                    Text = "🔄 Kiểm tra cập nhật",
+                    Text = "Kiểm tra cập nhật",
+                    Image = FluentIconRenderer.GetGlyphBitmap('\uE72C', 14, 14, Color.FromArgb(15, 23, 42)),
+                    ImageAlign = ContentAlignment.MiddleLeft,
+                    TextImageRelation = TextImageRelation.ImageBeforeText,
+                    Padding = new Padding(8, 0, 8, 0),
                     Size = new Size(160, 34),
                     Location = new Point(310, 418),
                     FlatStyle = FlatStyle.Flat,
@@ -1647,40 +1540,12 @@ namespace ZenQOffice.UI
 
         private void DrawVectorHomeIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 20f;
-            using (Pen p = new Pen(color, 1.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round, LineJoin = System.Drawing.Drawing2D.LineJoin.Round })
-            {
-                // House shape
-                PointF[] roof = new PointF[] {
-                    new PointF(x + 2 * s, y + 10 * s),
-                    new PointF(x + 10 * s, y + 3 * s),
-                    new PointF(x + 18 * s, y + 10 * s)
-                };
-                g.DrawLines(p, roof);
-                // Walls
-                g.DrawLine(p, x + 4 * s, y + 9 * s, x + 4 * s, y + 17 * s);
-                g.DrawLine(p, x + 16 * s, y + 9 * s, x + 16 * s, y + 17 * s);
-                g.DrawLine(p, x + 4 * s, y + 17 * s, x + 16 * s, y + 17 * s);
-                // Door
-                g.DrawLine(p, x + 8 * s, y + 17 * s, x + 8 * s, y + 12 * s);
-                g.DrawLine(p, x + 12 * s, y + 17 * s, x + 12 * s, y + 12 * s);
-                g.DrawLine(p, x + 8 * s, y + 12 * s, x + 12 * s, y + 12 * s);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE80F', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorBellIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float s = size / 18f;
-            using (Pen p = new Pen(color, 1.4f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
-            {
-                // Bell body
-                g.DrawArc(p, x + 3 * s, y + 2 * s, 12 * s, 10 * s, 180, 180);
-                g.DrawLine(p, x + 3 * s, y + 7 * s, x + 3 * s, y + 13 * s);
-                g.DrawLine(p, x + 15 * s, y + 7 * s, x + 15 * s, y + 13 * s);
-                g.DrawLine(p, x + 1 * s, y + 13 * s, x + 17 * s, y + 13 * s);
-                // Clapper
-                g.DrawLine(p, x + 7 * s, y + 15 * s, x + 11 * s, y + 15 * s);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uEA8F', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawBannerFloatingIcon(Graphics g, float x, float y, float size, Color bgColor, string letter)
@@ -2246,12 +2111,20 @@ namespace ZenQOffice.UI
                 for (int i = 0; i < features.Length; i++)
                 {
                     float fy = featY + 22f + i * 22f;
-                    g.DrawString("✓", featFont, checkB, px + 2f, fy);
+                    FluentIconRenderer.DrawGlyph(g, '\uE73E', new RectangleF(px + 2f, fy + 2f, 12f, 12f), Color.FromArgb(16, 185, 129), 11f);
                     g.DrawString(features[i], featFont, featB, px + 18f, fy);
                 }
             }
 
             // ── 5. Nút "Cập nhật ngay" nhỏ gọn, bo tròn chuẩn Win11, xích xuống góc dưới cùng ──
+            // Nếu phiên bản hiện tại đã là mới nhất (không có bản cập nhật mới), ẩn hoàn toàn nút cập nhật
+            bool hasNewUpdate = (UpdateManager.LastReleaseInfo != null && UpdateManager.LastReleaseInfo.HasUpdate);
+            if (!hasNewUpdate)
+            {
+                RightPanelUpdateBtnRect = RectangleF.Empty;
+                return;
+            }
+
             float btnW = 126f;
             float btnH = 26f;
             float btnX = px + pw - btnW; // Xích sát góc phải
@@ -2259,16 +2132,9 @@ namespace ZenQOffice.UI
 
             RightPanelUpdateBtnRect = new RectangleF(btnX, btnY, btnW, btnH);
 
-            bool hasNewUpdate = (UpdateManager.LastReleaseInfo != null && UpdateManager.LastReleaseInfo.HasUpdate);
-            Color btnBg = hasNewUpdate 
-                ? (HoverRightPanelUpdateBtn ? Color.FromArgb(185, 28, 28) : Color.FromArgb(220, 38, 38))
-                : (HoverRightPanelUpdateBtn ? Color.FromArgb(239, 246, 255) : Color.FromArgb(248, 250, 252));
-            Color btnBorder = hasNewUpdate 
-                ? Color.FromArgb(185, 28, 28) 
-                : (HoverRightPanelUpdateBtn ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240));
-            Color btnText = hasNewUpdate 
-                ? Color.White 
-                : (HoverRightPanelUpdateBtn ? Color.FromArgb(29, 78, 216) : Color.FromArgb(37, 99, 235));
+            Color btnBg = HoverRightPanelUpdateBtn ? Color.FromArgb(185, 28, 28) : Color.FromArgb(220, 38, 38);
+            Color btnBorder = Color.FromArgb(185, 28, 28);
+            Color btnText = Color.White;
 
             // Bo tròn dạng capsule / viên thuốc bo tròn 100%
             using (GraphicsPath btnPath = CreateRoundedRectanglePath(RightPanelUpdateBtnRect, btnH / 2f))
@@ -2280,8 +2146,8 @@ namespace ZenQOffice.UI
             }
 
             // Vẽ icon Win11 Fluent Update
-            float iconSize = 13f;
-            float iconX = btnX + 11f;
+            float iconSize = 14f;
+            float iconX = btnX + 10f;
             float iconY = btnY + (btnH - iconSize) / 2f;
             DrawWin11UpdateIcon(g, iconX, iconY, iconSize, btnText);
 
@@ -2573,7 +2439,7 @@ namespace ZenQOffice.UI
 
                     // Filter pills
                     MyDocsFilterPills.Clear();
-                    string[] labels = new string[] { "Tất cả", "Gần đây", "Đã gắn sao ⭐", "Văn bản (.docx)", "Bảng tính (.xlsx)", "Thuyết trình (.pptx)", "PDF (.pdf)", "Đồ họa (.psd)" };
+                    string[] labels = new string[] { "Tất cả", "Gần đây", "Đã gắn sao", "Văn bản (.docx)", "Bảng tính (.xlsx)", "Thuyết trình (.pptx)", "PDF (.pdf)", "Đồ họa Vector (.svg)" };
                     int[] ids = new int[] { 0, 1, 2, 10, 11, 12, 13, 15 };
                     float curPillX = startX;
                     float pillY = fileListY + 48f;
@@ -2607,7 +2473,7 @@ namespace ZenQOffice.UI
                     using (SolidBrush secHeaderBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                     {
                         string headerText = (ActiveTab == 1) ? "Thùng rác" :
-                                            ((SubFilter == 2) ? "Tài liệu đã gắn dấu sao ⭐" :
+                                            ((SubFilter == 2) ? "Tài liệu đã gắn dấu sao" :
                                             ((SubFilter == 1) ? "Tệp gần đây" : "Tất cả tệp gần đây"));
                         g.DrawString(headerText, secHeaderFont, secHeaderBrush, startX, fileListY);
                     }
@@ -2682,7 +2548,7 @@ namespace ZenQOffice.UI
                             if (ActiveTab == 3)
                             {
                                 if (SubFilter == 2 || SubFilter == 14)
-                                    emptyMsg = "Chưa có tài liệu nào được gắn dấu sao ⭐. Hãy nhấp vào biểu tượng ngôi sao ở danh sách tệp để đánh dấu tài liệu quan trọng!";
+                                    emptyMsg = "Chưa có tài liệu nào được gắn dấu sao. Hãy nhấp vào biểu tượng ngôi sao ở danh sách tệp để đánh dấu tài liệu quan trọng!";
                                 else
                                     emptyMsg = "Chưa có tài liệu nào trong mục này. Nhấn 'Mở tệp từ máy...' để thêm tài liệu hoặc tạo tệp mới từ Trang chủ!";
                             }
@@ -2983,7 +2849,7 @@ namespace ZenQOffice.UI
                 float r3Y = card1.Y + 100f;
                 g.DrawString("Cấu hình API Key", rTitleFont, rTitleBrush, card1.X + 16f, r3Y + 15f);
                 SettingAiConfigBtnRect = new RectangleF(card1.Right - 165f, r3Y + 9f, 150f, 32f);
-                DrawWpsActionButton(g, SettingAiConfigBtnRect, "Thiết lập API Key...", Color.FromArgb(79, 70, 229), ctrlFont);
+                DrawWpsActionButton(g, SettingAiConfigBtnRect, "Thiết lập API Key...", Color.FromArgb(79, 70, 229), ctrlFont, '\uE8D7');
 
                 curY += card1H + 20f;
 
@@ -3135,9 +3001,9 @@ namespace ZenQOffice.UI
                     SettingAssocUnsetAllBtnRect = new RectangleF(cardAssoc.Right - 315f, asRowY + 9f, 140f, 32f);
                     SettingAssocWinSettingsRect = new RectangleF(cardAssoc.Right - 165f, asRowY + 9f, 150f, 32f);
 
-                    DrawWpsActionButton(g, SettingAssocSetAllBtnRect, "Đặt tất cả mặc định", Color.FromArgb(16, 185, 129), ctrlFont);
-                    DrawWpsActionButton(g, SettingAssocUnsetAllBtnRect, "Tắt tất cả mặc định", Color.FromArgb(100, 116, 139), ctrlFont);
-                    DrawWpsActionButton(g, SettingAssocWinSettingsRect, "⚙ Cài đặt Windows...", Color.FromArgb(37, 99, 235), ctrlFont);
+                    DrawWpsActionButton(g, SettingAssocSetAllBtnRect, "Đặt tất cả mặc định", Color.FromArgb(16, 185, 129), ctrlFont, '\uE73E');
+                    DrawWpsActionButton(g, SettingAssocUnsetAllBtnRect, "Tắt tất cả mặc định", Color.FromArgb(100, 116, 139), ctrlFont, '\uE711');
+                    DrawWpsActionButton(g, SettingAssocWinSettingsRect, "Cài đặt Windows...", Color.FromArgb(37, 99, 235), ctrlFont, '\uE713');
                 }
 
                 curY += cardAssocH + 20f;
@@ -3232,8 +3098,8 @@ namespace ZenQOffice.UI
 
                 SettingCheckUpdateBtnRect = new RectangleF(card5.Right - 295f, card5.Y + 10f, 145f, 32f);
                 SettingHelpBtnRect = new RectangleF(card5.Right - 140f, card5.Y + 10f, 125f, 32f);
-                DrawWpsActionButton(g, SettingCheckUpdateBtnRect, "Kiểm tra cập nhật", Color.FromArgb(37, 99, 235), ctrlFont);
-                DrawWpsActionButton(g, SettingHelpBtnRect, "Xem tài liệu", Color.FromArgb(71, 85, 105), ctrlFont);
+                DrawWpsActionButton(g, SettingCheckUpdateBtnRect, "Kiểm tra cập nhật", Color.FromArgb(37, 99, 235), ctrlFont, '\uE72C');
+                DrawWpsActionButton(g, SettingHelpBtnRect, "Xem tài liệu", Color.FromArgb(71, 85, 105), ctrlFont, '\uE897');
                 curY += card5H + 40f;
             }
         }
@@ -3298,26 +3164,12 @@ namespace ZenQOffice.UI
 
         private void DrawVectorDesktopIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen p = new Pen(color, 1.4f))
-            {
-                // Screen
-                g.DrawRectangle(p, x + 1f, y + 1f, size - 2f, size - 6f);
-                // Stand neck
-                g.DrawLine(p, x + size / 2f, y + size - 5f, x + size / 2f, y + size - 1f);
-                // Stand base
-                g.DrawLine(p, x + 3f, y + size - 1f, x + size - 3f, y + size - 1f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE7F4', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorDefaultAppIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen p = new Pen(color, 1.4f))
-            {
-                g.DrawRectangle(p, x + 1f, y + 1f, size - 2f, size - 2f);
-                g.DrawLine(p, x + 1f, y + 5f, x + size - 1f, y + 5f);
-                g.DrawLine(p, x + 4f, y + 9f, x + 6.5f, y + 12f);
-                g.DrawLine(p, x + 6.5f, y + 12f, x + 12f, y + 7f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE71D', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorAppLogoIcon(Graphics g, float x, float y, float size)
@@ -3371,7 +3223,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawWpsActionButton(Graphics g, RectangleF rect, string label, Color textColor, Font font)
+        private void DrawWpsActionButton(Graphics g, RectangleF rect, string label, Color textColor, Font font, char glyph = '\0')
         {
             using (GraphicsPath p = CreateRoundedRectanglePath(rect, 4f))
             using (SolidBrush bg = new SolidBrush(Color.White))
@@ -3380,101 +3232,54 @@ namespace ZenQOffice.UI
                 g.FillPath(bg, p);
                 g.DrawPath(pen, p);
             }
-            using (SolidBrush txt = new SolidBrush(textColor))
+            if (glyph != '\0')
             {
-                StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString(label, font, txt, rect, sf);
+                float iconSize = 13f;
+                float iconX = rect.X + 8f;
+                float iconY = rect.Y + (rect.Height - iconSize) / 2f;
+                FluentIconRenderer.DrawGlyph(g, glyph, new RectangleF(iconX, iconY, iconSize, iconSize), textColor, 11f);
+                using (SolidBrush txt = new SolidBrush(textColor))
+                {
+                    RectangleF textRect = new RectangleF(iconX + iconSize + 4f, rect.Y, rect.Width - iconSize - 12f, rect.Height);
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+                    g.DrawString(label, font, txt, textRect, sf);
+                }
+            }
+            else
+            {
+                using (SolidBrush txt = new SolidBrush(textColor))
+                {
+                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    g.DrawString(label, font, txt, rect, sf);
+                }
             }
         }
 
         private void DrawFluentPaletteIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen pen = new Pen(color, 1.4f))
-            {
-                g.DrawEllipse(pen, x + 1, y + 1, size - 2, size - 2);
-                using (SolidBrush b = new SolidBrush(color))
-                {
-                    g.FillEllipse(b, x + size * 0.28f, y + size * 0.25f, 2.5f, 2.5f);
-                    g.FillEllipse(b, x + size * 0.60f, y + size * 0.28f, 2.5f, 2.5f);
-                    g.FillEllipse(b, x + size * 0.35f, y + size * 0.58f, 2.5f, 2.5f);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE790', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawFluentSlidersIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen pen = new Pen(color, 1.4f))
-            {
-                g.DrawLine(pen, x + 2, y + 5, x + size - 2, y + 5);
-                g.DrawLine(pen, x + 2, y + size / 2f, x + size - 2, y + size / 2f);
-                g.DrawLine(pen, x + 2, y + size - 5, x + size - 2, y + size - 5);
-
-                using (SolidBrush b = new SolidBrush(color))
-                {
-                    g.FillEllipse(b, x + size * 0.3f, y + 3, 4, 4);
-                    g.FillEllipse(b, x + size * 0.65f, y + size / 2f - 2, 4, 4);
-                    g.FillEllipse(b, x + size * 0.4f, y + size - 7, 4, 4);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE9E9', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawFluentGlobeIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen pen = new Pen(color, 1.4f))
-            {
-                g.DrawEllipse(pen, x + 1, y + 1, size - 2, size - 2);
-                g.DrawLine(pen, x + 1, y + size / 2f, x + size - 1, y + size / 2f);
-                g.DrawEllipse(pen, x + size * 0.25f, y + 1, size * 0.5f, size - 2);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE774', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawFluentUpdateIcon(Graphics g, float x, float y, float size, Color color)
         {
-            using (Pen pen = new Pen(color, 1.4f))
-            {
-                g.DrawArc(pen, x + 2, y + 2, size - 4, size - 4, 45, 230);
-                g.DrawArc(pen, x + 2, y + 2, size - 4, size - 4, 225, 50);
-                using (SolidBrush b = new SolidBrush(color))
-                {
-                    PointF[] arrow = new PointF[] {
-                        new PointF(x + size - 3, y + 4),
-                        new PointF(x + size + 1, y + 9),
-                        new PointF(x + size - 5, y + 10)
-                    };
-                    g.FillPolygon(b, arrow);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE72C', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
 
         private void DrawWin11UpdateIcon(Graphics g, float x, float y, float size, Color color)
         {
-            float stroke = Math.Max(1.2f, size * 0.11f);
-            using (Pen pen = new Pen(color, stroke))
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-
-                float pad = size * 0.12f;
-                RectangleF arcR = new RectangleF(x + pad, y + pad, size - pad * 2f, size - pad * 2f);
-
-                g.DrawArc(pen, arcR, 205f, 130f);
-                g.DrawArc(pen, arcR, 25f, 130f);
-
-                PointF[] arr1 = new PointF[] {
-                    new PointF(arcR.Right - 0.5f, arcR.Y + 2.5f),
-                    new PointF(arcR.Right + 3.5f, arcR.Y - 1.5f),
-                    new PointF(arcR.Right + 3.5f, arcR.Y + 5.5f)
-                };
-                g.FillPolygon(b, arr1);
-
-                PointF[] arr2 = new PointF[] {
-                    new PointF(arcR.X + 0.5f, arcR.Bottom - 2.5f),
-                    new PointF(arcR.X - 3.5f, arcR.Bottom + 1.5f),
-                    new PointF(arcR.X - 3.5f, arcR.Bottom - 5.5f)
-                };
-                g.FillPolygon(b, arr2);
-            }
+            // Sử dụng trực tiếp vector glyph chuẩn Microsoft Win11 Fluent Icons (\uE72C: Sync / Refresh)
+            // Khử răng cưa SSAA 4x mượt mà, đúng chuẩn Windows 11, không tự vẽ thủ công
+            FluentIconRenderer.DrawGlyph(g, '\uE72C', new RectangleF(x, y, size, size), color, size * 0.72f);
         }
         #endregion
 
@@ -3715,7 +3520,7 @@ namespace ZenQOffice.UI
                         if (i == 1) { docTitle = "Bảng tính Mới.xlsx"; return OfficeAppMode.Calc; }
                         if (i == 2) { docTitle = "Trình chiếu Mới.pptx"; return OfficeAppMode.Slides; }
                         if (i == 3) { docTitle = "Tài liệu PDF Mới.pdf"; return OfficeAppMode.Pdf; }
-                        if (i == 4) { docTitle = "Thiết kế Mới 1.psd"; return OfficeAppMode.Photo; }
+                        if (i == 4) { docTitle = "Thiết kế Mới 1.svg"; return OfficeAppMode.Photo; }
                     }
                 }
             }
@@ -3790,7 +3595,7 @@ namespace ZenQOffice.UI
             }
             if (GetAppNavBounds(4, width, height).Contains(x, y))
             {
-                docTitle = "Thiết kế Mới 1.psd";
+                docTitle = "Thiết kế Mới 1.svg";
                 openFilePath = null;
                 return OfficeAppMode.Photo;
             }
@@ -3903,7 +3708,7 @@ namespace ZenQOffice.UI
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
                         ofd.Title = "Mở tài liệu văn phòng - ZENQ OFFICE";
-                        ofd.Filter = "Tất cả tài liệu & Thiết kế (*.docx;*.xlsx;*.pptx;*.pdf;*.psd;*.png;*.jpg;*.jpeg)|*.docx;*.xlsx;*.pptx;*.pdf;*.psd;*.png;*.jpg;*.jpeg|Photoshop & Hình ảnh (*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff)|*.psd;*.png;*.jpg;*.jpeg;*.bmp;*.tiff|Word (*.docx)|*.docx|Excel (*.xlsx)|*.xlsx|PowerPoint (*.pptx)|*.pptx|PDF (*.pdf)|*.pdf|Tất cả tệp (*.*)|*.*";
+                        ofd.Filter = "Tất cả tài liệu & Thiết kế (*.docx;*.xlsx;*.pptx;*.pdf;*.svg;*.png;*.jpg;*.jpeg)|*.docx;*.xlsx;*.pptx;*.pdf;*.svg;*.png;*.jpg;*.jpeg|Đồ họa Vector SVG (*.svg)|*.svg|Hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.tiff;*.psd)|*.png;*.jpg;*.jpeg;*.bmp;*.tiff;*.psd|Word (*.docx)|*.docx|Excel (*.xlsx)|*.xlsx|PowerPoint (*.pptx)|*.pptx|PDF (*.pdf)|*.pdf|Tất cả tệp (*.*)|*.*";
                         ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                         if (ofd.ShowDialog() == DialogResult.OK)
                         {
@@ -3913,7 +3718,7 @@ namespace ZenQOffice.UI
                             if (ext == ".xlsx" || ext == ".xls" || ext == ".csv") chosenMode = OfficeAppMode.Calc;
                             else if (ext == ".pptx" || ext == ".ppt") chosenMode = OfficeAppMode.Slides;
                             else if (ext == ".pdf") chosenMode = OfficeAppMode.Pdf;
-                            else if (ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") chosenMode = OfficeAppMode.Photo;
+                            else if (ext == ".svg" || ext == ".psd" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tiff") chosenMode = OfficeAppMode.Photo;
 
                             AddRecentDocument(chosenPath, chosenMode);
                             docTitle = Path.GetFileName(chosenPath);

@@ -69,6 +69,37 @@ namespace ZenQOffice.UI
             return clone;
         }
 
+        public void SwitchRowColumn()
+        {
+            if (Categories == null || SeriesNames == null || Values == null) return;
+            int oldCatCount = Categories.Count;
+            int oldSeriesCount = SeriesNames.Count;
+
+            var newCategories = new List<string>(SeriesNames);
+            var newSeriesNames = new List<string>(Categories);
+            var newValues = new List<List<double>>();
+
+            for (int s = 0; s < oldSeriesCount; s++)
+            {
+                var row = new List<double>();
+                for (int c = 0; c < oldCatCount; c++)
+                {
+                    double v = (c < Values.Count && s < Values[c].Count) ? Values[c][s] : 0.0;
+                    row.Add(v);
+                }
+                newValues.Add(row);
+            }
+
+            Categories = newCategories;
+            SeriesNames = newSeriesNames;
+            Values = newValues;
+
+            SeriesVisible = new List<bool>();
+            for (int i = 0; i < SeriesNames.Count; i++) SeriesVisible.Add(true);
+            CategoriesVisible = new List<bool>();
+            for (int i = 0; i < Categories.Count; i++) CategoriesVisible.Add(true);
+        }
+
         public static DocChartData CreateDefault(string chartType)
         {
             DocChartData data = new DocChartData

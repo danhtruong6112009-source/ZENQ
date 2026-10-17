@@ -47,34 +47,88 @@ namespace ZenQOffice
                     return;
                 }
 
-                if (args != null && args.Length > 0 && args[0].Equals("--render-ribbon-preview", StringComparison.OrdinalIgnoreCase))
+                if (args != null && args.Length > 0 && args[0].Equals("--test-svg", StringComparison.OrdinalIgnoreCase))
                 {
-                    RenderRibbonPreview();
+                    string svgPath = args.Length > 1 ? args[1] : @"C:\Users\Danh\Downloads\3.svg";
+                    string outPath = args.Length > 2 ? args[2] : @"c:\Users\Danh\Desktop\genofficepy\rendered_out.png";
+                    int tw = args.Length > 3 ? int.Parse(args[3]) : 0;
+                    int th = args.Length > 4 ? int.Parse(args[4]) : 0;
+                    Console.WriteLine($"Reading SVG {svgPath} -> {outPath} ({tw}x{th})");
+                    string xml = File.ReadAllText(svgPath);
+                    var bmp = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(xml, tw, th);
+                    if (bmp != null)
+                    {
+                        bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine($"SUCCESS: saved {bmp.Width}x{bmp.Height} to " + outPath);
+                    }
+                    else
+                    {
+                        Console.WriteLine("FAILED: RenderSvgToBitmap returned null");
+                    }
                     return;
                 }
 
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 Application.ThreadException += (s, e) =>
                 {
-                    MessageBox.Show("Chi tiết sự cố:\n" + e.Exception.Message + "\n\nTại:\n" + e.Exception.StackTrace, "ZENQ OFFICE - Thông báo lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    HandleSafeException(e.Exception, "Sự cố giao diện", false);
                 };
                 AppDomain.CurrentDomain.UnhandledException += (s, e) =>
                 {
                     Exception ex = e.ExceptionObject as Exception;
-                    string msg = ex != null ? ex.ToString() : "Lỗi không xác định";
-                    MessageBox.Show("Sự cố hệ thống:\n" + msg, "ZENQ OFFICE - Lỗi hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    HandleSafeException(ex, "Sự cố hệ thống", true);
                 };
 
                 Application.Run(new GenOfficeApplicationContext(args));
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khởi động ZENQ OFFICE:\n" + ex.ToString(), "ZENQ OFFICE Crash Report", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                HandleSafeException(ex, "Lỗi khởi động ZENQ OFFICE", true);
             }
             finally
             {
                 try { Environment.Exit(0); } catch { }
             }
+        }
+
+        private static void HandleSafeException(Exception ex, string contextTitle, bool isFatal)
+        {
+            if (ex == null) return;
+
+            string logPath = string.Empty;
+            try
+            {
+                string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string logDir = Path.Combine(localApp, "ZenQOffice");
+                if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+                logPath = Path.Combine(logDir, "crash.log");
+
+                string rawDetails = ex.ToString();
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                File.AppendAllText(logPath, $"[{timestamp}] [{contextTitle}] {rawDetails}\r\n----------------------------------------\r\n");
+            }
+            catch { }
+
+            string errorName = ex.GetType().Name;
+            string cleanMsg = ex.Message ?? "Đã xảy ra sự cố trong quá trình xử lý.";
+            cleanMsg = System.Text.RegularExpressions.Regex.Replace(cleanMsg, @"[a-zA-Z]:\\[^:\r\n]+", "[đường dẫn tệp]");
+
+            string userNotice = $"ZENQ OFFICE phát hiện sự cố ({contextTitle}):\n\n"
+                              + $"• Loại lỗi: {errorName}\n"
+                              + $"• Chi tiết: {cleanMsg}\n\n";
+
+            if (!string.IsNullOrEmpty(logPath))
+            {
+                userNotice += $"Nhật ký chi tiết đã được ghi tại:\n{logPath}\n\n";
+            }
+            userNotice += isFatal ? "Ứng dụng sẽ tự động đóng lại." : "Nhấn OK để tiếp tục làm việc.";
+
+            MessageBox.Show(
+                userNotice,
+                "ZENQ OFFICE - " + (contextTitle ?? "Thông báo sự cố"),
+                MessageBoxButtons.OK,
+                isFatal ? MessageBoxIcon.Error : MessageBoxIcon.Warning
+            );
         }
 
 

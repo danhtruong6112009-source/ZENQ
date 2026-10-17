@@ -62,7 +62,11 @@ namespace ZenQOffice.Core
         Shield,
         Banner,
         Starburst,
-        Arch
+        Arch,
+        // Thu phóng PowerPoint 365 (Slide Zoom & Summary Zoom)
+        SlideZoom,
+        SummaryZoom,
+        SectionZoom
     }
 
     public enum CropHandleType
@@ -77,6 +81,16 @@ namespace ZenQOffice.Core
         BottomLeft,
         Left,
         PanImage
+    }
+
+    public enum TextWarpType
+    {
+        None,
+        ArcUp,
+        ArcDown,
+        Wave,
+        Circle,
+        Arch
     }
 
     public enum MergeShapeOperation
@@ -207,7 +221,9 @@ namespace ZenQOffice.Core
         In,
         Out,
         Horizontal,
-        Vertical
+        Vertical,
+        Smoothly,
+        ThroughBlack
     }
 
     public enum AnimationType
@@ -429,6 +445,7 @@ namespace ZenQOffice.Core
     {
         public string Id { get; set; }
         public string MorphName { get; set; }
+        public string RawSpid { get; set; } = "";
         public string Name { get; set; }
         public ShapeType Type { get; set; }
         public DocChartData ChartData { get; set; }
@@ -496,10 +513,50 @@ namespace ZenQOffice.Core
 
         // Effect Properties
         public bool HasShadow { get; set; }
-        public int ShadowColor { get; set; }
-        public float ShadowOffsetX { get; set; }
-        public float ShadowOffsetY { get; set; }
-        public float ShadowBlur { get; set; }
+        public int ShadowColor { get; set; } = 0x000000;
+        public float ShadowOffsetX { get; set; } = 4.0f;
+        public float ShadowOffsetY { get; set; } = 6.0f;
+        public float ShadowBlur { get; set; } = 16.0f;
+        public float ShadowOpacity { get; set; } = 0.35f;
+
+        // Glassmorphism (Frosted Glass Acrylic Effect)
+        public bool HasGlassmorphism { get; set; }
+        public int GlassTintColor { get; set; } = 0xFFFFFF;
+        public float GlassTintOpacity { get; set; } = 0.25f;
+        public float GlassBorderOpacity { get; set; } = 0.45f;
+        public float GlassBlurRadius { get; set; } = 18.0f;
+
+        // Typography & Text Warp
+        public TextWarpType TextWarpType { get; set; } = TextWarpType.None;
+
+        // Advanced Gradient Type
+        public GradientType GradientType { get; set; } = GradientType.Linear;
+
+        // High-performance shadow bitmap cache
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public Bitmap CachedShadowBmp;
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public int CachedShadowW;
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public int CachedShadowH;
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public float CachedShadowBlur;
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public int CachedShadowColor;
+
+        public void InvalidateShadowCache()
+        {
+            if (CachedShadowBmp != null)
+            {
+                try { CachedShadowBmp.Dispose(); } catch { }
+                CachedShadowBmp = null;
+            }
+        }
 
         // Media / Metadata / Placeholder
         public string ImagePath { get; set; }
@@ -510,6 +567,14 @@ namespace ZenQOffice.Core
         public string PlaceholderType { get; set; } // "Title", "Subtitle", "Body", "ThemeDecoration", "None"
         public bool IsPlaceholder { get; set; }
         public bool IsDecorative { get; set; }
+        public string AltText { get; set; }
+
+        // Slide Zoom Properties (PowerPoint 365 Zoom Feature)
+        public int ZoomTargetSlideIndex { get; set; } = -1;
+        public string ZoomTargetSlideId { get; set; }
+        public bool ZoomReturnToSlide { get; set; } = true;
+        public bool ZoomShowBorder { get; set; } = true;
+        public int ZoomTransitionDurationMs { get; set; } = 400;
 
         // Picture Format Properties
         public float ImageBrightness { get; set; } // -1.0f to 1.0f (default 0)
@@ -555,6 +620,7 @@ namespace ZenQOffice.Core
             DisplayCachedCropT = 0f;
             DisplayCachedCropR = 0f;
             DisplayCachedCropB = 0f;
+            InvalidateShadowCache();
         }
 
         public void InvalidateFeatherCache()
@@ -568,7 +634,6 @@ namespace ZenQOffice.Core
         }
 
         public string CropShapeType { get; set; } // "Rectangle", "RoundedRectangle", "Oval", "Triangle", "Diamond", "Hexagon", "Heart", "Star5", "Cloud", "ArrowRight", etc.
-        public string AltText { get; set; }
         public float OriginalWidth { get; set; }
         public float OriginalHeight { get; set; }
         public bool IsSvg { get; set; }
@@ -779,10 +844,19 @@ namespace ZenQOffice.Core
             DashStyle = DashStyle.Solid;
 
             HasShadow = false;
-            ShadowColor = 0x40000000;
+            ShadowColor = 0x000000;
             ShadowOffsetX = 4.0f;
-            ShadowOffsetY = 4.0f;
-            ShadowBlur = 8.0f;
+            ShadowOffsetY = 6.0f;
+            ShadowBlur = 16.0f;
+            ShadowOpacity = 0.35f;
+
+            HasGlassmorphism = false;
+            GlassTintColor = 0xFFFFFF;
+            GlassTintOpacity = 0.25f;
+            GlassBorderOpacity = 0.45f;
+            GlassBlurRadius = 18.0f;
+            TextWarpType = TextWarpType.None;
+            GradientType = GradientType.Linear;
 
             ImagePath = "";
             CachedImage = null;
@@ -917,6 +991,7 @@ namespace ZenQOffice.Core
             {
                 Id = Id,
                 MorphName = MorphName,
+                RawSpid = RawSpid,
                 Name = Name,
                 Type = Type,
                 IsVisible = IsVisible,
@@ -959,6 +1034,14 @@ namespace ZenQOffice.Core
                 ShadowOffsetX = ShadowOffsetX,
                 ShadowOffsetY = ShadowOffsetY,
                 ShadowBlur = ShadowBlur,
+                ShadowOpacity = ShadowOpacity,
+                HasGlassmorphism = HasGlassmorphism,
+                GlassTintColor = GlassTintColor,
+                GlassTintOpacity = GlassTintOpacity,
+                GlassBorderOpacity = GlassBorderOpacity,
+                GlassBlurRadius = GlassBlurRadius,
+                TextWarpType = TextWarpType,
+                GradientType = GradientType,
                 ImagePath = ImagePath,
                 CachedImage = (CachedImage != null) ? new Bitmap(CachedImage) : null,
                 CustomPath = (CustomPath != null) ? (GraphicsPath)CustomPath.Clone() : null,
@@ -1036,6 +1119,11 @@ namespace ZenQOffice.Core
                 TableHasBandedFill = TableHasBandedFill,
                 TableColumnWidths = TableColumnWidths != null ? new List<float>(TableColumnWidths) : new List<float>(),
                 TableRowHeights = TableRowHeights != null ? new List<float>(TableRowHeights) : new List<float>(),
+                ZoomTargetSlideIndex = ZoomTargetSlideIndex,
+                ZoomTargetSlideId = ZoomTargetSlideId,
+                ZoomReturnToSlide = ZoomReturnToSlide,
+                ZoomShowBorder = ZoomShowBorder,
+                ZoomTransitionDurationMs = ZoomTransitionDurationMs,
                 Selected = false,
                 IsEditingText = false
             };
@@ -1147,7 +1235,8 @@ namespace ZenQOffice.Core
         FormatShape,
         AnimationPane,
         FormatBackground,
-        SelectionPane
+        SelectionPane,
+        Designer
     }
 
     public enum NeonGlowTarget
@@ -1626,6 +1715,16 @@ namespace ZenQOffice.Core
             {
                 CanvasWidth = 1440.0f;
                 CanvasHeight = 1080.0f;
+            }
+        }
+
+        public void SetCustomSlideSize(float width, float height)
+        {
+            if (width > 50f && height > 50f)
+            {
+                CanvasWidth = width;
+                CanvasHeight = height;
+                IsWidescreen = Math.Abs((width / height) - (16.0f / 9.0f)) < 0.15f;
             }
         }
 

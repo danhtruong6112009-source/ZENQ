@@ -26,7 +26,7 @@ namespace ZenQOffice.UI
                 case OfficeAppMode.Calc: return "calc.png";
                 case OfficeAppMode.Slides: return "present.png";
                 case OfficeAppMode.Pdf: return "pdf.png";
-                case OfficeAppMode.Photo: return "photo.png";
+                case OfficeAppMode.Photo: return "vector.png";
                 default: return "writer.png";
             }
         }
@@ -39,7 +39,7 @@ namespace ZenQOffice.UI
                 case OfficeAppMode.Calc: return "icon_calc.png";
                 case OfficeAppMode.Slides: return "icon_present.png";
                 case OfficeAppMode.Pdf: return "icon_pdf.png";
-                case OfficeAppMode.Photo: return "icon_photo.png";
+                case OfficeAppMode.Photo: return "icon_vector.png";
                 default: return "icon_writer.png";
             }
         }
@@ -57,6 +57,13 @@ namespace ZenQOffice.UI
                 string fileName = GetIconFileName(mode);
                 string resName = GetIconResourceName(mode);
 
+                List<string> candidateFiles = new List<string> { fileName };
+                if (mode == OfficeAppMode.Photo)
+                {
+                    candidateFiles.Insert(0, "vector.png");
+                    if (!candidateFiles.Contains("photo.png")) candidateFiles.Add("photo.png");
+                }
+
                 // 1. Thử nạp từ thư mục icon/ trên ổ đĩa
                 string[] possibleDirs = new string[]
                 {
@@ -68,29 +75,41 @@ namespace ZenQOffice.UI
 
                 foreach (string dir in possibleDirs)
                 {
-                    try
+                    foreach (string fn in candidateFiles)
                     {
-                        string p = Path.Combine(dir, fileName);
-                        if (File.Exists(p))
+                        try
                         {
-                            byte[] bytes = File.ReadAllBytes(p);
-                            using (MemoryStream ms = new MemoryStream(bytes))
+                            string p = Path.Combine(dir, fn);
+                            if (File.Exists(p))
                             {
-                                Image img = Image.FromStream(ms);
-                                _rawIcons[key] = img;
-                                return img;
+                                byte[] bytes = File.ReadAllBytes(p);
+                                using (MemoryStream ms = new MemoryStream(bytes))
+                                {
+                                    Image img = Image.FromStream(ms);
+                                    _rawIcons[key] = img;
+                                    return img;
+                                }
                             }
                         }
+                        catch { }
                     }
-                    catch { }
                 }
 
                 // 2. Thử nạp từ Embedded Resource
                 try
                 {
                     System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
-                    string[] resNames = new string[] { resName, "icon." + fileName, fileName };
-                    foreach (string rn in resNames)
+                    List<string> candidateRes = new List<string> { resName, "icon." + fileName, fileName };
+                    if (mode == OfficeAppMode.Photo)
+                    {
+                        candidateRes.Insert(0, "icon_vector.png");
+                        candidateRes.Add("vector.png");
+                        candidateRes.Add("icon.vector.png");
+                        candidateRes.Add("icon_photo.png");
+                        candidateRes.Add("photo.png");
+                    }
+
+                    foreach (string rn in candidateRes)
                     {
                         using (Stream st = asm.GetManifestResourceStream(rn))
                         {

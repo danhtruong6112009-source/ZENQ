@@ -173,6 +173,15 @@ namespace ZenQOffice.Core
         public string Hyperlink { get; set; }
         public CellFormat Format { get; set; }
 
+        // Excel 365 Dynamic Array & Spilling Properties
+        public bool IsSpillOrigin { get; set; }
+        public int SpillRowCount { get; set; } = 1;
+        public int SpillColCount { get; set; } = 1;
+        public bool IsSpilledChild { get; set; }
+        public uint SpillOriginRow { get; set; }
+        public uint SpillOriginCol { get; set; }
+        public CellData[,] ArrayResult { get; set; }
+
         public CellData()
         {
             Type = CellType.Empty;
@@ -183,6 +192,13 @@ namespace ZenQOffice.Core
             Comment = "";
             Hyperlink = "";
             Format = new CellFormat();
+            IsSpillOrigin = false;
+            SpillRowCount = 1;
+            SpillColCount = 1;
+            IsSpilledChild = false;
+            SpillOriginRow = 0;
+            SpillOriginCol = 0;
+            ArrayResult = null;
         }
 
         public void SetString(string val)
@@ -231,6 +247,13 @@ namespace ZenQOffice.Core
             copy.NumericValue = this.NumericValue;
             copy.EvaluatedStr = this.EvaluatedStr;
             copy.Format = this.Format != null ? this.Format.Clone() : new CellFormat();
+            copy.IsSpillOrigin = this.IsSpillOrigin;
+            copy.SpillRowCount = this.SpillRowCount;
+            copy.SpillColCount = this.SpillColCount;
+            copy.IsSpilledChild = this.IsSpilledChild;
+            copy.SpillOriginRow = this.SpillOriginRow;
+            copy.SpillOriginCol = this.SpillOriginCol;
+            copy.ArrayResult = this.ArrayResult;
             return copy;
         }
     }
@@ -423,6 +446,103 @@ namespace ZenQOffice.Core
         public void ClearCell(uint row, uint col)
         {
             grid.Remove(EncodeKey(row, col));
+        }
+
+        public void ClearSpilledChildrenOf(uint originRow, uint originCol)
+        {
+            List<ulong> keysToRemove = new List<ulong>();
+            foreach (var kvp in grid)
+            {
+                CellData c = kvp.Value;
+                if (c != null && c.IsSpilledChild && c.SpillOriginRow == originRow && c.SpillOriginCol == originCol)
+                {
+                    keysToRemove.Add(kvp.Key);
+                }
+            }
+            foreach (ulong k in keysToRemove)
+            {
+                grid.Remove(k);
+            }
+        }
+
+        public bool CheckSpillCollision(uint originRow, uint originCol, int rowCount, int colCount)
+        {
+            CellData originCell;
+            if (grid.TryGetValue(EncodeKey(originRow, originCol), out originCell) && originCell != null)
+            {
+                if (originCell.Format != null && (originCell.Format.IsMergedParent || originCell.Format.IsMergedChild))
+                {
+                    return true;
+                }
+            }
+
+            for (uint r = originRow; r < originRow + rowCount; r++)
+            {
+                for (uint c = originCol; c < originCol + colCount; c++)
+                {
+                    if (r == originRow && c == originCol) continue;
+                    ulong key = EncodeKey(r, c);
+                    CellData cell;
+                    if (grid.TryGetValue(key, out cell) && cell != null)
+                    {
+                        if (cell.IsSpilledChild && cell.SpillOriginRow == originRow && cell.SpillOriginCol == originCol)
+                        {
+                            continue;
+                        }
+                        if (cell.Format != null && (cell.Format.IsMergedParent || cell.Format.IsMergedChild))
+                        {
+                            return true;
+                        }
+                        if (!string.IsNullOrEmpty(cell.FormulaStr) ||
+                            !string.IsNullOrEmpty(cell.RawValue) ||
+                            cell.Type == CellType.Number ||
+                            cell.Type == CellType.String ||
+                            cell.Type == CellType.Formula)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool IsCellSpilled(uint row, uint col)
+        {
+            uint or, oc;
+            int rc, cc;
+            return IsCellSpilled(row, col, out or, out oc, out rc, out cc);
+        }
+
+        public bool IsCellSpilled(uint row, uint col, out uint originR, out uint originC, out int rowCount, out int colCount)
+        {
+            originR = row;
+            originC = col;
+            rowCount = 1;
+            colCount = 1;
+            CellData cell = GetCell(row, col);
+            if (cell == null) return false;
+            if (cell.IsSpillOrigin)
+            {
+                originR = row;
+                originC = col;
+                rowCount = cell.SpillRowCount;
+                colCount = cell.SpillColCount;
+                return true;
+            }
+            if (cell.IsSpilledChild)
+            {
+                originR = cell.SpillOriginRow;
+                originC = cell.SpillOriginCol;
+                CellData originCell = GetCell(originR, originC);
+                if (originCell != null && originCell.IsSpillOrigin)
+                {
+                    rowCount = originCell.SpillRowCount;
+                    colCount = originCell.SpillColCount;
+                }
+                return true;
+            }
+            return false;
         }
 
         public void ClearAll()

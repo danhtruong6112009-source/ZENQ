@@ -17,7 +17,7 @@ const DICTIONARY = {
     nav_lang_btn: "English",
 
     // Hero Section
-    hero_badge: "Phiên bản chính thức v4.0 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới",
+    hero_badge: "Phiên bản chính thức v4.2 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới",
     hero_title_1: "Bộ Ứng Dụng Văn Phòng",
     hero_title_accent: "Hiện Đại Cho Windows",
     hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu OpenXML quốc tế và bảo mật ngoại tuyến 100%.",
@@ -164,7 +164,7 @@ const DICTIONARY = {
     // Download Section
     dl_section_badge: "TẢI VỀ NGAY",
     dl_section_title: "Trải Nghiệm ZenQ Office Cho Windows",
-    dl_section_desc: "Tải bản cài đặt chính thức v4.0. Cài đặt nhanh chóng và bắt đầu làm việc hiệu quả ngay hôm nay.",
+    dl_section_desc: "Tải bản cài đặt chính thức v4.2. Cài đặt nhanh chóng và bắt đầu làm việc hiệu quả ngay hôm nay.",
     dl_btn_main: "Tải Bộ Cài Đặt (ZenQOffice-Setup.exe)",
     dl_btn_portable: "Tải Bản Portable (.zip)",
     
@@ -196,7 +196,7 @@ const DICTIONARY = {
     nav_lang_btn: "Tiếng Việt",
 
     // Hero Section
-    hero_badge: "Official Release v4.0 • Next-Gen Office Suite",
+    hero_badge: "Official Release v4.2 • Next-Gen Office Suite",
     hero_title_1: "Modern Office Suite",
     hero_title_accent: "Crafted for Windows",
     hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling. 100% offline and seamlessly compatible with international OpenXML standard formats.",
@@ -343,7 +343,7 @@ const DICTIONARY = {
     // Download Section
     dl_section_badge: "DOWNLOAD NOW",
     dl_section_title: "Experience ZenQ Office for Windows",
-    dl_section_desc: "Download official release v4.0. Quick setup to start working productively today.",
+    dl_section_desc: "Download official release v4.2. Quick setup to start working productively today.",
     dl_btn_main: "Download Installer (ZenQOffice-Setup.exe)",
     dl_btn_portable: "Download Portable (.zip)",
     

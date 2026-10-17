@@ -719,14 +719,13 @@ namespace ZenQOffice.UI
             // 14. Format Cells...
             cms.Items.Add(CreateMenuItem("Format Cells...", CreateFormatCellsIcon(), (s, e) =>
             {
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(screenX, screenY)) : new Point(screenX, screenY);
-                ColorPaletteForm fcDlg = new ColorPaletteForm(pt, Color.LightYellow, true, false);
-                fcDlg.OnColorSelected += (c) =>
+                using (FormatCellsDialogForm fcDlg = new FormatCellsDialogForm(calcView, 0))
                 {
-                    calcView.SetSelectedCellBgColor(c);
-                    if (parentForm != null) parentForm.Invalidate();
-                };
-                fcDlg.Show();
+                    if (fcDlg.ShowDialog(parentForm) == DialogResult.OK)
+                    {
+                        if (parentForm != null) parentForm.Invalidate();
+                    }
+                }
             }));
 
             // 15. Pick From Drop-down List...

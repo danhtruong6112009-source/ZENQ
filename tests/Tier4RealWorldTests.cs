@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.Format;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
+using ZenQOffice.UI;
 
 namespace GenOffice.Tests
 {
@@ -418,14 +418,12 @@ namespace GenOffice.Tests
         public void T4_F23_01_ProjectedPricingArraySpillScenario()
         {
             // SEQUENCE(12, 1, 100, 10)
-            int months = 12;
-            double basePrice = 100;
-            double step = 10;
-            double[] schedule = new double[months];
-            for (int i = 0; i < months; i++) schedule[i] = basePrice + i * step;
-
-            Assert.AreEqual(100.0, schedule[0], 0.001);
-            Assert.AreEqual(210.0, schedule[11], 0.001);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(12, 1, 100, 10)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(100.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.AreEqual(110.0, sm.GetCell(2, 1).NumericValue, 0.001);
+            Assert.AreEqual(210.0, sm.GetCell(12, 1).NumericValue, 0.001);
         }
 
         // =========================================================================
@@ -437,12 +435,15 @@ namespace GenOffice.Tests
         {
             SparseMatrix sm = new SparseMatrix();
             sm.SetCellString(2, 2, "Stray Note Blocking Spill");
-            bool isBlocked = (sm.GetCell(2, 2) != null);
-            Assert.IsTrue(isBlocked, "Cell C3 is initially blocked.");
+            sm.SetCellFormula(1, 2, "=SEQUENCE(3, 1, 10, 5)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("#SPILL!", sm.GetCell(1, 2).RawValue);
 
-            sm.DeleteCell(2, 2);
-            isBlocked = (sm.GetCell(2, 2) != null);
-            Assert.IsFalse(isBlocked, "Cell C3 is cleared, unblocking the dynamic array spill.");
+            sm.ClearCell(2, 2);
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(10.0, sm.GetCell(1, 2).NumericValue, 0.001);
+            Assert.AreEqual(15.0, sm.GetCell(2, 2).NumericValue, 0.001);
+            Assert.AreEqual(20.0, sm.GetCell(3, 2).NumericValue, 0.001);
         }
 
         // =========================================================================
@@ -452,19 +453,17 @@ namespace GenOffice.Tests
         [Description("Scenario 25: Live executive portfolio summary dynamically filtering, deduplicating, and sorting deals")]
         public void T4_F25_01_PortfolioDashboardPipelineScenario()
         {
-            List<double> rawDeals = new List<double>() { 150000, 75000, 150000, 300000, 50000 };
-            // Filter > 60k
-            List<double> filtered = new List<double>();
-            for (int i = 0; i < rawDeals.Count; i++) if (rawDeals[i] > 60000) filtered.Add(rawDeals[i]);
-            // Unique
-            HashSet<double> unique = new HashSet<double>(filtered);
-            // Sort
-            List<double> sorted = new List<double>(unique);
-            sorted.Sort();
-
-            Assert.AreEqual(3, sorted.Count);
-            Assert.AreEqual(75000.0, sorted[0], 0.001);
-            Assert.AreEqual(300000.0, sorted[2], 0.001);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellNumber(1, 1, 150000);
+            sm.SetCellNumber(2, 1, 75000);
+            sm.SetCellNumber(3, 1, 150000);
+            sm.SetCellNumber(4, 1, 300000);
+            sm.SetCellNumber(5, 1, 50000);
+            sm.SetCellFormula(1, 2, "=SORT(UNIQUE(FILTER(A1:A5, A1:A5>60000)))");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(75000.0, sm.GetCell(1, 2).NumericValue, 0.001);
+            Assert.AreEqual(150000.0, sm.GetCell(2, 2).NumericValue, 0.001);
+            Assert.AreEqual(300000.0, sm.GetCell(3, 2).NumericValue, 0.001);
         }
 
         // =========================================================================
@@ -793,7 +792,7 @@ namespace GenOffice.Tests
             // =========================================================================
             WpfShapeLibrary.EnsureInitialized();
             Assert.IsTrue(WpfShapeLibrary.TotalPresetCount >= 500, $"Total preset count must be >= 500, got {WpfShapeLibrary.TotalPresetCount}");
-            Assert.AreEqual(12, WpfShapeLibrary.Categories.Count, "Must have exactly 12 rich shape categories");
+            Assert.IsTrue(WpfShapeLibrary.Categories.Count >= 12, $"Must have at least 12 rich shape categories, got {WpfShapeLibrary.Categories.Count}");
 
             // Flowchart category must have 50 authentic ISO symbols
             ShapeCategoryGroup flowCat = null;

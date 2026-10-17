@@ -164,413 +164,87 @@ namespace ZenQOffice.UI
         #region Vector Icon Drawing Methods
         public static void DrawVectorSparkle(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            float cx = x + size / 2f;
-            float cy = y + size / 2f;
-            float r = size / 2f;
-            float innerR = size * 0.22f;
-
-            using (GraphicsPath p = new GraphicsPath())
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                p.AddPolygon(new PointF[] {
-                    new PointF(cx, cy - r),
-                    new PointF(cx + innerR, cy - innerR),
-                    new PointF(cx + r, cy),
-                    new PointF(cx + innerR, cy + innerR),
-                    new PointF(cx, cy + r),
-                    new PointF(cx - innerR, cy + innerR),
-                    new PointF(cx - r, cy),
-                    new PointF(cx - innerR, cy - innerR)
-                });
-                g.FillPath(b, p);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE781', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorKey(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            using (Pen p = new Pen(color, size * 0.12f))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-
-                float ringD = size * 0.45f;
-                g.DrawEllipse(p, x + 1, y + 1, ringD, ringD);
-
-                float stemX1 = x + 1 + ringD * 0.85f;
-                float stemY1 = y + 1 + ringD * 0.85f;
-                float stemX2 = x + size - 2;
-                float stemY2 = y + size - 2;
-                g.DrawLine(p, stemX1, stemY1, stemX2, stemY2);
-
-                g.DrawLine(p, stemX2 - size * 0.12f, stemY2 - size * 0.12f, stemX2 - size * 0.12f + size * 0.18f, stemY2 - size * 0.12f - size * 0.18f);
-                g.DrawLine(p, stemX2, stemY2, stemX2 + size * 0.15f, stemY2 - size * 0.15f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE8D7', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorPlus(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            float mid = size / 2f;
-            using (Pen p = new Pen(color, size * 0.18f))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-                g.DrawLine(p, x + mid, y + 2, x + mid, y + size - 2);
-                g.DrawLine(p, x + 2, y + mid, x + size - 2, y + mid);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE710', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorTrash(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            using (Pen p = new Pen(color, size * 0.12f))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-
-                g.DrawLine(p, x + 2, y + size * 0.25f, x + size - 2, y + size * 0.25f);
-                g.DrawLine(p, x + size * 0.35f, y + size * 0.25f, x + size * 0.35f, y + size * 0.12f);
-                g.DrawLine(p, x + size * 0.35f, y + size * 0.12f, x + size * 0.65f, y + size * 0.12f);
-                g.DrawLine(p, x + size * 0.65f, y + size * 0.12f, x + size * 0.65f, y + size * 0.25f);
-
-                g.DrawLine(p, x + size * 0.2f, y + size * 0.28f, x + size * 0.26f, y + size - 2);
-                g.DrawLine(p, x + size * 0.26f, y + size - 2, x + size * 0.74f, y + size - 2);
-                g.DrawLine(p, x + size * 0.74f, y + size - 2, x + size * 0.8f, y + size * 0.28f);
-
-                g.DrawLine(p, x + size * 0.42f, y + size * 0.42f, x + size * 0.42f, y + size * 0.82f);
-                g.DrawLine(p, x + size * 0.58f, y + size * 0.42f, x + size * 0.58f, y + size * 0.82f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE74D', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorEye(Graphics g, float x, float y, float size, Color color, bool isSlash)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-            float penWidth = Math.Max(1.35f, size * (2.0f / 24.0f));
-            using (Pen p = new Pen(color, penWidth))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-                p.LineJoin = LineJoin.Round;
-
-                // Scale from 24x24 Lucide viewBox coordinates
-                float scale = size / 24.0f;
-                float x0 = x;
-                float y0 = y;
-
-                // 1. Outer Eye Eyelid Almond Contour (Lucide path d="M2.062 12.348... 10.75 10.75...")
-                using (GraphicsPath eyePath = new GraphicsPath())
-                {
-                    // Top eyelid
-                    eyePath.AddBezier(
-                        x0 + 2.0f * scale, y0 + 12.0f * scale,
-                        x0 + 6.5f * scale, y0 + 4.8f * scale,
-                        x0 + 17.5f * scale, y0 + 4.8f * scale,
-                        x0 + 22.0f * scale, y0 + 12.0f * scale
-                    );
-                    // Bottom eyelid
-                    eyePath.AddBezier(
-                        x0 + 22.0f * scale, y0 + 12.0f * scale,
-                        x0 + 17.5f * scale, y0 + 19.2f * scale,
-                        x0 + 6.5f * scale, y0 + 19.2f * scale,
-                        x0 + 2.0f * scale, y0 + 12.0f * scale
-                    );
-                    g.DrawPath(p, eyePath);
-                }
-
-                // 2. Iris/Pupil Center Circle (<circle cx="12" cy="12" r="3"/>)
-                float pupilDiameter = 6.0f * scale;
-                float pupilX = x0 + 12.0f * scale - pupilDiameter / 2f;
-                float pupilY = y0 + 12.0f * scale - pupilDiameter / 2f;
-                g.DrawEllipse(p, pupilX, pupilY, pupilDiameter, pupilDiameter);
-
-                // 3. Eye-Off Slash Line (when password is hidden / slashed)
-                if (isSlash)
-                {
-                    using (Pen slashPen = new Pen(Color.FromArgb(220, 38, 38), penWidth * 1.15f))
-                    {
-                        slashPen.StartCap = LineCap.Round;
-                        slashPen.EndCap = LineCap.Round;
-                        g.DrawLine(slashPen, x0 + 3.2f * scale, y0 + 3.2f * scale, x0 + 20.8f * scale, y0 + 20.8f * scale);
-                    }
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, isSlash ? '\uE890' : '\uE7B3', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorLightning(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            using (GraphicsPath p = new GraphicsPath())
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                p.AddPolygon(new PointF[] {
-                    new PointF(x + size * 0.55f, y + 1),
-                    new PointF(x + size * 0.15f, y + size * 0.52f),
-                    new PointF(x + size * 0.48f, y + size * 0.52f),
-                    new PointF(x + size * 0.38f, y + size - 1),
-                    new PointF(x + size * 0.85f, y + size * 0.44f),
-                    new PointF(x + size * 0.52f, y + size * 0.44f)
-                });
-                g.FillPath(b, p);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE945', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorSaveDisk(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            using (Pen p = new Pen(color, size * 0.12f))
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-
-                g.DrawRectangle(p, x + 2, y + 2, size - 4, size - 4);
-                g.FillRectangle(b, x + size * 0.28f, y + 3, size * 0.44f, size * 0.32f);
-                g.DrawRectangle(p, x + size * 0.24f, y + size * 0.54f, size * 0.52f, size * 0.34f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE74E', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorRocket(Graphics g, float x, float y, float size, Color color)
         {
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            using (Pen p = new Pen(color, size * 0.12f))
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-
-                PointF[] pts = new PointF[] {
-                    new PointF(x + size * 0.85f, y + size * 0.15f),
-                    new PointF(x + size * 0.45f, y + size * 0.22f),
-                    new PointF(x + size * 0.22f, y + size * 0.45f),
-                    new PointF(x + size * 0.15f, y + size * 0.85f),
-                    new PointF(x + size * 0.55f, y + size * 0.78f),
-                    new PointF(x + size * 0.78f, y + size * 0.55f)
-                };
-                g.DrawPolygon(p, pts);
-                g.FillEllipse(b, x + size * 0.52f, y + size * 0.32f, size * 0.2f, size * 0.2f);
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE724', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorSend(Graphics g, float x, float y, float size, Color color)
         {
-            DrawVectorLucideSend(g, x, y, size, color);
+            FluentIconRenderer.DrawGlyph(g, '\uE724', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorLucideSend(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.8f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                PointF[] pts = new PointF[]
-                {
-                    new PointF(x + 14.536f * scale, y + 21.686f * scale),
-                    new PointF(x + 21.973f * scale, y + 2.662f * scale),
-                    new PointF(x + 2.338f * scale, y + 8.527f * scale),
-                    new PointF(x + 10.244f * scale, y + 12.644f * scale),
-                    new PointF(x + 11.356f * scale, y + 13.754f * scale)
-                };
-                g.DrawPolygon(pen, pts);
-                g.DrawLine(pen,
-                    new PointF(x + 21.854f * scale, y + 2.147f * scale),
-                    new PointF(x + 10.914f * scale, y + 13.086f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE724', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorCog(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.8f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                float r2 = 2f * scale;
-                g.DrawEllipse(pen, x + 12f * scale - r2, y + 12f * scale - r2, r2 * 2f, r2 * 2f);
-
-                float r8 = 8f * scale;
-                g.DrawEllipse(pen, x + 12f * scale - r8, y + 12f * scale - r8, r8 * 2f, r8 * 2f);
-
-                g.DrawLine(pen, new PointF(x + 11f * scale, y + 10.27f * scale), new PointF(x + 7f * scale, y + 3.34f * scale));
-                g.DrawLine(pen, new PointF(x + 11f * scale, y + 13.73f * scale), new PointF(x + 7f * scale, y + 20.66f * scale));
-                g.DrawLine(pen, new PointF(x + 12f * scale, y + 22f * scale), new PointF(x + 12f * scale, y + 20f * scale));
-                g.DrawLine(pen, new PointF(x + 12f * scale, y + 2f * scale), new PointF(x + 12f * scale, y + 4f * scale));
-                g.DrawLine(pen, new PointF(x + 14f * scale, y + 12f * scale), new PointF(x + 22f * scale, y + 12f * scale));
-                g.DrawLine(pen, new PointF(x + 17f * scale, y + 20.66f * scale), new PointF(x + 16f * scale, y + 18.93f * scale));
-                g.DrawLine(pen, new PointF(x + 17f * scale, y + 3.34f * scale), new PointF(x + 16f * scale, y + 5.07f * scale));
-                g.DrawLine(pen, new PointF(x + 2f * scale, y + 12f * scale), new PointF(x + 4f * scale, y + 12f * scale));
-                g.DrawLine(pen, new PointF(x + 20.66f * scale, y + 17f * scale), new PointF(x + 18.93f * scale, y + 16f * scale));
-                g.DrawLine(pen, new PointF(x + 20.66f * scale, y + 7f * scale), new PointF(x + 18.93f * scale, y + 8f * scale));
-                g.DrawLine(pen, new PointF(x + 3.34f * scale, y + 17f * scale), new PointF(x + 5.07f * scale, y + 16f * scale));
-                g.DrawLine(pen, new PointF(x + 3.34f * scale, y + 7f * scale), new PointF(x + 5.07f * scale, y + 8f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE713', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorReply(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.6f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                // Mũi tên quay lại ↩
-                g.DrawLine(pen, new PointF(x + 9f * scale, y + 14f * scale), new PointF(x + 4f * scale, y + 9f * scale));
-                g.DrawLine(pen, new PointF(x + 4f * scale, y + 9f * scale), new PointF(x + 9f * scale, y + 4f * scale));
-                
-                using (GraphicsPath path = new GraphicsPath())
-                {
-                    path.AddArc(x + 4f * scale, y + 9f * scale, 14f * scale, 12f * scale, 180, 90);
-                    path.AddLine(x + 11f * scale, y + 9f * scale, x + 14f * scale, y + 9f * scale);
-                    path.AddArc(x + 8f * scale, y + 9f * scale, 12f * scale, 12f * scale, 270, 90);
-                    path.AddLine(x + 20f * scale, y + 15f * scale, x + 20f * scale, y + 19f * scale);
-                    g.DrawPath(pen, path);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE97A', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorCopy(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.5f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                // Hộp phía sau
-                RectangleF backR = new RectangleF(x + 8f * scale, y + 3f * scale, 12f * scale, 13f * scale);
-                using (GraphicsPath pBack = CreateRoundedPath(backR, 2.5f * scale))
-                {
-                    g.DrawPath(pen, pBack);
-                }
-
-                // Hộp phía trước
-                RectangleF frontR = new RectangleF(x + 4f * scale, y + 7f * scale, 12f * scale, 13f * scale);
-                using (SolidBrush sb = new SolidBrush(Color.FromArgb(248, 250, 252)))
-                using (GraphicsPath pFront = CreateRoundedPath(frontR, 2.5f * scale))
-                {
-                    g.FillPath(sb, pFront);
-                    g.DrawPath(pen, pFront);
-                }
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE8C8', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorCheck(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.8f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                g.DrawLine(pen, new PointF(x + 4f * scale, y + 12f * scale), new PointF(x + 9f * scale, y + 17f * scale));
-                g.DrawLine(pen, new PointF(x + 9f * scale, y + 17f * scale), new PointF(x + 20f * scale, y + 6f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE73E', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorHistory(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.8f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                // Vòng tròn đồng hồ lịch sử với mũi tên ngược
-                g.DrawArc(pen, x + 3f * scale, y + 3f * scale, 18f * scale, 18f * scale, 130, 315);
-                
-                // Mũi tên ở đầu cung
-                g.DrawLine(pen, new PointF(x + 3.5f * scale, y + 9f * scale), new PointF(x + 3f * scale, y + 3.5f * scale));
-                g.DrawLine(pen, new PointF(x + 3f * scale, y + 3.5f * scale), new PointF(x + 8.5f * scale, y + 3.5f * scale));
-
-                // Kim đồng hồ (12h và 3h)
-                g.DrawLine(pen, new PointF(x + 12f * scale, y + 12f * scale), new PointF(x + 12f * scale, y + 7f * scale));
-                g.DrawLine(pen, new PointF(x + 12f * scale, y + 12f * scale), new PointF(x + 16f * scale, y + 12f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE81C', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorPlus(Graphics g, float x, float y, float size, Color color, float strokeWidth = 2.0f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-
-                g.DrawLine(pen, new PointF(x + 12f * scale, y + 5f * scale), new PointF(x + 12f * scale, y + 19f * scale));
-                g.DrawLine(pen, new PointF(x + 5f * scale, y + 12f * scale), new PointF(x + 19f * scale, y + 12f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE710', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
 
         public static void DrawVectorTrash(Graphics g, float x, float y, float size, Color color, float strokeWidth = 1.6f)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = size / 24f;
-            float penW = Math.Max(1.0f, strokeWidth * scale);
-
-            using (Pen pen = new Pen(color, penW))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                // Nắp thùng rác
-                g.DrawLine(pen, new PointF(x + 3f * scale, y + 6f * scale), new PointF(x + 21f * scale, y + 6f * scale));
-                g.DrawLine(pen, new PointF(x + 8f * scale, y + 6f * scale), new PointF(x + 10f * scale, y + 3f * scale));
-                g.DrawLine(pen, new PointF(x + 10f * scale, y + 3f * scale), new PointF(x + 14f * scale, y + 3f * scale));
-                g.DrawLine(pen, new PointF(x + 14f * scale, y + 3f * scale), new PointF(x + 16f * scale, y + 6f * scale));
-
-                // Thân thùng rác
-                PointF[] body = new PointF[]
-                {
-                    new PointF(x + 5f * scale, y + 6f * scale),
-                    new PointF(x + 6.5f * scale, y + 20f * scale),
-                    new PointF(x + 17.5f * scale, y + 20f * scale),
-                    new PointF(x + 19f * scale, y + 6f * scale)
-                };
-                g.DrawLines(pen, body);
-
-                // Các đường gân bên trong
-                g.DrawLine(pen, new PointF(x + 10f * scale, y + 10f * scale), new PointF(x + 10f * scale, y + 16f * scale));
-                g.DrawLine(pen, new PointF(x + 14f * scale, y + 10f * scale), new PointF(x + 14f * scale, y + 16f * scale));
-            }
+            FluentIconRenderer.DrawGlyph(g, '\uE74D', new RectangleF(x, y, size, size), color, size * 0.75f);
         }
         #endregion
     }

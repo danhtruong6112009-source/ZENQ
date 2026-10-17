@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using ZenQOffice.Core;
@@ -25,6 +28,10 @@ namespace ZenQOffice.UI
         public float ScrollY { get; set; }
         public float TargetScrollY { get; set; }
         public float ScrollX { get; set; }
+        private int _lastViewWidth = 1000;
+        private int _lastViewHeight = 800;
+        private int _lastTopOffset = 155;
+        private int _lastStatusH = 26;
 
         public bool ShowThumbnailsSidebar { get; set; }
         public int SidebarWidth { get; set; }
@@ -49,7 +56,8 @@ namespace ZenQOffice.UI
 
         // Selected Tool:
         // 0: Select/Hand, 1: Add Text, 2: Edit Text, 3: Highlight, 4: Underline, 5: Strikethrough,
-        // 6: Sticky Note, 7: Freehand Pen, 8: Rectangle Shape, 9: Line Shape, 10: Stamp, 11: Signature
+        // 6: Sticky Note, 7: Freehand Pen, 8: Rectangle Shape, 9: Line Shape, 10: Stamp, 11: Signature,
+        // 12: Form Fill, 13: Add Form Text, 14: Add Form CheckBox, 15: Add Form Radio, 16: Add Form Dropdown, 17: Mark Redaction
         private int _selectedTool;
         public int SelectedTool
         {
@@ -57,20 +65,37 @@ namespace ZenQOffice.UI
             set
             {
                 _selectedTool = value;
-                if (_selectedTool != 0)
+                if (_selectedTool != 0 && _selectedTool != 12)
                 {
                     // Tự động bỏ chọn các hình khối / hộp chữ / chữ ký khi chuyển sang công cụ vẽ
                     SelectedShape = null;
                     SelectedText = null;
                     SelectedSignature = null;
                     SelectedAnnotation = null;
+                    SelectedFormField = null;
+                    SelectedRedaction = null;
                     if (EditingText != null) CommitInlineEdit();
+                    if (EditingFormField != null) CommitFormFieldEdit();
                 }
             }
         }
         public Color ActiveColor { get; set; }
         public float ActiveStrokeWidth { get; set; }
         public string ActiveStampText { get; set; }
+
+        // Form Fields (AcroForms) & Redaction
+        public bool HighlightFormFields { get; set; } = true;
+        public PdfFormFieldElement SelectedFormField { get; set; }
+        public PdfFormFieldElement EditingFormField { get; set; }
+        public string EditingFormFieldBuffer { get; set; } = "";
+        public PdfRedactionElement SelectedRedaction { get; set; }
+
+        // Sidebar View Mode (0: Thumbnails, 1: Bookmarks Outline)
+        public int SidebarViewMode { get; set; } = 0;
+        public PdfBookmarkNode SelectedBookmark { get; set; }
+        public RectangleF SidebarTabThumbnailsRect { get; set; }
+        public RectangleF SidebarTabBookmarksRect { get; set; }
+        public RectangleF BtnAddBookmarkRect { get; set; }
 
         // Inline Text Editing State
         public PdfTextElement EditingText { get; set; }
@@ -437,6 +462,11 @@ namespace ZenQOffice.UI
         #region Main Render Pipeline
         public void Draw(Graphics g, int width, int height, RibbonBar ribbon, int topOffset = 155, int statusH = 26)
         {
+            _lastViewWidth = width;
+            _lastViewHeight = height;
+            _lastTopOffset = topOffset;
+            _lastStatusH = statusH;
+
             g.SmoothingMode = SmoothingMode.HighSpeed;
             g.InterpolationMode = InterpolationMode.Bilinear;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
@@ -559,14 +589,34 @@ namespace ZenQOffice.UI
                 g.DrawLine(sideBorder, SidebarWidth, topOffset, SidebarWidth, topOffset + viewH);
             }
 
-            // Header Sidebar
-            Rectangle sideHead = new Rectangle(0, topOffset, SidebarWidth, 36);
-            using (SolidBrush hBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
-            using (Font hFont = new Font("Segoe UI", 9f, FontStyle.Bold))
-            using (SolidBrush hTxt = new SolidBrush(Color.FromArgb(51, 65, 85)))
+            // Header Sidebar: 2 Tabs [📑 Trang] & [🔖 Mục lục]
+            int tabW = SidebarWidth / 2;
+            SidebarTabThumbnailsRect = new RectangleF(0, topOffset, tabW, 34);
+            SidebarTabBookmarksRect = new RectangleF(tabW, topOffset, SidebarWidth - tabW, 34);
+
+            using (Font tabFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+            using (SolidBrush activeBg = new SolidBrush(Color.White))
+            using (SolidBrush inactiveBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+            using (SolidBrush activeTxt = new SolidBrush(Color.FromArgb(30, 58, 138)))
+            using (SolidBrush inactiveTxt = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            using (Pen borderP = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
-                g.FillRectangle(hBg, sideHead);
-                g.DrawString("TRANG: " + (Document != null ? Document.Pages.Count : 0), hFont, hTxt, 12, topOffset + 9);
+                // Tab 0: Trang
+                g.FillRectangle(SidebarViewMode == 0 ? activeBg : inactiveBg, SidebarTabThumbnailsRect);
+                g.DrawRectangle(borderP, SidebarTabThumbnailsRect.X, SidebarTabThumbnailsRect.Y, SidebarTabThumbnailsRect.Width, SidebarTabThumbnailsRect.Height);
+                g.DrawString($"📑 Trang ({Document?.Pages?.Count ?? 0})", tabFont, SidebarViewMode == 0 ? activeTxt : inactiveTxt, SidebarTabThumbnailsRect, sf);
+
+                // Tab 1: Mục lục (Bookmarks)
+                g.FillRectangle(SidebarViewMode == 1 ? activeBg : inactiveBg, SidebarTabBookmarksRect);
+                g.DrawRectangle(borderP, SidebarTabBookmarksRect.X, SidebarTabBookmarksRect.Y, SidebarTabBookmarksRect.Width, SidebarTabBookmarksRect.Height);
+                g.DrawString($"🔖 Mục lục ({Document?.Bookmarks?.Count ?? 0})", tabFont, SidebarViewMode == 1 ? activeTxt : inactiveTxt, SidebarTabBookmarksRect, sf);
+            }
+
+            if (SidebarViewMode == 1)
+            {
+                DrawBookmarksSidebar(g, width, height, topOffset, viewH);
+                return;
             }
 
             // Vùng cuộn danh sách ảnh thu nhỏ các trang
@@ -873,6 +923,47 @@ namespace ZenQOffice.UI
                         screenPts[pt] = new PointF(bounds.X + CurrentFreehandPoints[pt].X * ZoomLevel, bounds.Y + CurrentFreehandPoints[pt].Y * ZoomLevel);
                     }
                     g.DrawLines(pen, screenPts);
+                }
+            }
+
+            // Biểu mẫu tương tác Form Fields (AcroForms)
+            if (page.FormFields != null)
+            {
+                foreach (var ff in page.FormFields)
+                {
+                    DrawFormField(g, bounds, ff, (EditingFormField == ff));
+                }
+            }
+
+            // Vùng kiểm duyệt & xóa thông tin mật (Redactions)
+            if (page.Redactions != null)
+            {
+                foreach (var red in page.Redactions)
+                {
+                    DrawRedaction(g, bounds, red);
+                }
+            }
+
+            // Đánh số hồ sơ Bates
+            if (!string.IsNullOrEmpty(page.BatesNumber))
+            {
+                DrawBatesNumber(g, bounds, page);
+            }
+
+            // Hộp kéo chọn đánh dấu Redaction trực tiếp
+            if (IsBoxSelecting && SelectedTool == 17 && DrawingPageIndex == pageIndex)
+            {
+                float rx = Math.Min(BoxSelectStart.X, BoxSelectCurrent.X) * ZoomLevel;
+                float ry = Math.Min(BoxSelectStart.Y, BoxSelectCurrent.Y) * ZoomLevel;
+                float rw = Math.Abs(BoxSelectCurrent.X - BoxSelectStart.X) * ZoomLevel;
+                float rh = Math.Abs(BoxSelectCurrent.Y - BoxSelectStart.Y) * ZoomLevel;
+                RectangleF dragRect = new RectangleF(bounds.X + rx, bounds.Y + ry, rw, rh);
+
+                using (SolidBrush fillB = new SolidBrush(Color.FromArgb(50, 239, 68, 68)))
+                using (Pen borderP = new Pen(Color.FromArgb(239, 68, 68), 2f) { DashStyle = DashStyle.Dash })
+                {
+                    g.FillRectangle(fillB, dragRect);
+                    g.DrawRectangle(borderP, dragRect.X, dragRect.Y, dragRect.Width, dragRect.Height);
                 }
             }
 
@@ -1465,6 +1556,331 @@ namespace ZenQOffice.UI
             }
         }
 
+        private void DrawFormField(Graphics g, RectangleF pageBounds, PdfFormFieldElement field, bool isEditing)
+        {
+            if (field == null) return;
+            float sx = pageBounds.X + (field.Bounds.X * ZoomLevel);
+            float sy = pageBounds.Y + (field.Bounds.Y * ZoomLevel);
+            float sw = field.Bounds.Width * ZoomLevel;
+            float sh = field.Bounds.Height * ZoomLevel;
+            RectangleF r = new RectangleF(sx, sy, sw, sh);
+
+            if (field.FieldType == PdfFormFieldType.CheckBox)
+            {
+                using (SolidBrush bgB = new SolidBrush(field.BackgroundColor))
+                using (Pen bPen = new Pen(field.BorderColor, Math.Max(1f, field.BorderWidth * ZoomLevel)))
+                {
+                    g.FillRectangle(bgB, r);
+                    g.DrawRectangle(bPen, r.X, r.Y, r.Width, r.Height);
+                }
+                if (field.IsChecked)
+                {
+                    using (Pen chkPen = new Pen(Color.FromArgb(37, 99, 235), Math.Max(2f, 2.5f * ZoomLevel)))
+                    {
+                        chkPen.StartCap = LineCap.Round;
+                        chkPen.EndCap = LineCap.Round;
+                        PointF p1 = new PointF(r.X + r.Width * 0.22f, r.Y + r.Height * 0.52f);
+                        PointF p2 = new PointF(r.X + r.Width * 0.44f, r.Y + r.Height * 0.76f);
+                        PointF p3 = new PointF(r.X + r.Width * 0.80f, r.Y + r.Height * 0.24f);
+                        g.DrawLine(chkPen, p1, p2);
+                        g.DrawLine(chkPen, p2, p3);
+                    }
+                }
+            }
+            else if (field.FieldType == PdfFormFieldType.RadioButton)
+            {
+                using (SolidBrush bgB = new SolidBrush(field.BackgroundColor))
+                using (Pen bPen = new Pen(field.BorderColor, Math.Max(1f, field.BorderWidth * ZoomLevel)))
+                {
+                    g.FillEllipse(bgB, r);
+                    g.DrawEllipse(bPen, r);
+                }
+                if (field.IsChecked)
+                {
+                    float dotInset = r.Width * 0.25f;
+                    RectangleF dotR = new RectangleF(r.X + dotInset, r.Y + dotInset, r.Width - 2 * dotInset, r.Height - 2 * dotInset);
+                    using (SolidBrush dotB = new SolidBrush(field.TextColor))
+                    {
+                        g.FillEllipse(dotB, dotR);
+                    }
+                }
+            }
+            else if (field.FieldType == PdfFormFieldType.ComboBox)
+            {
+                Color bgCol = (HighlightFormFields && string.IsNullOrEmpty(field.Value))
+                    ? Color.FromArgb(235, 244, 255)
+                    : field.BackgroundColor;
+                Color borderCol = (HighlightFormFields && string.IsNullOrEmpty(field.Value))
+                    ? Color.FromArgb(59, 130, 246)
+                    : field.BorderColor;
+
+                using (SolidBrush bgB = new SolidBrush(bgCol))
+                using (Pen bPen = new Pen(borderCol, Math.Max(1f, field.BorderWidth * ZoomLevel)))
+                {
+                    g.FillRectangle(bgB, r);
+                    g.DrawRectangle(bPen, r.X, r.Y, r.Width, r.Height);
+                }
+
+                // Down arrow
+                float arrowX = r.Right - 16 * ZoomLevel;
+                float arrowY = r.Y + r.Height / 2f - 2 * ZoomLevel;
+                using (SolidBrush aBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    PointF[] arrow = new PointF[]
+                    {
+                        new PointF(arrowX, arrowY),
+                        new PointF(arrowX + 8 * ZoomLevel, arrowY),
+                        new PointF(arrowX + 4 * ZoomLevel, arrowY + 5 * ZoomLevel)
+                    };
+                    g.FillPolygon(aBrush, arrow);
+                }
+
+                string displayText = !string.IsNullOrEmpty(field.Value) ? field.Value : (field.Options != null && field.Options.Count > 0 ? field.Options[0] : field.FieldName);
+                using (Font f = new Font(field.FontName, Math.Max(7f, field.FontSize * ZoomLevel)))
+                using (SolidBrush tB = new SolidBrush(string.IsNullOrEmpty(field.Value) ? Color.Gray : field.TextColor))
+                {
+                    RectangleF textR = new RectangleF(r.X + 4 * ZoomLevel, r.Y + 2 * ZoomLevel, r.Width - 22 * ZoomLevel, r.Height - 4 * ZoomLevel);
+                    g.DrawString(displayText, f, tB, textR);
+                }
+            }
+            else // Text or Button
+            {
+                Color bgCol = (HighlightFormFields && string.IsNullOrEmpty(field.Value) && !isEditing)
+                    ? Color.FromArgb(235, 244, 255)
+                    : field.BackgroundColor;
+                Color borderCol = (HighlightFormFields && string.IsNullOrEmpty(field.Value) && !isEditing)
+                    ? Color.FromArgb(59, 130, 246)
+                    : field.BorderColor;
+
+                using (SolidBrush bgB = new SolidBrush(bgCol))
+                using (Pen bPen = new Pen(borderCol, Math.Max(1f, field.BorderWidth * ZoomLevel)))
+                {
+                    g.FillRectangle(bgB, r);
+                    g.DrawRectangle(bPen, r.X, r.Y, r.Width, r.Height);
+                }
+
+                string displayText = isEditing ? EditingFormFieldBuffer : (!string.IsNullOrEmpty(field.Value) ? field.Value : field.DefaultValue);
+                if (string.IsNullOrEmpty(displayText) && !isEditing)
+                {
+                    displayText = field.FieldName;
+                }
+
+                using (Font f = new Font(field.FontName, Math.Max(7f, field.FontSize * ZoomLevel)))
+                using (SolidBrush tB = new SolidBrush((string.IsNullOrEmpty(field.Value) && !isEditing) ? Color.FromArgb(148, 163, 184) : field.TextColor))
+                {
+                    RectangleF textR = new RectangleF(r.X + 4 * ZoomLevel, r.Y + 2 * ZoomLevel, r.Width - 8 * ZoomLevel, r.Height - 4 * ZoomLevel);
+                    g.DrawString(displayText, f, tB, textR);
+
+                    if (isEditing && ShowCursor)
+                    {
+                        SizeF sz = g.MeasureString(displayText ?? "", f);
+                        float cursorX = Math.Min(textR.Right - 2, textR.X + sz.Width);
+                        using (Pen curPen = new Pen(Color.FromArgb(15, 23, 42), 1.5f))
+                        {
+                            g.DrawLine(curPen, cursorX, textR.Y + 1, cursorX, textR.Y + textR.Height - 2);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DrawRedaction(Graphics g, RectangleF pageBounds, PdfRedactionElement red)
+        {
+            if (red == null) return;
+            float sx = pageBounds.X + (red.Bounds.X * ZoomLevel);
+            float sy = pageBounds.Y + (red.Bounds.Y * ZoomLevel);
+            float sw = red.Bounds.Width * ZoomLevel;
+            float sh = red.Bounds.Height * ZoomLevel;
+            RectangleF r = new RectangleF(sx, sy, sw, sh);
+
+            if (red.IsApplied)
+            {
+                using (SolidBrush b = new SolidBrush(red.FillColor))
+                {
+                    g.FillRectangle(b, r);
+                }
+                if (!string.IsNullOrEmpty(red.OverlayText))
+                {
+                    using (Font f = new Font("Segoe UI", Math.Max(8f, 10f * ZoomLevel), FontStyle.Bold))
+                    using (SolidBrush tb = new SolidBrush(red.TextColor))
+                    using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    {
+                        g.DrawString(red.OverlayText, f, tb, r, sf);
+                    }
+                }
+            }
+            else
+            {
+                // Marked state preview
+                using (SolidBrush transRed = new SolidBrush(Color.FromArgb(45, 239, 68, 68)))
+                {
+                    g.FillRectangle(transRed, r);
+                }
+                using (HatchBrush hb = new HatchBrush(HatchStyle.ForwardDiagonal, Color.FromArgb(140, 239, 68, 68), Color.Transparent))
+                {
+                    g.FillRectangle(hb, r);
+                }
+                using (Pen p = new Pen(Color.FromArgb(239, 68, 68), Math.Max(1.5f, 2f * ZoomLevel)) { DashStyle = DashStyle.Dash })
+                {
+                    g.DrawRectangle(p, r.X, r.Y, r.Width, r.Height);
+                }
+
+                // Badge overlay
+                string badge = string.IsNullOrEmpty(red.OverlayText) ? "ĐÃ ĐÁNH DẤU XÓA MẬT" : $"ĐÃ ĐÁNH DẤU: {red.OverlayText}";
+                using (Font badgeFont = new Font("Segoe UI", Math.Max(7f, 8f * ZoomLevel), FontStyle.Bold))
+                using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(220, 38, 38)))
+                using (SolidBrush badgeFg = new SolidBrush(Color.White))
+                {
+                    SizeF bSz = g.MeasureString(badge, badgeFont);
+                    RectangleF badgeRect = new RectangleF(r.X, Math.Max(pageBounds.Y, r.Y - bSz.Height - 2), bSz.Width + 6, bSz.Height + 2);
+                    g.FillRectangle(badgeBg, badgeRect);
+                    g.DrawString(badge, badgeFont, badgeFg, badgeRect.X + 3, badgeRect.Y + 1);
+                }
+            }
+        }
+
+        private void DrawBatesNumber(Graphics g, RectangleF pageBounds, PdfPageModel page)
+        {
+            if (Document == null || Document.ActiveBatesConfig == null || string.IsNullOrEmpty(page.BatesNumber)) return;
+            var cfg = Document.ActiveBatesConfig;
+
+            using (Font bf = new Font(cfg.FontName, Math.Max(7f, cfg.FontSize * ZoomLevel), FontStyle.Regular))
+            using (SolidBrush bb = new SolidBrush(cfg.TextColor))
+            {
+                SizeF sz = g.MeasureString(page.BatesNumber, bf);
+                float mx = cfg.MarginX * ZoomLevel;
+                float my = cfg.MarginY * ZoomLevel;
+                float bx = pageBounds.X + mx;
+                float by = pageBounds.Y + my;
+
+                switch (cfg.Position)
+                {
+                    case PdfBatesPosition.TopLeft:
+                        bx = pageBounds.X + mx;
+                        by = pageBounds.Y + my;
+                        break;
+                    case PdfBatesPosition.TopCenter:
+                        bx = pageBounds.X + (pageBounds.Width - sz.Width) / 2f;
+                        by = pageBounds.Y + my;
+                        break;
+                    case PdfBatesPosition.TopRight:
+                        bx = pageBounds.Right - mx - sz.Width;
+                        by = pageBounds.Y + my;
+                        break;
+                    case PdfBatesPosition.BottomLeft:
+                        bx = pageBounds.X + mx;
+                        by = pageBounds.Bottom - my - sz.Height;
+                        break;
+                    case PdfBatesPosition.BottomCenter:
+                        bx = pageBounds.X + (pageBounds.Width - sz.Width) / 2f;
+                        by = pageBounds.Bottom - my - sz.Height;
+                        break;
+                    case PdfBatesPosition.BottomRight:
+                        bx = pageBounds.Right - mx - sz.Width;
+                        by = pageBounds.Bottom - my - sz.Height;
+                        break;
+                }
+
+                g.DrawString(page.BatesNumber, bf, bb, bx, by);
+            }
+        }
+
+        private void DrawBookmarksSidebar(Graphics g, int width, int height, int topOffset, int viewH)
+        {
+            Rectangle sideListRect = new Rectangle(0, topOffset + 36, SidebarWidth - 8, viewH - 36);
+            GraphicsState sState = g.Save();
+            g.SetClip(sideListRect);
+
+            // Button Thêm dấu trang (+ Thêm Dấu Trang)
+            Rectangle btnAddRect = new Rectangle(12, topOffset + 44, SidebarWidth - 32, 28);
+            BtnAddBookmarkRect = btnAddRect;
+            using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(238, 242, 255)))
+            using (Pen btnBorder = new Pen(Color.FromArgb(99, 102, 241), 1f))
+            using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (SolidBrush btnTxt = new SolidBrush(Color.FromArgb(79, 70, 229)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.FillRectangle(btnBg, btnAddRect);
+                g.DrawRectangle(btnBorder, btnAddRect);
+                g.DrawString("🔖 + Thêm Dấu Trang", btnFont, btnTxt, btnAddRect, sf);
+            }
+
+            int curY = topOffset + 80;
+            if (Document != null && Document.Bookmarks != null && Document.Bookmarks.Count > 0)
+            {
+                DrawBookmarkNodesRecursive(g, Document.Bookmarks, 0, ref curY, topOffset, viewH);
+            }
+            else
+            {
+                using (Font hintFont = new Font("Segoe UI", 8.5f, FontStyle.Italic))
+                using (SolidBrush hintBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center })
+                {
+                    Rectangle hintRect = new Rectangle(12, curY + 20, SidebarWidth - 32, 60);
+                    g.DrawString("Chưa có dấu trang mục lục.\nNhấp '+ Thêm Dấu Trang' để tạo.", hintFont, hintBrush, hintRect, sf);
+                }
+            }
+
+            g.Restore(sState);
+        }
+
+        private void DrawBookmarkNodesRecursive(Graphics g, List<PdfBookmarkNode> nodes, int indent, ref int curY, int topOffset, int viewH)
+        {
+            if (nodes == null) return;
+            using (Font titleFont = new Font("Segoe UI", 9f, FontStyle.Regular))
+            using (Font pageFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (SolidBrush titleB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush pageB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            {
+                foreach (var node in nodes)
+                {
+                    if (curY >= topOffset + 36 && curY <= topOffset + viewH)
+                    {
+                        Rectangle itemRect = new Rectangle(10 + indent * 16, curY, SidebarWidth - 28 - indent * 16, 26);
+                        bool isSel = (SelectedBookmark == node);
+                        if (isSel)
+                        {
+                            using (SolidBrush selB = new SolidBrush(Color.FromArgb(224, 231, 255)))
+                            {
+                                g.FillRectangle(selB, itemRect);
+                            }
+                        }
+
+                        // Bookmark icon
+                        g.DrawString("🔖", titleFont, Brushes.Navy, itemRect.X, itemRect.Y + 2);
+                        // Title
+                        g.DrawString(node.Title, titleFont, titleB, itemRect.X + 20, itemRect.Y + 3);
+                        // Page pill
+                        string pageStr = $"Trang {node.TargetPageIndex + 1}";
+                        g.DrawString(pageStr, pageFont, pageB, itemRect.Right - 50, itemRect.Y + 5);
+                    }
+                    curY += 28;
+
+                    if (node.Children != null && node.Children.Count > 0 && node.IsExpanded)
+                    {
+                        DrawBookmarkNodesRecursive(g, node.Children, indent + 1, ref curY, topOffset, viewH);
+                    }
+                }
+            }
+        }
+
+        private PdfBookmarkNode HitTestBookmarkNode(List<PdfBookmarkNode> nodes, int x, int y, int indent, ref int curY)
+        {
+            if (nodes == null) return null;
+            foreach (var node in nodes)
+            {
+                Rectangle itemRect = new Rectangle(10 + indent * 16, curY, SidebarWidth - 28 - indent * 16, 26);
+                if (itemRect.Contains(x, y)) return node;
+                curY += 28;
+                if (node.Children != null && node.Children.Count > 0 && node.IsExpanded)
+                {
+                    var found = HitTestBookmarkNode(node.Children, x, y, indent + 1, ref curY);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
+
         public static SizeF CalculateSignatureAutoBounds(string signerName, string signDate, string reason, Image sigImage)
         {
             using (Bitmap tmpBmp = new Bitmap(1, 1))
@@ -1992,13 +2408,8 @@ namespace ZenQOffice.UI
                         if (canEdit)
                         {
                             StartInlineEdit(pageIdx, targetTxt, x, width, height);
+                            return true;
                         }
-                        else
-                        {
-                            // Nhấn bình thường chỉ chọn đối tượng, không kích hoạt sửa
-                            SelectedText = targetTxt;
-                        }
-                        return true;
                     }
                 }
                 for (int s = page.Signatures.Count - 1; s >= 0; s--)
@@ -2192,9 +2603,52 @@ namespace ZenQOffice.UI
                 return true;
             }
 
-            // 2. Kiểm tra nhấp chuột trên Sidebar Thumbnails
+            // 2. Kiểm tra nhấp chuột trên Sidebar Thumbnails & Bookmarks
             if (ShowThumbnailsSidebar && x <= SidebarWidth)
             {
+                // Nhấp vào 2 Tab [📑 Trang] vs [🔖 Mục lục] trên đỉnh Sidebar
+                if (y >= topOffset && y <= topOffset + 36)
+                {
+                    if (x < SidebarWidth / 2)
+                    {
+                        SidebarViewMode = 0;
+                    }
+                    else
+                    {
+                        SidebarViewMode = 1;
+                    }
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+
+                // Nếu đang ở Tab Mục lục (Bookmarks)
+                if (SidebarViewMode == 1)
+                {
+                    // Nút + Thêm Dấu Trang
+                    if (BtnAddBookmarkRect.Contains(x, y))
+                    {
+                        PushUndoState("Thêm dấu trang");
+                        AddBookmark($"Dấu trang - Trang {ActivePageIndex + 1}", ActivePageIndex, ScrollY);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+
+                    // Nhấp vào danh sách Dấu trang
+                    int curY = topOffset + 80;
+                    if (Document != null && Document.Bookmarks != null)
+                    {
+                        PdfBookmarkNode clickedBm = HitTestBookmarkNode(Document.Bookmarks, x, y, 0, ref curY);
+                        if (clickedBm != null)
+                        {
+                            SelectedBookmark = clickedBm;
+                            NavigateToBookmark(clickedBm);
+                            if (parentForm != null) parentForm.Invalidate();
+                            return true;
+                        }
+                    }
+                    return true;
+                }
+
                 // Kiểm tra kéo thanh cuộn Sidebar
                 if (SidebarScrollbarThumbRect.Contains(x, y))
                 {
@@ -2317,6 +2771,149 @@ namespace ZenQOffice.UI
                 ActivePageIndex = pageIdx;
                 PointF pagePt = ScreenToPagePoint(new PointF(x, y), pageIdx, width, height, topOffset);
                 PdfPageModel page = Document.Pages[pageIdx];
+
+                // Kiểm tra tương tác Biểu mẫu (AcroForms Form Filling)
+                if (SelectedTool == 12 || SelectedTool == 0)
+                {
+                    if (page.FormFields != null && page.FormFields.Count > 0)
+                    {
+                        for (int f = page.FormFields.Count - 1; f >= 0; f--)
+                        {
+                            var ff = page.FormFields[f];
+                            if (ff.Bounds.Contains(pagePt))
+                            {
+                                SelectedFormField = ff;
+                                if (ff.FieldType == PdfFormFieldType.CheckBox)
+                                {
+                                    PushUndoState("Đánh dấu hộp kiểm");
+                                    ff.IsChecked = !ff.IsChecked;
+                                    page.InvalidateCache();
+                                    Document.IsModified = true;
+                                    if (parentForm != null) parentForm.Invalidate();
+                                    return true;
+                                }
+                                else if (ff.FieldType == PdfFormFieldType.RadioButton)
+                                {
+                                    PushUndoState("Chọn nút radio");
+                                    foreach (var other in page.FormFields)
+                                    {
+                                        if (other.FieldType == PdfFormFieldType.RadioButton && other.GroupName == ff.GroupName)
+                                        {
+                                            other.IsChecked = false;
+                                        }
+                                    }
+                                    ff.IsChecked = true;
+                                    page.InvalidateCache();
+                                    Document.IsModified = true;
+                                    if (parentForm != null) parentForm.Invalidate();
+                                    return true;
+                                }
+                                else if (ff.FieldType == PdfFormFieldType.ComboBox)
+                                {
+                                    PushUndoState("Chọn danh sách");
+                                    if (ff.Options != null && ff.Options.Count > 0)
+                                    {
+                                        int curIdx = ff.Options.IndexOf(ff.Value);
+                                        int nextIdx = (curIdx + 1) % ff.Options.Count;
+                                        ff.Value = ff.Options[nextIdx];
+                                    }
+                                    page.InvalidateCache();
+                                    Document.IsModified = true;
+                                    if (parentForm != null) parentForm.Invalidate();
+                                    return true;
+                                }
+                                else if (ff.FieldType == PdfFormFieldType.Text)
+                                {
+                                    if (EditingFormField != null && EditingFormField != ff) CommitFormFieldEdit();
+                                    EditingFormField = ff;
+                                    EditingFormFieldBuffer = ff.Value ?? "";
+                                    if (parentForm != null) parentForm.Invalidate();
+                                    return true;
+                                }
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                // Nếu nhấp ra ngoài form field khi đang soạn thảo form field
+                if (EditingFormField != null)
+                {
+                    CommitFormFieldEdit();
+                }
+
+                // Thêm ô văn bản biểu mẫu (Tool 13)
+                if (SelectedTool == 13)
+                {
+                    PushUndoState("Thêm ô văn bản biểu mẫu");
+                    var ff = new PdfFormFieldElement(PdfFormFieldType.Text, new RectangleF(pagePt.X, pagePt.Y, 160, 26), "text_" + (page.FormFields.Count + 1));
+                    page.FormFields.Add(ff);
+                    page.InvalidateCache();
+                    Document.IsModified = true;
+                    SelectedFormField = ff;
+                    EditingFormField = ff;
+                    EditingFormFieldBuffer = "";
+                    SelectedTool = 12;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+
+                // Thêm hộp kiểm biểu mẫu (Tool 14)
+                if (SelectedTool == 14)
+                {
+                    PushUndoState("Thêm hộp kiểm biểu mẫu");
+                    var ff = new PdfFormFieldElement(PdfFormFieldType.CheckBox, new RectangleF(pagePt.X, pagePt.Y, 18, 18), "chk_" + (page.FormFields.Count + 1));
+                    page.FormFields.Add(ff);
+                    page.InvalidateCache();
+                    Document.IsModified = true;
+                    SelectedFormField = ff;
+                    SelectedTool = 12;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+
+                // Thêm nút radio biểu mẫu (Tool 15)
+                if (SelectedTool == 15)
+                {
+                    PushUndoState("Thêm nút radio biểu mẫu");
+                    var ff = new PdfFormFieldElement(PdfFormFieldType.RadioButton, new RectangleF(pagePt.X, pagePt.Y, 18, 18), "radio_" + (page.FormFields.Count + 1)) { GroupName = "Group1" };
+                    page.FormFields.Add(ff);
+                    page.InvalidateCache();
+                    Document.IsModified = true;
+                    SelectedFormField = ff;
+                    SelectedTool = 12;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+
+                // Thêm menu thả biểu mẫu (Tool 16)
+                if (SelectedTool == 16)
+                {
+                    PushUndoState("Thêm menu thả biểu mẫu");
+                    var ff = new PdfFormFieldElement(PdfFormFieldType.ComboBox, new RectangleF(pagePt.X, pagePt.Y, 160, 26), "combo_" + (page.FormFields.Count + 1))
+                    {
+                        Options = new List<string> { "Lựa chọn A", "Lựa chọn B", "Lựa chọn C" },
+                        Value = "Lựa chọn A"
+                    };
+                    page.FormFields.Add(ff);
+                    page.InvalidateCache();
+                    Document.IsModified = true;
+                    SelectedFormField = ff;
+                    SelectedTool = 12;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+
+                // Đánh dấu xóa mật Redaction (Tool 17)
+                if (SelectedTool == 17)
+                {
+                    IsBoxSelecting = true;
+                    BoxSelectStart = pagePt;
+                    BoxSelectCurrent = pagePt;
+                    DrawingPageIndex = pageIdx;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
 
                 // Nếu đang dùng công cụ Thêm Chữ (Add Text - Tool 1)
                 if (SelectedTool == 1)
@@ -2573,6 +3170,11 @@ namespace ZenQOffice.UI
                     var targetTxt = page.TextElements[t];
                     if (targetTxt.Bounds.Contains(pagePt))
                     {
+                        // Chỉ tương tác với chữ nếu là Hộp chữ tự tạo, hoặc khi đang chọn công cụ Sửa chữ (SelectedTool == 2)
+                        // Tuyệt đối không chọn/kéo chữ gốc khi đang dùng con trỏ đọc bình thường (SelectedTool == 0)
+                        bool canInteract = (!targetTxt.IsDetectedFromPdf) || (SelectedTool == 2);
+                        if (!canInteract) continue;
+
                         if (EditingText != null && EditingText != targetTxt)
                         {
                             CommitInlineEdit();
@@ -2914,6 +3516,16 @@ namespace ZenQOffice.UI
                             SelectedShape = shp;
                             SelectedTool = 0;
                         }
+                        else if (SelectedTool == 17) // Mark Redaction
+                        {
+                            PushUndoState("Đánh dấu xóa mật");
+                            var red = new PdfRedactionElement(new RectangleF(minX, minY, bw, bh), "BẢO MẬT");
+                            Document.Pages[pageIdx].Redactions.Add(red);
+                            Document.Pages[pageIdx].InvalidateCache();
+                            Document.IsModified = true;
+                            SelectedRedaction = red;
+                            SelectedTool = 0;
+                        }
                     }
                 }
                 IsBoxSelecting = false;
@@ -3025,6 +3637,26 @@ namespace ZenQOffice.UI
 
         public void HandleKeyDown(Keys keyCode)
         {
+            if (EditingFormField != null)
+            {
+                if (keyCode == Keys.Escape || keyCode == Keys.Enter)
+                {
+                    CommitFormFieldEdit();
+                    return;
+                }
+                if (keyCode == Keys.Back)
+                {
+                    if (!string.IsNullOrEmpty(EditingFormFieldBuffer))
+                    {
+                        EditingFormFieldBuffer = EditingFormFieldBuffer.Substring(0, EditingFormFieldBuffer.Length - 1);
+                        EditingFormField.Value = EditingFormFieldBuffer;
+                        if (ActivePageIndex < Document.Pages.Count) Document.Pages[ActivePageIndex].InvalidateCache();
+                        Document.IsModified = true;
+                    }
+                    return;
+                }
+            }
+
             if (ShowSearchBar)
             {
                 if (keyCode == Keys.Escape)
@@ -3294,6 +3926,34 @@ namespace ZenQOffice.UI
                 }
             }
 
+            if (EditingFormField != null)
+            {
+                if (keyChar == '\r' || keyChar == '\n')
+                {
+                    CommitFormFieldEdit();
+                    return;
+                }
+                if (keyChar == '\b')
+                {
+                    if (!string.IsNullOrEmpty(EditingFormFieldBuffer))
+                    {
+                        EditingFormFieldBuffer = EditingFormFieldBuffer.Substring(0, EditingFormFieldBuffer.Length - 1);
+                        EditingFormField.Value = EditingFormFieldBuffer;
+                        if (ActivePageIndex < Document.Pages.Count) Document.Pages[ActivePageIndex].InvalidateCache();
+                        Document.IsModified = true;
+                    }
+                    return;
+                }
+                if (!char.IsControl(keyChar))
+                {
+                    EditingFormFieldBuffer += keyChar;
+                    EditingFormField.Value = EditingFormFieldBuffer;
+                    if (ActivePageIndex < Document.Pages.Count) Document.Pages[ActivePageIndex].InvalidateCache();
+                    Document.IsModified = true;
+                    return;
+                }
+            }
+
             if (EditingText != null)
             {
                 if (!char.IsControl(keyChar) || keyChar == '\b' || keyChar == 22 || keyChar == '\x16')
@@ -3493,7 +4153,10 @@ namespace ZenQOffice.UI
             {
                 yAcc += (Document.Pages[i].Height * ZoomLevel) + 30f;
             }
-            TargetScrollY = yAcc;
+            int vH = Math.Max(100, viewHeight - _lastTopOffset - _lastStatusH);
+            int maxScroll = GetMaxScrollY(vH);
+            TargetScrollY = Math.Max(0, Math.Min(maxScroll, yAcc));
+            ScrollY = TargetScrollY;
         }
 
         public void ExecuteSearch(string query)
@@ -3557,71 +4220,198 @@ namespace ZenQOffice.UI
         }
         #endregion
 
-        #region Smart Zoom Algorithms (Fit Width, Fit Height, Fit Best, Actual Size)
-        public void ZoomFitWidth(int viewWidth, int viewHeight, int topOffset = 155)
+        #region Smart Zoom Algorithms (Fit Width, Fit Height, Fit Best, Actual Size, Anchored Zoom)
+        public void ZoomAt(Point anchorScreenPt, float newZoom, int viewWidth = 0, int viewHeight = 0, int topOffset = 155, int statusH = 26)
+        {
+            if (Document == null || Document.Pages == null || Document.Pages.Count == 0) return;
+
+            newZoom = Math.Max(0.20f, Math.Min(4.00f, (float)Math.Round(newZoom, 2)));
+            float oldZoom = ZoomLevel;
+            if (Math.Abs(newZoom - oldZoom) < 0.001f) return;
+
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+
+            int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
+            int canvasAreaW = Math.Max(100, viewWidth - sideOffset - 14);
+            int viewH = Math.Max(100, viewHeight - topOffset - statusH);
+
+            // If anchorScreenPt is out of the page viewport (e.g. in sidebar, ribbon or status bar), anchor to center of viewport
+            if (anchorScreenPt.X < sideOffset || anchorScreenPt.X > viewWidth - 14 ||
+                anchorScreenPt.Y < topOffset || anchorScreenPt.Y > viewHeight - statusH)
+            {
+                anchorScreenPt = new Point(sideOffset + canvasAreaW / 2, topOffset + viewH / 2);
+            }
+
+            // 1. Identify which page and unscaled page coordinates are under anchorScreenPt before zoom
+            int targetPageIdx = -1;
+            float targetLogicalY = 0f;
+            float targetLogicalX = 0f;
+
+            for (int i = 0; i < Document.Pages.Count; i++)
+            {
+                RectangleF pb = GetPageScreenBounds(i, viewWidth, viewHeight, topOffset);
+                if (anchorScreenPt.Y >= pb.Top && anchorScreenPt.Y <= pb.Bottom + 30f)
+                {
+                    targetPageIdx = i;
+                    targetLogicalY = Math.Max(0f, Math.Min(Document.Pages[i].Height, (anchorScreenPt.Y - pb.Top) / Math.Max(0.01f, oldZoom)));
+                    targetLogicalX = Math.Max(0f, Math.Min(Document.Pages[i].Width, (anchorScreenPt.X - pb.Left) / Math.Max(0.01f, oldZoom)));
+                    break;
+                }
+            }
+
+            if (targetPageIdx < 0)
+            {
+                RectangleF firstPb = GetPageScreenBounds(0, viewWidth, viewHeight, topOffset);
+                if (anchorScreenPt.Y < firstPb.Top)
+                {
+                    targetPageIdx = 0;
+                    targetLogicalY = 0f;
+                    targetLogicalX = Math.Max(0f, (anchorScreenPt.X - firstPb.Left) / Math.Max(0.01f, oldZoom));
+                }
+                else
+                {
+                    targetPageIdx = Math.Max(0, Math.Min(Document.Pages.Count - 1, ActivePageIndex));
+                    RectangleF pb = GetPageScreenBounds(targetPageIdx, viewWidth, viewHeight, topOffset);
+                    targetLogicalY = Math.Max(0f, Math.Min(Document.Pages[targetPageIdx].Height, (anchorScreenPt.Y - pb.Top) / Math.Max(0.01f, oldZoom)));
+                    targetLogicalX = Math.Max(0f, Math.Min(Document.Pages[targetPageIdx].Width, (anchorScreenPt.X - pb.Left) / Math.Max(0.01f, oldZoom)));
+                }
+            }
+
+            // 2. Apply new zoom level
+            ZoomLevel = newZoom;
+            InvalidateAllCaches();
+
+            // 3. Compute new document Y position for targetPageIdx with new zoom
+            float newPageDocY = topOffset + 30f;
+            for (int i = 0; i < targetPageIdx; i++)
+            {
+                newPageDocY += (Document.Pages[i].Height * newZoom) + 30f;
+            }
+
+            // Screen position of the anchor point remains unchanged:
+            // anchorScreenPt.Y = newPageDocY + (targetLogicalY * newZoom) - newScrollY
+            float targetDocY = newPageDocY + (targetLogicalY * newZoom);
+            float newScrollY = targetDocY - anchorScreenPt.Y;
+
+            int maxScrollY = GetMaxScrollY(viewH);
+            TargetScrollY = Math.Max(0, Math.Min(maxScrollY, newScrollY));
+            ScrollY = TargetScrollY;
+
+            // 4. Compute horizontal scroll adjustment
+            var targetPage = Document.Pages[targetPageIdx];
+            float newRenderW = targetPage.Width * newZoom;
+            if (newRenderW > canvasAreaW)
+            {
+                float newPageScreenLeftBeforeScrollX = sideOffset + 30f;
+                float targetDocX = newPageScreenLeftBeforeScrollX + (targetLogicalX * newZoom);
+                float newScrollX = targetDocX - anchorScreenPt.X;
+                float maxScrollX = Math.Max(0f, newRenderW - canvasAreaW + 60f);
+                ScrollX = Math.Max(0f, Math.Min(maxScrollX, newScrollX));
+            }
+            else
+            {
+                ScrollX = 0f;
+            }
+
+            // 5. Update active page index to match current viewport
+            UpdateActivePageFromScroll(viewWidth, viewHeight, topOffset, statusH);
+        }
+
+        public void ZoomFitWidth(int viewWidth = 0, int viewHeight = 0, int topOffset = 155, int statusH = 26)
         {
             if (Document == null || Document.Pages.Count == 0) return;
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+
             int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
             float availableW = Math.Max(100, viewWidth - sideOffset - 60);
 
-            var activePage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count)
-                ? Document.Pages[ActivePageIndex]
-                : Document.Pages[0];
+            int targetPage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count) ? ActivePageIndex : 0;
+            var activePage = Document.Pages[targetPage];
 
             float targetZoom = availableW / activePage.Width;
             ZoomLevel = Math.Max(0.2f, Math.Min(4.0f, (float)Math.Round(targetZoom, 2)));
+            ScrollX = 0f;
+            ScrollToPage(targetPage, viewWidth, viewHeight);
+            ScrollY = TargetScrollY;
             InvalidateAllCaches();
         }
 
-        public void ZoomFitHeight(int viewWidth, int viewHeight, int topOffset = 155, int statusH = 26)
+        public void ZoomFitHeight(int viewWidth = 0, int viewHeight = 0, int topOffset = 155, int statusH = 26)
         {
             if (Document == null || Document.Pages.Count == 0) return;
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+
             float availableH = Math.Max(100, viewHeight - topOffset - statusH - 60);
 
-            var activePage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count)
-                ? Document.Pages[ActivePageIndex]
-                : Document.Pages[0];
+            int targetPage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count) ? ActivePageIndex : 0;
+            var activePage = Document.Pages[targetPage];
 
             float targetZoom = availableH / activePage.Height;
             ZoomLevel = Math.Max(0.2f, Math.Min(4.0f, (float)Math.Round(targetZoom, 2)));
+            ScrollX = 0f;
+            ScrollToPage(targetPage, viewWidth, viewHeight);
+            ScrollY = TargetScrollY;
             InvalidateAllCaches();
         }
 
-        public void ZoomFitBest(int viewWidth, int viewHeight, int topOffset = 155, int statusH = 26)
+        public void ZoomFitBest(int viewWidth = 0, int viewHeight = 0, int topOffset = 155, int statusH = 26)
         {
             if (Document == null || Document.Pages.Count == 0) return;
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+
             int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
             float availableW = Math.Max(100, viewWidth - sideOffset - 60);
             float availableH = Math.Max(100, viewHeight - topOffset - statusH - 60);
 
-            var activePage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count)
-                ? Document.Pages[ActivePageIndex]
-                : Document.Pages[0];
+            int targetPage = (ActivePageIndex >= 0 && ActivePageIndex < Document.Pages.Count) ? ActivePageIndex : 0;
+            var activePage = Document.Pages[targetPage];
 
             float zw = availableW / activePage.Width;
             float zh = availableH / activePage.Height;
             float targetZoom = Math.Min(zw, zh);
 
             ZoomLevel = Math.Max(0.2f, Math.Min(4.0f, (float)Math.Round(targetZoom, 2)));
+            ScrollX = 0f;
+            ScrollToPage(targetPage, viewWidth, viewHeight);
+            ScrollY = TargetScrollY;
             InvalidateAllCaches();
         }
 
-        public void ZoomActualSize()
+        public void ZoomActualSize(int viewWidth = 0, int viewHeight = 0)
         {
-            ZoomLevel = 1.0f;
-            InvalidateAllCaches();
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+            int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
+            int canvasAreaW = Math.Max(100, viewWidth - sideOffset - 14);
+            int viewH = Math.Max(100, viewHeight - _lastTopOffset - _lastStatusH);
+            Point centerPt = new Point(sideOffset + canvasAreaW / 2, _lastTopOffset + viewH / 2);
+            ZoomAt(centerPt, 1.0f, viewWidth, viewHeight, _lastTopOffset, _lastStatusH);
         }
 
-        public void ZoomIn()
+        public void ZoomIn(int viewWidth = 0, int viewHeight = 0)
         {
-            ZoomLevel = Math.Min(4.0f, (float)Math.Round(ZoomLevel + 0.15f, 2));
-            InvalidateAllCaches();
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+            int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
+            int canvasAreaW = Math.Max(100, viewWidth - sideOffset - 14);
+            int viewH = Math.Max(100, viewHeight - _lastTopOffset - _lastStatusH);
+            Point centerPt = new Point(sideOffset + canvasAreaW / 2, _lastTopOffset + viewH / 2);
+            ZoomAt(centerPt, (float)Math.Round(ZoomLevel + 0.15f, 2), viewWidth, viewHeight, _lastTopOffset, _lastStatusH);
         }
 
-        public void ZoomOut()
+        public void ZoomOut(int viewWidth = 0, int viewHeight = 0)
         {
-            ZoomLevel = Math.Max(0.2f, (float)Math.Round(ZoomLevel - 0.15f, 2));
-            InvalidateAllCaches();
+            if (viewWidth <= 0) viewWidth = _lastViewWidth > 0 ? _lastViewWidth : 1000;
+            if (viewHeight <= 0) viewHeight = _lastViewHeight > 0 ? _lastViewHeight : 800;
+            int sideOffset = ShowThumbnailsSidebar ? SidebarWidth : 0;
+            int canvasAreaW = Math.Max(100, viewWidth - sideOffset - 14);
+            int viewH = Math.Max(100, viewHeight - _lastTopOffset - _lastStatusH);
+            Point centerPt = new Point(sideOffset + canvasAreaW / 2, _lastTopOffset + viewH / 2);
+            ZoomAt(centerPt, (float)Math.Round(ZoomLevel - 0.15f, 2), viewWidth, viewHeight, _lastTopOffset, _lastStatusH);
         }
         #endregion
 
@@ -4104,6 +4894,461 @@ namespace ZenQOffice.UI
             {
                 g.FillRectangle(fillBg, capX + 16, capY + capH - 8, pFillW, 3);
             }
+        }
+        #endregion
+
+        #region AcroForms, Redaction, Bates Numbering & Bookmarks Management
+        public void CommitFormFieldEdit()
+        {
+            if (EditingFormField != null)
+            {
+                EditingFormField.Value = EditingFormFieldBuffer;
+                EditingFormField = null;
+                EditingFormFieldBuffer = "";
+                if (ActivePageIndex < Document.Pages.Count) Document.Pages[ActivePageIndex].InvalidateCache();
+                Document.IsModified = true;
+            }
+        }
+
+        public PdfFormFieldElement AddFormField(int pageIndex, PdfFormFieldType type, RectangleF bounds, string fieldName = "")
+        {
+            if (Document == null || pageIndex < 0 || pageIndex >= Document.Pages.Count) return null;
+            PushUndoState("Thêm trường biểu mẫu");
+            var ff = new PdfFormFieldElement(type, bounds, fieldName);
+            Document.Pages[pageIndex].FormFields.Add(ff);
+            Document.Pages[pageIndex].InvalidateCache();
+            Document.IsModified = true;
+            SelectedFormField = ff;
+            return ff;
+        }
+
+        public int FlattenFormFields()
+        {
+            if (Document == null) return 0;
+            PushUndoState("Làm phẳng biểu mẫu");
+            int count = Document.FlattenFormFields();
+            SelectedFormField = null;
+            EditingFormField = null;
+            EditingFormFieldBuffer = "";
+            InvalidateAllCaches();
+            return count;
+        }
+
+        public PdfRedactionElement MarkRedaction(int pageIndex, RectangleF bounds, string overlayText = "BẢO MẬT")
+        {
+            if (Document == null || pageIndex < 0 || pageIndex >= Document.Pages.Count) return null;
+            PushUndoState("Đánh dấu xóa mật");
+            var red = new PdfRedactionElement(bounds, overlayText);
+            Document.Pages[pageIndex].Redactions.Add(red);
+            Document.Pages[pageIndex].InvalidateCache();
+            Document.IsModified = true;
+            SelectedRedaction = red;
+            return red;
+        }
+
+        public int ApplyRedactions()
+        {
+            if (Document == null) return 0;
+            PushUndoState("Áp dụng xóa mật vĩnh viễn");
+            int count = Document.ApplyRedactions();
+            SelectedRedaction = null;
+            InvalidateAllCaches();
+            return count;
+        }
+
+        public void SanitizeDocument()
+        {
+            if (Document == null) return;
+            PushUndoState("Làm sạch tài liệu");
+            Document.SanitizeDocument();
+            InvalidateAllCaches();
+        }
+
+        public void ApplyBatesNumbering(PdfBatesConfig config)
+        {
+            if (Document == null || config == null) return;
+            PushUndoState("Đánh số Bates");
+            Document.ApplyBatesNumbering(config);
+            InvalidateAllCaches();
+        }
+
+        public void RemoveBatesNumbering()
+        {
+            if (Document == null) return;
+            PushUndoState("Xóa số Bates");
+            Document.RemoveBatesNumbering();
+            InvalidateAllCaches();
+        }
+
+        public PdfBookmarkNode AddBookmark(string title, int pageIndex = -1, float scrollY = 0f, string parentId = null)
+        {
+            if (Document == null) return null;
+            int pIdx = (pageIndex >= 0) ? pageIndex : ActivePageIndex;
+            PushUndoState("Thêm dấu trang");
+            var bm = Document.AddBookmark(title, pIdx, scrollY, parentId);
+            SelectedBookmark = bm;
+            return bm;
+        }
+
+        public void NavigateToBookmark(PdfBookmarkNode node)
+        {
+            if (node == null || Document == null) return;
+            if (node.TargetPageIndex >= 0 && node.TargetPageIndex < Document.Pages.Count)
+            {
+                ActivePageIndex = node.TargetPageIndex;
+                ScrollToPage(node.TargetPageIndex, 1000, 800);
+            }
+        }
+
+        public bool PromptApplyBatesNumbering(Form parentForm)
+        {
+            if (Document == null || Document.Pages.Count == 0) return false;
+
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "Đánh Số Bates Pháp Lý - ZENQ PDF Legal Engine";
+                dlg.Size = new Size(380, 310);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+                dlg.BackColor = Color.FromArgb(248, 250, 252);
+                dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+
+                Label lblPrefix = new Label { Text = "Tiền tố (Prefix):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                TextBox txtPrefix = new TextBox { Text = "CONFIDENTIAL-", Location = new Point(20, 45), Width = 150 };
+
+                Label lblStart = new Label { Text = "Số bắt đầu:", Location = new Point(190, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                NumericUpDown numStart = new NumericUpDown { Location = new Point(190, 45), Width = 80, Minimum = 1, Maximum = 1000000, Value = 1 };
+
+                Label lblDigits = new Label { Text = "Số chữ số (Digits):", Location = new Point(20, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                NumericUpDown numDigits = new NumericUpDown { Location = new Point(20, 110), Width = 80, Minimum = 1, Maximum = 12, Value = 6 };
+
+                Label lblPos = new Label { Text = "Vị trí đánh số:", Location = new Point(140, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                ComboBox cbPos = new ComboBox { Location = new Point(140, 110), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
+                cbPos.Items.AddRange(new object[] { "Góc dưới cùng bên phải", "Góc dưới cùng ở giữa", "Góc dưới cùng bên trái", "Góc trên cùng bên phải", "Góc trên cùng ở giữa", "Góc trên cùng bên trái" });
+                cbPos.SelectedIndex = 0;
+
+                Label lblFont = new Label { Text = "Cỡ chữ: 10 pt Courier | Màu mực: Đen", Location = new Point(20, 155), AutoSize = true, ForeColor = Color.DarkSlateGray };
+
+                Button btnOk = new Button { Text = "Đánh số", Location = new Point(160, 210), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(270, 210), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+
+                dlg.Controls.AddRange(new Control[] { lblPrefix, txtPrefix, lblStart, numStart, lblDigits, numDigits, lblPos, cbPos, lblFont, btnOk, btnCancel });
+                dlg.AcceptButton = btnOk;
+                dlg.CancelButton = btnCancel;
+
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    PdfBatesPosition pos = PdfBatesPosition.BottomRight;
+                    switch (cbPos.SelectedIndex)
+                    {
+                        case 0: pos = PdfBatesPosition.BottomRight; break;
+                        case 1: pos = PdfBatesPosition.BottomCenter; break;
+                        case 2: pos = PdfBatesPosition.BottomLeft; break;
+                        case 3: pos = PdfBatesPosition.TopRight; break;
+                        case 4: pos = PdfBatesPosition.TopCenter; break;
+                        case 5: pos = PdfBatesPosition.TopLeft; break;
+                    }
+
+                    var config = new PdfBatesConfig
+                    {
+                        Prefix = txtPrefix.Text,
+                        StartNumber = (int)numStart.Value,
+                        NumberOfDigits = (int)numDigits.Value,
+                        Position = pos,
+                        FontSize = 10f
+                    };
+                    ApplyBatesNumbering(config);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool PromptAddBookmark(Form parentForm)
+        {
+            if (Document == null || Document.Pages.Count == 0) return false;
+
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "Thêm Dấu Trang / Mục Lục - ZENQ PDF";
+                dlg.Size = new Size(360, 180);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+                dlg.BackColor = Color.FromArgb(248, 250, 252);
+                dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+
+                Label lblTitle = new Label { Text = "Tiêu đề mục lục (Trang " + (ActivePageIndex + 1) + "):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                TextBox txtTitle = new TextBox { Text = "Trang " + (ActivePageIndex + 1), Location = new Point(20, 48), Width = 300 };
+
+                Button btnOk = new Button { Text = "Thêm", Location = new Point(140, 90), Width = 90, Height = 30, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = "Hủy", Location = new Point(240, 90), Width = 80, Height = 30, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+
+                dlg.Controls.AddRange(new Control[] { lblTitle, txtTitle, btnOk, btnCancel });
+                dlg.AcceptButton = btnOk;
+                dlg.CancelButton = btnCancel;
+
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    string title = txtTitle.Text.Trim();
+                    if (string.IsNullOrEmpty(title)) title = "Trang " + (ActivePageIndex + 1);
+                    AddBookmark(title, ActivePageIndex);
+                    ShowThumbnailsSidebar = true;
+                    SidebarViewMode = 1;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool PromptSetPasswordSecurity(Form parentForm)
+        {
+            if (Document == null) Document = new PdfDocument();
+
+            using (var dlg = new PdfSecurityDialog(Document.SecuritySettings))
+            {
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    if (dlg.RemoveSecurityRequested)
+                    {
+                        PushUndoState("Gỡ mật khẩu bảo mật PDF");
+                        Document.RemovePasswordProtection(dlg.OpenPassword ?? "");
+                        MessageBox.Show(parentForm, "Đã gỡ bỏ toàn bộ mật khẩu bảo vệ và hạn chế thao tác trên tài liệu!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (dlg.IsProtected)
+                    {
+                        PushUndoState("Thiết lập mật khẩu bảo mật PDF");
+                        Document.SetPasswordProtection(dlg.OpenPassword, dlg.PermissionPassword, dlg.AllowPrinting, dlg.AllowCopying, dlg.AllowModifying, dlg.KeyLength);
+                        MessageBox.Show(parentForm, "Đã thiết lập mật khẩu mã hóa thành công theo chuẩn " + dlg.KeyLength + "-bit AES!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool PromptExtractPages(Form parentForm, Action<PdfDocument, string> onExtracted = null)
+        {
+            if (Document == null || Document.Pages == null || Document.Pages.Count == 0) return false;
+
+            using (var dlg = new PdfExtractPagesDialog(Document.Pages.Count, ActivePageIndex + 1))
+            {
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    if (dlg.SelectedPageIndices == null || dlg.SelectedPageIndices.Count == 0) return false;
+
+                    string extractedTitle = "Trích xuất - " + (string.IsNullOrEmpty(Document.Title) ? "Tài liệu" : Document.Title);
+                    var extractedDoc = Document.ExtractPages(dlg.SelectedPageIndices, extractedTitle);
+
+                    if (dlg.DeleteAfterExtract)
+                    {
+                        PushUndoState("Trích xuất và xóa trang");
+                        var sortedDesc = dlg.SelectedPageIndices.OrderByDescending(x => x).ToList();
+                        foreach (int idx in sortedDesc)
+                        {
+                            if (Document.Pages.Count > 1)
+                            {
+                                Document.DeletePage(idx);
+                            }
+                        }
+                        ActivePageIndex = Math.Min(ActivePageIndex, Document.Pages.Count - 1);
+                        InvalidateAllCaches();
+                        if (parentForm != null) parentForm.Invalidate();
+                    }
+
+                    if (dlg.SaveDirectlyToFile && !string.IsNullOrEmpty(dlg.OutputFilePath))
+                    {
+                        bool saved = PdfHandler.SavePdf(extractedDoc, dlg.OutputFilePath);
+                        if (saved)
+                        {
+                            MessageBox.Show(parentForm, "Đã trích xuất " + dlg.SelectedPageIndices.Count + " trang và lưu thành công vào:\n" + dlg.OutputFilePath, "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                    else
+                    {
+                        if (onExtracted != null)
+                        {
+                            onExtracted(extractedDoc, extractedDoc.Title);
+                        }
+                        else
+                        {
+                            MessageBox.Show(parentForm, "Đã trích xuất thành công " + dlg.SelectedPageIndices.Count + " trang!", "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool PromptInsertPagesFromFile(Form parentForm)
+        {
+            if (Document == null) Document = new PdfDocument();
+
+            using (var dlg = new PdfInsertPagesDialog(Document.Pages.Count, ActivePageIndex + 1))
+            {
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK && !string.IsNullOrEmpty(dlg.SelectedFilePath))
+                {
+                    try
+                    {
+                        var externalDoc = PdfHandler.LoadPdf(dlg.SelectedFilePath);
+                        if (externalDoc == null || externalDoc.Pages == null || externalDoc.Pages.Count == 0)
+                        {
+                            MessageBox.Show(parentForm, "Không thể đọc nội dung từ tệp PDF đã chọn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+
+                        PushUndoState("Chèn trang từ tệp PDF");
+                        Document.InsertDocumentAt(dlg.InsertTargetIndex, externalDoc);
+                        ActivePageIndex = Math.Min(dlg.InsertTargetIndex, Document.Pages.Count - 1);
+                        InvalidateAllCaches();
+                        if (parentForm != null) parentForm.Invalidate();
+
+                        MessageBox.Show(parentForm, "Đã chèn thành công " + externalDoc.Pages.Count + " trang từ:\n" + Path.GetFileName(dlg.SelectedFilePath), "Chèn Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(parentForm, "Lỗi khi chèn trang: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool PromptCompressPdf(Form parentForm)
+        {
+            if (Document == null || Document.Pages == null || Document.Pages.Count == 0) return false;
+
+            using (var dlg = new PdfCompressDialog(Document))
+            {
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK && !string.IsNullOrEmpty(dlg.OutputFilePath))
+                {
+                    long originalBytes = 0;
+                    if (!string.IsNullOrEmpty(Document.FilePath) && File.Exists(Document.FilePath))
+                    {
+                        originalBytes = new FileInfo(Document.FilePath).Length;
+                    }
+
+                    bool ok = PdfConverterEngine.CompressPdf(Document, dlg.OutputFilePath, dlg.TargetQualityPercent, dlg.TargetMaxDpi, dlg.StripMetadata);
+                    if (ok)
+                    {
+                        long compressedBytes = File.Exists(dlg.OutputFilePath) ? new FileInfo(dlg.OutputFilePath).Length : 0;
+                        string msg = "Tối ưu hóa và nén tài liệu PDF thành công!";
+                        if (originalBytes > 0 && compressedBytes > 0)
+                        {
+                            double savedPct = Math.Max(0, (1.0 - ((double)compressedBytes / originalBytes)) * 100);
+                            msg += $"\n\n- Dung lượng gốc: {originalBytes / 1024:N0} KB\n- Dung lượng nén: {compressedBytes / 1024:N0} KB\n- Tiết kiệm: {savedPct:0.#}%";
+                        }
+                        msg += $"\n\nTệp đã lưu tại:\n{dlg.OutputFilePath}";
+                        MessageBox.Show(parentForm, msg, "Nén & Tối ưu hóa PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return true;
+                    }
+                    else
+                    {
+                        MessageBox.Show(parentForm, "Không thể hoàn tất nén tài liệu PDF!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool PromptExportWord(Form parentForm)
+        {
+            if (Document == null) return false;
+            using (var sfd = new SaveFileDialog { Filter = "Tài liệu Word (*.docx)|*.docx", Title = "Xuất PDF sang Word (.docx)" })
+            {
+                string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
+                sfd.FileName = defName + ".docx";
+                if (sfd.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    bool ok = PdfConverterEngine.ExportToDocx(Document, sfd.FileName);
+                    if (ok)
+                    {
+                        var res = MessageBox.Show(parentForm, "Đã xuất tài liệu sang Microsoft Word (.docx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Word 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (res == DialogResult.Yes)
+                        {
+                            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool PromptExportExcel(Form parentForm)
+        {
+            if (Document == null) return false;
+            using (var sfd = new SaveFileDialog { Filter = "Bảng tính Excel (*.xlsx)|*.xlsx", Title = "Xuất PDF sang Excel (.xlsx)" })
+            {
+                string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
+                sfd.FileName = defName + ".xlsx";
+                if (sfd.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    bool ok = PdfConverterEngine.ExportToXlsx(Document, sfd.FileName);
+                    if (ok)
+                    {
+                        var res = MessageBox.Show(parentForm, "Đã xuất bảng biểu sang Microsoft Excel (.xlsx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Excel 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (res == DialogResult.Yes)
+                        {
+                            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool PromptExportImages(Form parentForm)
+        {
+            if (Document == null) return false;
+            using (var fbd = new FolderBrowserDialog { Description = "Chọn thư mục lưu hình ảnh từng trang PDF" })
+            {
+                if (fbd.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    var list = PdfConverterEngine.ExportToImages(Document, fbd.SelectedPath, "PNG", 150);
+                    if (list.Count > 0)
+                    {
+                        MessageBox.Show(parentForm, $"Đã xuất thành công {list.Count} trang thành hình ảnh PNG tại:\n{fbd.SelectedPath}", "Xuất Hình Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public bool PromptExtractAllText(Form parentForm)
+        {
+            if (Document == null) return false;
+            string text = PdfConverterEngine.ExtractAllText(Document, includePageHeaders: true);
+            if (string.IsNullOrEmpty(text))
+            {
+                MessageBox.Show(parentForm, "Tài liệu PDF không chứa nội dung văn bản có thể trích xuất.", "Trích xuất Văn bản", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
+            try { Clipboard.SetText(text); } catch { }
+
+            var res = MessageBox.Show(parentForm, $"Đã trích xuất toàn bộ văn bản ({text.Length:N0} ký tự) và sao chép vào Clipboard!\n\nBạn có muốn lưu nội dung này ra tệp văn bản thuần (.txt) không?", "Trích xuất Văn bản", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (res == DialogResult.Yes)
+            {
+                using (var sfd = new SaveFileDialog { Filter = "Tệp văn bản (*.txt)|*.txt", Title = "Lưu văn bản trích xuất" })
+                {
+                    string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
+                    sfd.FileName = defName + "_Text.txt";
+                    if (sfd.ShowDialog(parentForm) == DialogResult.OK)
+                    {
+                        File.WriteAllText(sfd.FileName, text, Encoding.UTF8);
+                    }
+                }
+            }
+            return true;
         }
         #endregion
     }

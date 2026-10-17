@@ -17,6 +17,7 @@ namespace ZenQOffice.Format
 {
     public class DocxMetadata
     {
+        public string FilePath { get; set; }
         public string TextContent { get; set; }
         public List<FormattedRun> FormattedRuns { get; set; }
         public string HeaderText { get; set; }
@@ -60,6 +61,9 @@ namespace ZenQOffice.Format
         public Dictionary<int, float> ParagraphRightIndents { get; set; }
         public Dictionary<int, float> ParagraphHangingIndents { get; set; }
         public List<ZenQOffice.UI.DocTableObject> Tables { get; set; }
+        public float DefaultLineSpacing { get; set; } = 1.0f;
+        public float DefaultSpacingBefore { get; set; } = 0f;
+        public float DefaultSpacingAfter { get; set; } = 0f;
 
         public DocxMetadata()
         {
@@ -144,6 +148,7 @@ namespace ZenQOffice.Format
         public static bool LoadDocxFile(string filepath, out DocxMetadata meta)
         {
             meta = new DocxMetadata();
+            meta.FilePath = filepath;
 
             if (!File.Exists(filepath)) return false;
 
@@ -1276,8 +1281,12 @@ namespace ZenQOffice.Format
 
                             if (nStyle != null)
                             {
+                                stylesDict["__defaultParaStyle"] = nStyle;
                                 if (!string.IsNullOrEmpty(nStyle.FontName)) docDefaultFont = nStyle.FontName;
                                 if (nStyle.FontSize > 0) docDefaultFontSize = nStyle.FontSize;
+                                if (nStyle.LineSpacing.HasValue) meta.DefaultLineSpacing = nStyle.LineSpacing.Value;
+                                if (nStyle.SpacingBefore.HasValue) meta.DefaultSpacingBefore = nStyle.SpacingBefore.Value;
+                                if (nStyle.SpacingAfter.HasValue) meta.DefaultSpacingAfter = nStyle.SpacingAfter.Value;
                             }
                         }
                         catch { }
@@ -1379,38 +1388,47 @@ namespace ZenQOffice.Format
             float paraWidthScale = 1.0f;
             float paraCharSpacingPt = 0f;
 
-            // 1. Inherit from Paragraph Style (<w:pPr/w:pStyle>) if present
+            // 1. Inherit from Paragraph Style (<w:pPr/w:pStyle>) if present, or fallback to default style / Normal
             DocxStyleInfo sInfo = null;
             XmlNode pStyleNode = p.SelectSingleNode("w:pPr/w:pStyle", nsmgr);
             if (pStyleNode != null && pStyleNode.Attributes["w:val"] != null && stylesDict != null)
             {
                 string sVal = pStyleNode.Attributes["w:val"].Value;
-                if (stylesDict.TryGetValue(sVal, out sInfo))
+                stylesDict.TryGetValue(sVal, out sInfo);
+            }
+            if (sInfo == null && stylesDict != null)
+            {
+                if (!stylesDict.TryGetValue("__defaultParaStyle", out sInfo) || sInfo == null)
                 {
-                    if (!string.IsNullOrEmpty(sInfo.FontName)) paraFont = sInfo.FontName;
-                    if (sInfo.FontSize > 0) paraFontSize = sInfo.FontSize;
-                    if (sInfo.Bold.HasValue) paraBold = sInfo.Bold.Value;
-                    if (sInfo.Italic.HasValue) paraItalic = sInfo.Italic.Value;
-                    if (sInfo.Underline.HasValue) paraUnderline = sInfo.Underline.Value;
-                    if (sInfo.Color.HasValue) paraColor = sInfo.Color.Value;
-                    if (sInfo.CharWidthScale.HasValue) paraWidthScale = sInfo.CharWidthScale.Value;
-                    if (sInfo.CharSpacingPt.HasValue) paraCharSpacingPt = sInfo.CharSpacingPt.Value;
-                    if (sInfo.Alignment.HasValue && paraAlignments != null && !paraAlignments.ContainsKey(paraStartIndex))
-                    {
-                        paraAlignments[paraStartIndex] = sInfo.Alignment.Value;
-                    }
-                    if (sInfo.LineSpacing.HasValue && paraLineSpacings != null && !paraLineSpacings.ContainsKey(paraStartIndex))
-                    {
-                        paraLineSpacings[paraStartIndex] = sInfo.LineSpacing.Value;
-                    }
-                    if (sInfo.SpacingBefore.HasValue && paraSpacingsBefore != null && !paraSpacingsBefore.ContainsKey(paraStartIndex))
-                    {
-                        paraSpacingsBefore[paraStartIndex] = sInfo.SpacingBefore.Value;
-                    }
-                    if (sInfo.SpacingAfter.HasValue && paraSpacingsAfter != null && !paraSpacingsAfter.ContainsKey(paraStartIndex))
-                    {
-                        paraSpacingsAfter[paraStartIndex] = sInfo.SpacingAfter.Value;
-                    }
+                    stylesDict.TryGetValue("Normal", out sInfo);
+                }
+            }
+
+            if (sInfo != null)
+            {
+                if (!string.IsNullOrEmpty(sInfo.FontName)) paraFont = sInfo.FontName;
+                if (sInfo.FontSize > 0) paraFontSize = sInfo.FontSize;
+                if (sInfo.Bold.HasValue) paraBold = sInfo.Bold.Value;
+                if (sInfo.Italic.HasValue) paraItalic = sInfo.Italic.Value;
+                if (sInfo.Underline.HasValue) paraUnderline = sInfo.Underline.Value;
+                if (sInfo.Color.HasValue) paraColor = sInfo.Color.Value;
+                if (sInfo.CharWidthScale.HasValue) paraWidthScale = sInfo.CharWidthScale.Value;
+                if (sInfo.CharSpacingPt.HasValue) paraCharSpacingPt = sInfo.CharSpacingPt.Value;
+                if (sInfo.Alignment.HasValue && paraAlignments != null && !paraAlignments.ContainsKey(paraStartIndex))
+                {
+                    paraAlignments[paraStartIndex] = sInfo.Alignment.Value;
+                }
+                if (sInfo.LineSpacing.HasValue && paraLineSpacings != null && !paraLineSpacings.ContainsKey(paraStartIndex))
+                {
+                    paraLineSpacings[paraStartIndex] = sInfo.LineSpacing.Value;
+                }
+                if (sInfo.SpacingBefore.HasValue && paraSpacingsBefore != null && !paraSpacingsBefore.ContainsKey(paraStartIndex))
+                {
+                    paraSpacingsBefore[paraStartIndex] = sInfo.SpacingBefore.Value;
+                }
+                if (sInfo.SpacingAfter.HasValue && paraSpacingsAfter != null && !paraSpacingsAfter.ContainsKey(paraStartIndex))
+                {
+                    paraSpacingsAfter[paraStartIndex] = sInfo.SpacingAfter.Value;
                 }
             }
 
@@ -4556,7 +4574,19 @@ namespace ZenQOffice.Format
                         string fillVal = shd.Attributes["w:fill"].Value;
                         if (fillVal != "auto" && fillVal.Length == 6)
                         {
-                            try { cellObj.BackgroundColor = ColorTranslator.FromHtml("#" + fillVal); } catch { }
+                            bool isLegacyHeaderBug = fillVal.Equals("2563EB", StringComparison.OrdinalIgnoreCase) &&
+                                (meta == null || string.IsNullOrEmpty(meta.FilePath) ||
+                                 meta.FilePath.IndexOf("draft_", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 meta.FilePath.IndexOf("autosave", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                            if (isLegacyHeaderBug)
+                            {
+                                cellObj.BackgroundColor = Color.Transparent;
+                            }
+                            else
+                            {
+                                try { cellObj.BackgroundColor = ColorTranslator.FromHtml("#" + fillVal); } catch { }
+                            }
                         }
                     }
 
@@ -5013,7 +5043,13 @@ namespace ZenQOffice.Format
             Dictionary<int, float> paraFirstLineIndents = null,
             Dictionary<int, float> paraLeftIndents = null,
             Dictionary<int, float> paraRightIndents = null,
-            Dictionary<int, float> paraHangingIndents = null)
+            Dictionary<int, float> paraHangingIndents = null,
+            float customLeftMarginInches = 1.0f,
+            float customRightMarginInches = 1.0f,
+            float customTopMarginInches = 1.0f,
+            float customBottomMarginInches = 1.0f,
+            float paperWidthInches = 0f,
+            float paperHeightInches = 0f)
         {
             try
             {
@@ -5038,8 +5074,17 @@ namespace ZenQOffice.Format
                         sw.WriteLine("  <Default Extension=\"jpg\" ContentType=\"image/jpeg\"/>");
                         sw.WriteLine("  <Default Extension=\"gif\" ContentType=\"image/gif\"/>");
                         sw.WriteLine("  <Default Extension=\"bmp\" ContentType=\"image/bmp\"/>");
+                        sw.WriteLine("  <Default Extension=\"wmf\" ContentType=\"image/x-wmf\"/>");
+                        sw.WriteLine("  <Default Extension=\"emf\" ContentType=\"image/x-emf\"/>");
+                        sw.WriteLine("  <Default Extension=\"svg\" ContentType=\"image/svg+xml\"/>");
+                        sw.WriteLine("  <Default Extension=\"tif\" ContentType=\"image/tiff\"/>");
+                        sw.WriteLine("  <Default Extension=\"tiff\" ContentType=\"image/tiff\"/>");
+                        sw.WriteLine("  <Default Extension=\"webp\" ContentType=\"image/webp\"/>");
                         sw.WriteLine("  <Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>");
                         sw.WriteLine("  <Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>");
+                        sw.WriteLine("  <Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/>");
+                        sw.WriteLine("  <Override PartName=\"/word/webSettings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml\"/>");
+                        sw.WriteLine("  <Override PartName=\"/word/fontTable.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml\"/>");
                         if (!string.IsNullOrEmpty(headerText)) sw.WriteLine("  <Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>");
                         if (!string.IsNullOrEmpty(footerText) || showPageNumbers) sw.WriteLine("  <Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>");
                         sw.WriteLine("</Types>");
@@ -5107,6 +5152,45 @@ namespace ZenQOffice.Format
                         sw.WriteLine("    </w:rPrDefault>");
                         sw.WriteLine("  </w:docDefaults>");
                         sw.WriteLine("</w:styles>");
+                    }
+
+                    // 6b. word/settings.xml (Office 365 Compatibility Mode 15)
+                    var settingsEntry = archive.CreateEntry("word/settings.xml");
+                    using (StreamWriter sw = new StreamWriter(settingsEntry.Open(), Encoding.UTF8))
+                    {
+                        sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                        sw.WriteLine("<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                        sw.WriteLine("  <w:zoom w:percent=\"100\"/>");
+                        sw.WriteLine("  <w:defaultTabStop w:val=\"720\"/>");
+                        sw.WriteLine("  <w:characterSpacingControl w:val=\"doNotCompress\"/>");
+                        sw.WriteLine("  <w:compat>");
+                        sw.WriteLine("    <w:compatSetting w:name=\"compatibilityMode\" w:uri=\"http://schemas.microsoft.com/office/word\" w:val=\"15\"/>");
+                        sw.WriteLine("  </w:compat>");
+                        sw.WriteLine("</w:settings>");
+                    }
+
+                    // 6c. word/webSettings.xml
+                    var webSettingsEntry = archive.CreateEntry("word/webSettings.xml");
+                    using (StreamWriter sw = new StreamWriter(webSettingsEntry.Open(), Encoding.UTF8))
+                    {
+                        sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                        sw.WriteLine("<w:webSettings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                        sw.WriteLine("  <w:optimizeForBrowser/>");
+                        sw.WriteLine("  <w:allowPNG/>");
+                        sw.WriteLine("</w:webSettings>");
+                    }
+
+                    // 6d. word/fontTable.xml
+                    var fontTableEntry = archive.CreateEntry("word/fontTable.xml");
+                    using (StreamWriter sw = new StreamWriter(fontTableEntry.Open(), Encoding.UTF8))
+                    {
+                        sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                        sw.WriteLine("<w:fonts xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                        sw.WriteLine("  <w:font w:name=\"Calibri\"><w:panose1 w:val=\"020F0502020204030204\"/><w:charset w:val=\"00\"/><w:family w:val=\"swiss\"/><w:pitch w:val=\"variable\"/></w:font>");
+                        sw.WriteLine("  <w:font w:name=\"Times New Roman\"><w:panose1 w:val=\"02020603050405020304\"/><w:charset w:val=\"00\"/><w:family w:val=\"roman\"/><w:pitch w:val=\"variable\"/></w:font>");
+                        sw.WriteLine("  <w:font w:name=\"Arial\"><w:panose1 w:val=\"020B0604020202020204\"/><w:charset w:val=\"00\"/><w:family w:val=\"swiss\"/><w:pitch w:val=\"variable\"/></w:font>");
+                        sw.WriteLine("  <w:font w:name=\"Segoe UI\"><w:panose1 w:val=\"020B0502040204020203\"/><w:charset w:val=\"00\"/><w:family w:val=\"swiss\"/><w:pitch w:val=\"variable\"/></w:font>");
+                        sw.WriteLine("</w:fonts>");
                     }
 
                     // 7. word/document.xml
@@ -5182,19 +5266,49 @@ namespace ZenQOffice.Format
                                     }
                                     string bColor = (docTbl != null && docTbl.BorderColor != Color.Empty && docTbl.BorderColor != Color.Transparent) 
                                         ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderColor.R, docTbl.BorderColor.G, docTbl.BorderColor.B) 
-                                        : "CBD5E1";
+                                        : "000000";
+
+                                    string topStyle = (docTbl != null && !docTbl.HasBorderTop) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderTopStyle)) ? docTbl.BorderTopStyle : "single");
+                                    int topSz = (docTbl != null && docTbl.BorderTopWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderTopWidthPt * 8)) : 4;
+                                    string topClr = (docTbl != null && docTbl.BorderTopColor != Color.Empty && docTbl.BorderTopColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderTopColor.R, docTbl.BorderTopColor.G, docTbl.BorderTopColor.B) : bColor;
+
+                                    string bottomStyle = (docTbl != null && !docTbl.HasBorderBottom) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderBottomStyle)) ? docTbl.BorderBottomStyle : "single");
+                                    int bottomSz = (docTbl != null && docTbl.BorderBottomWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderBottomWidthPt * 8)) : 4;
+                                    string bottomClr = (docTbl != null && docTbl.BorderBottomColor != Color.Empty && docTbl.BorderBottomColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderBottomColor.R, docTbl.BorderBottomColor.G, docTbl.BorderBottomColor.B) : bColor;
+
+                                    string leftStyle = (docTbl != null && !docTbl.HasBorderLeft) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderLeftStyle)) ? docTbl.BorderLeftStyle : "single");
+                                    int leftSz = (docTbl != null && docTbl.BorderLeftWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderLeftWidthPt * 8)) : 4;
+                                    string leftClr = (docTbl != null && docTbl.BorderLeftColor != Color.Empty && docTbl.BorderLeftColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderLeftColor.R, docTbl.BorderLeftColor.G, docTbl.BorderLeftColor.B) : bColor;
+
+                                    string rightStyle = (docTbl != null && !docTbl.HasBorderRight) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderRightStyle)) ? docTbl.BorderRightStyle : "single");
+                                    int rightSz = (docTbl != null && docTbl.BorderRightWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderRightWidthPt * 8)) : 4;
+                                    string rightClr = (docTbl != null && docTbl.BorderRightColor != Color.Empty && docTbl.BorderRightColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderRightColor.R, docTbl.BorderRightColor.G, docTbl.BorderRightColor.B) : bColor;
+
+                                    string inHStyle = (docTbl != null && !docTbl.HasBorderInsideH) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderInsideHStyle)) ? docTbl.BorderInsideHStyle : "single");
+                                    int inHSz = (docTbl != null && docTbl.BorderInsideHWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderInsideHWidthPt * 8)) : 4;
+                                    string inHClr = (docTbl != null && docTbl.BorderInsideHColor != Color.Empty && docTbl.BorderInsideHColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderInsideHColor.R, docTbl.BorderInsideHColor.G, docTbl.BorderInsideHColor.B) : bColor;
+
+                                    string inVStyle = (docTbl != null && !docTbl.HasBorderInsideV) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderInsideVStyle)) ? docTbl.BorderInsideVStyle : "single");
+                                    int inVSz = (docTbl != null && docTbl.BorderInsideVWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderInsideVWidthPt * 8)) : 4;
+                                    string inVClr = (docTbl != null && docTbl.BorderInsideVColor != Color.Empty && docTbl.BorderInsideVColor != Color.Transparent)
+                                        ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderInsideVColor.R, docTbl.BorderInsideVColor.G, docTbl.BorderInsideVColor.B) : bColor;
 
                                     sw.WriteLine("    <w:tbl>");
                                     sw.WriteLine("      <w:tblPr>");
                                     sw.WriteLine(string.Format("        <w:tblW w:w=\"{0}\" w:type=\"{1}\"/>", tblWVal, tblWType));
                                     sw.WriteLine(string.Format("        <w:jc w:val=\"{0}\"/>", tblJc));
                                     sw.WriteLine("        <w:tblBorders>");
-                                    sw.WriteLine(string.Format("          <w:top w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
-                                    sw.WriteLine(string.Format("          <w:left w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
-                                    sw.WriteLine(string.Format("          <w:bottom w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
-                                    sw.WriteLine(string.Format("          <w:right w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
-                                    sw.WriteLine(string.Format("          <w:insideH w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
-                                    sw.WriteLine(string.Format("          <w:insideV w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"{0}\"/>", bColor));
+                                    sw.WriteLine(string.Format("          <w:top w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", topStyle, topSz, topClr));
+                                    sw.WriteLine(string.Format("          <w:left w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", leftStyle, leftSz, leftClr));
+                                    sw.WriteLine(string.Format("          <w:bottom w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", bottomStyle, bottomSz, bottomClr));
+                                    sw.WriteLine(string.Format("          <w:right w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", rightStyle, rightSz, rightClr));
+                                    sw.WriteLine(string.Format("          <w:insideH w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", inHStyle, inHSz, inHClr));
+                                    sw.WriteLine(string.Format("          <w:insideV w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", inVStyle, inVSz, inVClr));
                                     sw.WriteLine("        </w:tblBorders>");
                                     sw.WriteLine("        <w:tblCellMar>");
                                     sw.WriteLine("          <w:top w:w=\"120\" w:type=\"dxa\"/>");
@@ -5203,18 +5317,31 @@ namespace ZenQOffice.Format
                                     sw.WriteLine("          <w:right w:w=\"160\" w:type=\"dxa\"/>");
                                     sw.WriteLine("        </w:tblCellMar>");
                                     sw.WriteLine("      </w:tblPr>");
+                                    sw.WriteLine("      <w:tblGrid>");
+                                    int numCols = rows[0].Count;
+                                    int defaultColW = 9000 / Math.Max(1, numCols);
+                                    for (int cIdx = 0; cIdx < numCols; cIdx++)
+                                    {
+                                        int colW = defaultColW;
+                                        if (docTbl != null && docTbl.Rows.Count > 0 && cIdx < docTbl.Rows[0].Cells.Count && docTbl.Rows[0].Cells[cIdx].WidthPt > 0)
+                                        {
+                                            colW = (int)(docTbl.Rows[0].Cells[cIdx].WidthPt * 20);
+                                        }
+                                        sw.WriteLine(string.Format("        <w:gridCol w:w=\"{0}\"/>", colW));
+                                    }
+                                    sw.WriteLine("      </w:tblGrid>");
                                     for (int rIdx = 0; rIdx < rows.Count; rIdx++)
                                     {
                                         var row = rows[rIdx];
-                                        bool isHeaderRow = (rIdx == 0);
+                                        bool isHeaderRow = (docTbl != null && docTbl.RepeatHeaderRow && rIdx == 0);
                                         int rowHPt = (docTbl != null && rIdx < docTbl.Rows.Count) ? docTbl.Rows[rIdx].HeightPt : 0;
 
                                         sw.WriteLine("      <w:tr>");
                                         if (isHeaderRow || rowHPt > 0)
                                         {
                                             sw.WriteLine("        <w:trPr>");
-                                            if (isHeaderRow) sw.WriteLine("          <w:tblHeader/>");
                                             if (rowHPt > 0) sw.WriteLine(string.Format("          <w:trHeight w:val=\"{0}\" w:hRule=\"atLeast\"/>", rowHPt * 20));
+                                            if (isHeaderRow) sw.WriteLine("          <w:tblHeader/>");
                                             sw.WriteLine("        </w:trPr>");
                                         }
 
@@ -5225,38 +5352,41 @@ namespace ZenQOffice.Format
 
                                             string shdHex = null;
                                             if (cObj != null && cObj.BackgroundColor != Color.Transparent && cObj.BackgroundColor != Color.Empty && cObj.BackgroundColor.A > 0)
+                                            {
                                                 shdHex = string.Format("{0:X2}{1:X2}{2:X2}", cObj.BackgroundColor.R, cObj.BackgroundColor.G, cObj.BackgroundColor.B);
-                                            else
-                                                shdHex = isHeaderRow ? "2563EB" : (rIdx % 2 == 0 ? "F8FAFC" : "FFFFFF");
+                                            }
 
                                             string textHex = null;
                                             if (cObj != null && cObj.TextColor != Color.Empty && cObj.TextColor != Color.Transparent)
                                                 textHex = string.Format("{0:X2}{1:X2}{2:X2}", cObj.TextColor.R, cObj.TextColor.G, cObj.TextColor.B);
                                             else
-                                                textHex = isHeaderRow ? "FFFFFF" : "0F172A";
+                                                textHex = "000000";
 
-                                            string fontName = (cObj != null && !string.IsNullOrEmpty(cObj.FontName)) ? cObj.FontName : "Segoe UI";
-                                            int halfPtSize = (cObj != null && cObj.FontSize > 0) ? (int)Math.Round(cObj.FontSize * 2) : (isHeaderRow ? 22 : 21);
-                                            bool isBold = (cObj != null) ? cObj.Bold : isHeaderRow;
+                                            string fontName = (cObj != null && !string.IsNullOrEmpty(cObj.FontName)) ? cObj.FontName : "Times New Roman";
+                                            int halfPtSize = (cObj != null && cObj.FontSize > 0) ? (int)Math.Round(cObj.FontSize * 2) : 24;
+                                            bool isBold = (cObj != null) ? cObj.Bold : false;
+                                            bool isItalic = (cObj != null) ? cObj.Italic : false;
 
                                             string alignVal = "left";
                                             if (cObj != null)
                                             {
                                                 if (cObj.Alignment == 1) alignVal = "center";
                                                 else if (cObj.Alignment == 2) alignVal = "right";
+                                                else if (cObj.Alignment == 3) alignVal = "both";
                                                 else alignVal = "left";
                                             }
                                             else
                                             {
                                                 decimal dummyD;
-                                                alignVal = isHeaderRow ? "center" : (cIdx == 0 ? "left" : (decimal.TryParse(cell.Replace(",", "").Replace("%", "").Trim(), out dummyD) ? "right" : "left"));
+                                                alignVal = (decimal.TryParse(cell.Replace(",", "").Replace("%", "").Trim(), out dummyD) ? "right" : "left");
                                             }
 
-                                            string vAlign = "center";
+                                            string vAlign = "top";
                                             if (cObj != null)
                                             {
-                                                if (cObj.VerticalAlignment == 0) vAlign = "top";
+                                                if (cObj.VerticalAlignment == 1) vAlign = "center";
                                                 else if (cObj.VerticalAlignment == 2) vAlign = "bottom";
+                                                else vAlign = "top";
                                             }
 
                                             sw.WriteLine("        <w:tc>");
@@ -5265,7 +5395,10 @@ namespace ZenQOffice.Format
                                             {
                                                 sw.WriteLine(string.Format("            <w:tcW w:w=\"{0}\" w:type=\"dxa\"/>", cObj.WidthPt * 20));
                                             }
-                                            sw.WriteLine(string.Format("            <w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{0}\"/>", shdHex));
+                                            if (!string.IsNullOrEmpty(shdHex))
+                                            {
+                                                sw.WriteLine(string.Format("            <w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{0}\"/>", shdHex));
+                                            }
                                             sw.WriteLine(string.Format("            <w:vAlign w:val=\"{0}\"/>", vAlign));
                                             sw.WriteLine("          </w:tcPr>");
                                             sw.WriteLine("          <w:p>");
@@ -5273,13 +5406,22 @@ namespace ZenQOffice.Format
                                             sw.WriteLine("            <w:r>");
                                             sw.WriteLine("              <w:rPr>");
                                             sw.WriteLine(string.Format("                <w:rFonts w:ascii=\"{0}\" w:hAnsi=\"{0}\" w:cs=\"{0}\"/>", EscapeXml(fontName)));
+                                            if (isBold) { sw.WriteLine("                <w:b/>"); sw.WriteLine("                <w:bCs/>"); }
+                                            if (isItalic) { sw.WriteLine("                <w:i/>"); sw.WriteLine("                <w:iCs/>"); }
+                                            if (!string.IsNullOrEmpty(textHex) && textHex != "000000")
+                                            {
+                                                sw.WriteLine(string.Format("                <w:color w:val=\"{0}\"/>", textHex));
+                                            }
                                             sw.WriteLine(string.Format("                <w:sz w:val=\"{0}\"/>", halfPtSize));
                                             sw.WriteLine(string.Format("                <w:szCs w:val=\"{0}\"/>", halfPtSize));
-                                            if (isBold) { sw.WriteLine("                <w:b/>"); sw.WriteLine("                <w:bCs/>"); }
-                                            sw.WriteLine(string.Format("                <w:color w:val=\"{0}\"/>", textHex));
                                             sw.WriteLine("              </w:rPr>");
                                             string cellText = (cObj != null && !string.IsNullOrEmpty(cObj.Text)) ? cObj.Text : cell;
-                                            sw.WriteLine("              <w:t xml:space=\"preserve\">" + EscapeXml(cellText) + "</w:t>");
+                                            string[] cellLines = (cellText ?? "").Replace("\r\n", "\n").Split('\n');
+                                            for (int cl = 0; cl < cellLines.Length; cl++)
+                                            {
+                                                if (cl > 0) sw.WriteLine("              <w:br/>");
+                                                sw.WriteLine("              <w:t xml:space=\"preserve\">" + EscapeXml(cellLines[cl]) + "</w:t>");
+                                            }
                                             sw.WriteLine("            </w:r>");
                                             sw.WriteLine("          </w:p>");
                                             sw.WriteLine("        </w:tc>");
@@ -5633,19 +5775,31 @@ namespace ZenQOffice.Format
                             sw.WriteLine("    <w:p>");
                             sw.WriteLine("      <w:pPr>");
 
-                            // Alignment
-                            int pAlign = 3; // default both / justify
-                            if (paraAlignments != null && paraAlignments.ContainsKey(charOffset))
+                            // 1. Paragraph Borders (<w:pBdr>) - Must appear before spacing/ind/jc
+                            if (paraBorders != null && paraBorders.ContainsKey(charOffset))
                             {
-                                pAlign = paraAlignments[charOffset];
+                                ParagraphBorderInfo bdr = paraBorders[charOffset];
+                                if (bdr != null && bdr.HasAnyBorder)
+                                {
+                                    sw.WriteLine("        <w:pBdr>");
+                                    int sz = Math.Max(4, (int)(bdr.SizePt * 8)); // 1/8 pt
+                                    string colHex = string.Format("{0:X2}{1:X2}{2:X2}", bdr.Color.R, bdr.Color.G, bdr.Color.B);
+                                    if (bdr.IsHorizontalLine)
+                                    {
+                                        sw.WriteLine(string.Format("          <w:bottom w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", Math.Max(6, sz), colHex));
+                                    }
+                                    else
+                                    {
+                                        if (bdr.Top) sw.WriteLine(string.Format("          <w:top w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", sz, colHex));
+                                        if (bdr.Left) sw.WriteLine(string.Format("          <w:left w:val=\"single\" w:sz=\"{0}\" w:space=\"4\" w:color=\"{1}\"/>", sz, colHex));
+                                        if (bdr.Bottom) sw.WriteLine(string.Format("          <w:bottom w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", sz, colHex));
+                                        if (bdr.Right) sw.WriteLine(string.Format("          <w:right w:val=\"single\" w:sz=\"{0}\" w:space=\"4\" w:color=\"{1}\"/>", sz, colHex));
+                                    }
+                                    sw.WriteLine("        </w:pBdr>");
+                                }
                             }
-                            string jcVal = "both";
-                            if (pAlign == 0) jcVal = "left";
-                            else if (pAlign == 1) jcVal = "center";
-                            else if (pAlign == 2) jcVal = "right";
-                            sw.WriteLine(string.Format("        <w:jc w:val=\"{0}\"/>", jcVal));
 
-                            // Spacing (Line spacing + before/after)
+                            // 2. Spacing (Line spacing + before/after) - Must appear before ind/jc
                             float lSpacing = 1.15f;
                             float sBefore = 0.0f;
                             float sAfter = 0.0f;
@@ -5673,31 +5827,7 @@ namespace ZenQOffice.Format
                                 sw.WriteLine(string.Format("        <w:spacing w:line=\"{0}\" w:lineRule=\"auto\" w:before=\"{1}\" w:after=\"{2}\"/>", lineTwips, beforeTwips, afterTwips));
                             }
 
-                            // Paragraph Borders (<w:pBdr>)
-                            if (paraBorders != null && paraBorders.ContainsKey(charOffset))
-                            {
-                                ParagraphBorderInfo bdr = paraBorders[charOffset];
-                                if (bdr != null && bdr.HasAnyBorder)
-                                {
-                                    sw.WriteLine("        <w:pBdr>");
-                                    int sz = Math.Max(4, (int)(bdr.SizePt * 8)); // 1/8 pt
-                                    string colHex = string.Format("{0:X2}{1:X2}{2:X2}", bdr.Color.R, bdr.Color.G, bdr.Color.B);
-                                    if (bdr.IsHorizontalLine)
-                                    {
-                                        sw.WriteLine(string.Format("          <w:bottom w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", Math.Max(6, sz), colHex));
-                                    }
-                                    else
-                                    {
-                                        if (bdr.Top) sw.WriteLine(string.Format("          <w:top w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", sz, colHex));
-                                        if (bdr.Left) sw.WriteLine(string.Format("          <w:left w:val=\"single\" w:sz=\"{0}\" w:space=\"4\" w:color=\"{1}\"/>", sz, colHex));
-                                        if (bdr.Bottom) sw.WriteLine(string.Format("          <w:bottom w:val=\"single\" w:sz=\"{0}\" w:space=\"1\" w:color=\"{1}\"/>", sz, colHex));
-                                        if (bdr.Right) sw.WriteLine(string.Format("          <w:right w:val=\"single\" w:sz=\"{0}\" w:space=\"4\" w:color=\"{1}\"/>", sz, colHex));
-                                    }
-                                    sw.WriteLine("        </w:pBdr>");
-                                }
-                            }
-
-                            // Paragraph Indentation (<w:ind>)
+                            // 3. Paragraph Indentation (<w:ind>) - Must appear before jc
                             float pFL = (paraFirstLineIndents != null && paraFirstLineIndents.ContainsKey(charOffset)) ? paraFirstLineIndents[charOffset] : 0f;
                             float pL = (paraLeftIndents != null && paraLeftIndents.ContainsKey(charOffset)) ? paraLeftIndents[charOffset] : 0f;
                             float pR = (paraRightIndents != null && paraRightIndents.ContainsKey(charOffset)) ? paraRightIndents[charOffset] : 0f;
@@ -5719,6 +5849,18 @@ namespace ZenQOffice.Format
                                 indSb.Append("/>");
                                 sw.WriteLine(indSb.ToString());
                             }
+
+                            // 4. Alignment (<w:jc>)
+                            int pAlign = 3; // default both / justify
+                            if (paraAlignments != null && paraAlignments.ContainsKey(charOffset))
+                            {
+                                pAlign = paraAlignments[charOffset];
+                            }
+                            string jcVal = "both";
+                            if (pAlign == 0) jcVal = "left";
+                            else if (pAlign == 1) jcVal = "center";
+                            else if (pAlign == 2) jcVal = "right";
+                            sw.WriteLine(string.Format("        <w:jc w:val=\"{0}\"/>", jcVal));
 
                             sw.WriteLine("      </w:pPr>");
 
@@ -5758,18 +5900,18 @@ namespace ZenQOffice.Format
                                     sw.WriteLine("      <w:r>");
                                     sw.WriteLine("        <w:rPr>");
                                     sw.WriteLine(string.Format("          <w:rFonts w:ascii=\"{0}\" w:hAnsi=\"{0}\" w:cs=\"{0}\" w:eastAsia=\"{0}\"/>", EscapeXml(font)));
-                                    sw.WriteLine(string.Format("          <w:sz w:val=\"{0}\"/>", halfPts));
-                                    sw.WriteLine(string.Format("          <w:szCs w:val=\"{0}\"/>", halfPts));
                                     if (b) { sw.WriteLine("          <w:b/>"); sw.WriteLine("          <w:bCs/>"); }
                                     if (it) { sw.WriteLine("          <w:i/>"); sw.WriteLine("          <w:iCs/>"); }
-                                    if (u) sw.WriteLine("          <w:u w:val=\"single\"/>");
                                     if (strk) sw.WriteLine("          <w:strike/>");
-                                    if (sub) sw.WriteLine("          <w:vertAlign w:val=\"subscript\"/>");
-                                    else if (sup) sw.WriteLine("          <w:vertAlign w:val=\"superscript\"/>");
                                     if (c != Color.Black && c != Color.Empty && c.A > 0)
                                     {
                                         sw.WriteLine(string.Format("          <w:color w:val=\"{0:X2}{1:X2}{2:X2}\"/>", c.R, c.G, c.B));
                                     }
+                                    sw.WriteLine(string.Format("          <w:sz w:val=\"{0}\"/>", halfPts));
+                                    sw.WriteLine(string.Format("          <w:szCs w:val=\"{0}\"/>", halfPts));
+                                    if (u) sw.WriteLine("          <w:u w:val=\"single\"/>");
+                                    if (sub) sw.WriteLine("          <w:vertAlign w:val=\"subscript\"/>");
+                                    else if (sup) sw.WriteLine("          <w:vertAlign w:val=\"superscript\"/>");
                                     sw.WriteLine("        </w:rPr>");
                                     sw.WriteLine("        <w:t xml:space=\"preserve\">" + EscapeXml(runText) + "</w:t>");
                                     sw.WriteLine("      </w:r>");
@@ -5795,18 +5937,27 @@ namespace ZenQOffice.Format
                         if (!string.IsNullOrEmpty(headerText)) sw.WriteLine("      <w:headerReference r:id=\"rIdHeader1\" w:type=\"default\"/>");
                         if (!string.IsNullOrEmpty(footerText) || showPageNumbers) sw.WriteLine("      <w:footerReference r:id=\"rIdFooter1\" w:type=\"default\"/>");
 
+                        int pgW = (int)Math.Round((paperWidthInches > 0 ? paperWidthInches : (isLandscape ? 11.69f : 8.27f)) * 1440);
+                        int pgH = (int)Math.Round((paperHeightInches > 0 ? paperHeightInches : (isLandscape ? 8.27f : 11.69f)) * 1440);
                         if (isLandscape)
                         {
-                            sw.WriteLine("      <w:pgSz w:w=\"16838\" w:h=\"11906\" w:orient=\"landscape\"/>");
+                            sw.WriteLine(string.Format("      <w:pgSz w:w=\"{0}\" w:h=\"{1}\" w:orient=\"landscape\"/>", Math.Max(pgW, pgH), Math.Min(pgW, pgH)));
                         }
                         else
                         {
-                            sw.WriteLine("      <w:pgSz w:w=\"11906\" w:h=\"16838\"/>");
+                            sw.WriteLine(string.Format("      <w:pgSz w:w=\"{0}\" w:h=\"{1}\"/>", Math.Min(pgW, pgH), Math.Max(pgW, pgH)));
                         }
 
                         int topM = 1440, rightM = 1440, bottomM = 1440, leftM = 1440;
                         if (marginMode == 1) { topM = 720; rightM = 720; bottomM = 720; leftM = 720; }
                         else if (marginMode == 2) { topM = 1440; rightM = 2880; bottomM = 1440; leftM = 2880; }
+                        else if (marginMode == 4)
+                        {
+                            topM = (int)Math.Round((customTopMarginInches > 0 ? customTopMarginInches : 1.0f) * 1440);
+                            rightM = (int)Math.Round((customRightMarginInches > 0 ? customRightMarginInches : 1.0f) * 1440);
+                            bottomM = (int)Math.Round((customBottomMarginInches > 0 ? customBottomMarginInches : 1.0f) * 1440);
+                            leftM = (int)Math.Round((customLeftMarginInches > 0 ? customLeftMarginInches : 1.0f) * 1440);
+                        }
                         sw.WriteLine(string.Format("      <w:pgMar w:top=\"{0}\" w:right=\"{1}\" w:bottom=\"{2}\" w:left=\"{3}\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>", topM, rightM, bottomM, leftM));
                         sw.WriteLine("    </w:sectPr>");
 
@@ -5821,6 +5972,9 @@ namespace ZenQOffice.Format
                         sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
                         sw.WriteLine("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
                         sw.WriteLine("  <Relationship Id=\"rIdStyles\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>");
+                        sw.WriteLine("  <Relationship Id=\"rIdSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/>");
+                        sw.WriteLine("  <Relationship Id=\"rIdWebSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings\" Target=\"webSettings.xml\"/>");
+                        sw.WriteLine("  <Relationship Id=\"rIdFontTable\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable\" Target=\"fontTable.xml\"/>");
                         if (!string.IsNullOrEmpty(headerText))
                         {
                             sw.WriteLine("  <Relationship Id=\"rIdHeader1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header1.xml\"/>");
@@ -5868,12 +6022,23 @@ namespace ZenQOffice.Format
 
         private static string EscapeXml(string input)
         {
-            return (input ?? "")
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;")
-                .Replace("\"", "&quot;")
-                .Replace("'", "&apos;");
+            if (string.IsNullOrEmpty(input)) return "";
+            StringBuilder sb = new StringBuilder(input.Length);
+            for (int i = 0; i < input.Length; i++)
+            {
+                char ch = input[i];
+                // Allow only valid XML 1.0 chars: 0x9 (\t), 0xA (\n), 0xD (\r), 0x20..0xD7FF, 0xE000..0xFFFD
+                if (ch == 0x9 || ch == 0xA || ch == 0xD || (ch >= 0x20 && ch <= 0xD7FF) || (ch >= 0xE000 && ch <= 0xFFFD))
+                {
+                    if (ch == '&') sb.Append("&amp;");
+                    else if (ch == '<') sb.Append("&lt;");
+                    else if (ch == '>') sb.Append("&gt;");
+                    else if (ch == '"') sb.Append("&quot;");
+                    else if (ch == '\'') sb.Append("&apos;");
+                    else sb.Append(ch);
+                }
+            }
+            return sb.ToString();
         }
     }
 
@@ -8076,8 +8241,9 @@ namespace ZenQOffice.Format
             {
                 if (cNvPr.Attributes["id"] != null)
                 {
-                    shape.Id = cNvPr.Attributes["id"].Value;
+                    shape.RawSpid = cNvPr.Attributes["id"].Value;
                 }
+                shape.Id = Guid.NewGuid().ToString("N");
                 if (cNvPr.Attributes["name"] != null)
                 {
                     string n = cNvPr.Attributes["name"].Value;
@@ -8331,6 +8497,7 @@ namespace ZenQOffice.Format
                                             {
                                                 shape.CachedImage = new Bitmap(rawImg);
                                             }
+                                            shape.ImagePath = target;
                                             if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
                                         }
                                     }
@@ -9225,7 +9392,8 @@ namespace ZenQOffice.Format
             XmlNode cNvPr = picNode.SelectSingleNode(".//*[local-name()='cNvPr']");
             if (cNvPr != null)
             {
-                if (cNvPr.Attributes["id"] != null) picShape.Id = cNvPr.Attributes["id"].Value;
+                if (cNvPr.Attributes["id"] != null) picShape.RawSpid = cNvPr.Attributes["id"].Value;
+                picShape.Id = Guid.NewGuid().ToString("N");
                 if (cNvPr.Attributes["name"] != null) picShape.Name = cNvPr.Attributes["name"].Value;
             }
 
@@ -9414,6 +9582,7 @@ namespace ZenQOffice.Format
                                         {
                                             picShape.CachedImage = new Bitmap(rawImg);
                                         }
+                                        picShape.ImagePath = target;
                                     }
                                 }
                             }
@@ -9593,7 +9762,7 @@ namespace ZenQOffice.Format
             XmlNode cNvPr = gfNode.SelectSingleNode(".//*[local-name()='cNvPr']");
             if (cNvPr != null)
             {
-                if (cNvPr.Attributes["id"] != null) shape.Id = cNvPr.Attributes["id"].Value;
+                if (cNvPr.Attributes["id"] != null) shape.RawSpid = cNvPr.Attributes["id"].Value;
                 if (cNvPr.Attributes["name"] != null) shape.Name = cNvPr.Attributes["name"].Value;
             }
 
@@ -10178,7 +10347,7 @@ namespace ZenQOffice.Format
                     {
                         foreach (ShapeNode sh in slide.Shapes)
                         {
-                            if (sh.Id == spid || sh.Name == spid || sh.Name == "Shape " + spid || (sh.Name != null && sh.Name.EndsWith(" " + spid)))
+                            if (sh.Id == spid || sh.RawSpid == spid || sh.Name == spid || sh.Name == "Shape " + spid || (sh.Name != null && sh.Name.EndsWith(" " + spid)))
                             {
                                 targetShapeId = sh.Id;
                                 break;

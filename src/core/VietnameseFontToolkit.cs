@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml;
 using ZenQOffice.Core;
@@ -13,7 +14,7 @@ namespace ZenQOffice.Core
     {
         public string Typeface { get; set; } = "Unknown";
         public string Subfamily { get; set; } = "Regular";
-        public string Format { get; set; } = "TrueType"; // TrueType or OpenType
+        public string Format { get; set; } = "TrueType"; // TrueType, OpenType, TCVN3 (ABC), VNI-Windows
         public string FileName { get; set; } = "";
         public byte[] Data { get; set; }
         public int FileSize => Data != null ? Data.Length : 0;
@@ -23,6 +24,7 @@ namespace ZenQOffice.Core
         public List<char> MissingVietnameseChars { get; set; } = new List<char>();
         public string SuggestedVietnameseFont { get; set; } = "";
         public string SourceDocument { get; set; } = "";
+        public bool IsUsedInDocumentBody { get; set; } = false;
     }
 
     public class FontFixOptions
@@ -424,6 +426,245 @@ namespace ZenQOffice.Core
             return "Be Vietnam Pro";
         }
 
+        [DllImport("gdi32.dll", ExactSpelling = true, SetLastError = true)]
+        private static extern uint GetFontUnicodeRanges(IntPtr hdc, IntPtr lpgs);
+
+        [DllImport("gdi32.dll", ExactSpelling = true)]
+        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+        [DllImport("gdi32.dll", ExactSpelling = true)]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        private static readonly HashSet<string> _systemFontNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static bool _systemFontsLoaded = false;
+        private static readonly object _fontLock = new object();
+
+        // Danh sách phông chữ Unicode thông dụng hỗ trợ đầy đủ 100% tiếng Việt
+        private static readonly HashSet<string> FullVietnameseUnicodeFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Times New Roman", "Arial", "Calibri", "Segoe UI", "Tahoma", "Georgia", 
+            "Cambria", "Verdana", "Trebuchet MS", "Roboto", "Open Sans", "Be Vietnam Pro", 
+            "Montserrat", "Aptos", "Noto Serif", "Noto Sans", "Mulish", "Inter", 
+            "Lora", "Merriweather", "Helvetica", "Consolas", "Courier New", "Palatino Linotype",
+            "Segoe UI Variable", "Aptos Display", "Lucida Sans Unicode", "Arial Unicode MS"
+        };
+
+        public static bool IsSystemFontInstalled(string fontName)
+        {
+            if (string.IsNullOrEmpty(fontName)) return false;
+            lock (_fontLock)
+            {
+                if (!_systemFontsLoaded)
+                {
+                    try
+                    {
+                        using (var ifc = new System.Drawing.Text.InstalledFontCollection())
+                        {
+                            foreach (var f in ifc.Families)
+                            {
+                                _systemFontNames.Add(f.Name);
+                            }
+                        }
+                    }
+                    catch { }
+                    _systemFontsLoaded = true;
+                }
+                return _systemFontNames.Contains(fontName) || SlideFontManager.HasFont(fontName);
+            }
+        }
+
+        public static bool CheckInstalledFontVietnameseSupport(string fontName, out List<char> missingChars)
+        {
+            missingChars = new List<char>();
+            if (string.IsNullOrEmpty(fontName)) return false;
+
+            if (FullVietnameseUnicodeFonts.Contains(fontName))
+            {
+                return true;
+            }
+
+            if (fontName.StartsWith(".Vn", StringComparison.OrdinalIgnoreCase) || fontName.StartsWith(".vn", StringComparison.OrdinalIgnoreCase) ||
+                fontName.StartsWith("VNI-", StringComparison.OrdinalIgnoreCase) || fontName.StartsWith("vni-", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (char c in "áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ")
+                {
+                    missingChars.Add(c);
+                }
+                return false;
+            }
+
+            try
+            {
+                IntPtr hdc = GetDC(IntPtr.Zero);
+                if (hdc != IntPtr.Zero)
+                {
+                    try
+                    {
+                        using (Font font = SlideFontManager.CreateFont(fontName, 12f, FontStyle.Regular, GraphicsUnit.Point))
+                        {
+                            IntPtr hFont = font.ToHfont();
+                            IntPtr oldFont = SelectObject(hdc, hFont);
+
+                            try
+                            {
+                                uint size = GetFontUnicodeRanges(hdc, IntPtr.Zero);
+                                if (size > 16)
+                                {
+                                    IntPtr buffer = Marshal.AllocHGlobal((int)size);
+                                    try
+                                    {
+                                        GetFontUnicodeRanges(hdc, buffer);
+                                        int cRanges = Marshal.ReadInt32(buffer, 12);
+                                        List<Tuple<int, int>> ranges = new List<Tuple<int, int>>(cRanges);
+                                        int offset = 16;
+                                        for (int i = 0; i < cRanges; i++)
+                                        {
+                                            ushort low = (ushort)Marshal.ReadInt16(buffer, offset);
+                                            ushort count = (ushort)Marshal.ReadInt16(buffer, offset + 2);
+                                            offset += 4;
+                                            ranges.Add(Tuple.Create((int)low, (int)(low + count - 1)));
+                                        }
+
+                                        foreach (char c in AllVietnameseDiacritics)
+                                        {
+                                            int code = (int)c;
+                                            bool found = false;
+                                            for (int r = 0; r < ranges.Count; r++)
+                                            {
+                                                if (code >= ranges[r].Item1 && code <= ranges[r].Item2)
+                                                {
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (!found) missingChars.Add(c);
+                                        }
+
+                                        return missingChars.Count == 0;
+                                    }
+                                    finally
+                                    {
+                                        Marshal.FreeHGlobal(buffer);
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                SelectObject(hdc, oldFont);
+                                DeleteObject(hFont);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        ReleaseDC(IntPtr.Zero, hdc);
+                    }
+                }
+            }
+            catch { }
+
+            return missingChars.Count == 0;
+        }
+
+        /// <summary>
+        /// Trích xuất một đoạn văn bản thực tế từ tài liệu để làm nội dung xem trước
+        /// </summary>
+        public static string ExtractDocumentSampleText(string filePath, int maxLength = 120)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return null;
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+
+            try
+            {
+                if (ext == ".docx")
+                {
+                    using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (ZipArchive zip = new ZipArchive(fs, ZipArchiveMode.Read))
+                    {
+                        var entry = zip.GetEntry("word/document.xml");
+                        if (entry != null)
+                        {
+                            XmlDocument doc = new XmlDocument();
+                            using (Stream s = entry.Open()) doc.Load(s);
+                            XmlNodeList tNodes = doc.SelectNodes("//*[local-name()='t']");
+                            if (tNodes != null)
+                            {
+                                StringBuilder sb = new StringBuilder();
+                                foreach (XmlNode t in tNodes)
+                                {
+                                    string text = t.InnerText?.Trim();
+                                    if (!string.IsNullOrEmpty(text) && text.Length > 2)
+                                    {
+                                        if (sb.Length > 0 && !sb.ToString().EndsWith(" ") && !sb.ToString().EndsWith("-"))
+                                        {
+                                            sb.Append(" - ");
+                                        }
+                                        sb.Append(text);
+                                        if (sb.Length >= maxLength) break;
+                                    }
+                                }
+                                if (sb.Length > 0)
+                                {
+                                    string res = sb.ToString();
+                                    if (res.Length > maxLength) res = res.Substring(0, maxLength).TrimEnd() + "...";
+                                    return res;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (ext == ".pptx")
+                {
+                    using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (ZipArchive zip = new ZipArchive(fs, ZipArchiveMode.Read))
+                    {
+                        foreach (var entry in zip.Entries)
+                        {
+                            if (entry.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase) && entry.FullName.EndsWith(".xml"))
+                            {
+                                XmlDocument doc = new XmlDocument();
+                                using (Stream s = entry.Open()) doc.Load(s);
+                                XmlNodeList tNodes = doc.SelectNodes("//*[local-name()='t']");
+                                if (tNodes != null)
+                                {
+                                    StringBuilder sb = new StringBuilder();
+                                    foreach (XmlNode t in tNodes)
+                                    {
+                                        string text = t.InnerText?.Trim();
+                                        if (!string.IsNullOrEmpty(text) && text.Length > 2)
+                                        {
+                                            if (sb.Length > 0 && !sb.ToString().EndsWith(" ") && !sb.ToString().EndsWith("-"))
+                                            {
+                                                sb.Append(" - ");
+                                            }
+                                            sb.Append(text);
+                                            if (sb.Length >= maxLength) break;
+                                        }
+                                    }
+                                    if (sb.Length > 0)
+                                    {
+                                        string res = sb.ToString();
+                                        if (res.Length > maxLength) res = res.Substring(0, maxLength).TrimEnd() + "...";
+                                        return res;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
         /// <summary>
         /// Quét toàn bộ phông chữ trong tệp PPTX, DOCX hoặc TTF/OTF
         /// </summary>
@@ -460,11 +701,12 @@ namespace ZenQOffice.Core
                         FileName = Path.GetFileName(filePath),
                         Data = d,
                         IsEmbedded = false,
-                        IsInstalledOnSystem = SlideFontManager.HasFont(fam),
+                        IsInstalledOnSystem = IsSystemFontInstalled(fam),
                         HasVietnameseSupport = viSupport,
                         MissingVietnameseChars = missing,
                         SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
-                        SourceDocument = filePath
+                        SourceDocument = filePath,
+                        IsUsedInDocumentBody = true
                     });
                 }
             }
@@ -480,11 +722,69 @@ namespace ZenQOffice.Core
         {
             List<ExtractedFontInfo> list = new List<ExtractedFontInfo>();
             Dictionary<string, ExtractedFontInfo> map = new Dictionary<string, ExtractedFontInfo>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> bodyFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             using (FileStream fs = new FileStream(pptxPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Read))
             {
-                // 1. Phân tích presentation.xml tìm font mapping
+                // 1. Quét phông thực tế trong toàn bộ slide XML
+                foreach (ZipArchiveEntry entry in archive.Entries)
+                {
+                    string fn = entry.FullName.Replace('\\', '/');
+                    if (fn.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase) && fn.EndsWith(".xml"))
+                    {
+                        try
+                        {
+                            XmlDocument sDoc = new XmlDocument();
+                            using (Stream s = entry.Open()) sDoc.Load(s);
+                            XmlNodeList fontNodes = sDoc.SelectNodes("//*[local-name()='latin' or local-name()='ea' or local-name()='cs']");
+                            if (fontNodes != null)
+                            {
+                                foreach (XmlNode fNode in fontNodes)
+                                {
+                                    if (fNode.Attributes["typeface"] != null)
+                                    {
+                                        string tf = fNode.Attributes["typeface"].Value?.Trim();
+                                        if (!string.IsNullOrEmpty(tf) && !tf.StartsWith("+") && !tf.StartsWith("minor") && !tf.StartsWith("major"))
+                                        {
+                                            bodyFonts.Add(tf);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                // 2. Quét theme và presentation
+                ZipArchiveEntry themeEntry = archive.GetEntry("ppt/theme/theme1.xml");
+                if (themeEntry != null)
+                {
+                    try
+                    {
+                        XmlDocument tDoc = new XmlDocument();
+                        using (Stream s = themeEntry.Open()) tDoc.Load(s);
+                        XmlNodeList tFonts = tDoc.SelectNodes("//*[local-name()='latin']");
+                        if (tFonts != null)
+                        {
+                            foreach (XmlNode tfNode in tFonts)
+                            {
+                                if (tfNode.Attributes["typeface"] != null)
+                                {
+                                    string tf = tfNode.Attributes["typeface"].Value?.Trim();
+                                    if (!string.IsNullOrEmpty(tf) && !tf.StartsWith("+"))
+                                    {
+                                        bodyFonts.Add(tf);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 3. Phân tích presentation.xml tìm font mapping nhúng
                 Dictionary<string, string> rIdToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 ZipArchiveEntry presEntry = archive.GetEntry("ppt/presentation.xml");
                 if (presEntry != null)
@@ -512,7 +812,7 @@ namespace ZenQOffice.Core
                     }
                 }
 
-                // 2. Phân tích relationships
+                // 4. Phân tích relationships
                 Dictionary<string, string> targetToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 ZipArchiveEntry presRels = archive.GetEntry("ppt/_rels/presentation.xml.rels");
                 if (presRels != null)
@@ -531,7 +831,7 @@ namespace ZenQOffice.Core
                     }
                 }
 
-                // 3. Đọc các tệp font nhúng trong ppt/fonts/
+                // 5. Đọc các tệp font nhúng trong ppt/fonts/
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
                     string fn = entry.FullName.Replace('\\', '/');
@@ -585,20 +885,58 @@ namespace ZenQOffice.Core
                                 FileName = safeName,
                                 Data = cleanFont,
                                 IsEmbedded = true,
-                                IsInstalledOnSystem = SlideFontManager.HasFont(fam),
+                                IsInstalledOnSystem = IsSystemFontInstalled(fam),
                                 HasVietnameseSupport = viSupport,
                                 MissingVietnameseChars = missing,
                                 SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
-                                SourceDocument = pptxPath
+                                SourceDocument = pptxPath,
+                                IsUsedInDocumentBody = bodyFonts.Contains(fam)
                             };
 
                             map[fam] = info;
                         }
                     }
                 }
+
+                // 6. Thêm các phông chữ dùng trong tài liệu nhưng không nhúng file
+                foreach (string fam in bodyFonts)
+                {
+                    if (!map.ContainsKey(fam))
+                    {
+                        bool isTcvn3 = fam.StartsWith(".Vn", StringComparison.OrdinalIgnoreCase) || fam.StartsWith(".vn", StringComparison.OrdinalIgnoreCase);
+                        bool isVni = fam.StartsWith("VNI-", StringComparison.OrdinalIgnoreCase) || fam.StartsWith("vni-", StringComparison.OrdinalIgnoreCase);
+                        string formatStr = isTcvn3 ? "TCVN3 (ABC)" : (isVni ? "VNI-Windows" : "TrueType");
+
+                        List<char> missing;
+                        bool viSupport = CheckInstalledFontVietnameseSupport(fam, out missing);
+
+                        map[fam] = new ExtractedFontInfo
+                        {
+                            Typeface = fam,
+                            Subfamily = "Regular",
+                            Format = formatStr,
+                            FileName = $"{fam.Replace(' ', '_')}.ttf",
+                            Data = null,
+                            IsEmbedded = false,
+                            IsInstalledOnSystem = IsSystemFontInstalled(fam),
+                            HasVietnameseSupport = viSupport,
+                            MissingVietnameseChars = missing,
+                            SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
+                            SourceDocument = pptxPath,
+                            IsUsedInDocumentBody = true
+                        };
+                    }
+                }
             }
 
             list.AddRange(map.Values);
+            list.Sort((a, b) =>
+            {
+                int scoreA = (!a.HasVietnameseSupport ? 100 : 0) + (a.IsEmbedded ? 50 : 0) + (a.IsUsedInDocumentBody ? 25 : 0);
+                int scoreB = (!b.HasVietnameseSupport ? 100 : 0) + (b.IsEmbedded ? 50 : 0) + (b.IsUsedInDocumentBody ? 25 : 0);
+                if (scoreA != scoreB) return scoreB.CompareTo(scoreA);
+                return string.Compare(a.Typeface, b.Typeface, StringComparison.OrdinalIgnoreCase);
+            });
             return list;
         }
 
@@ -606,11 +944,45 @@ namespace ZenQOffice.Core
         {
             List<ExtractedFontInfo> list = new List<ExtractedFontInfo>();
             Dictionary<string, ExtractedFontInfo> map = new Dictionary<string, ExtractedFontInfo>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> bodyFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> allDeclaredFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             using (FileStream fs = new FileStream(docxPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Read))
             {
-                // 1. Phân tích word/fontTable.xml và fontKey
+                // 1. Quét nội dung thực tế trong word/document.xml
+                ZipArchiveEntry docEntry = archive.GetEntry("word/document.xml");
+                if (docEntry != null)
+                {
+                    try
+                    {
+                        XmlDocument doc = new XmlDocument();
+                        using (Stream s = docEntry.Open()) doc.Load(s);
+                        XmlNodeList rFontsList = doc.SelectNodes("//*[local-name()='rFonts']");
+                        if (rFontsList != null)
+                        {
+                            foreach (XmlNode rf in rFontsList)
+                            {
+                                string[] attrs = { "w:ascii", "w:hAnsi", "w:cs", "w:eastAsia" };
+                                foreach (string a in attrs)
+                                {
+                                    if (rf.Attributes[a] != null)
+                                    {
+                                        string val = rf.Attributes[a].Value?.Trim();
+                                        if (!string.IsNullOrEmpty(val) && !val.StartsWith("minor", StringComparison.OrdinalIgnoreCase) && !val.StartsWith("default", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            bodyFonts.Add(val);
+                                            allDeclaredFonts.Add(val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 2. Phân tích word/fontTable.xml và fontKey
                 Dictionary<string, string> rIdToFontKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 Dictionary<string, string> rIdToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -626,6 +998,7 @@ namespace ZenQOffice.Core
                         {
                             string fontName = fn.Attributes["w:name"] != null ? fn.Attributes["w:name"].Value : "";
                             if (string.IsNullOrEmpty(fontName)) continue;
+                            allDeclaredFonts.Add(fontName);
 
                             foreach (XmlNode emb in fn.SelectNodes(".//*[local-name()='embedRegular' or local-name()='embedBold' or local-name()='embedItalic']"))
                             {
@@ -641,7 +1014,38 @@ namespace ZenQOffice.Core
                     }
                 }
 
-                // 2. Phân tích relationships của fontTable
+                // 3. Quét word/styles.xml
+                ZipArchiveEntry stylesEntry = archive.GetEntry("word/styles.xml");
+                if (stylesEntry != null)
+                {
+                    try
+                    {
+                        XmlDocument sDoc = new XmlDocument();
+                        using (Stream s = stylesEntry.Open()) sDoc.Load(s);
+                        XmlNodeList rfNodes = sDoc.SelectNodes("//*[local-name()='rFonts']");
+                        if (rfNodes != null)
+                        {
+                            foreach (XmlNode rf in rfNodes)
+                            {
+                                string[] attrs = { "w:ascii", "w:hAnsi", "w:cs", "w:eastAsia" };
+                                foreach (string a in attrs)
+                                {
+                                    if (rf.Attributes[a] != null)
+                                    {
+                                        string val = rf.Attributes[a].Value?.Trim();
+                                        if (!string.IsNullOrEmpty(val) && !val.StartsWith("minor", StringComparison.OrdinalIgnoreCase) && !val.StartsWith("default", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            allDeclaredFonts.Add(val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 4. Phân tích relationships của fontTable
                 Dictionary<string, string> targetToTypeface = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 Dictionary<string, string> targetToFontKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -663,7 +1067,7 @@ namespace ZenQOffice.Core
                     }
                 }
 
-                // 3. Đọc các tệp font nhúng trong word/fonts/
+                // 5. Đọc các tệp font nhúng trong word/fonts/
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
                     string fn = entry.FullName.Replace('\\', '/');
@@ -717,20 +1121,58 @@ namespace ZenQOffice.Core
                                 FileName = safeName,
                                 Data = cleanFont,
                                 IsEmbedded = true,
-                                IsInstalledOnSystem = SlideFontManager.HasFont(fam),
+                                IsInstalledOnSystem = IsSystemFontInstalled(fam),
                                 HasVietnameseSupport = viSupport,
                                 MissingVietnameseChars = missing,
                                 SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
-                                SourceDocument = docxPath
+                                SourceDocument = docxPath,
+                                IsUsedInDocumentBody = bodyFonts.Contains(fam)
                             };
 
                             map[fam] = info;
                         }
                     }
                 }
+
+                // 6. Thêm các phông chữ dùng trong tài liệu nhưng không nhúng file
+                foreach (string fam in allDeclaredFonts)
+                {
+                    if (!map.ContainsKey(fam))
+                    {
+                        bool isTcvn3 = fam.StartsWith(".Vn", StringComparison.OrdinalIgnoreCase) || fam.StartsWith(".vn", StringComparison.OrdinalIgnoreCase);
+                        bool isVni = fam.StartsWith("VNI-", StringComparison.OrdinalIgnoreCase) || fam.StartsWith("vni-", StringComparison.OrdinalIgnoreCase);
+                        string formatStr = isTcvn3 ? "TCVN3 (ABC)" : (isVni ? "VNI-Windows" : "TrueType");
+
+                        List<char> missing;
+                        bool viSupport = CheckInstalledFontVietnameseSupport(fam, out missing);
+
+                        map[fam] = new ExtractedFontInfo
+                        {
+                            Typeface = fam,
+                            Subfamily = "Regular",
+                            Format = formatStr,
+                            FileName = $"{fam.Replace(' ', '_')}.ttf",
+                            Data = null,
+                            IsEmbedded = false,
+                            IsInstalledOnSystem = IsSystemFontInstalled(fam),
+                            HasVietnameseSupport = viSupport,
+                            MissingVietnameseChars = missing,
+                            SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
+                            SourceDocument = docxPath,
+                            IsUsedInDocumentBody = bodyFonts.Contains(fam)
+                        };
+                    }
+                }
             }
 
             list.AddRange(map.Values);
+            list.Sort((a, b) =>
+            {
+                int scoreA = (!a.HasVietnameseSupport ? 100 : 0) + (a.IsEmbedded ? 50 : 0) + (a.IsUsedInDocumentBody ? 25 : 0);
+                int scoreB = (!b.HasVietnameseSupport ? 100 : 0) + (b.IsEmbedded ? 50 : 0) + (b.IsUsedInDocumentBody ? 25 : 0);
+                if (scoreA != scoreB) return scoreB.CompareTo(scoreA);
+                return string.Compare(a.Typeface, b.Typeface, StringComparison.OrdinalIgnoreCase);
+            });
             return list;
         }
 
@@ -1059,7 +1501,9 @@ namespace ZenQOffice.Core
                             string fn = entry.FullName.Replace('\\', '/');
                             if (fn.Equals("word/document.xml", StringComparison.OrdinalIgnoreCase) ||
                                 fn.StartsWith("word/header", StringComparison.OrdinalIgnoreCase) ||
-                                fn.StartsWith("word/footer", StringComparison.OrdinalIgnoreCase))
+                                fn.StartsWith("word/footer", StringComparison.OrdinalIgnoreCase) ||
+                                fn.Equals("word/styles.xml", StringComparison.OrdinalIgnoreCase) ||
+                                fn.Equals("word/fontTable.xml", StringComparison.OrdinalIgnoreCase))
                             {
                                 XmlDocument doc = new XmlDocument();
                                 using (Stream s = entry.Open()) doc.Load(s);
@@ -1107,6 +1551,25 @@ namespace ZenQOffice.Core
                                                         report.FontsReplacedCount++;
                                                         modified = true;
                                                     }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Cập nhật tên font trong word/fontTable.xml
+                                    XmlNodeList fNodes = doc.SelectNodes("//*[local-name()='font']");
+                                    if (fNodes != null)
+                                    {
+                                        foreach (XmlNode fnNode in fNodes)
+                                        {
+                                            if (fnNode.Attributes["w:name"] != null)
+                                            {
+                                                string oldF = fnNode.Attributes["w:name"].Value;
+                                                string newF;
+                                                if (replacements.TryGetValue(oldF, out newF))
+                                                {
+                                                    fnNode.Attributes["w:name"].Value = newF;
+                                                    modified = true;
                                                 }
                                             }
                                         }

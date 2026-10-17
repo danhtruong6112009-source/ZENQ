@@ -77,14 +77,15 @@ namespace ZenQOffice.UI
                 {
                     e.Graphics.FillRectangle(barB, 0, 0, 6, pnlHeader.Height);
                 }
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE781', new RectangleF(16, 12, 22, 22), Color.FromArgb(99, 102, 241), 18f);
             };
 
             Label lblTitle = new Label
             {
-                Text = "✨ Thiết lập Trí tuệ Nhân tạo - ZENQ AI Engine",
+                Text = "Thiết lập Trí tuệ Nhân tạo - ZENQ AI Engine",
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(18, 12),
+                Location = new Point(44, 12),
                 AutoSize = true
             };
             pnlHeader.Controls.Add(lblTitle);
@@ -94,7 +95,7 @@ namespace ZenQOffice.UI
                 Text = "Hỗ trợ Google AI Studio (Gemini 3.7/3.6/3.5/2.5), Groq Cloud, OpenAI, DeepSeek, Ollama & Custom API",
                 Font = new Font("Segoe UI", 8.8f),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(18, 38),
+                Location = new Point(44, 38),
                 AutoSize = true
             };
             pnlHeader.Controls.Add(lblSub);
@@ -172,17 +173,19 @@ namespace ZenQOffice.UI
 
             btnToggleKey = new Button
             {
-                Text = "👁️",
                 Location = new Point(545, formY - 1),
                 Size = new Size(55, 30),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(241, 245, 249),
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE7B3', 16, 16, Color.FromArgb(71, 85, 105)),
                 Cursor = Cursors.Hand
             };
             btnToggleKey.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnToggleKey.Click += (s, e) =>
             {
                 txtApiKey.UseSystemPasswordChar = !txtApiKey.UseSystemPasswordChar;
+                btnToggleKey.Image = FluentIconRenderer.GetGlyphBitmap(
+                    txtApiKey.UseSystemPasswordChar ? '\uE7B3' : '\uE890', 16, 16, Color.FromArgb(71, 85, 105));
             };
             pnlCard.Controls.Add(btnToggleKey);
             formY += 42;
@@ -248,7 +251,7 @@ namespace ZenQOffice.UI
             // 3. Status Bar
             lblStatus = new Label
             {
-                Text = "⚡ Trạng thái: Chưa kiểm tra kết nối",
+                Text = "Trạng thái: Chưa kiểm tra kết nối",
                 Location = new Point(22, curY),
                 Size = new Size(618, 30),
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
@@ -267,7 +270,12 @@ namespace ZenQOffice.UI
 
             btnTest = new Button
             {
-                Text = "⚡ Kiểm tra kết nối",
+                Text = "Kiểm tra kết nối",
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE945', 16, 16, Color.FromArgb(30, 41, 59)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0),
                 Location = new Point(0, 0),
                 Size = new Size(160, 40),
                 FlatStyle = FlatStyle.Flat,
@@ -282,7 +290,12 @@ namespace ZenQOffice.UI
 
             btnSave = new Button
             {
-                Text = "💾 Lưu & Kích hoạt",
+                Text = "Lưu & Kích hoạt",
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE74E', 16, 16, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0),
                 Location = new Point(340, 0),
                 Size = new Size(160, 40),
                 FlatStyle = FlatStyle.Flat,
@@ -298,6 +311,11 @@ namespace ZenQOffice.UI
             btnClose = new Button
             {
                 Text = "Đóng",
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 14, 14, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0),
                 Location = new Point(510, 0),
                 Size = new Size(110, 40),
                 FlatStyle = FlatStyle.Flat,
@@ -406,7 +424,7 @@ namespace ZenQOffice.UI
         private void BtnTest_Click(object sender, EventArgs e)
         {
             ReadUiToConfig();
-            lblStatus.Text = "⏳ Đang gửi yêu cầu kiểm tra kết nối tới " + Config.ModelName + "...";
+            lblStatus.Text = "Đang gửi yêu cầu kiểm tra kết nối tới " + Config.ModelName + "...";
             lblStatus.ForeColor = Color.FromArgb(202, 138, 4);
             btnTest.Enabled = false;
 
@@ -417,12 +435,12 @@ namespace ZenQOffice.UI
                     btnTest.Enabled = true;
                     if (resp.Success)
                     {
-                        lblStatus.Text = "✅ Kết nối thành công! Phản hồi sau " + resp.DurationMs + " ms từ " + resp.ModelUsed;
+                        lblStatus.Text = "Kết nối thành công! Phản hồi sau " + resp.DurationMs + " ms từ " + resp.ModelUsed;
                         lblStatus.ForeColor = Color.FromArgb(22, 163, 74);
                     }
                     else
                     {
-                        lblStatus.Text = "❌ Kết nối thất bại: " + resp.ErrorMessage;
+                        lblStatus.Text = "Kết nối thất bại: " + resp.ErrorMessage;
                         lblStatus.ForeColor = Color.FromArgb(220, 38, 38);
                     }
                 }));

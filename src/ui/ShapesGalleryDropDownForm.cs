@@ -69,6 +69,8 @@ namespace ZenQOffice.UI
             AddSection(scrollPanel, ref curY, "Đã dùng gần đây (Recently Used Shapes)", new ShapeItemDefinition[] {
                 new ShapeItemDefinition("TextBox", "Hộp văn bản (Text Box)", ShapeType.TextBox),
                 new ShapeItemDefinition("Line", "Đường thẳng (Line)", ShapeType.Line),
+                new ShapeItemDefinition("FreeformShape", "Freeform: Shape (Hình dạng tự do - Nhấp điểm / Đa giác)", ShapeType.CustomPath),
+                new ShapeItemDefinition("FreeformScribble", "Freeform: Scribble (Vẽ tự do nét nguệch ngoạc)", ShapeType.CustomPath),
                 new ShapeItemDefinition("ArrowLine", "Mũi tên (Arrow)", ShapeType.Arrow),
                 new ShapeItemDefinition("Rectangle", "Hình chữ nhật (Rectangle)", ShapeType.Rectangle),
                 new ShapeItemDefinition("RoundedRectangle", "Hình chữ nhật bo tròn (Rounded Rectangle)", ShapeType.RoundedRectangle),
@@ -86,7 +88,9 @@ namespace ZenQOffice.UI
                 new ShapeItemDefinition("DoubleArrowLine", "Mũi tên hai chiều (Double Arrow)", ShapeType.Arrow),
                 new ShapeItemDefinition("ElbowConnector", "Đầu nối góc (Elbow Connector)", ShapeType.Line),
                 new ShapeItemDefinition("ElbowArrowConnector", "Đầu nối góc mũi tên (Elbow Arrow)", ShapeType.Arrow),
-                new ShapeItemDefinition("CurvedConnector", "Đầu nối cong (Curved Connector)", ShapeType.Line)
+                new ShapeItemDefinition("CurvedConnector", "Đầu nối cong (Curved Connector)", ShapeType.Line),
+                new ShapeItemDefinition("FreeformShape", "Freeform: Shape (Hình dạng tự do - Nhấp điểm / Đa giác)", ShapeType.CustomPath),
+                new ShapeItemDefinition("FreeformScribble", "Freeform: Scribble (Vẽ tự do nét nguệch ngoạc)", ShapeType.CustomPath)
             });
 
             // 3. Hình chữ nhật (Rectangles)
@@ -294,6 +298,36 @@ namespace ZenQOffice.UI
                     {
                         g.DrawString("A", f, Brushes.Black, x + (w - 11) / 2, y + (h - 13) / 2);
                     }
+                    return;
+                }
+
+                if (shapeName == "FreeformShape")
+                {
+                    PointF[] freeformPts = new PointF[] {
+                        new PointF(x + 2, y + h - 4),
+                        new PointF(x + 2, y + 4),
+                        new PointF(x + w * 0.55f, y + 2),
+                        new PointF(x + w - 2, y + h * 0.45f),
+                        new PointF(x + w - 4, y + h - 3),
+                        new PointF(x + w * 0.45f, y + h - 6),
+                        new PointF(x + 2, y + h - 4)
+                    };
+                    g.DrawLines(p, freeformPts);
+                    return;
+                }
+
+                if (shapeName == "FreeformScribble")
+                {
+                    PointF[] scribblePts = new PointF[] {
+                        new PointF(x + 2, y + h - 3),
+                        new PointF(x + 2, y + h * 0.35f),
+                        new PointF(x + w * 0.45f, y + 2),
+                        new PointF(x + w * 0.70f, y + h * 0.45f),
+                        new PointF(x + w * 0.32f, y + h * 0.65f),
+                        new PointF(x + w * 0.62f, y + h - 2),
+                        new PointF(x + w - 2, y + h - 3)
+                    };
+                    g.DrawCurve(p, scribblePts, 0.5f);
                     return;
                 }
 

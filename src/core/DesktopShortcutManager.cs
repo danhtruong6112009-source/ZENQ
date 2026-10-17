@@ -153,6 +153,7 @@ namespace ZenQOffice.Core
                     else if (a.Contains("-calc") || a.Contains("-excel") || a.Contains("-sheet")) appId = "ZenQOffice.Suite.Calc";
                     else if (a.Contains("-slides") || a.Contains("-present") || a.Contains("-ppt")) appId = "ZenQOffice.Suite.Slides";
                     else if (a.Contains("-pdf")) appId = "ZenQOffice.Suite.Pdf";
+                    else if (a.Contains("-photo") || a.Contains("-vector")) appId = "ZenQOffice.Suite.Vector";
                 }
                 SetShortcutAppId(lnkPath, appId);
 
@@ -214,10 +215,14 @@ namespace ZenQOffice.Core
             string slidesIco = Path.Combine(baseDir, "icon", "present.ico");
             string pdfIco = Path.Combine(baseDir, "icon", "pdf.ico");
 
+            string vectorIco = Path.Combine(baseDir, "icon", "vector.ico");
+            if (!File.Exists(vectorIco)) vectorIco = Path.Combine(baseDir, "icon", "photo.ico");
+
             CreateShortcut("ZenQ Writer", "-word", File.Exists(writerIco) ? "icon\\writer.ico" : "ZenQOffice.ico", "ZenQ Writer - Soạn thảo văn bản độc lập");
             CreateShortcut("ZenQ Calc", "-calc", File.Exists(calcIco) ? "icon\\calc.ico" : "ZenQOffice.ico", "ZenQ Calc - Bảng tính điện tử độc lập");
             CreateShortcut("ZenQ Slides", "-slides", File.Exists(slidesIco) ? "icon\\present.ico" : "ZenQOffice.ico", "ZenQ Slides - Thiết kế trình chiếu độc lập");
             CreateShortcut("ZenQ PDF", "-pdf", File.Exists(pdfIco) ? "icon\\pdf.ico" : "ZenQOffice.ico", "ZenQ PDF - Đọc & biên tập tài liệu PDF");
+            CreateShortcut("ZenQ Vector", "-photo", File.Exists(vectorIco) ? "icon\\vector.ico" : "ZenQOffice.ico", "ZenQ Vector - Thiết kế đồ họa vector chuyên nghiệp");
         }
 
         public static void DeleteAllBranchShortcuts()
@@ -226,6 +231,7 @@ namespace ZenQOffice.Core
             DeleteShortcut("ZenQ Calc");
             DeleteShortcut("ZenQ Slides");
             DeleteShortcut("ZenQ PDF");
+            DeleteShortcut("ZenQ Vector");
         }
     }
 }

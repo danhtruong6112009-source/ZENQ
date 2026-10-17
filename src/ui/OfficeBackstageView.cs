@@ -192,20 +192,43 @@ namespace ZenQOffice.UI
         public bool UpdateSmoothScroll(int windowHeight, int windowWidth)
         {
             int maxScroll = GetMaxScroll(windowHeight, windowWidth);
-            TargetScrollY = Math.Max(0, Math.Min(maxScroll, TargetScrollY));
-            bool isAnimating = false;
+            TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(TargetScrollY)));
+            int prevInt = (int)Math.Round(SmoothScrollY);
+            int targetInt = (int)TargetScrollY;
 
-            if (Math.Abs(TargetScrollY - SmoothScrollY) > 0.3f)
+            if (prevInt == targetInt)
             {
-                SmoothScrollY += (TargetScrollY - SmoothScrollY) * 0.25f;
-                isAnimating = true;
+                if (SmoothScrollY != TargetScrollY)
+                {
+                    SmoothScrollY = TargetScrollY;
+                }
+                return false;
             }
-            else if (SmoothScrollY != TargetScrollY)
+
+            float diff = TargetScrollY - SmoothScrollY;
+            float step = diff * 0.25f;
+            float maxStep = 80f;
+            if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
+
+            float nextSmooth = SmoothScrollY + step;
+            int nextInt = (int)Math.Round(nextSmooth);
+
+            if (nextInt == prevInt)
+            {
+                nextInt = prevInt + Math.Sign(diff);
+                nextSmooth = nextInt;
+            }
+
+            if ((diff > 0 && nextInt >= targetInt) || (diff < 0 && nextInt <= targetInt))
             {
                 SmoothScrollY = TargetScrollY;
             }
+            else
+            {
+                SmoothScrollY = nextSmooth;
+            }
 
-            return isAnimating;
+            return true;
         }
 
         private int GetMaxScroll(int windowHeight, int windowWidth)
@@ -305,18 +328,20 @@ namespace ZenQOffice.UI
             // 2.2 Các mục Menu Điều hướng bên trái
             _sidebarItemBounds.Clear();
             string[] navLabels = new string[] {
-                "Trang chủ",      // 0
-                "Mới",            // 1
-                "Mở",             // 2
-                "---",            // 3 (Separator)
-                "Thông tin",      // 4
-                "Lưu",            // 5
-                "Lưu dưới dạng",  // 6
-                "In",             // 7
-                "Xuất",           // 8
-                "Font & Tiếng Việt", // 9 (Trích xuất & Sửa lỗi Font)
-                "---",            // 10 (Separator)
-                "Đóng"            // 11
+                "Trang chủ",            // 0
+                "Mới",                  // 1
+                "Mở",                   // 2
+                "---",                  // 3 (Separator)
+                "Thông tin",            // 4
+                "Lưu",                  // 5
+                "Lưu dưới dạng",        // 6
+                "In",                   // 7
+                "Chia sẻ & Gửi Email",  // 8
+                "Xuất",                 // 9
+                "Bản sao lưu tệp gốc",  // 10
+                "Font & Tiếng Việt",    // 11 (Trích xuất & Sửa lỗi Font)
+                "---",                  // 12 (Separator)
+                "Đóng"                  // 13
             };
             char[] navGlyphs = new char[] {
                 '\uE80F', // Home
@@ -326,8 +351,10 @@ namespace ZenQOffice.UI
                 '\uE946', // Info
                 '\uE74E', // Save
                 '\uE792', // Save As
-                '\uE749', // Print
+                '\uE2F6', // Print
+                '\uE715', // Mail / Share
                 '\uEDE1', // Export
+                '\uEA35', // Safety Vault / Shield / History / Backup
                 '\uE8D2', // Font / Text
                 '\0',
                 '\uE711'  // Close
@@ -744,7 +771,8 @@ namespace ZenQOffice.UI
             using (Font hFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
             using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("📐 Tùy chỉnh kích thước trang chiếu:", hFont, hBrush, x + 16f, y + 12f);
+                FluentIconRenderer.DrawGlyph(g, '\uE740', new RectangleF(x + 16f, y + 13f, 15f, 15f), Color.FromArgb(30, 41, 59), 13f);
+                g.DrawString("Tùy chỉnh kích thước trang chiếu:", hFont, hBrush, x + 36f, y + 12f);
             }
 
             float rowY = y + 42f;
@@ -821,8 +849,9 @@ namespace ZenQOffice.UI
             using (SolidBrush btnTxt = new SolidBrush(Color.White))
             {
                 g.FillPath(btnBg, btnP);
-                StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
-                g.DrawString("✨ Tạo thiết kế mới", btnFont, btnTxt, _createCustomBtnBounds, sf);
+                FluentIconRenderer.DrawGlyph(g, '\uE710', new RectangleF(_createCustomBtnBounds.X + 10f, _createCustomBtnBounds.Y + 8f, 16f, 16f), Color.White, 13f);
+                StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near };
+                g.DrawString("Tạo thiết kế mới", btnFont, btnTxt, new RectangleF(_createCustomBtnBounds.X + 30f, _createCustomBtnBounds.Y, _createCustomBtnBounds.Width - 32f, _createCustomBtnBounds.Height), sf);
             }
         }
 
@@ -1305,11 +1334,73 @@ namespace ZenQOffice.UI
                     Close();
                     if (_appForm != null) _appForm.PerformPrint();
                     break;
-                case 8: // Xuất (Export PDF)
+                case 8: // Chia sẻ & Gửi Email (Share / Email)
                     Close();
-                    if (_appForm != null) _appForm.PerformExportPdf();
+                    if (_appForm != null)
+                    {
+                        string curPath = null;
+                        string docTitle = "Tai_Lieu_ZenQOffice";
+                        if (_appForm.Ribbon != null && _appForm.Ribbon.ActiveDocIndex >= 0 && _appForm.Ribbon.ActiveDocIndex < _appForm.Ribbon.DocTabs.Count)
+                        {
+                            var activeTab = _appForm.Ribbon.DocTabs[_appForm.Ribbon.ActiveDocIndex];
+                            curPath = activeTab.FilePath;
+                            if (!string.IsNullOrEmpty(curPath))
+                                docTitle = System.IO.Path.GetFileNameWithoutExtension(curPath);
+                            else if (!string.IsNullOrEmpty(activeTab.Title))
+                                docTitle = activeTab.Title;
+                        }
+
+                        using (var emailDlg = new SendEmailDialogForm(
+                            docTitle,
+                            curPath,
+                            saveTempCopyAction: (tempPath) =>
+                            {
+                                if (_appForm == null) return false;
+                                try
+                                {
+                                    if (_appForm.Ribbon != null)
+                                    {
+                                        if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Writer && _appForm.WriterView != null)
+                                            return _appForm.WriterView.SaveDocumentFile(tempPath, _appForm.Ribbon, false);
+                                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Calc && _appForm.CalcView != null)
+                                            return ZenQOffice.Format.XlsxHandler.SaveXlsxOrCsv(tempPath, _appForm.CalcView);
+                                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Slides && _appForm.SlidesView != null)
+                                            return ZenQOffice.Format.PptxHandler.SavePptx(tempPath, _appForm.SlidesView.Presentation);
+                                    }
+                                    if (!string.IsNullOrEmpty(curPath) && File.Exists(curPath))
+                                    {
+                                        File.Copy(curPath, tempPath, true);
+                                        return true;
+                                    }
+                                }
+                                catch { }
+                                return false;
+                            },
+                            exportPdfAction: (pdfPath) =>
+                            {
+                                if (_appForm == null) return false;
+                                try
+                                {
+                                    if (_appForm.Ribbon != null && _appForm.Ribbon.CurrentMode == OfficeAppMode.Writer && _appForm.WriterView != null)
+                                        return _appForm.WriterView.ExportToPdf(pdfPath, _appForm.Ribbon);
+                                }
+                                catch { }
+                                return false;
+                            }))
+                        {
+                            emailDlg.ShowDialog(_appForm);
+                        }
+                    }
                     break;
-                case 9: // Font & Tiếng Việt (Trích xuất & Sửa lỗi Font)
+                case 9: // Xuất (Multi-Format Export)
+                    Close();
+                    if (_appForm != null) _appForm.PerformExport();
+                    break;
+                case 10: // Bản sao lưu tệp gốc (Safety Vault)
+                    Close();
+                    if (_appForm != null) _appForm.OpenBackupManagerDialog();
+                    break;
+                case 11: // Font & Tiếng Việt (Trích xuất & Sửa lỗi Font)
                     Close();
                     {
                         string curDocPath = null;
@@ -1323,7 +1414,7 @@ namespace ZenQOffice.UI
                         }
                     }
                     break;
-                case 11: // Đóng
+                case 13: // Đóng
                     Close();
                     if (_appForm != null)
                     {
@@ -1482,11 +1573,11 @@ namespace ZenQOffice.UI
         private void CreateNewPhotoDocument(int templateIndex)
         {
             if (_appForm == null || _appForm.Ribbon == null) return;
-            string docTitle = "Thiết kế Mới.psd";
+            string docTitle = "Thiết kế Mới.svg";
             int w = 1920, h = 1080;
-            if (templateIndex == 1) { w = 1080; h = 1080; docTitle = "Thiết kế Vuông 1080x1080.psd"; }
-            else if (templateIndex == 2) { w = 1280; h = 720; docTitle = "Thiết kế HD 1280x720.psd"; }
-            else if (templateIndex == 3) { w = 3840; h = 2160; docTitle = "Áp phích Poster 4K.psd"; }
+            if (templateIndex == 1) { w = 1080; h = 1080; docTitle = "Thiết kế Vuông 1080x1080.svg"; }
+            else if (templateIndex == 2) { w = 1280; h = 720; docTitle = "Thiết kế HD 1280x720.svg"; }
+            else if (templateIndex == 3) { w = 3840; h = 2160; docTitle = "Áp phích Poster 4K.svg"; }
 
             _appForm.Ribbon.AddDocTab(docTitle, OfficeAppMode.Photo, _appForm.SlidesView, _appForm.WriterView, _appForm.CalcView, _appForm.PdfView, _appForm.PhotoView);
             int activeIdx = _appForm.Ribbon.ActiveDocIndex;

@@ -133,8 +133,8 @@ namespace ZenQOffice.Core
                                         draftPath,
                                         wText,
                                         tab.WriterFormattedRuns,
-                                        false,
-                                        0,
+                                        tab.WriterPaperWidthInches > tab.WriterPaperHeightInches,
+                                        tab.WriterMarginMode,
                                         tab.WriterHeaderText ?? "",
                                         tab.WriterFooterText ?? "",
                                         tab.WriterShowPageNumbers,
@@ -149,7 +149,13 @@ namespace ZenQOffice.Core
                                         tab.WriterParagraphFirstLineIndents,
                                         tab.WriterParagraphLeftIndents,
                                         tab.WriterParagraphRightIndents,
-                                        tab.WriterParagraphHangingIndents);
+                                        tab.WriterParagraphHangingIndents,
+                                        tab.WriterCustomLeftMargin,
+                                        tab.WriterCustomRightMargin,
+                                        tab.WriterCustomTopMargin,
+                                        tab.WriterCustomBottomMargin,
+                                        tab.WriterPaperWidthInches,
+                                        tab.WriterPaperHeightInches);
                                 }
                             }
                             catch
@@ -189,6 +195,8 @@ namespace ZenQOffice.Core
                                 CalcView tempCv = new CalcView();
                                 tempCv.Sheets = tab.CalcSheets;
                                 tempCv.SheetNames = tab.CalcSheetNames;
+                                if (tab.CalcColWidths != null) tempCv.CustomColWidths = new Dictionary<uint, int>(tab.CalcColWidths);
+                                if (tab.CalcRowHeights != null) tempCv.CustomRowHeights = new Dictionary<uint, int>(tab.CalcRowHeights);
                                 Format.XlsxHandler.SaveXlsx(draftPath, tempCv);
                             }
                         }
@@ -442,27 +450,45 @@ namespace ZenQOffice.Core
                             {
                                 if (item.Mode == OfficeAppMode.Writer && appForm.WriterView != null)
                                 {
-                                    string ext = Path.GetExtension(draftPath).ToLower();
-                                    if (ext == ".docx")
+                                    bool preferOriginal = false;
+                                    if (hasFile && File.Exists(item.FilePath))
                                     {
-                                        loaded = appForm.WriterView.LoadDocumentFile(draftPath, appForm.Ribbon);
-                                    }
-                                    else if (IsSafeDraftText(draftPath))
-                                    {
-                                        string draftText = File.ReadAllText(draftPath, Encoding.UTF8);
-                                        if (!string.IsNullOrEmpty(draftText))
+                                        try
                                         {
-                                            appForm.WriterView.PieceTable.SetInitialText(draftText);
-                                            appForm.WriterView.CursorPosition = draftText.Length;
-                                            loaded = true;
+                                            var fInfoOrig = new FileInfo(item.FilePath);
+                                            var fInfoDraft = new FileInfo(draftPath);
+                                            if (fInfoOrig.LastWriteTimeUtc >= fInfoDraft.LastWriteTimeUtc)
+                                            {
+                                                preferOriginal = true;
+                                            }
                                         }
+                                        catch { }
                                     }
-                                    if (loaded)
+
+                                    if (!preferOriginal)
                                     {
-                                        appForm.WriterView.CurrentFilePath = item.FilePath ?? "";
-                                        appForm.Ribbon.DocTabs[currentIdx].FilePath = item.FilePath ?? "";
-                                        appForm.Ribbon.DocTabs[currentIdx].Title = displayTitle;
-                                        appForm.Ribbon.DocTabs[currentIdx].IsModified = true;
+                                        string ext = Path.GetExtension(draftPath).ToLower();
+                                        if (ext == ".docx")
+                                        {
+                                            loaded = appForm.WriterView.LoadDocumentFile(draftPath, appForm.Ribbon);
+                                        }
+                                        else if (IsSafeDraftText(draftPath))
+                                        {
+                                            string draftText = File.ReadAllText(draftPath, Encoding.UTF8);
+                                            if (!string.IsNullOrEmpty(draftText))
+                                            {
+                                                appForm.WriterView.PieceTable.SetInitialText(draftText);
+                                                appForm.WriterView.CursorPosition = draftText.Length;
+                                                loaded = true;
+                                            }
+                                        }
+                                        if (loaded)
+                                        {
+                                            appForm.WriterView.CurrentFilePath = item.FilePath ?? "";
+                                            appForm.Ribbon.DocTabs[currentIdx].FilePath = item.FilePath ?? "";
+                                            appForm.Ribbon.DocTabs[currentIdx].Title = displayTitle;
+                                            appForm.Ribbon.DocTabs[currentIdx].IsModified = true;
+                                        }
                                     }
                                 }
                                 else if (item.Mode == OfficeAppMode.Slides && appForm.SlidesView != null && !hasFile)
@@ -474,7 +500,7 @@ namespace ZenQOffice.Core
                                     appForm.Ribbon.DocTabs[currentIdx].IsModified = true;
                                     loaded = true;
                                 }
-                                else if (item.Mode == OfficeAppMode.Calc && appForm.CalcView != null)
+                                else if (item.Mode == OfficeAppMode.Calc && appForm.CalcView != null && !hasFile)
                                 {
                                     Format.XlsxHandler.LoadXlsxOrCsv(draftPath, appForm.CalcView);
                                     appForm.CalcView.ActiveSheetIndex = Math.Max(0, Math.Min(appForm.CalcView.Sheets.Count - 1, item.ActiveSheetIndex));
@@ -513,6 +539,12 @@ namespace ZenQOffice.Core
                                     appForm.PdfView.Document = Format.PdfHandler.LoadPdf(item.FilePath);
                                     appForm.PdfView.ActivePageIndex = Math.Max(0, Math.Min(appForm.PdfView.Document.Pages.Count - 1, item.ActivePageIndex));
                                     loaded = true;
+                                }
+                                if (loaded)
+                                {
+                                    appForm.Ribbon.DocTabs[currentIdx].FilePath = item.FilePath ?? "";
+                                    appForm.Ribbon.DocTabs[currentIdx].Title = displayTitle;
+                                    appForm.Ribbon.DocTabs[currentIdx].IsModified = false;
                                 }
                             }
                             catch { }

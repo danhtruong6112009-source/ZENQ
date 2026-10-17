@@ -79,7 +79,7 @@ namespace ZenQOffice.UI
                         {
                             // Align Justify: Tái tạo đồng bộ 100% từ vạch chuẩn của \uE8E4 (Align Left) trong font Segoe Fluent Icons.
                             // Đảm bảo cùng độ dày, cùng bo góc, cùng độ dài và chuẩn xác trên cùng 3 hàng ngang (không bao giờ lệch hàng hay dày/dài bất thường).
-                            float hiFontSz = (fontSize > 0) ? (fontSize * scale) : (hiH * 0.72f);
+                            float hiFontSz = (fontSize > 0) ? Math.Min(fontSize * scale, hiH * 0.75f) : (hiH * 0.72f);
                             Font hiFont = GetFont(hiFontSz);
 
                             using (Bitmap hiSrc = new Bitmap(hiW, hiH, PixelFormat.Format32bppArgb))
@@ -147,7 +147,7 @@ namespace ZenQOffice.UI
                         {
                             gHi.TextRenderingHint = TextRenderingHint.AntiAlias;
 
-                            float hiFontSz = (fontSize > 0) ? (fontSize * scale) : (hiH * 0.72f);
+                            float hiFontSz = (fontSize > 0) ? Math.Min(fontSize * scale, hiH * 0.75f) : (hiH * 0.72f);
                             Font hiFont = GetFont(hiFontSz);
 
                             using (SolidBrush brush = new SolidBrush(color))

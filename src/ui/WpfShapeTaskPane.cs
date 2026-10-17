@@ -1012,24 +1012,52 @@ namespace ZenQOffice.UI
         {
             int scrollStep = (delta > 0) ? -100 : 100;
             TargetScrollY = Math.Max(0, Math.Min(MaxScrollY, TargetScrollY + scrollStep));
+            ScrollY = (int)TargetScrollY;
+            SmoothScrollY = TargetScrollY;
         }
 
         public bool UpdateSmoothScroll()
         {
-            float diff = TargetScrollY - SmoothScrollY;
-            if (Math.Abs(diff) > 0.5f)
+            TargetScrollY = (float)Math.Round(TargetScrollY);
+            int prevInt = (int)Math.Round(SmoothScrollY);
+            int targetInt = (int)TargetScrollY;
+
+            if (prevInt == targetInt)
             {
-                SmoothScrollY += diff * 0.35f;
-                ScrollY = (int)Math.Round(SmoothScrollY);
-                return true;
+                if (SmoothScrollY != TargetScrollY || ScrollY != targetInt)
+                {
+                    SmoothScrollY = TargetScrollY;
+                    ScrollY = targetInt;
+                }
+                return false;
             }
-            else if (ScrollY != (int)TargetScrollY)
+
+            float diff = TargetScrollY - SmoothScrollY;
+            float step = diff * 0.28f;
+            float maxStep = 60f;
+            if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
+
+            float nextSmooth = SmoothScrollY + step;
+            int nextInt = (int)Math.Round(nextSmooth);
+
+            if (nextInt == prevInt)
+            {
+                nextInt = prevInt + Math.Sign(diff);
+                nextSmooth = nextInt;
+            }
+
+            if ((diff > 0 && nextInt >= targetInt) || (diff < 0 && nextInt <= targetInt))
             {
                 SmoothScrollY = TargetScrollY;
-                ScrollY = (int)TargetScrollY;
-                return true;
+                ScrollY = targetInt;
             }
-            return false;
+            else
+            {
+                SmoothScrollY = nextSmooth;
+                ScrollY = nextInt;
+            }
+
+            return true;
         }
     }
 }

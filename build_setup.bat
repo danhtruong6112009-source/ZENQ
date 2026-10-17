@@ -6,7 +6,7 @@ echo [1/3] Building ZenQOffice.exe...
 echo ===================================================
 call build.bat
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] ZenQOffice.exe build failed!
+    echo [ERROR] ZenQOffice build failed!
     exit /b 1
 )
 
@@ -21,6 +21,14 @@ mkdir temp_dist\x64
 mkdir temp_dist\x86
 
 copy /y bin\Release\net10.0-windows\* temp_dist\ >nul
+
+:: Remove any stray pdb or xml documentation to keep payload clean and protect privacy
+del /s /q temp_dist\*.pdb >nul 2>&1
+del /s /q temp_dist\*.xml >nul 2>&1
+
+if not exist temp_dist\x64 mkdir temp_dist\x64
+if not exist temp_dist\x86 mkdir temp_dist\x86
+
 if exist pdfium.dll copy /y pdfium.dll temp_dist\ >nul
 if exist ZenQOffice.ico copy /y ZenQOffice.ico temp_dist\ >nul
 if exist GenOffice.ico copy /y GenOffice.ico temp_dist\ >nul
@@ -29,11 +37,11 @@ if exist GENOFFICE.png copy /y GENOFFICE.png temp_dist\ >nul
 if exist x64\pdfium.dll copy /y x64\pdfium.dll temp_dist\x64\ >nul
 if exist x86\pdfium.dll copy /y x86\pdfium.dll temp_dist\x86\ >nul
 if exist data\graphics.json (
-    mkdir temp_dist\data >nul 2>&1
+    if not exist temp_dist\data mkdir temp_dist\data >nul 2>&1
     copy /y data\graphics.json temp_dist\data\ >nul
 )
 if exist icon (
-    mkdir temp_dist\icon >nul 2>&1
+    if not exist temp_dist\icon mkdir temp_dist\icon >nul 2>&1
     copy /y icon\* temp_dist\icon\ >nul
 )
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct2D1;
 using Vortice.DirectWrite;
@@ -28,7 +29,7 @@ namespace ZenQOffice.UI
                     try
                     {
                         _renderTarget.Flush(out _, out _);
-                        _hdc = _gdiInterop.GetDC(DcInitializeMode.Copy);
+                        _interopHdc = _gdiInterop.GetDC(DcInitializeMode.Copy);
                         _inGdiDc = true;
                     }
                     catch (Exception ex)
@@ -36,14 +37,14 @@ namespace ZenQOffice.UI
                         System.Diagnostics.Debug.WriteLine("GdiInterop GetDC error: " + ex.Message);
                     }
                 }
-                return _hdc;
+                return _interopHdc;
             }
 
             if (_renderTarget != null && _isDrawing)
             {
                 try { _renderTarget.Flush(out _, out _); } catch { }
             }
-            return _hdc;
+            return _gdiHdc;
         }
 
         public void ReleaseHdc()
@@ -59,7 +60,7 @@ namespace ZenQOffice.UI
                     System.Diagnostics.Debug.WriteLine("GdiInterop ReleaseDC error: " + ex.Message);
                 }
                 _inGdiDc = false;
-                _hdc = IntPtr.Zero;
+                _interopHdc = IntPtr.Zero;
             }
         }
 
@@ -68,6 +69,7 @@ namespace ZenQOffice.UI
         private static readonly IDWriteFactory5 _dwriteFactory5;
         private static IDWriteFontCollection _customFontCollection;
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IDWriteTextFormat> _textFormatCache = new System.Collections.Concurrent.ConcurrentDictionary<string, IDWriteTextFormat>();
+        public static ID2D1Factory D2DFactory => _d2dFactory;
 
         static D2DGraphics()
         {
@@ -104,14 +106,13 @@ namespace ZenQOffice.UI
 
         private ID2D1RenderTarget _renderTarget;
         private ID2D1HwndRenderTarget _hwndRenderTarget;
-        private ID2D1DCRenderTarget _dcRenderTarget;
-        private static ID2D1DCRenderTarget _sharedDcRenderTarget;
-        private static readonly object _sharedDcLock = new object();
-        private bool _isUsingSharedDc = false;
         private ID2D1GdiInteropRenderTarget _gdiInterop;
+        private bool _isUsingSharedDc = false;
         private bool _inGdiDc = false;
-        private IntPtr _hdc = IntPtr.Zero;
-        private bool _ownsHdc = false;
+        private IntPtr _interopHdc = IntPtr.Zero;
+        private IntPtr _gdiHdc = IntPtr.Zero;
+        private bool _ownsGdiHdc = false;
+        private bool _ownsHdc => _ownsGdiHdc;
         private bool _isDrawing = false;
         private Graphics _gdiGraphics;
         private bool _ownsGraphics = false;
@@ -126,7 +127,7 @@ namespace ZenQOffice.UI
         {
             _gdiGraphics = g;
             _ownsGraphics = false;
-            _ownsHdc = false;
+            _ownsGdiHdc = false;
             _renderTarget = null;
             if (g != null)
             {
@@ -138,82 +139,11 @@ namespace ZenQOffice.UI
         {
             _gdiGraphics = g;
             _ownsGraphics = false;
+            _ownsGdiHdc = false;
+            _renderTarget = null;
             if (g != null)
             {
                 try { _dpiX = g.DpiX; _dpiY = g.DpiY; } catch { }
-                int clipW = 0, clipH = 0;
-                try
-                {
-                    var clip = g.VisibleClipBounds;
-                    clipW = Math.Max(1, (int)Math.Ceiling(clip.Right));
-                    clipH = Math.Max(1, (int)Math.Ceiling(clip.Bottom));
-                }
-                catch { }
-
-                try
-                {
-                    _hdc = g.GetHdc();
-                    _ownsHdc = true;
-
-                    int w = viewportWidth;
-                    int h = viewportHeight;
-
-                    if (w <= 0 || h <= 0)
-                    {
-                        IntPtr hBmp = GetCurrentObject(_hdc, OBJ_BITMAP);
-                        if (hBmp != IntPtr.Zero && GetObject(hBmp, Marshal.SizeOf<BITMAP>(), out BITMAP bmpObj) > 0 && bmpObj.bmWidth > 0 && bmpObj.bmHeight > 0)
-                        {
-                            w = bmpObj.bmWidth;
-                            h = bmpObj.bmHeight;
-                        }
-                    }
-
-                    if (w <= 0 || h <= 0)
-                    {
-                        int devW = GetDeviceCaps(_hdc, HORZRES);
-                        int devH = GetDeviceCaps(_hdc, VERTRES);
-                        w = Math.Max(clipW, devW > 0 ? devW : 1920);
-                        h = Math.Max(clipH, devH > 0 ? devH : 1080);
-                    }
-
-                    w = Math.Max(1, w);
-                    h = Math.Max(1, h);
-
-                    lock (_sharedDcLock)
-                    {
-                        if (_sharedDcRenderTarget == null)
-                        {
-                            var props = new RenderTargetProperties(
-                                RenderTargetType.Default,
-                                new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
-                                96.0f, 96.0f,
-                                RenderTargetUsage.GdiCompatible,
-                                FeatureLevel.Default
-                            );
-                            _sharedDcRenderTarget = _d2dFactory.CreateDCRenderTarget(props);
-                        }
-                        _dcRenderTarget = _sharedDcRenderTarget;
-                        _isUsingSharedDc = true;
-                    }
-
-                    _dcRenderTarget.BindDC(_hdc, new Vortice.Mathematics.RectI(0, 0, w, h));
-                    _renderTarget = _dcRenderTarget;
-                    try { _gdiInterop = _renderTarget.QueryInterface<ID2D1GdiInteropRenderTarget>(); } catch { }
-                    _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
-                    _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Cleartype;
-                    _renderTarget.BeginDraw();
-                    _isDrawing = true;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("D2D DC fallback: " + ex.Message);
-                    if (_ownsHdc && _hdc != IntPtr.Zero)
-                    {
-                        try { g.ReleaseHdc(_hdc); } catch { }
-                        _hdc = IntPtr.Zero;
-                        _ownsHdc = false;
-                    }
-                }
             }
         }
 
@@ -333,6 +263,13 @@ namespace ZenQOffice.UI
                 _clipDepth--;
             }
 
+            if (_inGdiDc && _gdiInterop != null)
+            {
+                try { _gdiInterop.ReleaseDC(null); } catch { }
+                _inGdiDc = false;
+                _interopHdc = IntPtr.Zero;
+            }
+
             if (_isDrawing && _renderTarget != null)
             {
                 try 
@@ -345,23 +282,17 @@ namespace ZenQOffice.UI
                 _isDrawing = false;
             }
 
-            if (_inGdiDc && _gdiInterop != null)
-            {
-                try { _gdiInterop.ReleaseDC(null); } catch { }
-                _inGdiDc = false;
-                _hdc = IntPtr.Zero;
-            }
             if (_gdiInterop != null)
             {
                 try { _gdiInterop.Dispose(); } catch { }
                 _gdiInterop = null;
             }
 
-            if (_ownsHdc && _gdiGraphics != null && _hdc != IntPtr.Zero)
+            if (_ownsGdiHdc && _gdiGraphics != null && _gdiHdc != IntPtr.Zero)
             {
-                try { _gdiGraphics.ReleaseHdc(_hdc); } catch { }
-                _hdc = IntPtr.Zero;
-                _ownsHdc = false;
+                try { _gdiGraphics.ReleaseHdc(_gdiHdc); } catch { }
+                _gdiHdc = IntPtr.Zero;
+                _ownsGdiHdc = false;
             }
 
             if (_hwndRenderTarget != null)
@@ -369,25 +300,13 @@ namespace ZenQOffice.UI
                 _hwndRenderTarget.Dispose();
                 _hwndRenderTarget = null;
             }
-            if (_isUsingSharedDc)
-            {
-                _dcRenderTarget = null;
-            }
-            else if (_dcRenderTarget != null)
-            {
-                _dcRenderTarget.Dispose();
-                _dcRenderTarget = null;
-            }
             _renderTarget = null;
 
-            if (!_isUsingSharedDc)
+            foreach (var bmp in _bitmapCache.Values)
             {
-                foreach (var bmp in _bitmapCache.Values)
-                {
-                    try { bmp?.Dispose(); } catch { }
-                }
-                _bitmapCache.Clear();
+                try { bmp?.Dispose(); } catch { }
             }
+            _bitmapCache.Clear();
 
             if (_ownsGraphics && _gdiGraphics != null)
             {
@@ -855,7 +774,7 @@ namespace ZenQOffice.UI
             });
         }
 
-        private ID2D1PathGeometry ConvertPath(GraphicsPath path)
+        public static ID2D1PathGeometry ConvertPath(GraphicsPath path)
         {
             if (path == null || _d2dFactory == null || path.PointCount == 0) return null;
             try
@@ -1511,6 +1430,32 @@ namespace ZenQOffice.UI
         public void DrawImage(Image image, Rectangle destRect, float srcX, float srcY, float srcWidth, float srcHeight, GraphicsUnit srcUnit, float opacity = -1.0f)
             => DrawImage(image, destRect, (int)srcX, (int)srcY, (int)srcWidth, (int)srcHeight, srcUnit, opacity);
 
+        public void DrawImage(Image image, RectangleF destRect, RectangleF srcRect, GraphicsUnit srcUnit = GraphicsUnit.Pixel, float opacity = -1.0f)
+        {
+            if (image == null || destRect.Width <= 0.001f || destRect.Height <= 0.001f || srcRect.Width <= 0.001f || srcRect.Height <= 0.001f) return;
+            float finalOp = (opacity >= 0.0f) ? Math.Max(0.0f, Math.Min(1.0f, opacity)) : _currentImageOpacity;
+            if (_renderTarget != null)
+            {
+                try
+                {
+                    var d2dBmp = GetOrCreateD2DBitmap(image);
+                    if (d2dBmp != null)
+                    {
+                        _renderTarget.DrawBitmap(
+                            d2dBmp,
+                            new Vortice.Mathematics.Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height),
+                            finalOp,
+                            BitmapInterpolationMode.Linear,
+                            new Vortice.Mathematics.Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height)
+                        );
+                        return;
+                    }
+                }
+                catch { }
+            }
+            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, destRect, srcRect, srcUnit);
+        }
+
         public void DrawImage(Image image, PointF[] destPoints, RectangleF srcRect, GraphicsUnit srcUnit, System.Drawing.Imaging.ImageAttributes imageAttr, float opacity = -1.0f)
         {
             if (image == null) return;
@@ -1618,10 +1563,39 @@ namespace ZenQOffice.UI
         public float DpiX => _dpiX;
         public float DpiY => _dpiY;
 
+        private readonly ConditionalWeakTable<Region, StrongBox<int>> _regionDepthMap = new ConditionalWeakTable<Region, StrongBox<int>>();
+
         public Region Clip
         {
-            get => (_gdiGraphics != null && !_ownsHdc) ? _gdiGraphics.Clip : new Region();
-            set { if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.Clip = value; }
+            get
+            {
+                if (_renderTarget != null)
+                {
+                    Region r = (_gdiGraphics != null && !_ownsHdc) ? _gdiGraphics.Clip : new Region();
+                    _regionDepthMap.AddOrUpdate(r, new StrongBox<int>(_clipDepth));
+                    return r;
+                }
+                return (_gdiGraphics != null && !_ownsHdc) ? _gdiGraphics.Clip : new Region();
+            }
+            set
+            {
+                if (_renderTarget != null)
+                {
+                    int baseClip = (_d2dStateStack.Count > 0) ? _d2dStateStack[_d2dStateStack.Count - 1].Layer.ClipDepth : 0;
+                    int targetDepth = baseClip;
+                    if (value != null && _regionDepthMap.TryGetValue(value, out var box))
+                    {
+                        targetDepth = Math.Max(baseClip, box.Value);
+                    }
+                    while (_clipDepth > targetDepth)
+                    {
+                        try { _renderTarget.PopAxisAlignedClip(); } catch { }
+                        _clipDepth--;
+                    }
+                    return;
+                }
+                if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.Clip = value;
+            }
         }
 
         public Matrix Transform
@@ -1778,8 +1752,43 @@ namespace ZenQOffice.UI
 
         public void SetClip(Region region, System.Drawing.Drawing2D.CombineMode combineMode)
         {
-            if (_renderTarget != null) return;
+            if (_renderTarget != null)
+            {
+                if (combineMode == System.Drawing.Drawing2D.CombineMode.Replace)
+                {
+                    Clip = region;
+                }
+                return;
+            }
             if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.SetClip(region, combineMode);
+        }
+
+        public void SetClip(Region region) => SetClip(region, System.Drawing.Drawing2D.CombineMode.Replace);
+
+        public void PushClip(Rectangle rect) => PushClip(new RectangleF(rect.X, rect.Y, rect.Width, rect.Height));
+        public void PushClip(RectangleF rect)
+        {
+            if (_renderTarget != null)
+            {
+                _renderTarget.PushAxisAlignedClip(new Vortice.Mathematics.Rect(rect.X, rect.Y, rect.Width, rect.Height), AntialiasMode.PerPrimitive);
+                _clipDepth++;
+                return;
+            }
+            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.IntersectClip(rect);
+        }
+
+        public void PopClip()
+        {
+            if (_renderTarget != null)
+            {
+                int baseClip = (_d2dStateStack.Count > 0) ? _d2dStateStack[_d2dStateStack.Count - 1].Layer.ClipDepth : 0;
+                if (_clipDepth > baseClip)
+                {
+                    try { _renderTarget.PopAxisAlignedClip(); } catch { }
+                    _clipDepth--;
+                }
+                return;
+            }
         }
 
         public void IntersectClip(Rectangle rect) => IntersectClip(new RectangleF(rect.X, rect.Y, rect.Width, rect.Height));

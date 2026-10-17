@@ -56,6 +56,11 @@ namespace ZenQOffice.UI
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.In, "In (Phóng to vào trong)", currentDir == TransitionDirection.In, "↘↖");
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Out, "Out (Thu nhỏ ra ngoài)", currentDir == TransitionDirection.Out, "↖↘");
             }
+            else if (transType == TransitionType.Fade)
+            {
+                AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Smoothly, "Smoothly (Chuyển êm)", currentDir != TransitionDirection.ThroughBlack, "☁");
+                AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.ThroughBlack, "Through Black (Qua màn đen)", currentDir == TransitionDirection.ThroughBlack, "⬛");
+            }
             else
             {
                 // Default directional 4-way transitions (Push, Wipe, Reveal, Cover, Uncover, Pan, Cube, etc.)

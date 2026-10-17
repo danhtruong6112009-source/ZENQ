@@ -94,11 +94,11 @@ namespace ZenQOffice.UI
             Panel cardTouch = CreateSectionCard("Cảm ứng & Bút vẽ", '\uED5F', new Point(16, 12), new Size(608, 104));
             body.Controls.Add(cardTouch);
 
-            Button btnOpenOsk = CreateNeutralButton("Bàn phím ảo", new Point(366, 8), new Size(95, 25));
+            Button btnOpenOsk = CreateNeutralButton("Bàn phím ảo", new Point(356, 8), new Size(105, 25), '\uE765');
             btnOpenOsk.Click += (sender, e) => PeripheralDeviceManager.ToggleTouchKeyboard();
             cardTouch.Controls.Add(btnOpenOsk);
 
-            Button btnOpenConnect = CreateNeutralButton("📱 Kết nối Mobile", new Point(468, 8), new Size(126, 25));
+            Button btnOpenConnect = CreateNeutralButton("Kết nối Mobile", new Point(468, 8), new Size(126, 25), '\uE8EA');
             btnOpenConnect.Click += (sender, e) =>
             {
                 using (var dlg = new ZenQConnectDialog())
@@ -171,15 +171,15 @@ namespace ZenQOffice.UI
             _cboUsbDrives.SelectedIndexChanged += (sender, e) => RefreshUsbFilesList();
             cardUsb.Controls.Add(_cboUsbDrives);
 
-            Button btnRefreshUsb = CreateNeutralButton("Làm mới", new Point(310, 36), new Size(80, 27));
+            Button btnRefreshUsb = CreateNeutralButton("Làm mới", new Point(298, 36), new Size(92, 27), '\uE72C');
             btnRefreshUsb.Click += (sender, e) => RefreshDeviceLists();
             cardUsb.Controls.Add(btnRefreshUsb);
 
-            Button btnBackupUsb = CreateNeutralButton("Sao lưu ra USB", new Point(398, 36), new Size(112, 27));
+            Button btnBackupUsb = CreateNeutralButton("Sao lưu", new Point(396, 36), new Size(96, 27), '\uEA35');
             btnBackupUsb.Click += (sender, e) => DoBackupToSelectedUsb();
             cardUsb.Controls.Add(btnBackupUsb);
 
-            Button btnOpenUsbFile = CreateNeutralButton("Mở tệp", new Point(518, 36), new Size(74, 27));
+            Button btnOpenUsbFile = CreateNeutralButton("Mở tệp", new Point(498, 36), new Size(94, 27), '\uE838');
             btnOpenUsbFile.Click += (sender, e) => OpenSelectedUsbFile();
             cardUsb.Controls.Add(btnOpenUsbFile);
 
@@ -227,7 +227,7 @@ namespace ZenQOffice.UI
             };
             Controls.Add(footer);
 
-            Button btnCancel = CreateNeutralButton("Đóng", new Point(422, 10), new Size(94, 30));
+            Button btnCancel = CreateNeutralButton("Đóng", new Point(422, 10), new Size(94, 30), '\uE711');
             btnCancel.Click += (sender, e) =>
             {
                 DialogResult = DialogResult.Cancel;
@@ -235,7 +235,7 @@ namespace ZenQOffice.UI
             };
             footer.Controls.Add(btnCancel);
 
-            Button btnApply = CreatePrimaryButton("Lưu", new Point(524, 10), new Size(100, 30));
+            Button btnApply = CreatePrimaryButton("Lưu", new Point(524, 10), new Size(100, 30), '\uE74E');
             btnApply.Click += (sender, e) =>
             {
                 SaveSettingsFromUI();
@@ -282,7 +282,7 @@ namespace ZenQOffice.UI
             };
         }
 
-        private Button CreateNeutralButton(string text, Point loc, Size sz)
+        private Button CreateNeutralButton(string text, Point loc, Size sz, char glyph = '\0')
         {
             Button btn = new Button
             {
@@ -300,10 +300,18 @@ namespace ZenQOffice.UI
             btn.FlatAppearance.BorderSize = 1;
             btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(241, 245, 249);
             btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(226, 232, 240);
+            if (glyph != '\0')
+            {
+                btn.Image = FluentIconRenderer.GetGlyphBitmap(glyph, 13, 13, Color.FromArgb(30, 41, 59));
+                btn.ImageAlign = ContentAlignment.MiddleLeft;
+                btn.TextAlign = ContentAlignment.MiddleCenter;
+                btn.TextImageRelation = TextImageRelation.ImageBeforeText;
+                btn.Padding = new Padding(4, 0, 4, 0);
+            }
             return btn;
         }
 
-        private Button CreatePrimaryButton(string text, Point loc, Size sz)
+        private Button CreatePrimaryButton(string text, Point loc, Size sz, char glyph = '\0')
         {
             Button btn = new Button
             {
@@ -320,6 +328,14 @@ namespace ZenQOffice.UI
             btn.FlatAppearance.BorderSize = 0;
             btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 78, 216);
             btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(30, 64, 175);
+            if (glyph != '\0')
+            {
+                btn.Image = FluentIconRenderer.GetGlyphBitmap(glyph, 13, 13, Color.White);
+                btn.ImageAlign = ContentAlignment.MiddleLeft;
+                btn.TextAlign = ContentAlignment.MiddleCenter;
+                btn.TextImageRelation = TextImageRelation.ImageBeforeText;
+                btn.Padding = new Padding(4, 0, 4, 0);
+            }
             return btn;
         }
 

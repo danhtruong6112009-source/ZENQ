@@ -24,14 +24,18 @@ namespace ZenQOffice.UI
                 Height = 65,
                 BackColor = Color.FromArgb(30, 64, 175) // Royal Blue
             };
+            headerPanel.Paint += (s, e) =>
+            {
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE765', new Rectangle(18, 16, 30, 30), Color.White, 22f);
+            };
             this.Controls.Add(headerPanel);
 
             Label lblTitle = new Label
             {
-                Text = "⌨ BẢNG TRA CỨU PHÍM TẮT ZENQ OFFICE / MICROSOFT WORD",
+                Text = "BẢNG TRA CỨU PHÍM TẮT ZENQ OFFICE / MICROSOFT WORD",
                 Font = new Font("Segoe UI", 12.5f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(18, 12),
+                Location = new Point(56, 12),
                 AutoSize = true
             };
             headerPanel.Controls.Add(lblTitle);
@@ -41,7 +45,7 @@ namespace ZenQOffice.UI
                 Text = "Tương thích 100% phím tắt chuẩn Microsoft Word 2016-365",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(224, 231, 255),
-                Location = new Point(20, 38),
+                Location = new Point(58, 38),
                 AutoSize = true
             };
             headerPanel.Controls.Add(lblSub);
@@ -142,6 +146,38 @@ namespace ZenQOffice.UI
                 { "Escape", "Hủy chọn / Thoát chế độ chọn mở rộng F8" }
             });
 
+            AddCategoryTab(tabControl, "8. Đồ Họa (Photo Studio)", new string[,] {
+                { "V", "Công cụ Di chuyển & Chọn đối tượng (Move Tool)" },
+                { "A / N", "Công cụ Chỉnh sửa Điểm neo Vector (Node Tool)" },
+                { "M", "Công cụ Chọn vùng bao chữ nhật (Marquee Tool)" },
+                { "B", "Công cụ Cọ vẽ tự do (Brush Tool)" },
+                { "E", "Công cụ Cục tẩy xóa (Eraser Tool)" },
+                { "P", "Công cụ Bút vẽ đường cong Bezier (Pen Tool)" },
+                { "T", "Công cụ Soạn thảo Văn bản (Text Tool)" },
+                { "G", "Công cụ Đổ màu / Chuyển sắc (Bucket / Gradient)" },
+                { "I", "Công cụ Hút màu điểm ảnh (Eyedropper Tool)" },
+                { "C", "Công cụ Cắt xén Khung vẽ (Crop Canvas Tool)" },
+                { "U", "Công cụ Vẽ các Hình dạng Vector (Shape Tool)" },
+                { "H / Space + Kéo", "Công cụ Bàn tay cuộn khung hình (Hand / Pan Canvas)" },
+                { "Z / Ctrl + / -", "Thu phóng hiển thị (Zoom In / Zoom Out)" },
+                { "Ctrl + 0 / Ctrl + 1", "Xem vừa vặn màn hình (Fit) / Xem chuẩn 100%" },
+                { "Ctrl + C / X / V", "Sao chép / Cắt / Dán lớp & hình ảnh (Copy / Cut / Paste)" },
+                { "Ctrl + J / Ctrl + D", "Nhân đôi lớp được chọn (Duplicate Layer)" },
+                { "Ctrl + G / Ctrl+Shift+G", "Nhóm các lớp (Group) / Rã nhóm lớp (Ungroup)" },
+                { "Ctrl + [ / Ctrl + ]", "Hạ lớp xuống dưới / Nâng lớp lên trên (Z-Order)" },
+                { "Ctrl+Shift+[ / ]", "Đưa lớp xuống đáy cùng / Đưa lớp lên đỉnh cùng" },
+                { "Ctrl + R", "Bật / Tắt Thước đo chuẩn (Toggle Rulers)" },
+                { "Ctrl + '", "Bật / Tắt Lưới căn chỉnh (Toggle Grid)" },
+                { "Shift + 5 (%)", "Bật / Tắt Bắt dính đối tượng thông minh (Snapping)" },
+                { "Phím Mũi tên", "Dịch chuyển chính xác 1px (Arrow Nudge)" },
+                { "Shift + Mũi tên", "Dịch chuyển nhanh 10px (Fast Nudge)" },
+                { "Ctrl + T", "Bật khung biến đổi tự do (Free Transform Box)" },
+                { "Ctrl + E", "Gộp lớp hiện tại xuống lớp dưới (Merge Down)" },
+                { "Ctrl + K / Shift+K", "Gộp các đường Path (Combine) / Tách đường (Break Apart)" },
+                { "Delete / Backspace", "Xóa lớp đang chọn hoặc xóa các điểm neo được chọn" },
+                { "Escape", "Hủy vùng chọn / Thoát công cụ cắt xén / Bỏ chọn neo" }
+            });
+
             // Bottom Panel
             Panel bottomPanel = new Panel
             {
@@ -153,13 +189,17 @@ namespace ZenQOffice.UI
 
             Button btnClose = new Button
             {
-                Text = "Đóng (Close)",
+                Text = "Đóng",
                 Size = new Size(110, 30),
                 Location = new Point(this.ClientSize.Width - 130, 8),
                 BackColor = Color.FromArgb(30, 64, 175),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                DialogResult = DialogResult.OK
+                DialogResult = DialogResult.OK,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 13, 13, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText
             };
             btnClose.FlatAppearance.BorderSize = 0;
             btnClose.Click += (s, e) => this.Close();

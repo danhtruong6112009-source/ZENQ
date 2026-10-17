@@ -906,6 +906,11 @@ namespace ZenQOffice.UI
             }
         }
 
+        public void ExportVideoDirect(string targetPath, bool showSuccessDialog = true)
+        {
+            ExportPresentationVideo(targetPath, showSuccessDialog);
+        }
+
         private void ExportPresentationVideo(string targetPath, bool showSuccessDialog = true)
         {
             try

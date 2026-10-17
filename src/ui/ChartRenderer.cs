@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -1179,7 +1179,8 @@ namespace ZenQOffice.UI
                         g.DrawPath(regP, regPath);
 
                         string cName = (i < data.Categories.Count) ? data.Categories[i] : ("Vùng " + (i + 1));
-                        g.DrawString("📍 " + cName, regFont, tB, cx + 5, cy + 4);
+                        FluentIconRenderer.DrawGlyph(g, '\uE707', new Rectangle(cx + 5, cy + 5, 12, 12), textC, 10f);
+                        g.DrawString(cName, regFont, tB, cx + 19, cy + 4);
                         g.DrawString(val.ToString("N1") + (data.SeriesNames != null && data.SeriesNames.Count > 0 ? " " + data.SeriesNames[0] : ""), valFont, tB, cx + 5, cy + cardH - 18);
                     }
                 }

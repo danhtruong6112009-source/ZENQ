@@ -8,6 +8,166 @@ using Vortice.Direct2D1;
 namespace ZenQOffice.UI
 {
     /// <summary>
+    /// Các phép toán đại số hình học (Boolean operations) theo chuẩn Inkscape/SVG.
+    /// </summary>
+    public enum BooleanOpType
+    {
+        /// <summary> Hợp nhất hai hoặc nhiều đường vẽ (Union / Ctrl++) </summary>
+        Union,
+        /// <summary> Trừ hình học: Lớp dưới trừ đi vùng giao với lớp trên (Difference / Ctrl+-) </summary>
+        Difference,
+        /// <summary> Giao nhau: Chỉ giữ lại phần trùng khớp giữa các hình (Intersection / Ctrl+*) </summary>
+        Intersection,
+        /// <summary> Loại trừ (XOR): Giữ lại các phần không giao nhau (Exclusion / Ctrl+^) </summary>
+        Exclusion,
+        /// <summary> Phân chia: Cắt lớp dưới thành 2 phần bởi đường biên của lớp trên (Division / Ctrl+/) </summary>
+        Division
+    }
+
+    /// <summary>
+    /// Các kiểu căn gióng đối tượng theo chuẩn Inkscape/Office.
+    /// </summary>
+    public enum AlignType
+    {
+        Left,
+        CenterH,
+        Right,
+        Top,
+        MiddleV,
+        Bottom
+    }
+
+    /// <summary>
+    /// Các kiểu phân bố khoảng cách đều theo chuẩn Inkscape.
+    /// </summary>
+    public enum DistributeType
+    {
+        Horizontal,
+        Vertical
+    }
+
+    /// <summary>
+    /// Direct2D Simplified Geometry Sink thu thập dữ liệu đường cong và đoạn thẳng từ 
+    /// engine toán học Direct2D và chuyển đổi thành cấu trúc VectorSubPath và VectorPathNode.
+    /// </summary>
+    internal class D2DSubPathSink : SharpGen.Runtime.CallbackBase, ID2D1GeometrySink
+    {
+        public List<VectorSubPath> SubPaths { get; } = new List<VectorSubPath>();
+        private VectorSubPath _currentSub;
+        private PointF _startPt;
+
+        public void SetFillMode(Vortice.Direct2D1.FillMode fillMode) { }
+        public void SetSegmentFlags(PathSegment vertexFlags) { }
+
+        public void BeginFigure(System.Numerics.Vector2 startPoint, FigureBegin figureBegin)
+        {
+            _currentSub = new VectorSubPath(isClosed: false);
+            _startPt = new PointF(startPoint.X, startPoint.Y);
+            _currentSub.Nodes.Add(new VectorPathNode(_startPt, VectorNodeType.Corner));
+            SubPaths.Add(_currentSub);
+        }
+
+        public void AddLines(System.Numerics.Vector2[] points)
+        {
+            if (_currentSub == null || points == null) return;
+            for (int i = 0; i < points.Length; i++)
+            {
+                _currentSub.Nodes.Add(new VectorPathNode(new PointF(points[i].X, points[i].Y), VectorNodeType.Corner));
+            }
+        }
+
+        public void AddLine(System.Numerics.Vector2 point)
+        {
+            if (_currentSub == null) return;
+            _currentSub.Nodes.Add(new VectorPathNode(new PointF(point.X, point.Y), VectorNodeType.Corner));
+        }
+
+        public void AddBeziers(BezierSegment[] beziers)
+        {
+            if (_currentSub == null || beziers == null) return;
+            for (int i = 0; i < beziers.Length; i++)
+            {
+                var b = beziers[i];
+                if (_currentSub.Nodes.Count > 0)
+                {
+                    var prevNode = _currentSub.Nodes[_currentSub.Nodes.Count - 1];
+                    prevNode.OutHandle = new PointF(b.Point1.X, b.Point1.Y);
+                    prevNode.HasOutHandle = true;
+                }
+
+                var nextNode = new VectorPathNode(new PointF(b.Point3.X, b.Point3.Y), VectorNodeType.Smooth);
+                nextNode.InHandle = new PointF(b.Point2.X, b.Point2.Y);
+                nextNode.HasInHandle = true;
+                _currentSub.Nodes.Add(nextNode);
+            }
+        }
+
+        public void AddBezier(BezierSegment bezier)
+        {
+            AddBeziers(new[] { bezier });
+        }
+
+        public void AddQuadraticBezier(QuadraticBezierSegment bezier)
+        {
+            if (_currentSub == null || _currentSub.Nodes.Count == 0) return;
+            var p0 = _currentSub.Nodes[_currentSub.Nodes.Count - 1].Point;
+            var p1 = new PointF(bezier.Point1.X, bezier.Point1.Y);
+            var p2 = new PointF(bezier.Point2.X, bezier.Point2.Y);
+            PointF c1 = new PointF(p0.X + 2f / 3f * (p1.X - p0.X), p0.Y + 2f / 3f * (p1.Y - p0.Y));
+            PointF c2 = new PointF(p2.X + 2f / 3f * (p1.X - p2.X), p2.Y + 2f / 3f * (p1.Y - p2.Y));
+
+            AddBeziers(new[] {
+                new BezierSegment {
+                    Point1 = new System.Numerics.Vector2(c1.X, c1.Y),
+                    Point2 = new System.Numerics.Vector2(c2.X, c2.Y),
+                    Point3 = bezier.Point2
+                }
+            });
+        }
+
+        public void AddQuadraticBeziers(QuadraticBezierSegment[] beziers)
+        {
+            if (beziers == null) return;
+            foreach (var b in beziers) AddQuadraticBezier(b);
+        }
+
+        public void AddArc(ArcSegment arc)
+        {
+            if (_currentSub != null)
+            {
+                _currentSub.Nodes.Add(new VectorPathNode(new PointF(arc.Point.X, arc.Point.Y), VectorNodeType.Smooth));
+            }
+        }
+
+        public void EndFigure(FigureEnd figureEnd)
+        {
+            if (_currentSub != null)
+            {
+                _currentSub.IsClosed = (figureEnd == FigureEnd.Closed);
+                if (_currentSub.IsClosed && _currentSub.Nodes.Count > 1)
+                {
+                    var first = _currentSub.Nodes[0];
+                    var last = _currentSub.Nodes[_currentSub.Nodes.Count - 1];
+                    float dx = first.Point.X - last.Point.X;
+                    float dy = first.Point.Y - last.Point.Y;
+                    if (dx * dx + dy * dy < 0.25f)
+                    {
+                        if (last.HasInHandle)
+                        {
+                            first.InHandle = last.InHandle;
+                            first.HasInHandle = true;
+                        }
+                        _currentSub.Nodes.RemoveAt(_currentSub.Nodes.Count - 1);
+                    }
+                }
+            }
+            _currentSub = null;
+        }
+
+        public void Close() { }
+    }
+
+    /// <summary>
     /// Phân loại hình thái uốn cong của điểm neo vector theo chuẩn Inkscape/SVG.
     /// </summary>
     public enum VectorNodeType
@@ -1397,6 +1557,633 @@ namespace ZenQOffice.UI
         {
             if (layer == null) return new GraphicsPath();
             return layer.BuildGraphicsPath();
+        }
+
+        // ==========================================
+        // 8. ĐẠI SỐ HÌNH HỌC & INKSCAPE BOOLEAN OPERATIONS
+        // ==========================================
+
+        public static bool ExecuteBoolean(PhotoLayer layerA, PhotoLayer layerB, BooleanOpType op, out List<VectorSubPath> resultSubPaths, out List<VectorSubPath> divisionExtraPaths)
+        {
+            resultSubPaths = null;
+            divisionExtraPaths = null;
+            if (layerA == null || layerB == null) return false;
+
+            layerA.EnsureNodesInitialized();
+            layerB.EnsureNodesInitialized();
+
+            using var gpA = layerA.BuildGraphicsPath();
+            using var gpB = layerB.BuildGraphicsPath();
+            if (gpA == null || gpB == null || gpA.PointCount == 0 || gpB.PointCount == 0) return false;
+
+            if (layerA.Rotation != 0f)
+            {
+                using var mA = new Matrix();
+                PointF cA = new PointF(layerA.Bounds.X + layerA.Bounds.Width / 2f, layerA.Bounds.Y + layerA.Bounds.Height / 2f);
+                mA.RotateAt(layerA.Rotation, cA);
+                gpA.Transform(mA);
+            }
+
+            if (layerB.Rotation != 0f)
+            {
+                using var mB = new Matrix();
+                PointF cB = new PointF(layerB.Bounds.X + layerB.Bounds.Width / 2f, layerB.Bounds.Y + layerB.Bounds.Height / 2f);
+                mB.RotateAt(layerB.Rotation, cB);
+                gpB.Transform(mB);
+            }
+
+            using var geomA = D2DGraphics.ConvertPath(gpA);
+            using var geomB = D2DGraphics.ConvertPath(gpB);
+            if (geomA == null || geomB == null) return false;
+
+            if (op == BooleanOpType.Division)
+            {
+                var sinkCut = new D2DSubPathSink();
+                geomA.CombineWithGeometry(geomB, Vortice.Direct2D1.CombineMode.Intersect, sinkCut);
+                resultSubPaths = sinkCut.SubPaths;
+
+                var sinkRemain = new D2DSubPathSink();
+                geomA.CombineWithGeometry(geomB, Vortice.Direct2D1.CombineMode.Exclude, sinkRemain);
+                divisionExtraPaths = sinkRemain.SubPaths;
+
+                return (resultSubPaths != null && resultSubPaths.Count > 0) || (divisionExtraPaths != null && divisionExtraPaths.Count > 0);
+            }
+            else
+            {
+                Vortice.Direct2D1.CombineMode mode = op switch
+                {
+                    BooleanOpType.Union => Vortice.Direct2D1.CombineMode.Union,
+                    BooleanOpType.Difference => Vortice.Direct2D1.CombineMode.Exclude,
+                    BooleanOpType.Intersection => Vortice.Direct2D1.CombineMode.Intersect,
+                    BooleanOpType.Exclusion => Vortice.Direct2D1.CombineMode.Xor,
+                    _ => Vortice.Direct2D1.CombineMode.Union
+                };
+
+                var sink = new D2DSubPathSink();
+                geomA.CombineWithGeometry(geomB, mode, sink);
+                resultSubPaths = sink.SubPaths;
+                return (resultSubPaths != null && resultSubPaths.Count > 0);
+            }
+        }
+
+        public static bool CombineLayers(PhotoDocument doc, List<PhotoLayer> layers)
+        {
+            if (doc == null || layers == null || layers.Count < 2) return false;
+            var vecLayers = layers.Where(l => l.Type == LayerType.VectorShape).ToList();
+            if (vecLayers.Count < 2) return false;
+
+            doc.SaveUndoSnapshot();
+            var baseLayer = vecLayers[0];
+            baseLayer.EnsureNodesInitialized();
+
+            if (baseLayer.Rotation != 0f)
+            {
+                RotateLayerInPlace(baseLayer, baseLayer.Rotation);
+                baseLayer.Rotation = 0f;
+            }
+
+            for (int i = 1; i < vecLayers.Count; i++)
+            {
+                var other = vecLayers[i];
+                other.EnsureNodesInitialized();
+                if (other.SubPaths != null)
+                {
+                    var clonedSubs = other.SubPaths.Select(sp => sp.Clone()).ToList();
+                    if (other.Rotation != 0f)
+                    {
+                        PointF cOther = new PointF(other.Bounds.X + other.Bounds.Width / 2f, other.Bounds.Y + other.Bounds.Height / 2f);
+                        float rad = other.Rotation * (float)Math.PI / 180f;
+                        float cos = (float)Math.Cos(rad);
+                        float sin = (float)Math.Sin(rad);
+                        foreach (var sp in clonedSubs)
+                        {
+                            if (sp.Nodes == null) continue;
+                            foreach (var n in sp.Nodes)
+                            {
+                                float dx = n.Point.X - cOther.X, dy = n.Point.Y - cOther.Y;
+                                n.Point = new PointF(cOther.X + dx * cos - dy * sin, cOther.Y + dx * sin + dy * cos);
+                                if (n.HasInHandle)
+                                {
+                                    float hdx = n.InHandle.X - cOther.X, hdy = n.InHandle.Y - cOther.Y;
+                                    n.InHandle = new PointF(cOther.X + hdx * cos - hdy * sin, cOther.Y + hdx * sin + hdy * cos);
+                                }
+                                if (n.HasOutHandle)
+                                {
+                                    float hdx = n.OutHandle.X - cOther.X, hdy = n.OutHandle.Y - cOther.Y;
+                                    n.OutHandle = new PointF(cOther.X + hdx * cos - hdy * sin, cOther.Y + hdx * sin + hdy * cos);
+                                }
+                            }
+                        }
+                    }
+                    baseLayer.SubPaths.AddRange(clonedSubs);
+                }
+                doc.Layers.Remove(other);
+                other.Dispose();
+            }
+
+            baseLayer.ShapeType = VectorShapeType.Path;
+            UpdateLayerBounds(baseLayer);
+            doc.ActiveLayerIndex = doc.Layers.IndexOf(baseLayer);
+            return true;
+        }
+
+        private static void RotateLayerInPlace(PhotoLayer layer, float angleDegrees)
+        {
+            if (layer == null || layer.SubPaths == null) return;
+            PointF c = new PointF(layer.Bounds.X + layer.Bounds.Width / 2f, layer.Bounds.Y + layer.Bounds.Height / 2f);
+            float rad = angleDegrees * (float)Math.PI / 180f;
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+            foreach (var sp in layer.SubPaths)
+            {
+                if (sp.Nodes == null) continue;
+                foreach (var n in sp.Nodes)
+                {
+                    float dx = n.Point.X - c.X, dy = n.Point.Y - c.Y;
+                    n.Point = new PointF(c.X + dx * cos - dy * sin, c.Y + dx * sin + dy * cos);
+                    if (n.HasInHandle)
+                    {
+                        float hdx = n.InHandle.X - c.X, hdy = n.InHandle.Y - c.Y;
+                        n.InHandle = new PointF(c.X + hdx * cos - hdy * sin, c.Y + hdx * sin + hdy * cos);
+                    }
+                    if (n.HasOutHandle)
+                    {
+                        float hdx = n.OutHandle.X - c.X, hdy = n.OutHandle.Y - c.Y;
+                        n.OutHandle = new PointF(c.X + hdx * cos - hdy * sin, c.Y + hdx * sin + hdy * cos);
+                    }
+                }
+            }
+        }
+
+        public static bool BreakApartLayer(PhotoDocument doc, PhotoLayer targetLayer)
+        {
+            if (doc == null || targetLayer == null) return false;
+            targetLayer.EnsureNodesInitialized();
+            if (targetLayer.SubPaths == null || targetLayer.SubPaths.Count <= 1) return false;
+
+            doc.SaveUndoSnapshot();
+            int insertIdx = doc.Layers.IndexOf(targetLayer);
+            if (insertIdx < 0) insertIdx = doc.Layers.Count - 1;
+
+            var subPaths = targetLayer.SubPaths.ToList();
+            targetLayer.SubPaths = new List<VectorSubPath> { subPaths[0] };
+            UpdateLayerBounds(targetLayer);
+
+            for (int i = 1; i < subPaths.Count; i++)
+            {
+                var newLayer = targetLayer.Clone();
+                newLayer.Id = Guid.NewGuid();
+                newLayer.Name = targetLayer.Name + $" (Phần {i + 1})";
+                newLayer.SubPaths = new List<VectorSubPath> { subPaths[i] };
+                UpdateLayerBounds(newLayer);
+                doc.Layers.Insert(insertIdx + i, newLayer);
+            }
+            return true;
+        }
+
+        // ==========================================
+        // 9. BIẾN ĐỔI (TRANSFORM & FLIP & ROTATE)
+        // ==========================================
+
+        public static void FlipLayer(PhotoLayer layer, bool horizontal)
+        {
+            if (layer == null) return;
+            layer.EnsureNodesInitialized();
+
+            RectangleF b = layer.Bounds;
+            float cx = b.Left + b.Width / 2f;
+            float cy = b.Top + b.Height / 2f;
+
+            if (layer.SubPaths != null)
+            {
+                foreach (var sp in layer.SubPaths)
+                {
+                    if (sp.Nodes == null) continue;
+                    foreach (var node in sp.Nodes)
+                    {
+                        if (horizontal)
+                        {
+                            node.Point = new PointF(2 * cx - node.Point.X, node.Point.Y);
+                            if (node.HasInHandle)
+                                node.InHandle = new PointF(2 * cx - node.InHandle.X, node.InHandle.Y);
+                            if (node.HasOutHandle)
+                                node.OutHandle = new PointF(2 * cx - node.OutHandle.X, node.OutHandle.Y);
+                        }
+                        else
+                        {
+                            node.Point = new PointF(node.Point.X, 2 * cy - node.Point.Y);
+                            if (node.HasInHandle)
+                                node.InHandle = new PointF(node.InHandle.X, 2 * cy - node.InHandle.Y);
+                            if (node.HasOutHandle)
+                                node.OutHandle = new PointF(node.OutHandle.X, 2 * cy - node.OutHandle.Y);
+                        }
+                        (node.InHandle, node.OutHandle) = (node.OutHandle, node.InHandle);
+                        (node.HasInHandle, node.HasOutHandle) = (node.HasOutHandle, node.HasInHandle);
+                    }
+                    sp.Reverse();
+                }
+            }
+
+            if (layer.PathPoints != null && layer.PathPoints.Count > 0)
+            {
+                for (int i = 0; i < layer.PathPoints.Count; i++)
+                {
+                    var p = layer.PathPoints[i];
+                    float nx = horizontal ? (2 * cx - p.X) : p.X;
+                    float ny = horizontal ? p.Y : (2 * cy - p.Y);
+                    layer.PathPoints[i] = new PointF(nx, ny);
+                }
+                layer.PathPoints.Reverse();
+            }
+
+            UpdateLayerBounds(layer);
+        }
+
+        public static void RotateLayer90(PhotoLayer layer, bool clockwise)
+        {
+            if (layer == null) return;
+            layer.EnsureNodesInitialized();
+
+            RectangleF b = layer.Bounds;
+            float cx = b.Left + b.Width / 2f;
+            float cy = b.Top + b.Height / 2f;
+            float angle = clockwise ? (float)(Math.PI / 2.0) : -(float)(Math.PI / 2.0);
+            float cos = (float)Math.Cos(angle);
+            float sin = (float)Math.Sin(angle);
+
+            PointF Rot(PointF pt)
+            {
+                float dx = pt.X - cx;
+                float dy = pt.Y - cy;
+                return new PointF(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+            }
+
+            if (layer.SubPaths != null)
+            {
+                foreach (var sp in layer.SubPaths)
+                {
+                    if (sp.Nodes == null) continue;
+                    foreach (var node in sp.Nodes)
+                    {
+                        node.Point = Rot(node.Point);
+                        if (node.HasInHandle) node.InHandle = Rot(node.InHandle);
+                        if (node.HasOutHandle) node.OutHandle = Rot(node.OutHandle);
+                    }
+                }
+            }
+
+            if (layer.PathPoints != null && layer.PathPoints.Count > 0)
+            {
+                for (int i = 0; i < layer.PathPoints.Count; i++)
+                {
+                    layer.PathPoints[i] = Rot(layer.PathPoints[i]);
+                }
+            }
+
+            UpdateLayerBounds(layer);
+        }
+
+        // ==========================================
+        // 10. CĂN GIÓNG & PHÂN BỐ (ALIGN & DISTRIBUTE)
+        // ==========================================
+
+        public static void AlignLayers(List<PhotoLayer> layers, AlignType alignType)
+        {
+            if (layers == null || layers.Count < 2) return;
+
+            float minX = float.MaxValue, minY = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue;
+
+            foreach (var l in layers)
+            {
+                var b = l.Bounds;
+                if (b.Left < minX) minX = b.Left;
+                if (b.Top < minY) minY = b.Top;
+                if (b.Right > maxX) maxX = b.Right;
+                if (b.Bottom > maxY) maxY = b.Bottom;
+            }
+
+            float totalW = Math.Max(1f, maxX - minX);
+            float totalH = Math.Max(1f, maxY - minY);
+            float midX = minX + totalW / 2f;
+            float midY = minY + totalH / 2f;
+
+            foreach (var l in layers)
+            {
+                var b = l.Bounds;
+                float dx = 0f, dy = 0f;
+
+                switch (alignType)
+                {
+                    case AlignType.Left:
+                        dx = minX - b.Left;
+                        break;
+                    case AlignType.CenterH:
+                        dx = midX - (b.Left + b.Width / 2f);
+                        break;
+                    case AlignType.Right:
+                        dx = maxX - b.Right;
+                        break;
+                    case AlignType.Top:
+                        dy = minY - b.Top;
+                        break;
+                    case AlignType.MiddleV:
+                        dy = midY - (b.Top + b.Height / 2f);
+                        break;
+                    case AlignType.Bottom:
+                        dy = maxY - b.Bottom;
+                        break;
+                }
+
+                if (Math.Abs(dx) > 0.001f || Math.Abs(dy) > 0.001f)
+                {
+                    TranslateLayer(l, dx, dy);
+                }
+            }
+        }
+
+        public static void DistributeLayers(List<PhotoLayer> layers, DistributeType distType)
+        {
+            if (layers == null || layers.Count < 3) return;
+
+            if (distType == DistributeType.Horizontal)
+            {
+                var sorted = layers.OrderBy(l => l.Bounds.Left).ToList();
+                float firstLeft = sorted[0].Bounds.Left;
+                float lastRight = sorted[sorted.Count - 1].Bounds.Right;
+                float sumWidths = sorted.Sum(l => l.Bounds.Width);
+                float totalGap = (lastRight - firstLeft) - sumWidths;
+                float gap = totalGap / (sorted.Count - 1);
+
+                float currentX = firstLeft;
+                for (int i = 0; i < sorted.Count; i++)
+                {
+                    var l = sorted[i];
+                    float dx = currentX - l.Bounds.Left;
+                    TranslateLayer(l, dx, 0);
+                    currentX += l.Bounds.Width + gap;
+                }
+            }
+            else
+            {
+                var sorted = layers.OrderBy(l => l.Bounds.Top).ToList();
+                float firstTop = sorted[0].Bounds.Top;
+                float lastBottom = sorted[sorted.Count - 1].Bounds.Bottom;
+                float sumHeights = sorted.Sum(l => l.Bounds.Height);
+                float totalGap = (lastBottom - firstTop) - sumHeights;
+                float gap = totalGap / (sorted.Count - 1);
+
+                float currentY = firstTop;
+                for (int i = 0; i < sorted.Count; i++)
+                {
+                    var l = sorted[i];
+                    float dy = currentY - l.Bounds.Top;
+                    TranslateLayer(l, 0, dy);
+                    currentY += l.Bounds.Height + gap;
+                }
+            }
+        }
+
+        public static void TranslateLayer(PhotoLayer layer, float dx, float dy)
+        {
+            if (layer == null) return;
+            layer.Bounds = new RectangleF(layer.Bounds.X + dx, layer.Bounds.Y + dy, layer.Bounds.Width, layer.Bounds.Height);
+
+            if (layer.SubPaths != null)
+            {
+                foreach (var sp in layer.SubPaths)
+                {
+                    if (sp.Nodes == null) continue;
+                    foreach (var n in sp.Nodes)
+                    {
+                        n.Translate(dx, dy);
+                    }
+                }
+            }
+
+            if (layer.PathPoints != null)
+            {
+                for (int i = 0; i < layer.PathPoints.Count; i++)
+                {
+                    var p = layer.PathPoints[i];
+                    layer.PathPoints[i] = new PointF(p.X + dx, p.Y + dy);
+                }
+            }
+        }
+
+        public static void ReversePath(PhotoLayer layer)
+        {
+            if (layer == null) return;
+            layer.EnsureNodesInitialized();
+            if (layer.SubPaths != null)
+            {
+                foreach (var sp in layer.SubPaths)
+                {
+                    sp.Reverse();
+                }
+            }
+            if (layer.PathPoints != null && layer.PathPoints.Count > 0)
+            {
+                layer.PathPoints.Reverse();
+            }
+            UpdateLayerBounds(layer);
+        }
+
+        public static bool SimplifyPath(PhotoLayer layer, float tolerance = 2.0f)
+        {
+            if (layer == null) return false;
+            layer.EnsureNodesInitialized();
+            if (layer.SubPaths == null || layer.SubPaths.Count == 0) return false;
+
+            bool anyRemoved = false;
+            foreach (var sp in layer.SubPaths)
+            {
+                if (sp.Nodes == null || sp.Nodes.Count <= 3) continue;
+
+                var nodes = sp.Nodes;
+                int n = nodes.Count;
+                var toKeep = new List<VectorPathNode>();
+                toKeep.Add(nodes[0]);
+
+                int prevIdx = 0;
+                for (int i = 1; i < n - 1; i++)
+                {
+                    var prev = nodes[prevIdx];
+                    var curr = nodes[i];
+                    var next = nodes[i + 1];
+
+                    float dist = PointToSegmentDistance(curr.Point, prev.Point, next.Point);
+                    bool hasSharpHandles = curr.HasInHandle || curr.HasOutHandle;
+
+                    if (dist > tolerance || (hasSharpHandles && curr.NodeType == VectorNodeType.Corner))
+                    {
+                        toKeep.Add(curr);
+                        prevIdx = i;
+                    }
+                    else
+                    {
+                        anyRemoved = true;
+                    }
+                }
+                toKeep.Add(nodes[n - 1]);
+
+                if (toKeep.Count >= 2)
+                {
+                    sp.Nodes = toKeep;
+                }
+            }
+
+            if (anyRemoved)
+            {
+                UpdateLayerBounds(layer);
+            }
+            return anyRemoved;
+        }
+
+        private static float PointToSegmentDistance(PointF pt, PointF p1, PointF p2)
+        {
+            float dx = p2.X - p1.X;
+            float dy = p2.Y - p1.Y;
+            float lenSq = dx * dx + dy * dy;
+            if (lenSq < 0.0001f)
+            {
+                float dxx = pt.X - p1.X;
+                float dyy = pt.Y - p1.Y;
+                return (float)Math.Sqrt(dxx * dxx + dyy * dyy);
+            }
+
+            float t = Math.Max(0f, Math.Min(1f, ((pt.X - p1.X) * dx + (pt.Y - p1.Y) * dy) / lenSq));
+            float projX = p1.X + t * dx;
+            float projY = p1.Y + t * dy;
+            float ex = pt.X - projX;
+            float ey = pt.Y - projY;
+            return (float)Math.Sqrt(ex * ex + ey * ey);
+        }
+
+        public static bool ApplyOffset(PhotoLayer layer, float delta)
+        {
+            if (layer == null) return false;
+            layer.EnsureNodesInitialized();
+            if (layer.SubPaths == null || layer.SubPaths.Count == 0) return false;
+
+            bool anyModified = false;
+            foreach (var sp in layer.SubPaths)
+            {
+                if (sp.Nodes == null || sp.Nodes.Count < 2) continue;
+                int count = sp.Nodes.Count;
+
+                PointF[] normals = new PointF[count];
+                for (int i = 0; i < count; i++)
+                {
+                    PointF prevPt = (sp.IsClosed || i > 0) ? sp.Nodes[(i - 1 + count) % count].Point : sp.Nodes[i].Point;
+                    PointF nextPt = (sp.IsClosed || i < count - 1) ? sp.Nodes[(i + 1) % count].Point : sp.Nodes[i].Point;
+
+                    float dx = nextPt.X - prevPt.X;
+                    float dy = nextPt.Y - prevPt.Y;
+                    float len = (float)Math.Sqrt(dx * dx + dy * dy);
+                    if (len < 0.001f)
+                    {
+                        normals[i] = new PointF(0, -1);
+                    }
+                    else
+                    {
+                        normals[i] = new PointF(dy / len, -dx / len);
+                    }
+                }
+
+                for (int i = 0; i < count; i++)
+                {
+                    var node = sp.Nodes[i];
+                    PointF n = normals[i];
+                    node.Point = new PointF(node.Point.X + n.X * delta, node.Point.Y + n.Y * delta);
+
+                    if (node.HasInHandle)
+                    {
+                        node.InHandle = new PointF(node.InHandle.X + n.X * delta, node.InHandle.Y + n.Y * delta);
+                    }
+                    if (node.HasOutHandle)
+                    {
+                        node.OutHandle = new PointF(node.OutHandle.X + n.X * delta, node.OutHandle.Y + n.Y * delta);
+                    }
+                }
+                anyModified = true;
+            }
+
+            if (anyModified)
+            {
+                UpdateLayerBounds(layer);
+            }
+            return anyModified;
+        }
+
+        public static void SampleSubPath(VectorSubPath sp, int numSamples, out List<PointF> samplePoints, out List<float> cumDistances)
+        {
+            samplePoints = new List<PointF>();
+            cumDistances = new List<float>();
+            if (sp == null || sp.Nodes == null || sp.Nodes.Count == 0) return;
+
+            int count = sp.Nodes.Count;
+            int segCount = sp.IsClosed ? count : count - 1;
+            if (segCount <= 0)
+            {
+                samplePoints.Add(sp.Nodes[0].Point);
+                cumDistances.Add(0f);
+                return;
+            }
+
+            int stepsPerSeg = Math.Max(2, numSamples / segCount);
+            float totalDist = 0f;
+            PointF prevPt = sp.Nodes[0].Point;
+            samplePoints.Add(prevPt);
+            cumDistances.Add(0f);
+
+            for (int i = 0; i < segCount; i++)
+            {
+                var n1 = sp.Nodes[i];
+                var n2 = sp.Nodes[(i + 1) % count];
+
+                PointF p0 = n1.Point;
+                PointF p3 = n2.Point;
+
+                if (!n1.HasOutHandle && !n2.HasInHandle)
+                {
+                    for (int step = 1; step <= stepsPerSeg; step++)
+                    {
+                        float t = (float)step / stepsPerSeg;
+                        PointF curPt = new PointF(p0.X + (p3.X - p0.X) * t, p0.Y + (p3.Y - p0.Y) * t);
+                        float segD = (float)Math.Sqrt((curPt.X - prevPt.X) * (curPt.X - prevPt.X) + (curPt.Y - prevPt.Y) * (curPt.Y - prevPt.Y));
+                        totalDist += segD;
+                        samplePoints.Add(curPt);
+                        cumDistances.Add(totalDist);
+                        prevPt = curPt;
+                    }
+                }
+                else
+                {
+                    PointF p1 = n1.HasOutHandle ? n1.OutHandle : new PointF(p0.X + (n2.Point.X - n1.Point.X) / 3f, p0.Y + (n2.Point.Y - n1.Point.Y) / 3f);
+                    PointF p2 = n2.HasInHandle ? n2.InHandle : new PointF(p3.X - (p3.X - n1.Point.X) / 3f, p3.Y - (n2.Point.Y - n1.Point.Y) / 3f);
+
+                    for (int step = 1; step <= stepsPerSeg; step++)
+                    {
+                        float t = (float)step / stepsPerSeg;
+                        float oneMinusT = 1f - t;
+                        float b0 = oneMinusT * oneMinusT * oneMinusT;
+                        float b1 = 3f * oneMinusT * oneMinusT * t;
+                        float b2 = 3f * oneMinusT * t * t;
+                        float b3 = t * t * t;
+
+                        PointF curPt = new PointF(
+                            b0 * p0.X + b1 * p1.X + b2 * p2.X + b3 * p3.X,
+                            b0 * p0.Y + b1 * p1.Y + b2 * p2.Y + b3 * p3.Y
+                        );
+                        float segD = (float)Math.Sqrt((curPt.X - prevPt.X) * (curPt.X - prevPt.X) + (curPt.Y - prevPt.Y) * (curPt.Y - prevPt.Y));
+                        totalDist += segD;
+                        samplePoints.Add(curPt);
+                        cumDistances.Add(totalDist);
+                        prevPt = curPt;
+                    }
+                }
+            }
         }
     }
 }

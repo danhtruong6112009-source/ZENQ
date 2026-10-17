@@ -163,7 +163,7 @@ namespace ZenQOffice.UI
             };
             cardQr.Controls.Add(_lblUrl);
 
-            _btnCopyUrl = CreateNeutralButton("Sao chép liên kết", new Point(15, 310), new Size(115, 30));
+            _btnCopyUrl = CreateNeutralButton("Sao chép", new Point(15, 310), new Size(115, 30), '\uE8C8');
             _btnCopyUrl.Click += (s, e) =>
             {
                 try
@@ -175,7 +175,7 @@ namespace ZenQOffice.UI
             };
             cardQr.Controls.Add(_btnCopyUrl);
 
-            _btnOpenBrowser = CreateNeutralButton("Mở trình duyệt", new Point(140, 310), new Size(115, 30));
+            _btnOpenBrowser = CreateNeutralButton("Trình duyệt", new Point(140, 310), new Size(115, 30), '\uE774');
             _btnOpenBrowser.Click += (s, e) =>
             {
                 try
@@ -282,7 +282,7 @@ namespace ZenQOffice.UI
             };
             cardConfig.Controls.Add(_cboIpAddresses);
 
-            _btnToggleServer = CreateNeutralButton("Tạm dừng", new Point(234, 77), new Size(100, 25));
+            _btnToggleServer = CreateNeutralButton("Tạm dừng", new Point(234, 77), new Size(100, 25), '\uE768');
             _btnToggleServer.Click += (s, e) => ToggleServerState();
             cardConfig.Controls.Add(_btnToggleServer);
 
@@ -329,7 +329,7 @@ namespace ZenQOffice.UI
                 }
             };
 
-            Button btnHelp = CreateNeutralButton("Lưu ý kết nối", new Point(16, 16), new Size(120, 30));
+            Button btnHelp = CreateNeutralButton("Lưu ý kết nối", new Point(16, 16), new Size(130, 30), '\uE897');
             btnHelp.Click += (s, e) =>
             {
                 MessageBox.Show(this,
@@ -344,15 +344,20 @@ namespace ZenQOffice.UI
 
             _btnClose = new Button
             {
-                Text = "Đóng (Tiếp tục chạy ngầm)",
+                Text = "Đóng",
                 DialogResult = DialogResult.OK,
-                Location = new Point(460, 15),
-                Size = new Size(184, 32),
+                Location = new Point(510, 15),
+                Size = new Size(134, 32),
                 BackColor = Color.FromArgb(37, 99, 235),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 13, 13, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0)
             };
             _btnClose.FlatAppearance.BorderSize = 0;
             footer.Controls.Add(_btnClose);
@@ -541,7 +546,7 @@ namespace ZenQOffice.UI
             return card;
         }
 
-        private Button CreateNeutralButton(string text, Point loc, Size sz)
+        private Button CreateNeutralButton(string text, Point loc, Size sz, char glyph = '\0')
         {
             Button btn = new Button
             {
@@ -558,6 +563,14 @@ namespace ZenQOffice.UI
             btn.FlatAppearance.BorderSize = 1;
             btn.MouseEnter += (s, e) => btn.BackColor = Color.FromArgb(226, 232, 240);
             btn.MouseLeave += (s, e) => btn.BackColor = Color.FromArgb(241, 245, 249);
+            if (glyph != '\0')
+            {
+                btn.Image = FluentIconRenderer.GetGlyphBitmap(glyph, 13, 13, Color.FromArgb(30, 41, 59));
+                btn.ImageAlign = ContentAlignment.MiddleLeft;
+                btn.TextAlign = ContentAlignment.MiddleCenter;
+                btn.TextImageRelation = TextImageRelation.ImageBeforeText;
+                btn.Padding = new Padding(4, 0, 4, 0);
+            }
             return btn;
         }
     }

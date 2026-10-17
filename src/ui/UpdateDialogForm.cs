@@ -218,11 +218,16 @@ namespace ZenQOffice.UI
             _btnCheckAgain = new Button
             {
                 Text = "Kiểm tra lại",
-                Size = new Size(100, 32),
+                Size = new Size(115, 32),
                 Location = new Point(20, 10),
                 BackColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE72C', 13, 13, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(4, 0, 4, 0)
             };
             _btnCheckAgain.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             _btnCheckAgain.Click += (s, e) => RunCheck();
@@ -231,14 +236,19 @@ namespace ZenQOffice.UI
             _btnUpdate = new Button
             {
                 Text = "Cập nhật ngay",
-                Size = new Size(125, 32),
-                Location = new Point(250, 10),
+                Size = new Size(135, 32),
+                Location = new Point(235, 10),
                 BackColor = Color.FromArgb(210, 71, 38),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Enabled = false
+                Enabled = false,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE896', 14, 14, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(4, 0, 4, 0)
             };
             _btnUpdate.FlatAppearance.BorderSize = 0;
             _btnUpdate.Click += (s, e) => StartDownloadAndInstall();
@@ -247,11 +257,16 @@ namespace ZenQOffice.UI
             _btnClose = new Button
             {
                 Text = "Đóng",
-                Size = new Size(80, 32),
-                Location = new Point(384, 10),
+                Size = new Size(95, 32),
+                Location = new Point(379, 10),
                 BackColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 13, 13, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(4, 0, 4, 0)
             };
             _btnClose.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             _btnClose.Click += (s, e) => Close();

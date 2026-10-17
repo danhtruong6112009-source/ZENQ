@@ -997,19 +997,24 @@ namespace ZenQOffice.UI
                 string textToInsert = _streamingAiLabel.Text;
                 
                 OfficeAppMode curMode = _appForm != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
-                string actionBtnText = (curMode == OfficeAppMode.Slides) ? "🎨 Chèn vào Slide" : ((curMode == OfficeAppMode.Calc) ? "📊 Chèn vào Bảng tính" : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? "📝 Thay thế vùng quét khối" : "📝 Chèn vào văn bản"));
+                string actionBtnText = (curMode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((curMode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản"));
+                char glyph = (curMode == OfficeAppMode.Slides) ? '\uE714' : ((curMode == OfficeAppMode.Calc) ? '\uE80A' : '\uE70F');
 
                 AiInsertActionButton btnAction = new AiInsertActionButton
                 {
                     Text = actionBtnText,
+                    Image = FluentIconRenderer.GetGlyphBitmap(glyph, 12, 12, Color.FromArgb(100, 116, 139)),
+                    ImageAlign = ContentAlignment.MiddleLeft,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    TextImageRelation = TextImageRelation.ImageBeforeText,
+                    Padding = new Padding(4, 0, 4, 0),
                     Font = new Font("Segoe UI", 8.2f, FontStyle.Regular),
                     ForeColor = Color.FromArgb(100, 116, 139),
                     BackColor = Color.Transparent,
                     FlatStyle = FlatStyle.Flat,
-                    Size = new Size(136, 24),
+                    Size = new Size(140, 24),
                     Location = new Point(14, _streamingAiBubble.Height + 4),
                     Cursor = Cursors.Hand,
-                    TextAlign = ContentAlignment.MiddleLeft,
                 };
                 btnAction.FlatAppearance.BorderSize = 0;
                 btnAction.FlatAppearance.MouseOverBackColor = Color.FromArgb(241, 245, 249);
@@ -1045,15 +1050,19 @@ namespace ZenQOffice.UI
                 {
                     AiInsertActionButton btnConfirm = new AiInsertActionButton
                     {
-                        Text = string.Format("✅ Xác nhận sửa {0} lỗi", detectedCorrs.Count),
+                        Text = string.Format("Xác nhận sửa {0} lỗi", detectedCorrs.Count),
+                        Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74)),
+                        ImageAlign = ContentAlignment.MiddleLeft,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        TextImageRelation = TextImageRelation.ImageBeforeText,
+                        Padding = new Padding(4, 0, 4, 0),
                         Font = new Font("Segoe UI", 8.2f, FontStyle.Bold),
                         ForeColor = Color.FromArgb(22, 163, 74),
                         BackColor = Color.FromArgb(240, 253, 244),
                         FlatStyle = FlatStyle.Flat,
-                        Size = new Size(130, 24),
+                        Size = new Size(135, 24),
                         Location = new Point(14, _streamingAiBubble.Height + 4),
                         Cursor = Cursors.Hand,
-                        TextAlign = ContentAlignment.MiddleCenter,
                     };
                     btnConfirm.FlatAppearance.BorderColor = Color.FromArgb(187, 247, 208);
                     btnConfirm.FlatAppearance.BorderSize = 1;
@@ -1061,15 +1070,19 @@ namespace ZenQOffice.UI
 
                     AiInsertActionButton btnCancel = new AiInsertActionButton
                     {
-                        Text = "❌ Bỏ qua",
+                        Text = "Bỏ qua",
+                        Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 11, 11, Color.FromArgb(220, 38, 38)),
+                        ImageAlign = ContentAlignment.MiddleLeft,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        TextImageRelation = TextImageRelation.ImageBeforeText,
+                        Padding = new Padding(4, 0, 4, 0),
                         Font = new Font("Segoe UI", 8.2f, FontStyle.Bold),
                         ForeColor = Color.FromArgb(220, 38, 38),
                         BackColor = Color.FromArgb(254, 242, 242),
                         FlatStyle = FlatStyle.Flat,
                         Size = new Size(80, 24),
-                        Location = new Point(148, _streamingAiBubble.Height + 4),
+                        Location = new Point(155, _streamingAiBubble.Height + 4),
                         Cursor = Cursors.Hand,
-                        TextAlign = ContentAlignment.MiddleCenter,
                     };
                     btnCancel.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
                     btnCancel.FlatAppearance.BorderSize = 1;
@@ -1080,7 +1093,8 @@ namespace ZenQOffice.UI
                         if (_appForm != null && _appForm.WriterView != null)
                         {
                             _appForm.WriterView.ApplyPendingAiCorrections();
-                            btnConfirm.Text = "✅ Đã sửa!";
+                            btnConfirm.Text = "Đã sửa!";
+                            btnConfirm.Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74));
                             btnConfirm.Enabled = false;
                             btnCancel.Visible = false;
                         }
@@ -1091,6 +1105,7 @@ namespace ZenQOffice.UI
                         {
                             _appForm.WriterView.CancelPendingAiCorrections();
                             btnCancel.Text = "Đã bỏ qua";
+                            btnCancel.Image = null;
                             btnCancel.Enabled = false;
                             btnConfirm.Visible = false;
                         }
@@ -2314,10 +2329,12 @@ namespace ZenQOffice.UI
         private System.Windows.Forms.Timer _copyTimer;
         private Action<string> _onInsertAction;
         private string _actionText;
+        private OfficeAppMode _mode;
 
         public AiChatBubbleControl(string text, int feedW, OfficeAppMode mode, Action<string> onInsert, AppForm appForm = null)
         {
             _text = text ?? "";
+            _mode = mode;
             _onInsertAction = onInsert;
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
@@ -2332,9 +2349,9 @@ namespace ZenQOffice.UI
             _bubbleW = Math.Max(46, Math.Min(maxBubbleW, txtSize.Width + padX * 2));
             _bubbleH = Math.Max(32, txtSize.Height + padY * 2);
 
-            _actionText = (mode == OfficeAppMode.Slides) ? "🎨 Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "📊 Chèn vào Bảng tính" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "📝 Thay thế vùng quét khối" : "📝 Chèn vào văn bản"));
-            _actionBtnRect = new Rectangle(8, _bubbleH + 6, 136, 22);
-            _copyBtnRect = new Rectangle(8 + 136 + 6, _bubbleH + 6, 80, 22);
+            _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản"));
+            _actionBtnRect = new Rectangle(8, _bubbleH + 6, 140, 22);
+            _copyBtnRect = new Rectangle(8 + 140 + 6, _bubbleH + 6, 80, 22);
 
             this.Size = new Size(feedW, _bubbleH + 34);
         }
@@ -2377,9 +2394,12 @@ namespace ZenQOffice.UI
                     g.FillPath(abb, abp);
                 }
             }
+            char actGlyph = (_mode == OfficeAppMode.Slides) ? '\uE714' : ((_mode == OfficeAppMode.Calc) ? '\uE80A' : '\uE70F');
+            FluentIconRenderer.DrawGlyph(g, actGlyph, new RectangleF(_actionBtnRect.X + 4, _actionBtnRect.Y + 4, 14, 14), _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), 11f);
             using (Font abf = new Font("Segoe UI", 8.2f))
             {
-                TextRenderer.DrawText(g, _actionText, abf, _actionBtnRect, _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                Rectangle tr = new Rectangle(_actionBtnRect.X + 20, _actionBtnRect.Y, _actionBtnRect.Width - 20, _actionBtnRect.Height);
+                TextRenderer.DrawText(g, _actionText, abf, tr, _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             }
 
             // Nút Sao chép AI
@@ -2693,12 +2713,17 @@ namespace ZenQOffice.UI
                     Margin = new Padding(0, 40, 0, 0),
                     BackColor = Color.Transparent
                 };
+                emptyCard.Paint += (s, e) =>
+                {
+                    FluentIconRenderer.DrawGlyph(e.Graphics, '\uE8BD', new Rectangle((emptyCard.Width - 32) / 2, 16, 32, 32), Color.FromArgb(203, 213, 225), 26f);
+                };
                 Label lblEmpty = new Label
                 {
-                    Text = "💬 Chưa có đoạn chat nào trong lịch sử.\nHãy trò chuyện với AI để lưu lại các cuộc hội thoại!",
-                    Font = new Font("Segoe UI", 10f),
+                    Text = "Chưa có đoạn chat nào trong lịch sử.\nHãy trò chuyện với AI để lưu lại các cuộc hội thoại!",
+                    Font = new Font("Segoe UI", 9.5f),
                     ForeColor = Color.FromArgb(148, 163, 184),
                     TextAlign = ContentAlignment.MiddleCenter,
+                    Padding = new Padding(0, 48, 0, 0),
                     Dock = DockStyle.Fill
                 };
                 emptyCard.Controls.Add(lblEmpty);

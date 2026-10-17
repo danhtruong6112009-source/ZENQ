@@ -135,14 +135,14 @@ namespace ZenQOffice.UI
 
             // 1. Hình dạng đã dùng gần đây (Recently Used Shapes)
             string[] recent = new string[] {
-                "TextBox", "Line", "ArrowLine", "Rectangle", "Oval", "RoundedRectangle", "Triangle", "RightArrow",
+                "TextBox", "Line", "ArrowLine", "FreeformShape", "FreeformScribble", "Rectangle", "Oval", "RoundedRectangle", "Triangle", "RightArrow",
                 "DownArrow", "Cross", "Star5", "CalloutRect"
             };
             startY = AddGroupSection("Hình dạng đã dùng gần đây", recent, startY, leftMargin, itemW, itemH, gap, cols);
 
             // 2. Đường thẳng (Lines)
             string[] lines = new string[] {
-                "Line", "ArrowLine", "DoubleArrowLine", "ElbowConnector", "ElbowArrowConnector", "CurvedConnector"
+                "Line", "ArrowLine", "DoubleArrowLine", "ElbowConnector", "ElbowArrowConnector", "CurvedConnector", "FreeformShape", "FreeformScribble"
             };
             startY = AddGroupSection("Đường thẳng (Lines)", lines, startY, leftMargin, itemW, itemH, gap, cols);
 
@@ -310,6 +310,34 @@ namespace ZenQOffice.UI
                             g.DrawLine(aPen, iconBounds.Left, iconBounds.Bottom, iconBounds.Right, iconBounds.Top);
                         }
                     }
+                    else if (item.ShapeType == "FreeformShape")
+                    {
+                        // Authentic PowerPoint Freeform: Shape icon (polygon with straight edges and bottom curve)
+                        PointF[] freeformPts = new PointF[] {
+                            new PointF(iconBounds.Left + 2, iconBounds.Bottom - 4),
+                            new PointF(iconBounds.Left + 2, iconBounds.Top + 4),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.55f, iconBounds.Top + 2),
+                            new PointF(iconBounds.Right - 2, iconBounds.Top + iconBounds.Height * 0.45f),
+                            new PointF(iconBounds.Right - 4, iconBounds.Bottom - 3),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.45f, iconBounds.Bottom - 6),
+                            new PointF(iconBounds.Left + 2, iconBounds.Bottom - 4)
+                        };
+                        g.DrawLines(itemPen, freeformPts);
+                    }
+                    else if (item.ShapeType == "FreeformScribble")
+                    {
+                        // Authentic PowerPoint Freeform: Scribble looping curve icon (matching media_1792221980468_7bb82e0b.png)
+                        PointF[] scribblePts = new PointF[] {
+                            new PointF(iconBounds.Left + 2, iconBounds.Bottom - 3),
+                            new PointF(iconBounds.Left + 2, iconBounds.Top + iconBounds.Height * 0.35f),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.45f, iconBounds.Top + 2),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.70f, iconBounds.Top + iconBounds.Height * 0.45f),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.32f, iconBounds.Top + iconBounds.Height * 0.65f),
+                            new PointF(iconBounds.Left + iconBounds.Width * 0.62f, iconBounds.Bottom - 2),
+                            new PointF(iconBounds.Right - 2, iconBounds.Bottom - 3)
+                        };
+                        g.DrawCurve(itemPen, scribblePts, 0.5f);
+                    }
                     else if (item.ShapeType.StartsWith("ActionButton"))
                     {
                         g.DrawRectangle(itemPen, iconBounds);
@@ -406,6 +434,8 @@ namespace ZenQOffice.UI
                 case "ElbowConnector": return "Đường nối khuỷu (Elbow Connector)";
                 case "ElbowArrowConnector": return "Đường nối khuỷu mũi tên (Elbow Arrow Connector)";
                 case "CurvedConnector": return "Đường nối cong (Curved Connector)";
+                case "FreeformShape": return "Freeform: Shape (Hình dạng tự do - Nhấp điểm / Đa giác)";
+                case "FreeformScribble": return "Freeform: Scribble (Vẽ tự do nét nguệch ngoạc)";
                 case "Rectangle": return "Hình chữ nhật (Rectangle)";
                 case "RoundedRectangle": return "Hình chữ nhật bo góc (Rounded Rectangle)";
                 case "SingleCornerSnipped": return "Cắt một góc (Single Corner Snipped)";

@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using GenOffice.Core;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
+using ZenQOffice.UI;
 
 namespace GenOffice.Tests
 {
@@ -310,6 +312,16 @@ namespace GenOffice.Tests
             {
                 Type t = GenOfficeAssembly.GetType(typeFullName);
                 if (t != null) return t;
+                if (typeFullName.StartsWith("GenOffice."))
+                {
+                    t = GenOfficeAssembly.GetType("ZenQOffice." + typeFullName.Substring("GenOffice.".Length));
+                    if (t != null) return t;
+                }
+            }
+            if (typeFullName.StartsWith("GenOffice."))
+            {
+                Type t = Type.GetType("ZenQOffice." + typeFullName.Substring("GenOffice.".Length));
+                if (t != null) return t;
             }
             return Type.GetType(typeFullName);
         }
@@ -327,7 +339,10 @@ namespace GenOffice.Tests
             "ROW", "COLUMN", "IFNA", "WEEKDAY", "EDATE", "NETWORKDAYS", "DATEDIF",
             "VALUE", "FIND", "SEARCH", "TEXTBEFORE", "TEXTAFTER", "CHAR", "CODE", "REPT",
             "RANDBETWEEN", "CEILING", "FLOOR", "SIGN", "STDEV", "VAR", "RANK", "MODE",
-            "ISNUMBER", "ISTEXT", "ISBLANK", "ISERROR", "ISNA"
+            "ISNUMBER", "ISTEXT", "ISBLANK", "ISERROR", "ISNA",
+            "SEQUENCE", "UNIQUE", "FILTER", "SORT", "SORTBY", "XMATCH", "RANDARRAY",
+            "CHOOSEROWS", "CHOOSECOLS", "TAKE", "DROP", "TOCOL", "TOROW", "VSTACK",
+            "HSTACK", "TEXTSPLIT", "EXPAND"
         };
 
         public static bool IsFormulaFunctionImplemented(string funcName)

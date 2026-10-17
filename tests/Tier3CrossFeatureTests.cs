@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.Format;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
+using ZenQOffice.UI;
 
 namespace GenOffice.Tests
 {
@@ -541,19 +541,26 @@ namespace GenOffice.Tests
         [Description("Pairwise: Dynamic array spill referenced by '#' operator in SUM")]
         public void T3_F23_01_DynamicArraySpillReferencedByHashOperator()
         {
-            string hashFormula = "=SUM(C2#)";
-            Assert.IsTrue(hashFormula.Contains("#"));
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(2, 3, "=SEQUENCE(4, 1, 10, 5)"); // C2:C5 -> 10, 15, 20, 25
+            sm.SetCellFormula(1, 1, "=SUM(C2#)"); // 10+15+20+25 = 70
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(70.0, sm.GetCell(1, 1).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier3_CrossFeature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
         [Description("Pairwise: Dynamic array spilled values formatted with Currency")]
         public void T3_F23_02_DynamicArraySpillWithNumberFormat()
         {
-            CellData cd = new CellData();
-            cd.SetNumber(1500.5);
-            cd.Format.NumberFormat = "Currency";
-            string formatted = FormulaEngine.FormatCellDisplay(cd);
-            Assert.IsTrue(formatted.Contains("$") || formatted.Contains("1,500.50"));
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(2, 1, 1000, 500)");
+            CellFormat fmt = sm.GetFormat(1, 1);
+            fmt.NumberFormat = "Currency";
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(1000.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.AreEqual(1500.0, sm.GetCell(2, 1).NumericValue, 0.001);
+            string formatted = FormulaEngine.FormatCellDisplay(sm.GetCell(1, 1));
+            Assert.IsTrue(formatted.Contains("$") || formatted.Contains("1,000.00"));
         }
 
         // =========================================================================
@@ -564,9 +571,16 @@ namespace GenOffice.Tests
         public void T3_F24_01_ClearObstacleResolvesSpillCollision()
         {
             SparseMatrix sm = new SparseMatrix();
-            sm.SetCellString(2, 2, "BlockingData");
-            sm.DeleteCell(2, 2);
-            Assert.IsNull(sm.GetCell(2, 2));
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 1)");
+            sm.SetCellString(2, 1, "BlockingData");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("#SPILL!", sm.GetCell(1, 1).RawValue);
+
+            sm.ClearCell(2, 1);
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(1.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.AreEqual(2.0, sm.GetCell(2, 1).NumericValue, 0.001);
+            Assert.AreEqual(3.0, sm.GetCell(3, 1).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier3_CrossFeature), Feature(24, "Spill Collision & #SPILL!", Milestone.M3)]
@@ -584,8 +598,18 @@ namespace GenOffice.Tests
         [Description("Pairwise: Multi-stage array pipeline SORT(UNIQUE(FILTER(...)))")]
         public void T3_F25_01_SortUniqueFilterPipeline()
         {
-            string pipelineFormula = "=SORT(UNIQUE(FILTER(A2:B50, B2:B50>100)))";
-            Assert.IsTrue(pipelineFormula.StartsWith("=SORT("));
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellNumber(1, 1, 150);
+            sm.SetCellNumber(2, 1, 75);
+            sm.SetCellNumber(3, 1, 150);
+            sm.SetCellNumber(4, 1, 300);
+            sm.SetCellNumber(5, 1, 50);
+            sm.SetCellFormula(1, 3, "=SORT(UNIQUE(FILTER(A1:A5, A1:A5>60)))");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(75.0, sm.GetCell(1, 3).NumericValue, 0.001);
+            Assert.AreEqual(150.0, sm.GetCell(2, 3).NumericValue, 0.001);
+            Assert.AreEqual(300.0, sm.GetCell(3, 3).NumericValue, 0.001);
+            Assert.IsNull(sm.GetCell(4, 3));
         }
 
         [Test, Tier(TestTier.Tier3_CrossFeature), Feature(25, "Array & Scoping Functions", Milestone.M3)]

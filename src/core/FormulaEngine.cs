@@ -107,9 +107,12 @@ namespace ZenQOffice.Core
             return true;
         }
 
+        public static SparseMatrix CurrentEvaluatingSheet = null;
+
         public static void EvaluateSheet(SparseMatrix sheet)
         {
             if (sheet == null) return;
+            CurrentEvaluatingSheet = sheet;
             var cells = new List<KeyValuePair<ulong, CellData>>(sheet.GetAllCells());
             for (int pass = 0; pass < 2; pass++)
             {
@@ -118,9 +121,76 @@ namespace ZenQOffice.Core
                     CellData cell = kvp.Value;
                     if (cell.Type == CellType.Formula)
                     {
+                        var pos = SparseMatrix.DecodeKey(kvp.Key);
+                        uint originR = pos.Item1;
+                        uint originC = pos.Item2;
+
                         CellData evalRes = EvaluateFormula(cell.FormulaStr, sheet);
-                        cell.NumericValue = evalRes.NumericValue;
-                        cell.EvaluatedStr = evalRes.EvaluatedStr;
+
+                        if (evalRes.ArrayResult != null && (evalRes.ArrayResult.GetLength(0) > 1 || evalRes.ArrayResult.GetLength(1) > 1))
+                        {
+                            int H = evalRes.ArrayResult.GetLength(0);
+                            int W = evalRes.ArrayResult.GetLength(1);
+
+                            sheet.ClearSpilledChildrenOf(originR, originC);
+
+                            bool collision = sheet.CheckSpillCollision(originR, originC, H, W);
+                            if (collision)
+                            {
+                                cell.RawValue = "#SPILL!";
+                                cell.EvaluatedStr = "#SPILL!";
+                                cell.NumericValue = 0.0;
+                                cell.IsSpillOrigin = false;
+                                cell.SpillRowCount = 1;
+                                cell.SpillColCount = 1;
+                                cell.ArrayResult = null;
+                            }
+                            else
+                            {
+                                cell.IsSpillOrigin = true;
+                                cell.SpillRowCount = H;
+                                cell.SpillColCount = W;
+                                cell.ArrayResult = evalRes.ArrayResult;
+
+                                CellData rootVal = evalRes.ArrayResult[0, 0];
+                                cell.NumericValue = rootVal.NumericValue;
+                                cell.EvaluatedStr = rootVal.EvaluatedStr ?? rootVal.RawValue;
+                                cell.RawValue = rootVal.RawValue;
+
+                                for (int dr = 0; dr < H; dr++)
+                                {
+                                    for (int dc = 0; dc < W; dc++)
+                                    {
+                                        if (dr == 0 && dc == 0) continue;
+                                        uint targetR = originR + (uint)dr;
+                                        uint targetC = originC + (uint)dc;
+                                        CellData val = evalRes.ArrayResult[dr, dc];
+                                        CellData child = sheet.GetOrCreateCell(targetR, targetC);
+                                        child.IsSpilledChild = true;
+                                        child.SpillOriginRow = originR;
+                                        child.SpillOriginCol = originC;
+                                        child.NumericValue = val.NumericValue;
+                                        child.EvaluatedStr = val.EvaluatedStr ?? val.RawValue;
+                                        child.RawValue = val.RawValue;
+                                        child.Type = val.Type == CellType.Empty ? CellType.String : val.Type;
+                                        child.FormulaStr = "";
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (cell.IsSpillOrigin)
+                            {
+                                sheet.ClearSpilledChildrenOf(originR, originC);
+                                cell.IsSpillOrigin = false;
+                                cell.SpillRowCount = 1;
+                                cell.SpillColCount = 1;
+                                cell.ArrayResult = null;
+                            }
+                            cell.NumericValue = evalRes.NumericValue;
+                            cell.EvaluatedStr = evalRes.EvaluatedStr;
+                        }
                     }
                     else if (cell.Type == CellType.Number)
                     {
@@ -214,11 +284,37 @@ namespace ZenQOffice.Core
             else if (expr.StartsWith("_xlfn.", StringComparison.OrdinalIgnoreCase))
                 expr = expr.Substring(6).Trim();
 
+            if (expr.EndsWith("#"))
+            {
+                string baseRef = expr.Substring(0, expr.Length - 1).Trim();
+                if (IsCellReference(baseRef))
+                {
+                    SparseMatrix refSheet = ResolveSheet(baseRef, sheet);
+                    var pos = SparseMatrix.ParseCellAddress(baseRef);
+                    CellData src = refSheet != null ? refSheet.GetCell(pos.Item1, pos.Item2) : null;
+                    if (src != null)
+                    {
+                        if (src.IsSpillOrigin && src.ArrayResult != null)
+                        {
+                            res.ArrayResult = src.ArrayResult;
+                        }
+                        res.NumericValue = src.NumericValue;
+                        res.EvaluatedStr = src.EvaluatedStr ?? src.RawValue;
+                        res.RawValue = src.RawValue;
+                        res.Type = src.Type;
+                        return res;
+                    }
+                    res.SetNumber(0);
+                    res.EvaluatedStr = "0";
+                    return res;
+                }
+            }
+
             if (IsCellReference(expr))
             {
                 SparseMatrix refSheet = ResolveSheet(expr, sheet);
                 var pos = SparseMatrix.ParseCellAddress(expr);
-                CellData src = refSheet.GetCell(pos.Item1, pos.Item2);
+                CellData src = refSheet != null ? refSheet.GetCell(pos.Item1, pos.Item2) : null;
                 if (src != null)
                 {
                     res.NumericValue = src.NumericValue;
@@ -967,36 +1063,889 @@ namespace ZenQOffice.Core
                 else if (funcName == "XLOOKUP" && args.Length >= 3)
                 {
                     string lookupKey = GetStringValue(args[0], sheet).Trim().ToUpper();
-                    SparseMatrix sLookup = ResolveSheet(args[1], sheet);
-                    SparseMatrix sRet = ResolveSheet(args[2], sheet);
-                    var lookupRange = ParseRange(args[1]);
-                    var returnRange = ParseRange(args[2]);
+                    double lookupNum;
+                    bool isLookupNum = double.TryParse(lookupKey, NumberStyles.Any, CultureInfo.InvariantCulture, out lookupNum);
 
-                    int n = Math.Min(lookupRange.Count, returnRange.Count);
-                    for (int i = 0; i < n; i++)
+                    CellData[,] lkArray = ExtractArray(args[1], sheet);
+                    CellData[,] retArray = ExtractArray(args[2], sheet);
+                    int matchMode = args.Length >= 5 ? (int)ParseAndEvaluateNumeric(args[4], sheet) : 0; // 0: exact, -1: exact/smaller, 1: exact/larger, 2: wildcard
+                    int searchMode = args.Length >= 6 ? (int)ParseAndEvaluateNumeric(args[5], sheet) : 1; // 1: first-to-last, -1: last-to-first
+
+                    int lkCount = Math.Max(lkArray.GetLength(0), lkArray.GetLength(1));
+                    bool isLkCol = lkArray.GetLength(0) >= lkArray.GetLength(1);
+
+                    int foundIdx = -1;
+                    int step = searchMode < 0 ? -1 : 1;
+                    int startIdx = searchMode < 0 ? (lkCount - 1) : 0;
+                    int endIdx = searchMode < 0 ? -1 : lkCount;
+
+                    for (int i = startIdx; i != endIdx; i += step)
                     {
-                        CellData keyCell = sLookup.GetCell(lookupRange[i].Item1, lookupRange[i].Item2);
-                        string kVal = keyCell != null ? (!string.IsNullOrEmpty(keyCell.EvaluatedStr) ? keyCell.EvaluatedStr : keyCell.RawValue ?? "").Trim().ToUpper() : "";
+                        CellData cell = isLkCol ? (i < lkArray.GetLength(0) ? lkArray[i, 0] : null) : (i < lkArray.GetLength(1) ? lkArray[0, i] : null);
+                        string kVal = cell != null ? (cell.EvaluatedStr ?? cell.RawValue ?? "").Trim().ToUpper() : "";
+                        double kNum = cell != null ? cell.NumericValue : 0;
 
-                        if (kVal == lookupKey)
+                        if (matchMode == 2)
                         {
-                            CellData retCell = sRet.GetCell(returnRange[i].Item1, returnRange[i].Item2);
-                            if (retCell != null)
+                            if (MatchesWildcard(kVal, lookupKey)) { foundIdx = i; break; }
+                        }
+                        else
+                        {
+                            if (isLookupNum && cell != null && cell.Type == CellType.Number)
                             {
-                                res.NumericValue = retCell.NumericValue;
-                                res.EvaluatedStr = retCell.EvaluatedStr ?? retCell.RawValue;
-                                res.RawValue = retCell.RawValue;
-                                res.Type = retCell.Type;
-                                return res;
+                                if (Math.Abs(kNum - lookupNum) < 1e-9) { foundIdx = i; break; }
+                            }
+                            else if (kVal == lookupKey)
+                            {
+                                foundIdx = i; break;
                             }
                         }
                     }
-                    if (args.Length >= 4)
+
+                    if (foundIdx >= 0)
+                    {
+                        bool isRetCol = retArray.GetLength(0) >= retArray.GetLength(1);
+                        if (isRetCol)
+                        {
+                            int numCols = retArray.GetLength(1);
+                            if (numCols > 1)
+                            {
+                                CellData[,] arr = new CellData[1, numCols];
+                                for (int c = 0; c < numCols; c++)
+                                {
+                                    arr[0, c] = (foundIdx < retArray.GetLength(0)) ? retArray[foundIdx, c].Clone() : new CellData();
+                                }
+                                res.ArrayResult = arr;
+                                CellData root = arr[0, 0];
+                                res.NumericValue = root.NumericValue;
+                                res.EvaluatedStr = root.EvaluatedStr;
+                                res.RawValue = root.RawValue;
+                                res.Type = root.Type;
+                                return res;
+                            }
+                            else
+                            {
+                                CellData retCell = foundIdx < retArray.GetLength(0) ? retArray[foundIdx, 0] : null;
+                                if (retCell != null)
+                                {
+                                    res.NumericValue = retCell.NumericValue;
+                                    res.EvaluatedStr = retCell.EvaluatedStr ?? retCell.RawValue;
+                                    res.RawValue = retCell.RawValue;
+                                    res.Type = retCell.Type;
+                                    return res;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            int numRows = retArray.GetLength(0);
+                            if (numRows > 1)
+                            {
+                                CellData[,] arr = new CellData[numRows, 1];
+                                for (int r = 0; r < numRows; r++)
+                                {
+                                    arr[r, 0] = (foundIdx < retArray.GetLength(1)) ? retArray[r, foundIdx].Clone() : new CellData();
+                                }
+                                res.ArrayResult = arr;
+                                CellData root = arr[0, 0];
+                                res.NumericValue = root.NumericValue;
+                                res.EvaluatedStr = root.EvaluatedStr;
+                                res.RawValue = root.RawValue;
+                                res.Type = root.Type;
+                                return res;
+                            }
+                            else
+                            {
+                                CellData retCell = foundIdx < retArray.GetLength(1) ? retArray[0, foundIdx] : null;
+                                if (retCell != null)
+                                {
+                                    res.NumericValue = retCell.NumericValue;
+                                    res.EvaluatedStr = retCell.EvaluatedStr ?? retCell.RawValue;
+                                    res.RawValue = retCell.RawValue;
+                                    res.Type = retCell.Type;
+                                    return res;
+                                }
+                            }
+                        }
+                    }
+
+                    if (args.Length >= 4 && !string.IsNullOrEmpty(args[3]))
                     {
                         SetResultFromToken(res, args[3], sheet);
                         return res;
                     }
                     res.SetString("#N/A");
+                    return res;
+                }
+                else if (funcName == "XMATCH" && args.Length >= 2)
+                {
+                    string lookupKey = GetStringValue(args[0], sheet).Trim().ToUpper();
+                    double lookupNum;
+                    bool isLookupNum = double.TryParse(lookupKey, NumberStyles.Any, CultureInfo.InvariantCulture, out lookupNum);
+
+                    CellData[,] lkArray = ExtractArray(args[1], sheet);
+                    int matchMode = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : 0;
+                    int searchMode = args.Length >= 4 ? (int)ParseAndEvaluateNumeric(args[3], sheet) : 1;
+
+                    int lkCount = Math.Max(lkArray.GetLength(0), lkArray.GetLength(1));
+                    bool isLkCol = lkArray.GetLength(0) >= lkArray.GetLength(1);
+
+                    int foundIdx = -1;
+                    int step = searchMode < 0 ? -1 : 1;
+                    int startIdx = searchMode < 0 ? (lkCount - 1) : 0;
+                    int endIdx = searchMode < 0 ? -1 : lkCount;
+
+                    for (int i = startIdx; i != endIdx; i += step)
+                    {
+                        CellData cell = isLkCol ? (i < lkArray.GetLength(0) ? lkArray[i, 0] : null) : (i < lkArray.GetLength(1) ? lkArray[0, i] : null);
+                        string kVal = cell != null ? (cell.EvaluatedStr ?? cell.RawValue ?? "").Trim().ToUpper() : "";
+                        double kNum = cell != null ? cell.NumericValue : 0;
+
+                        if (matchMode == 2)
+                        {
+                            if (MatchesWildcard(kVal, lookupKey)) { foundIdx = i; break; }
+                        }
+                        else
+                        {
+                            if (isLookupNum && cell != null && cell.Type == CellType.Number)
+                            {
+                                if (Math.Abs(kNum - lookupNum) < 1e-9) { foundIdx = i; break; }
+                            }
+                            else if (kVal == lookupKey)
+                            {
+                                foundIdx = i; break;
+                            }
+                        }
+                    }
+
+                    if (foundIdx >= 0)
+                    {
+                        res.SetNumber(foundIdx + 1);
+                        res.EvaluatedStr = (foundIdx + 1).ToString();
+                        return res;
+                    }
+                    res.SetString("#N/A");
+                    return res;
+                }
+                else if (funcName == "SEQUENCE" && args.Length >= 1)
+                {
+                    int rows = (int)Math.Max(1, ParseAndEvaluateNumeric(args[0], sheet));
+                    int cols = args.Length >= 2 ? (int)Math.Max(1, ParseAndEvaluateNumeric(args[1], sheet)) : 1;
+                    double start = args.Length >= 3 ? ParseAndEvaluateNumeric(args[2], sheet) : 1.0;
+                    double step = args.Length >= 4 ? ParseAndEvaluateNumeric(args[3], sheet) : 1.0;
+                    if (double.IsNaN(start)) start = 1.0;
+                    if (double.IsNaN(step)) step = 1.0;
+
+                    CellData[,] arr = new CellData[rows, cols];
+                    for (int r = 0; r < rows; r++)
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            double val = start + (r * cols + c) * step;
+                            CellData item = new CellData();
+                            item.SetNumber(val);
+                            arr[r, c] = item;
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    res.SetNumber(start);
+                    res.EvaluatedStr = arr[0, 0].EvaluatedStr;
+                    return res;
+                }
+                else if (funcName == "UNIQUE" && args.Length >= 1)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    if (rCount == 0 || cCount == 0)
+                    {
+                        res.SetString("#CALC!");
+                        return res;
+                    }
+
+                    bool byCol = args.Length >= 2 && GetStringValue(args[1], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+                    bool exactlyOnce = args.Length >= 3 && GetStringValue(args[2], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+
+                    if (!byCol)
+                    {
+                        List<int> validRowIndices = new List<int>();
+                        Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        List<string> rowSignatures = new List<string>();
+
+                        for (int r = 0; r < rCount; r++)
+                        {
+                            StringBuilder sb = new StringBuilder();
+                            for (int c = 0; c < cCount; c++)
+                            {
+                                CellData cell = src[r, c];
+                                string val = cell != null ? (cell.EvaluatedStr ?? cell.RawValue ?? "") : "";
+                                sb.Append(val).Append("\x1F");
+                            }
+                            string sig = sb.ToString();
+                            rowSignatures.Add(sig);
+                            if (!counts.ContainsKey(sig)) counts[sig] = 0;
+                            counts[sig]++;
+                        }
+
+                        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        for (int r = 0; r < rCount; r++)
+                        {
+                            string sig = rowSignatures[r];
+                            if (exactlyOnce)
+                            {
+                                if (counts[sig] == 1) validRowIndices.Add(r);
+                            }
+                            else
+                            {
+                                if (seen.Add(sig)) validRowIndices.Add(r);
+                            }
+                        }
+
+                        if (validRowIndices.Count == 0)
+                        {
+                            res.SetString("#CALC!");
+                            return res;
+                        }
+
+                        CellData[,] arr = new CellData[validRowIndices.Count, cCount];
+                        for (int i = 0; i < validRowIndices.Count; i++)
+                        {
+                            int r = validRowIndices[i];
+                            for (int c = 0; c < cCount; c++)
+                            {
+                                arr[i, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                            }
+                        }
+                        res.ArrayResult = arr;
+                        CellData root = arr[0, 0];
+                        res.NumericValue = root.NumericValue;
+                        res.EvaluatedStr = root.EvaluatedStr;
+                        res.RawValue = root.RawValue;
+                        res.Type = root.Type;
+                        return res;
+                    }
+                    else
+                    {
+                        List<int> validColIndices = new List<int>();
+                        Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        List<string> colSignatures = new List<string>();
+
+                        for (int c = 0; c < cCount; c++)
+                        {
+                            StringBuilder sb = new StringBuilder();
+                            for (int r = 0; r < rCount; r++)
+                            {
+                                CellData cell = src[r, c];
+                                string val = cell != null ? (cell.EvaluatedStr ?? cell.RawValue ?? "") : "";
+                                sb.Append(val).Append("\x1F");
+                            }
+                            string sig = sb.ToString();
+                            colSignatures.Add(sig);
+                            if (!counts.ContainsKey(sig)) counts[sig] = 0;
+                            counts[sig]++;
+                        }
+
+                        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        for (int c = 0; c < cCount; c++)
+                        {
+                            string sig = colSignatures[c];
+                            if (exactlyOnce)
+                            {
+                                if (counts[sig] == 1) validColIndices.Add(c);
+                            }
+                            else
+                            {
+                                if (seen.Add(sig)) validColIndices.Add(c);
+                            }
+                        }
+
+                        if (validColIndices.Count == 0)
+                        {
+                            res.SetString("#CALC!");
+                            return res;
+                        }
+
+                        CellData[,] arr = new CellData[rCount, validColIndices.Count];
+                        for (int j = 0; j < validColIndices.Count; j++)
+                        {
+                            int c = validColIndices[j];
+                            for (int r = 0; r < rCount; r++)
+                            {
+                                arr[r, j] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                            }
+                        }
+                        res.ArrayResult = arr;
+                        CellData root = arr[0, 0];
+                        res.NumericValue = root.NumericValue;
+                        res.EvaluatedStr = root.EvaluatedStr;
+                        res.RawValue = root.RawValue;
+                        res.Type = root.Type;
+                        return res;
+                    }
+                }
+                else if (funcName == "FILTER" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    if (rCount == 0 || cCount == 0)
+                    {
+                        res.SetString(args.Length >= 3 ? GetStringValue(args[2], sheet) : "#CALC!");
+                        return res;
+                    }
+
+                    string includeExpr = args[1].Trim();
+                    bool[] matches = new bool[rCount];
+                    
+                    int opLen = 0;
+                    int opPos = -1;
+                    string op = "";
+                    string[] ops = new string[] { ">=", "<=", "<>", "!=", "=", ">", "<" };
+                    foreach (var o in ops)
+                    {
+                        int idx = includeExpr.IndexOf(o);
+                        if (idx > 0)
+                        {
+                            op = o;
+                            opLen = o.Length;
+                            opPos = idx;
+                            break;
+                        }
+                    }
+
+                    if (opPos > 0)
+                    {
+                        string leftPart = includeExpr.Substring(0, opPos).Trim();
+                        string rightPart = includeExpr.Substring(opPos + opLen).Trim();
+                        CellData[,] leftArr = ExtractArray(leftPart, sheet);
+                        double targetNum;
+                        bool targetIsNum = double.TryParse(rightPart, NumberStyles.Any, CultureInfo.InvariantCulture, out targetNum);
+                        string targetStr = rightPart.Trim('"', '\'').ToUpper();
+
+                        for (int r = 0; r < rCount; r++)
+                        {
+                            CellData leftCell = (r < leftArr.GetLength(0)) ? leftArr[r, 0] : null;
+                            double cellNum = leftCell != null ? leftCell.NumericValue : 0;
+                            string cellStr = leftCell != null ? (leftCell.EvaluatedStr ?? leftCell.RawValue ?? "").Trim().ToUpper() : "";
+                            bool isCellNum = leftCell != null && leftCell.Type == CellType.Number;
+
+                            bool isMatch = false;
+                            switch (op)
+                            {
+                                case "=":
+                                    if (targetIsNum && isCellNum) isMatch = Math.Abs(cellNum - targetNum) < 1e-9;
+                                    else isMatch = cellStr == targetStr;
+                                    break;
+                                case "<>":
+                                case "!=":
+                                    if (targetIsNum && isCellNum) isMatch = Math.Abs(cellNum - targetNum) >= 1e-9;
+                                    else isMatch = cellStr != targetStr;
+                                    break;
+                                case ">":
+                                    if (targetIsNum) isMatch = cellNum > targetNum;
+                                    else isMatch = string.Compare(cellStr, targetStr, StringComparison.OrdinalIgnoreCase) > 0;
+                                    break;
+                                case ">=":
+                                    if (targetIsNum) isMatch = cellNum >= targetNum;
+                                    else isMatch = string.Compare(cellStr, targetStr, StringComparison.OrdinalIgnoreCase) >= 0;
+                                    break;
+                                case "<":
+                                    if (targetIsNum) isMatch = cellNum < targetNum;
+                                    else isMatch = string.Compare(cellStr, targetStr, StringComparison.OrdinalIgnoreCase) < 0;
+                                    break;
+                                case "<=":
+                                    if (targetIsNum) isMatch = cellNum <= targetNum;
+                                    else isMatch = string.Compare(cellStr, targetStr, StringComparison.OrdinalIgnoreCase) <= 0;
+                                    break;
+                            }
+                            matches[r] = isMatch;
+                        }
+                    }
+                    else
+                    {
+                        CellData[,] incArr = ExtractArray(includeExpr, sheet);
+                        for (int r = 0; r < rCount; r++)
+                        {
+                            if (r < incArr.GetLength(0))
+                            {
+                                CellData c = incArr[r, 0];
+                                string s = c != null ? (c.EvaluatedStr ?? c.RawValue ?? "").Trim() : "";
+                                matches[r] = s.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || (c != null && c.NumericValue != 0);
+                            }
+                        }
+                    }
+
+                    List<int> matchedRows = new List<int>();
+                    for (int r = 0; r < rCount; r++)
+                    {
+                        if (matches[r]) matchedRows.Add(r);
+                    }
+
+                    if (matchedRows.Count == 0)
+                    {
+                        string emptyFallback = args.Length >= 3 ? GetStringValue(args[2], sheet) : "#CALC!";
+                        res.SetString(emptyFallback);
+                        return res;
+                    }
+
+                    CellData[,] arr = new CellData[matchedRows.Count, cCount];
+                    for (int i = 0; i < matchedRows.Count; i++)
+                    {
+                        int r = matchedRows[i];
+                        for (int c = 0; c < cCount; c++)
+                        {
+                            arr[i, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    CellData root = arr[0, 0];
+                    res.NumericValue = root.NumericValue;
+                    res.EvaluatedStr = root.EvaluatedStr;
+                    res.RawValue = root.RawValue;
+                    res.Type = root.Type;
+                    return res;
+                }
+                else if (funcName == "SORT" && args.Length >= 1)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    if (rCount == 0 || cCount == 0)
+                    {
+                        res.SetString("#CALC!");
+                        return res;
+                    }
+
+                    int sortIdx = args.Length >= 2 ? (int)ParseAndEvaluateNumeric(args[1], sheet) - 1 : 0;
+                    int sortOrder = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : 1;
+                    bool byCol = args.Length >= 4 && GetStringValue(args[3], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+
+                    if (!byCol)
+                    {
+                        sortIdx = Math.Max(0, Math.Min(cCount - 1, sortIdx));
+                        List<int> rowIndices = new List<int>();
+                        for (int r = 0; r < rCount; r++) rowIndices.Add(r);
+
+                        rowIndices.Sort((r1, r2) =>
+                        {
+                            CellData c1 = src[r1, sortIdx];
+                            CellData c2 = src[r2, sortIdx];
+                            int cmp = CompareCells(c1, c2);
+                            return sortOrder < 0 ? -cmp : cmp;
+                        });
+
+                        CellData[,] arr = new CellData[rCount, cCount];
+                        for (int i = 0; i < rCount; i++)
+                        {
+                            int r = rowIndices[i];
+                            for (int c = 0; c < cCount; c++)
+                            {
+                                arr[i, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                            }
+                        }
+                        res.ArrayResult = arr;
+                        CellData root = arr[0, 0];
+                        res.NumericValue = root.NumericValue;
+                        res.EvaluatedStr = root.EvaluatedStr;
+                        res.RawValue = root.RawValue;
+                        res.Type = root.Type;
+                        return res;
+                    }
+                    else
+                    {
+                        sortIdx = Math.Max(0, Math.Min(rCount - 1, sortIdx));
+                        List<int> colIndices = new List<int>();
+                        for (int c = 0; c < cCount; c++) colIndices.Add(c);
+
+                        colIndices.Sort((c1, c2) =>
+                        {
+                            CellData cell1 = src[sortIdx, c1];
+                            CellData cell2 = src[sortIdx, c2];
+                            int cmp = CompareCells(cell1, cell2);
+                            return sortOrder < 0 ? -cmp : cmp;
+                        });
+
+                        CellData[,] arr = new CellData[rCount, cCount];
+                        for (int j = 0; j < cCount; j++)
+                        {
+                            int c = colIndices[j];
+                            for (int r = 0; r < rCount; r++)
+                            {
+                                arr[r, j] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                            }
+                        }
+                        res.ArrayResult = arr;
+                        CellData root = arr[0, 0];
+                        res.NumericValue = root.NumericValue;
+                        res.EvaluatedStr = root.EvaluatedStr;
+                        res.RawValue = root.RawValue;
+                        res.Type = root.Type;
+                        return res;
+                    }
+                }
+                else if (funcName == "SORTBY" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    if (rCount == 0 || cCount == 0)
+                    {
+                        res.SetString("#CALC!");
+                        return res;
+                    }
+
+                    CellData[,] by1 = ExtractArray(args[1], sheet);
+                    int order1 = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : 1;
+
+                    List<int> rowIndices = new List<int>();
+                    for (int r = 0; r < rCount; r++) rowIndices.Add(r);
+
+                    rowIndices.Sort((r1, r2) =>
+                    {
+                        CellData c1 = r1 < by1.GetLength(0) ? by1[r1, 0] : null;
+                        CellData c2 = r2 < by1.GetLength(0) ? by1[r2, 0] : null;
+                        int cmp = CompareCells(c1, c2);
+                        return order1 < 0 ? -cmp : cmp;
+                    });
+
+                    CellData[,] arr = new CellData[rCount, cCount];
+                    for (int i = 0; i < rCount; i++)
+                    {
+                        int r = rowIndices[i];
+                        for (int c = 0; c < cCount; c++)
+                        {
+                            arr[i, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    CellData root = arr[0, 0];
+                    res.NumericValue = root.NumericValue;
+                    res.EvaluatedStr = root.EvaluatedStr;
+                    res.RawValue = root.RawValue;
+                    res.Type = root.Type;
+                    return res;
+                }
+                else if (funcName == "RANDARRAY")
+                {
+                    int rows = args.Length >= 1 ? (int)Math.Max(1, ParseAndEvaluateNumeric(args[0], sheet)) : 1;
+                    int cols = args.Length >= 2 ? (int)Math.Max(1, ParseAndEvaluateNumeric(args[1], sheet)) : 1;
+                    double min = args.Length >= 3 ? ParseAndEvaluateNumeric(args[2], sheet) : 0.0;
+                    double max = args.Length >= 4 ? ParseAndEvaluateNumeric(args[3], sheet) : 1.0;
+                    bool wholeNum = args.Length >= 5 && GetStringValue(args[4], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+
+                    if (double.IsNaN(min)) min = 0.0;
+                    if (double.IsNaN(max)) max = 1.0;
+                    if (max < min) { double tmp = min; min = max; max = tmp; }
+
+                    Random rng = new Random();
+                    CellData[,] arr = new CellData[rows, cols];
+                    for (int r = 0; r < rows; r++)
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            double val;
+                            if (wholeNum)
+                                val = rng.Next((int)Math.Floor(min), (int)Math.Ceiling(max) + 1);
+                            else
+                                val = min + rng.NextDouble() * (max - min);
+
+                            CellData item = new CellData();
+                            item.SetNumber(val);
+                            arr[r, c] = item;
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    CellData root = arr[0, 0];
+                    res.NumericValue = root.NumericValue;
+                    res.EvaluatedStr = root.EvaluatedStr;
+                    res.Type = root.Type;
+                    return res;
+                }
+                else if (funcName == "CHOOSEROWS" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    List<int> targetRows = new List<int>();
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        int rowIdx = (int)ParseAndEvaluateNumeric(args[i], sheet);
+                        if (rowIdx < 0) rowIdx = rCount + rowIdx + 1;
+                        rowIdx--;
+                        if (rowIdx >= 0 && rowIdx < rCount) targetRows.Add(rowIdx);
+                    }
+                    if (targetRows.Count == 0) { res.SetString("#VALUE!"); return res; }
+                    CellData[,] arr = new CellData[targetRows.Count, cCount];
+                    for (int i = 0; i < targetRows.Count; i++)
+                    {
+                        int r = targetRows[i];
+                        for (int c = 0; c < cCount; c++)
+                            arr[i, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "CHOOSECOLS" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    List<int> targetCols = new List<int>();
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        int colIdx = (int)ParseAndEvaluateNumeric(args[i], sheet);
+                        if (colIdx < 0) colIdx = cCount + colIdx + 1;
+                        colIdx--;
+                        if (colIdx >= 0 && colIdx < cCount) targetCols.Add(colIdx);
+                    }
+                    if (targetCols.Count == 0) { res.SetString("#VALUE!"); return res; }
+                    CellData[,] arr = new CellData[rCount, targetCols.Count];
+                    for (int j = 0; j < targetCols.Count; j++)
+                    {
+                        int c = targetCols[j];
+                        for (int r = 0; r < rCount; r++)
+                            arr[r, j] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "TAKE" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    int numRows = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    int numCols = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : cCount;
+
+                    int rStart = numRows >= 0 ? 0 : Math.Max(0, rCount + numRows);
+                    int rTake = Math.Min(rCount - rStart, Math.Abs(numRows));
+                    int cStart = numCols >= 0 ? 0 : Math.Max(0, cCount + numCols);
+                    int cTake = Math.Min(cCount - cStart, Math.Abs(numCols));
+
+                    CellData[,] arr = new CellData[rTake, cTake];
+                    for (int r = 0; r < rTake; r++)
+                    {
+                        for (int c = 0; c < cTake; c++)
+                            arr[r, c] = src[rStart + r, cStart + c] != null ? src[rStart + r, cStart + c].Clone() : new CellData();
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "DROP" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    int dropRows = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    int dropCols = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : 0;
+
+                    int rStart = dropRows >= 0 ? Math.Min(rCount, dropRows) : 0;
+                    int rEnd = dropRows < 0 ? Math.Max(0, rCount + dropRows) : rCount;
+                    int cStart = dropCols >= 0 ? Math.Min(cCount, dropCols) : 0;
+                    int cEnd = dropCols < 0 ? Math.Max(0, cCount + dropCols) : cCount;
+
+                    int rFinal = Math.Max(0, rEnd - rStart);
+                    int cFinal = Math.Max(0, cEnd - cStart);
+                    if (rFinal == 0 || cFinal == 0) { res.SetString("#CALC!"); return res; }
+
+                    CellData[,] arr = new CellData[rFinal, cFinal];
+                    for (int r = 0; r < rFinal; r++)
+                    {
+                        for (int c = 0; c < cFinal; c++)
+                            arr[r, c] = src[rStart + r, cStart + c] != null ? src[rStart + r, cStart + c].Clone() : new CellData();
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "TOCOL" && args.Length >= 1)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    int ignore = args.Length >= 2 ? (int)ParseAndEvaluateNumeric(args[1], sheet) : 0;
+                    bool scanByCol = args.Length >= 3 && GetStringValue(args[2], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+
+                    List<CellData> list = new List<CellData>();
+                    if (!scanByCol)
+                    {
+                        for (int r = 0; r < rCount; r++)
+                            for (int c = 0; c < cCount; c++)
+                                AddFilteredCell(list, src[r, c], ignore);
+                    }
+                    else
+                    {
+                        for (int c = 0; c < cCount; c++)
+                            for (int r = 0; r < rCount; r++)
+                                AddFilteredCell(list, src[r, c], ignore);
+                    }
+
+                    if (list.Count == 0) { res.SetString("#CALC!"); return res; }
+                    CellData[,] arr = new CellData[list.Count, 1];
+                    for (int i = 0; i < list.Count; i++) arr[i, 0] = list[i];
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "TOROW" && args.Length >= 1)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    int ignore = args.Length >= 2 ? (int)ParseAndEvaluateNumeric(args[1], sheet) : 0;
+                    bool scanByCol = args.Length >= 3 && GetStringValue(args[2], sheet).Equals("TRUE", StringComparison.OrdinalIgnoreCase);
+
+                    List<CellData> list = new List<CellData>();
+                    if (!scanByCol)
+                    {
+                        for (int r = 0; r < rCount; r++)
+                            for (int c = 0; c < cCount; c++)
+                                AddFilteredCell(list, src[r, c], ignore);
+                    }
+                    else
+                    {
+                        for (int c = 0; c < cCount; c++)
+                            for (int r = 0; r < rCount; r++)
+                                AddFilteredCell(list, src[r, c], ignore);
+                    }
+
+                    if (list.Count == 0) { res.SetString("#CALC!"); return res; }
+                    CellData[,] arr = new CellData[1, list.Count];
+                    for (int j = 0; j < list.Count; j++) arr[0, j] = list[j];
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "VSTACK" && args.Length >= 1)
+                {
+                    List<CellData[,]> arrays = new List<CellData[,]>();
+                    int maxCols = 0;
+                    int totalRows = 0;
+                    foreach (var arg in args)
+                    {
+                        CellData[,] a = ExtractArray(arg, sheet);
+                        arrays.Add(a);
+                        totalRows += a.GetLength(0);
+                        if (a.GetLength(1) > maxCols) maxCols = a.GetLength(1);
+                    }
+                    CellData[,] arr = new CellData[totalRows, maxCols];
+                    int curRow = 0;
+                    foreach (var a in arrays)
+                    {
+                        for (int r = 0; r < a.GetLength(0); r++)
+                        {
+                            for (int c = 0; c < maxCols; c++)
+                            {
+                                arr[curRow + r, c] = c < a.GetLength(1) && a[r, c] != null ? a[r, c].Clone() : new CellData();
+                            }
+                        }
+                        curRow += a.GetLength(0);
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "HSTACK" && args.Length >= 1)
+                {
+                    List<CellData[,]> arrays = new List<CellData[,]>();
+                    int maxRows = 0;
+                    int totalCols = 0;
+                    foreach (var arg in args)
+                    {
+                        CellData[,] a = ExtractArray(arg, sheet);
+                        arrays.Add(a);
+                        totalCols += a.GetLength(1);
+                        if (a.GetLength(0) > maxRows) maxRows = a.GetLength(0);
+                    }
+                    CellData[,] arr = new CellData[maxRows, totalCols];
+                    int curCol = 0;
+                    foreach (var a in arrays)
+                    {
+                        for (int c = 0; c < a.GetLength(1); c++)
+                        {
+                            for (int r = 0; r < maxRows; r++)
+                            {
+                                arr[r, curCol + c] = r < a.GetLength(0) && a[r, c] != null ? a[r, c].Clone() : new CellData();
+                            }
+                        }
+                        curCol += a.GetLength(1);
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "TEXTSPLIT" && args.Length >= 2)
+                {
+                    string text = GetStringValue(args[0], sheet);
+                    string colDelim = GetStringValue(args[1], sheet);
+                    string rowDelim = args.Length >= 3 ? GetStringValue(args[2], sheet) : "";
+
+                    string[] rows = !string.IsNullOrEmpty(rowDelim) ? text.Split(new string[] { rowDelim }, StringSplitOptions.None) : new string[] { text };
+                    List<string[]> grid = new List<string[]>();
+                    int maxCols = 1;
+                    foreach (var r in rows)
+                    {
+                        string[] cols = !string.IsNullOrEmpty(colDelim) ? r.Split(new string[] { colDelim }, StringSplitOptions.None) : new string[] { r };
+                        grid.Add(cols);
+                        if (cols.Length > maxCols) maxCols = cols.Length;
+                    }
+                    CellData[,] arr = new CellData[grid.Count, maxCols];
+                    for (int r = 0; r < grid.Count; r++)
+                    {
+                        for (int c = 0; c < maxCols; c++)
+                        {
+                            CellData cell = new CellData();
+                            string v = c < grid[r].Length ? grid[r][c] : "";
+                            double d;
+                            if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
+                                cell.SetNumber(d);
+                            else
+                                cell.SetString(v);
+                            arr[r, c] = cell;
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
+                    return res;
+                }
+                else if (funcName == "EXPAND" && args.Length >= 2)
+                {
+                    CellData[,] src = ExtractArray(args[0], sheet);
+                    int rCount = src.GetLength(0);
+                    int cCount = src.GetLength(1);
+                    int targetRows = (int)ParseAndEvaluateNumeric(args[1], sheet);
+                    int targetCols = args.Length >= 3 ? (int)ParseAndEvaluateNumeric(args[2], sheet) : cCount;
+                    string padVal = args.Length >= 4 ? GetStringValue(args[3], sheet) : "#N/A";
+
+                    targetRows = Math.Max(rCount, targetRows);
+                    targetCols = Math.Max(cCount, targetCols);
+
+                    CellData[,] arr = new CellData[targetRows, targetCols];
+                    for (int r = 0; r < targetRows; r++)
+                    {
+                        for (int c = 0; c < targetCols; c++)
+                        {
+                            if (r < rCount && c < cCount)
+                            {
+                                arr[r, c] = src[r, c] != null ? src[r, c].Clone() : new CellData();
+                            }
+                            else
+                            {
+                                CellData pad = new CellData();
+                                double pd;
+                                if (double.TryParse(padVal, NumberStyles.Any, CultureInfo.InvariantCulture, out pd))
+                                    pad.SetNumber(pd);
+                                else
+                                    pad.SetString(padVal);
+                                arr[r, c] = pad;
+                            }
+                        }
+                    }
+                    res.ArrayResult = arr;
+                    res.SetString(arr[0, 0].EvaluatedStr);
                     return res;
                 }
                 else if (funcName == "INDEX" && args.Length >= 2)
@@ -2707,20 +3656,6 @@ namespace ZenQOffice.Core
                     res.SetString(label);
                     return res;
                 }
-                else if (funcName == "UNIQUE" && args.Length >= 1)
-                {
-                    SparseMatrix sRange = ResolveSheet(args[0], sheet);
-                    var range = ParseRange(args[0]);
-                    List<string> uniq = new List<string>();
-                    foreach (var p in range)
-                    {
-                        CellData c = sRange.GetCell(p.Item1, p.Item2);
-                        string v = c != null ? (c.EvaluatedStr ?? c.RawValue ?? "") : "";
-                        if (!string.IsNullOrEmpty(v) && !uniq.Contains(v)) uniq.Add(v);
-                    }
-                    res.SetString(uniq.Count > 0 ? string.Join(", ", uniq.ToArray()) : "");
-                    return res;
-                }
 
                 // --- LOGICAL & INFORMATION FUNCTIONS ---
                 else if (funcName == "TRUE")
@@ -3313,13 +4248,52 @@ namespace ZenQOffice.Core
 
         public static List<Tuple<uint, uint>> ParseRange(string rangeStr)
         {
+            return ParseRange(rangeStr, null);
+        }
+
+        public static List<Tuple<uint, uint>> ParseRange(string rangeStr, SparseMatrix sheet)
+        {
             var res = new List<Tuple<uint, uint>>();
             string clean = (rangeStr ?? "").Trim().Replace("$", "");
+            if (string.IsNullOrEmpty(clean) || clean.IndexOf('(') >= 0 || clean.IndexOf(')') >= 0)
+            {
+                return res;
+            }
+
+            SparseMatrix sRange = ResolveSheet(rangeStr, sheet ?? CurrentEvaluatingSheet);
             int excl = clean.LastIndexOf('!');
             if (excl >= 0 && excl < clean.Length - 1)
             {
                 clean = clean.Substring(excl + 1).Trim();
             }
+
+            // Excel 365 Spill Reference Operator (#)
+            if (clean.EndsWith("#"))
+            {
+                string baseAddr = clean.Substring(0, clean.Length - 1).Trim();
+                if (IsCellReference(baseAddr))
+                {
+                    var basePos = SparseMatrix.ParseCellAddress(baseAddr);
+                    if (sRange != null)
+                    {
+                        CellData baseCell = sRange.GetCell(basePos.Item1, basePos.Item2);
+                        if (baseCell != null && baseCell.IsSpillOrigin && (baseCell.SpillRowCount > 1 || baseCell.SpillColCount > 1))
+                        {
+                            for (uint r = basePos.Item1; r < basePos.Item1 + (uint)baseCell.SpillRowCount; r++)
+                            {
+                                for (uint c = basePos.Item2; c < basePos.Item2 + (uint)baseCell.SpillColCount; c++)
+                                {
+                                    res.Add(new Tuple<uint, uint>(r, c));
+                                }
+                            }
+                            return res;
+                        }
+                    }
+                    res.Add(basePos);
+                    return res;
+                }
+            }
+
             int colonPos = clean.IndexOf(':');
             if (colonPos < 0)
             {
@@ -3343,6 +4317,10 @@ namespace ZenQOffice.Core
                 startAddr = "A" + startAddr;
                 endAddr = "AZ" + endAddr;
             }
+            else if (!IsCellReference(startAddr) || !IsCellReference(endAddr))
+            {
+                return res;
+            }
 
             var p1 = SparseMatrix.ParseCellAddress(startAddr);
             var p2 = SparseMatrix.ParseCellAddress(endAddr);
@@ -3352,6 +4330,11 @@ namespace ZenQOffice.Core
             uint minC = Math.Min(p1.Item2, p2.Item2);
             uint maxC = Math.Max(p1.Item2, p2.Item2);
 
+            if (maxR - minR > 50000 || maxC - minC > 1000)
+            {
+                return res;
+            }
+
             for (uint r = minR; r <= maxR; r++)
             {
                 for (uint c = minC; c <= maxC; c++)
@@ -3360,6 +4343,161 @@ namespace ZenQOffice.Core
                 }
             }
             return res;
+        }
+
+        public static CellData[,] ExtractArray(string arg, SparseMatrix sheet)
+        {
+            if (string.IsNullOrEmpty(arg)) return new CellData[0, 0];
+            string trimmed = arg.Trim();
+            SparseMatrix sRange = ResolveSheet(trimmed, sheet ?? CurrentEvaluatingSheet);
+
+            // 1. Array literal {1, 2; 3, 4}
+            if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+            {
+                string body = trimmed.Substring(1, trimmed.Length - 2).Trim();
+                string[] rows = body.Split(';');
+                int rCount = rows.Length;
+                int cCount = 1;
+                List<string[]> splitRows = new List<string[]>();
+                foreach (var r in rows)
+                {
+                    string[] cols = r.Split(',');
+                    splitRows.Add(cols);
+                    if (cols.Length > cCount) cCount = cols.Length;
+                }
+                CellData[,] arr = new CellData[rCount, cCount];
+                for (int r = 0; r < rCount; r++)
+                {
+                    for (int c = 0; c < cCount; c++)
+                    {
+                        CellData item = new CellData();
+                        string cellStr = c < splitRows[r].Length ? splitRows[r][c].Trim() : "";
+                        double d;
+                        if (double.TryParse(cellStr, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
+                            item.SetNumber(d);
+                        else
+                            item.SetString(cellStr.Trim('"'));
+                        arr[r, c] = item;
+                    }
+                }
+                return arr;
+            }
+
+            // 2. Formula or function evaluation (MUST precede range check to avoid evaluating nested formulas as ranges)
+            if (trimmed.StartsWith("=") || trimmed.Contains("("))
+            {
+                string expr = trimmed.StartsWith("=") ? trimmed : ("=" + trimmed);
+                CellData eval = EvaluateFormula(expr, sheet ?? CurrentEvaluatingSheet);
+                if (eval.ArrayResult != null && eval.ArrayResult.GetLength(0) > 0)
+                {
+                    return eval.ArrayResult;
+                }
+                CellData[,] single = new CellData[1, 1];
+                single[0, 0] = eval;
+                return single;
+            }
+
+            // 3. Range or Spill Reference (e.g. A1:B10 or C2#)
+            var rangeList = ParseRange(trimmed, sheet ?? CurrentEvaluatingSheet);
+            if (rangeList.Count > 0)
+            {
+                uint minR = uint.MaxValue, maxR = 0;
+                uint minC = uint.MaxValue, maxC = 0;
+                foreach (var p in rangeList)
+                {
+                    if (p.Item1 < minR) minR = p.Item1;
+                    if (p.Item1 > maxR) maxR = p.Item1;
+                    if (p.Item2 < minC) minC = p.Item2;
+                    if (p.Item2 > maxC) maxC = p.Item2;
+                }
+                int rCount = (int)(maxR - minR + 1);
+                int cCount = (int)(maxC - minC + 1);
+                CellData[,] arr = new CellData[rCount, cCount];
+                for (int r = 0; r < rCount; r++)
+                {
+                    for (int c = 0; c < cCount; c++)
+                    {
+                        CellData existing = sRange != null ? sRange.GetCell((uint)(minR + r), (uint)(minC + c)) : null;
+                        if (existing != null)
+                        {
+                            arr[r, c] = existing.Clone();
+                        }
+                        else
+                        {
+                            CellData empty = new CellData();
+                            empty.SetString("");
+                            arr[r, c] = empty;
+                        }
+                    }
+                }
+                return arr;
+            }
+
+            // 4. Scalar fallback
+            CellData scalar = new CellData();
+            double num;
+            if (double.TryParse(trimmed, NumberStyles.Any, CultureInfo.InvariantCulture, out num))
+                scalar.SetNumber(num);
+            else
+                scalar.SetString(trimmed.Trim('"'));
+            CellData[,] fallback = new CellData[1, 1];
+            fallback[0, 0] = scalar;
+            return fallback;
+        }
+
+        private static int CompareCells(CellData c1, CellData c2)
+        {
+            if (c1 == null && c2 == null) return 0;
+            if (c1 == null) return -1;
+            if (c2 == null) return 1;
+
+            if (c1.Type == CellType.Number && c2.Type == CellType.Number)
+            {
+                return c1.NumericValue.CompareTo(c2.NumericValue);
+            }
+            string s1 = c1.EvaluatedStr ?? c1.RawValue ?? "";
+            string s2 = c2.EvaluatedStr ?? c2.RawValue ?? "";
+            double n1, n2;
+            if (double.TryParse(s1, NumberStyles.Any, CultureInfo.InvariantCulture, out n1) &&
+                double.TryParse(s2, NumberStyles.Any, CultureInfo.InvariantCulture, out n2))
+            {
+                return n1.CompareTo(n2);
+            }
+            return string.Compare(s1, s2, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MatchesWildcard(string text, string pattern)
+        {
+            if (pattern == "*") return true;
+            try
+            {
+                string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+                    .Replace("\\*", ".*")
+                    .Replace("\\?", ".") + "$";
+                return System.Text.RegularExpressions.Regex.IsMatch(text, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(text, pattern, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static void AddFilteredCell(List<CellData> list, CellData c, int ignore)
+        {
+            if (c == null)
+            {
+                if (ignore == 0 || ignore == 2) list.Add(new CellData());
+                return;
+            }
+            string s = c.EvaluatedStr ?? c.RawValue ?? "";
+            bool isBlank = string.IsNullOrEmpty(s);
+            bool isErr = s.StartsWith("#");
+
+            if (ignore == 1 && isBlank) return;
+            if (ignore == 2 && isErr) return;
+            if (ignore == 3 && (isBlank || isErr)) return;
+
+            list.Add(c.Clone());
         }
 
         public static string[] SplitArgs(string argsStr)

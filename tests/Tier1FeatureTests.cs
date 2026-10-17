@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.Format;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
+using ZenQOffice.UI;
 
 namespace GenOffice.Tests
 {
@@ -1425,39 +1425,55 @@ namespace GenOffice.Tests
         // FEATURE 23: Dynamic Array Evaluation (Milestone M3)
         // =========================================================================
         [Test, Tier(TestTier.Tier1_Feature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
-        [Description("Verify formula anchor cell setting")]
+        [Description("Verify formula anchor cell setting and spill metadata")]
         public void T1_F23_01_ArrayFormulaAnchorCellSetting()
         {
             SparseMatrix sm = new SparseMatrix();
             sm.SetCellFormula(2, 2, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
             CellData cd = sm.GetCell(2, 2);
             Assert.AreEqual("=SEQUENCE(3, 2)", cd.FormulaStr);
+            Assert.IsTrue(cd.IsSpillOrigin);
+            Assert.AreEqual(3, cd.SpillRowCount);
+            Assert.AreEqual(2, cd.SpillColCount);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
         [Description("Verify array formula spilling into adjacent empty cells")]
         public void T1_F23_02_ArraySpillIntoAdjacentEmptyCells()
         {
-            int rows = 3;
-            int cols = 2;
-            int spillCount = rows * cols;
-            Assert.AreEqual(6, spillCount);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.IsTrue(sm.GetCell(1, 1).IsSpillOrigin);
+            Assert.AreEqual(1.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.IsTrue(sm.GetCell(1, 2).IsSpilledChild);
+            Assert.AreEqual(2.0, sm.GetCell(1, 2).NumericValue, 0.001);
+            Assert.IsTrue(sm.GetCell(3, 2).IsSpilledChild);
+            Assert.AreEqual(6.0, sm.GetCell(3, 2).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
-        [Description("Verify SparseMatrix spill metadata fields")]
+        [Description("Verify SparseMatrix spill metadata tracking")]
         public void T1_F23_03_SparseMatrixSpillMetadataTracking()
         {
-            Type smType = typeof(SparseMatrix);
-            Assert.IsNotNull(smType);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(2, 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.IsTrue(sm.IsCellSpilled(1, 2));
+            Assert.IsTrue(sm.IsCellSpilled(2, 2));
+            Assert.IsFalse(sm.IsCellSpilled(3, 3));
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
         [Description("Verify spill range hash '#' operator reference")]
         public void T1_F23_04_SpillRangeHashOperatorReference()
         {
-            string hashRef = "=SUM(A1#)";
-            Assert.IsTrue(hashRef.Contains("#)"));
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)"); // values 1..6
+            sm.SetCellFormula(5, 1, "=SUM(A1#)"); // 1+2+3+4+5+6 = 21
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(21.0, sm.GetCell(5, 1).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(23, "Dynamic Array Evaluation", Milestone.M3)]
@@ -1465,8 +1481,14 @@ namespace GenOffice.Tests
         public void T1_F23_05_DynamicArrayReCalculationOnDependencyChange()
         {
             SparseMatrix sm = new SparseMatrix();
-            sm.SetCellNumber(1, 1, 5);
-            Assert.AreEqual(5.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            sm.SetCellNumber(1, 1, 10);
+            sm.SetCellFormula(2, 1, "=SEQUENCE(1, 1, A1, 1)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(10.0, sm.GetCell(2, 1).NumericValue, 0.001);
+
+            sm.SetCellNumber(1, 1, 99);
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(99.0, sm.GetCell(2, 1).NumericValue, 0.001);
         }
 
         // =========================================================================
@@ -1476,17 +1498,23 @@ namespace GenOffice.Tests
         [Description("Verify spill collision with non-empty cell evaluates to #SPILL!")]
         public void T1_F24_01_SpillCollisionWithNonEmptyCellReturnsSpillError()
         {
-            string spillErr = "#SPILL!";
-            Assert.AreEqual("#SPILL!", spillErr);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellString(2, 2, "Obstacle");
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("#SPILL!", sm.GetCell(1, 1).RawValue);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(24, "Spill Collision & #SPILL!", Milestone.M3)]
         [Description("Verify spill collision with merged cell evaluates to #SPILL!")]
         public void T1_F24_02_SpillCollisionWithMergedCellReturnsSpillError()
         {
-            CellFormat fmt = new CellFormat();
-            fmt.IsMergedParent = true;
-            Assert.IsTrue(fmt.IsMergedParent);
+            SparseMatrix sm = new SparseMatrix();
+            CellFormat fmt = sm.GetFormat(2, 2);
+            fmt.IsMergedChild = true;
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("#SPILL!", sm.GetCell(1, 1).RawValue);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(24, "Spill Collision & #SPILL!", Milestone.M3)]
@@ -1495,6 +1523,8 @@ namespace GenOffice.Tests
         {
             SparseMatrix sm = new SparseMatrix();
             sm.SetCellString(2, 2, "ExistingContent");
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
             Assert.AreEqual("ExistingContent", sm.GetCell(2, 2).RawValue);
         }
 
@@ -1504,8 +1534,15 @@ namespace GenOffice.Tests
         {
             SparseMatrix sm = new SparseMatrix();
             sm.SetCellString(2, 2, "Obstacle");
-            sm.DeleteCell(2, 2);
-            Assert.IsNull(sm.GetCell(2, 2));
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("#SPILL!", sm.GetCell(1, 1).RawValue);
+
+            sm.ClearCell(2, 2);
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(1.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.AreEqual(4.0, sm.GetCell(2, 2).NumericValue, 0.001);
+            Assert.IsFalse(sm.GetCell(1, 1).RawValue == "#SPILL!");
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(24, "Spill Collision & #SPILL!", Milestone.M3)]
@@ -1523,51 +1560,63 @@ namespace GenOffice.Tests
         [Description("Verify SORT array function ascending and descending")]
         public void T1_F25_01_SortArrayFunctionAscendingDescending()
         {
-            List<int> vals = new List<int>() { 40, 10, 30, 20 };
-            vals.Sort();
-            Assert.AreEqual(10, vals[0]);
-            Assert.AreEqual(40, vals[3]);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellNumber(1, 1, 40);
+            sm.SetCellNumber(2, 1, 10);
+            sm.SetCellNumber(3, 1, 30);
+            sm.SetCellNumber(4, 1, 20);
+            sm.SetCellFormula(1, 3, "=SORT(A1:A4, 1, 1)");
+            sm.SetCellFormula(1, 5, "=SORT(A1:A4, 1, -1)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(10.0, sm.GetCell(1, 3).NumericValue, 0.001);
+            Assert.AreEqual(40.0, sm.GetCell(4, 3).NumericValue, 0.001);
+            Assert.AreEqual(40.0, sm.GetCell(1, 5).NumericValue, 0.001);
+            Assert.AreEqual(10.0, sm.GetCell(4, 5).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
         [Description("Verify FILTER array function matching condition")]
         public void T1_F25_02_FilterArrayFunctionByCondition()
         {
-            List<int> vals = new List<int>() { 10, 25, 5, 40 };
-            List<int> filtered = new List<int>();
-            for (int i = 0; i < vals.Count; i++)
-            {
-                if (vals[i] > 20) filtered.Add(vals[i]);
-            }
-            Assert.AreEqual(2, filtered.Count);
-            Assert.AreEqual(25, filtered[0]);
-            Assert.AreEqual(40, filtered[1]);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellNumber(1, 1, 10);
+            sm.SetCellNumber(2, 1, 25);
+            sm.SetCellNumber(3, 1, 5);
+            sm.SetCellNumber(4, 1, 40);
+            sm.SetCellFormula(1, 3, "=FILTER(A1:A4, A1:A4>20)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(25.0, sm.GetCell(1, 3).NumericValue, 0.001);
+            Assert.AreEqual(40.0, sm.GetCell(2, 3).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
         [Description("Verify UNIQUE array function extracting distinct values")]
         public void T1_F25_03_UniqueArrayFunctionDistinctExtraction()
         {
-            List<string> items = new List<string>() { "A", "B", "A", "C", "B" };
-            HashSet<string> unique = new HashSet<string>(items);
-            Assert.AreEqual(3, unique.Count);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellString(1, 1, "A");
+            sm.SetCellString(2, 1, "B");
+            sm.SetCellString(3, 1, "A");
+            sm.SetCellString(4, 1, "C");
+            sm.SetCellString(5, 1, "B");
+            sm.SetCellFormula(1, 3, "=UNIQUE(A1:A5)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual("A", sm.GetCell(1, 3).RawValue);
+            Assert.AreEqual("B", sm.GetCell(2, 3).RawValue);
+            Assert.AreEqual("C", sm.GetCell(3, 3).RawValue);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
         [Description("Verify SEQUENCE array function grid generation")]
         public void T1_F25_04_SequenceArrayFunctionGridGeneration()
         {
-            int r = 2, c = 2, start = 1, step = 1;
-            int[,] grid = new int[r, c];
-            int cur = start;
-            for (int i = 0; i < r; i++)
-                for (int j = 0; j < c; j++)
-                {
-                    grid[i, j] = cur;
-                    cur += step;
-                }
-            Assert.AreEqual(1, grid[0, 0]);
-            Assert.AreEqual(4, grid[1, 1]);
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(2, 2, 1, 1)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(1.0, sm.GetCell(1, 1).NumericValue, 0.001);
+            Assert.AreEqual(2.0, sm.GetCell(1, 2).NumericValue, 0.001);
+            Assert.AreEqual(3.0, sm.GetCell(2, 1).NumericValue, 0.001);
+            Assert.AreEqual(4.0, sm.GetCell(2, 2).NumericValue, 0.001);
         }
 
         [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
@@ -1579,6 +1628,110 @@ namespace GenOffice.Tests
             int y = 20;
             int res = x + y;
             Assert.AreEqual(30, res);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
+        [Description("Verify XLOOKUP with wildcard match and multi-column spill return")]
+        public void T1_F25_06_XLookupMultiColumnAndWildcard()
+        {
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellString(1, 1, "Apple");
+            sm.SetCellNumber(1, 2, 100);
+            sm.SetCellNumber(1, 3, 10);
+            sm.SetCellString(2, 1, "Banana");
+            sm.SetCellNumber(2, 2, 200);
+            sm.SetCellNumber(2, 3, 20);
+            sm.SetCellString(3, 1, "Orange");
+            sm.SetCellNumber(3, 2, 300);
+            sm.SetCellNumber(3, 3, 30);
+
+            // Lookup "Ban*" in A1:A3, return B1:C3
+            sm.SetCellFormula(5, 1, "=XLOOKUP(\"Ban*\", A1:A3, B1:C3, \"None\", 2)");
+            FormulaEngine.EvaluateSheet(sm);
+            Assert.AreEqual(200.0, sm.GetCell(5, 1).NumericValue, 0.001);
+            Assert.AreEqual(20.0, sm.GetCell(5, 2).NumericValue, 0.001);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
+        [Description("Verify XMATCH and RANDARRAY dynamic array generation")]
+        public void T1_F25_07_XMatchAndRandArray()
+        {
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellString(1, 1, "Apple");
+            sm.SetCellString(2, 1, "Banana");
+            sm.SetCellString(3, 1, "Orange");
+
+            sm.SetCellFormula(5, 1, "=XMATCH(\"Orange\", A1:A3)");
+            sm.SetCellFormula(6, 1, "=RANDARRAY(3, 2, 5, 5, 1)"); // fixed min=max=5 integers
+            FormulaEngine.EvaluateSheet(sm);
+
+            Assert.AreEqual(3.0, sm.GetCell(5, 1).NumericValue, 0.001);
+            Assert.AreEqual(5.0, sm.GetCell(6, 1).NumericValue, 0.001);
+            Assert.AreEqual(5.0, sm.GetCell(8, 2).NumericValue, 0.001);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
+        [Description("Verify CHOOSEROWS, CHOOSECOLS, TAKE, and DROP manipulation")]
+        public void T1_F25_08_ChooseRowsChooseColsTakeDrop()
+        {
+            SparseMatrix sm = new SparseMatrix();
+            // A1:C3 is SEQUENCE(3, 3) -> 1..9
+            sm.SetCellFormula(1, 1, "=SEQUENCE(3, 3)");
+            // TAKE top 2 rows, DROP first col
+            sm.SetCellFormula(5, 1, "=TAKE(DROP(A1#, 0, 1), 2)");
+            // CHOOSEROWS last row (-1), CHOOSECOLS middle col (2)
+            sm.SetCellFormula(8, 1, "=CHOOSEROWS(A1#, -1)");
+            FormulaEngine.EvaluateSheet(sm);
+
+            Assert.AreEqual(2.0, sm.GetCell(5, 1).NumericValue, 0.001);
+            Assert.AreEqual(3.0, sm.GetCell(5, 2).NumericValue, 0.001);
+            Assert.AreEqual(5.0, sm.GetCell(6, 1).NumericValue, 0.001);
+            Assert.AreEqual(6.0, sm.GetCell(6, 2).NumericValue, 0.001);
+
+            Assert.AreEqual(7.0, sm.GetCell(8, 1).NumericValue, 0.001);
+            Assert.AreEqual(8.0, sm.GetCell(8, 2).NumericValue, 0.001);
+            Assert.AreEqual(9.0, sm.GetCell(8, 3).NumericValue, 0.001);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
+        [Description("Verify TOCOL, TOROW, VSTACK, and HSTACK stacking functions")]
+        public void T1_F25_09_ToColToRowVStackHStack()
+        {
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=SEQUENCE(2, 2, 1, 1)"); // 1,2; 3,4
+            sm.SetCellFormula(4, 1, "=TOCOL(A1#)"); // 1; 2; 3; 4
+            sm.SetCellFormula(9, 1, "=HSTACK(A1#, A1#)"); // 1,2,1,2; 3,4,3,4
+            FormulaEngine.EvaluateSheet(sm);
+
+            Assert.AreEqual(1.0, sm.GetCell(4, 1).NumericValue, 0.001);
+            Assert.AreEqual(2.0, sm.GetCell(5, 1).NumericValue, 0.001);
+            Assert.AreEqual(3.0, sm.GetCell(6, 1).NumericValue, 0.001);
+            Assert.AreEqual(4.0, sm.GetCell(7, 1).NumericValue, 0.001);
+
+            Assert.AreEqual(1.0, sm.GetCell(9, 1).NumericValue, 0.001);
+            Assert.AreEqual(2.0, sm.GetCell(9, 2).NumericValue, 0.001);
+            Assert.AreEqual(1.0, sm.GetCell(9, 3).NumericValue, 0.001);
+            Assert.AreEqual(2.0, sm.GetCell(9, 4).NumericValue, 0.001);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(25, "Array & Scoping Functions", Milestone.M3)]
+        [Description("Verify TEXTSPLIT and EXPAND array functions")]
+        public void T1_F25_10_TextSplitAndExpand()
+        {
+            SparseMatrix sm = new SparseMatrix();
+            sm.SetCellFormula(1, 1, "=TEXTSPLIT(\"A,B;C,D\", \",\", \";\")");
+            sm.SetCellFormula(4, 1, "=EXPAND(A1#, 3, 3, \"N/A\")");
+            FormulaEngine.EvaluateSheet(sm);
+
+            Assert.AreEqual("A", sm.GetCell(1, 1).RawValue);
+            Assert.AreEqual("B", sm.GetCell(1, 2).RawValue);
+            Assert.AreEqual("C", sm.GetCell(2, 1).RawValue);
+            Assert.AreEqual("D", sm.GetCell(2, 2).RawValue);
+
+            Assert.AreEqual("A", sm.GetCell(4, 1).RawValue);
+            Assert.AreEqual("N/A", sm.GetCell(4, 3).RawValue);
+            Assert.AreEqual("N/A", sm.GetCell(6, 1).RawValue);
+            Assert.AreEqual("N/A", sm.GetCell(6, 3).RawValue);
         }
 
         // =========================================================================
@@ -2076,6 +2229,1158 @@ namespace GenOffice.Tests
                 bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
             }
         }
+
+        // =========================================================================
+        // FEATURE 35: Writer Track Changes & Revision Management
+        // =========================================================================
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify that typing text with Track Changes records Insertion revision and underline run")]
+        public void T1_F35_01_TrackChangesInsertionRecordsRevisionAndUnderline()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Xin chào");
+            wv.TrackChanges = true;
+            wv.InsertText(" Việt Nam");
+
+            Assert.AreEqual("Xin chào Việt Nam", wv.PieceTable.GetText(), "Full text should contain both base and inserted text");
+            Assert.AreEqual(1, wv.Revisions.Count, "One revision should be recorded for the insertion");
+            var rev = wv.Revisions[0];
+            Assert.AreEqual(RevisionType.Insertion, rev.Type, "Revision type must be Insertion");
+            Assert.AreEqual(" Việt Nam", rev.Text, "Revision text must match inserted content");
+            Assert.IsTrue(rev.StartIndex >= 8, "StartIndex must point to insert position");
+
+            // Verify run formatting: Underline is true, Color matches rev.Color
+            FormattedRun insRun = wv.GetFormatAt(rev.StartIndex);
+            Assert.IsNotNull(insRun, "Format run at revision position must exist");
+            Assert.IsTrue(insRun.Underline, "Insertion must be formatted with underline");
+            Assert.AreEqual(rev.Color, insRun.Color, "Insertion must be colored with revision color");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify that deleting text with Track Changes marks Deletion revision with strikeout without removing text")]
+        public void T1_F35_02_TrackChangesDeletionMarksStrikeoutWithoutRemoval()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Hà Nội mùa thu");
+            wv.TrackChanges = true;
+
+            // Select " mùa thu"
+            wv.SelectionStart = 6;
+            wv.SelectionEnd = 14;
+            wv.HandleChar('\b'); // Backspace on selection
+
+            // Text is still present in PieceTable for visual review
+            Assert.AreEqual("Hà Nội mùa thu", wv.PieceTable.GetText(), "Text must NOT be immediately removed from PieceTable");
+            Assert.AreEqual(1, wv.Revisions.Count, "One revision must be recorded for deletion");
+            var rev = wv.Revisions[0];
+            Assert.AreEqual(RevisionType.Deletion, rev.Type, "Revision type must be Deletion");
+            Assert.AreEqual(" mùa thu", rev.Text, "Revision text must capture deleted text");
+
+            FormattedRun delRun = wv.GetFormatAt(6);
+            Assert.IsTrue(delRun.Strike, "Deleted text must have strikeout formatting");
+            Assert.AreEqual(rev.Color, delRun.Color, "Deleted text must have revision deletion color");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify that AcceptRevision permanently removes deletion or normalizes insertion")]
+        public void T1_F35_03_TrackChangesAcceptRevision()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Tài liệu chính thức 2025");
+            wv.TrackChanges = true;
+
+            // Delete " 2025"
+            wv.SelectionStart = 19;
+            wv.SelectionEnd = 24;
+            wv.HandleChar('\b');
+            Assert.AreEqual(1, wv.Revisions.Count);
+
+            // Accept the deletion: now it should be physically deleted from PieceTable
+            wv.AcceptRevision(wv.Revisions[0]);
+            Assert.AreEqual("Tài liệu chính thức", wv.PieceTable.GetText(), "Accepting deletion must physically remove text");
+            Assert.AreEqual(0, wv.Revisions.Count, "Revisions list must be cleared after accept");
+
+            // Insert " 2026"
+            wv.InsertText(" 2026");
+            Assert.AreEqual(1, wv.Revisions.Count);
+            // Accept the insertion: text remains, underline is cleared
+            wv.AcceptRevision(wv.Revisions[0]);
+            Assert.AreEqual("Tài liệu chính thức 2026", wv.PieceTable.GetText(), "Accepting insertion must keep text");
+            Assert.AreEqual(0, wv.Revisions.Count);
+            FormattedRun insRun = wv.GetFormatAt(19);
+            Assert.IsFalse(insRun.Underline, "Underline must be cleared after accept");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify that RejectRevision rolls back insertion or restores deleted text")]
+        public void T1_F35_04_TrackChangesRejectRevision()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Phiên bản v1.0");
+            wv.TrackChanges = true;
+
+            // 1. Insert " BETA"
+            wv.InsertText(" BETA");
+            Assert.AreEqual("Phiên bản v1.0 BETA", wv.PieceTable.GetText());
+            Assert.AreEqual(1, wv.Revisions.Count);
+
+            // Reject insertion -> must delete " BETA"
+            wv.RejectRevision(wv.Revisions[0]);
+            Assert.AreEqual("Phiên bản v1.0", wv.PieceTable.GetText(), "Rejecting insertion must remove inserted text");
+            Assert.AreEqual(0, wv.Revisions.Count);
+
+            // 2. Delete " v1.0"
+            wv.SelectionStart = 9;
+            wv.SelectionEnd = 14;
+            wv.HandleChar('\b');
+            Assert.AreEqual(1, wv.Revisions.Count);
+
+            // Reject deletion -> must restore " v1.0" (clear strikeout)
+            wv.RejectRevision(wv.Revisions[0]);
+            Assert.AreEqual("Phiên bản v1.0", wv.PieceTable.GetText(), "Text must remain intact");
+            Assert.AreEqual(0, wv.Revisions.Count);
+            FormattedRun restoredRun = wv.GetFormatAt(10);
+            Assert.IsFalse(restoredRun.Strike, "Strikeout must be cleared on reject deletion");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify AcceptAllTrackedChanges and RejectAllTrackedChanges with multiple mixed revisions")]
+        public void T1_F35_05_AcceptAllAndRejectAllTrackedChanges()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Văn bản khởi tạo ban đầu");
+            wv.TrackChanges = true;
+
+            // Delete " ban đầu"
+            wv.SelectionStart = 16;
+            wv.SelectionEnd = 24;
+            wv.HandleChar('\b');
+
+            // Insert " hoàn chỉnh"
+            wv.CursorPosition = 16;
+            wv.InsertText(" hoàn chỉnh");
+
+            Assert.AreEqual(2, wv.Revisions.Count, "Two revisions recorded (one delete, one insert)");
+
+            // Test AcceptAll
+            wv.AcceptAllTrackedChanges();
+            Assert.AreEqual(0, wv.Revisions.Count, "All revisions must be cleared");
+            Assert.AreEqual("Văn bản khởi tạo hoàn chỉnh", wv.PieceTable.GetText(), "Accepted text must have deletion removed and insertion kept");
+
+            // Test Undo / Redo integration
+            wv.Undo();
+            Assert.AreEqual(2, wv.Revisions.Count, "Undo must restore tracked revisions state");
+            
+            // Now test RejectAll
+            wv.RejectAllTrackedChanges();
+            Assert.AreEqual(0, wv.Revisions.Count);
+            Assert.AreEqual("Văn bản khởi tạo ban đầu", wv.PieceTable.GetText(), "Rejecting all must restore original text");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(35, "Writer Track Changes & Revisions", Milestone.M4)]
+        [Description("Verify revision navigation NextRevision and PreviousRevision")]
+        public void T1_F35_06_TrackChangesNavigation()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Đoạn một. Đoạn hai. Đoạn ba.");
+            wv.TrackChanges = true;
+
+            // Change 1 at start
+            wv.CursorPosition = 0;
+            wv.InsertText("[Sửa 1] ");
+
+            // Change 2 in middle
+            wv.CursorPosition = 18;
+            wv.InsertText("[Sửa 2] ");
+
+            Assert.AreEqual(2, wv.Revisions.Count);
+
+            wv.CursorPosition = 0;
+            bool hasNext = wv.NextRevision();
+            Assert.IsTrue(hasNext, "NextRevision should navigate forward");
+            Assert.AreEqual(wv.Revisions[1].StartIndex, wv.CursorPosition, "Should navigate to second revision");
+
+            bool hasPrev = wv.PreviousRevision();
+            Assert.IsTrue(hasPrev, "PreviousRevision should navigate backward");
+            Assert.AreEqual(wv.Revisions[0].StartIndex, wv.CursorPosition, "Should navigate back to first revision");
+        }
+
+        // =========================================================================
+        // FEATURE 36: Writer Mail Merge Engine
+        // =========================================================================
+        [Test, Tier(TestTier.Tier1_Feature), Feature(36, "Writer Mail Merge Engine", Milestone.M4)]
+        [Description("Verify inserting merge fields and detecting them in document")]
+        public void T1_F36_01_InsertAndDetectMergeFields()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Thư mời: ");
+            wv.InsertMergeField("Họ và tên");
+            wv.InsertText(" - Phòng ban: ");
+            wv.InsertMergeField("Phòng ban");
+
+            Assert.IsTrue(wv.PieceTable.GetText().Contains("«Họ và tên»"), "Must contain merge field «Họ và tên»");
+            Assert.IsTrue(wv.PieceTable.GetText().Contains("«Phòng ban»"), "Must contain merge field «Phòng ban»");
+
+            var detected = wv.DetectMergeFields();
+            Assert.AreEqual(2, detected.Count, "Should detect 2 merge fields");
+            Assert.IsTrue(detected.Contains("Họ và tên"), "Detected fields must include Họ và tên");
+            Assert.IsTrue(detected.Contains("Phòng ban"), "Detected fields must include Phòng ban");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(36, "Writer Mail Merge Engine", Milestone.M4)]
+        [Description("Verify CSV recipients data loading and parsing")]
+        public void T1_F36_02_LoadMailMergeFromCsv()
+        {
+            WriterView wv = new WriterView();
+            string csv = "Họ và tên,Công ty,Email\r\nNguyễn Văn A,ZenQ Corp,a@zenq.vn\r\nTrần Thị B,Tech JSC,b@tech.vn";
+            wv.LoadMailMergeFromCsv(csv);
+
+            Assert.AreEqual(2, wv.MailMergeData.Count, "Should parse 2 recipient records");
+            Assert.AreEqual("Nguyễn Văn A", wv.MailMergeData[0]["Họ và tên"]);
+            Assert.AreEqual("ZenQ Corp", wv.MailMergeData[0]["Công ty"]);
+            Assert.AreEqual("Trần Thị B", wv.MailMergeData[1]["Họ và tên"]);
+            Assert.AreEqual("b@tech.vn", wv.MailMergeData[1]["Email"]);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(36, "Writer Mail Merge Engine", Milestone.M4)]
+        [Description("Verify merged document generation for single record with composite fields")]
+        public void T1_F36_03_GetMergedDocumentTextSingleRecord()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("«Kính_gửi_Họ_Tên»\r\nCông tác tại «Công ty».\r\n«Khối_Địa_Chỉ»");
+
+            var data = new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string>
+                {
+                    { "Họ và tên", "Lê Văn C" },
+                    { "Công ty", "Tập đoàn ABC" },
+                    { "Chức danh", "Giám đốc" },
+                    { "Địa chỉ", "Hà Nội" }
+                }
+            };
+            wv.LoadMailMergeData(data);
+
+            string merged = wv.GetMergedDocumentText(0);
+            Assert.IsTrue(merged.Contains("Kính gửi Ông/Bà Lê Văn C,"), "Greeting line must be evaluated");
+            Assert.IsTrue(merged.Contains("Công tác tại Tập đoàn ABC."), "Company name must be merged");
+            Assert.IsTrue(merged.Contains("Lê Văn C\nGiám đốc\nTập đoàn ABC\nHà Nội"), "Address block must be formatted properly");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(36, "Writer Mail Merge Engine", Milestone.M4)]
+        [Description("Verify FinishAndMergeAllRecords generates continuous document with page breaks")]
+        public void T1_F36_04_FinishAndMergeAllRecordsWithPageBreaks()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Xin chào «Họ và tên»! Mã số: «Mã»");
+
+            var data = new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "Họ và tên", "An" }, { "Mã", "001" } },
+                new Dictionary<string, string> { { "Họ và tên", "Bình" }, { "Mã", "002" } },
+                new Dictionary<string, string> { { "Họ và tên", "Cường" }, { "Mã", "003" } }
+            };
+            wv.LoadMailMergeData(data);
+
+            string allDocs = wv.FinishAndMergeAllRecords();
+            Assert.IsTrue(allDocs.Contains("Xin chào An! Mã số: 001"), "Record 1 must be present");
+            Assert.IsTrue(allDocs.Contains("Xin chào Bình! Mã số: 002"), "Record 2 must be present");
+            Assert.IsTrue(allDocs.Contains("Xin chào Cường! Mã số: 003"), "Record 3 must be present");
+            Assert.IsTrue(allDocs.Contains("[--- PAGE BREAK ---]"), "Records must be separated by page breaks");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(36, "Writer Mail Merge Engine", Milestone.M4)]
+        [Description("Verify live preview toggle and restoration of template text")]
+        public void T1_F36_05_ApplyAndClearMailMergePreview()
+        {
+            WriterView wv = new WriterView();
+            wv.InsertText("Thông báo gửi «Họ và tên»");
+
+            var data = new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "Họ và tên", "Phạm Văn D" } },
+                new Dictionary<string, string> { { "Họ và tên", "Hoàng Thị E" } }
+            };
+            wv.LoadMailMergeData(data);
+
+            // Preview Record 0
+            wv.ApplyMailMergePreview(0);
+            Assert.IsTrue(wv.PreviewMailMerge, "PreviewMailMerge flag must be active");
+            Assert.AreEqual("Thông báo gửi Phạm Văn D", wv.PieceTable.GetText(), "Record 0 preview text should display");
+
+            // Preview Record 1
+            wv.ApplyMailMergePreview(1);
+            Assert.AreEqual("Thông báo gửi Hoàng Thị E", wv.PieceTable.GetText(), "Record 1 preview text should display");
+
+            // Clear Preview
+            wv.ClearMailMergePreview();
+            Assert.IsFalse(wv.PreviewMailMerge, "PreviewMailMerge flag must be false");
+            Assert.AreEqual("Thông báo gửi «Họ và tên»", wv.PieceTable.GetText(), "Template text with merge fields must be fully restored");
+        }
+
+        // =========================================================================
+        // FEATURE 37: Slides PowerPoint 365 Designer & Zoom Navigation Engine
+        // =========================================================================
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify Designer engine analyzes slide content and generates 8 distinct modern layout ideas")]
+        public void T1_F37_01_GenerateDesignIdeasForSlide()
+        {
+            SlideNode slide = new SlideNode
+            {
+                Id = "slide_1",
+                Title = "Báo Cáo Tăng Trưởng Quý 4"
+            };
+            slide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                PlaceholderType = "Title",
+                Text = "Chiến Lược Kinh Doanh 2026",
+                FontSize = 36f
+            });
+            slide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Text = "• Mở rộng thị trường Đông Nam Á\n• Nâng cấp hạ tầng đám mây\n• Đẩy mạnh AI tự động hóa",
+                FontSize = 20f
+            });
+
+            var ideas = SlideDesignerEngine.GenerateIdeas(slide, 1920f, 1080f);
+            Assert.AreEqual(8, ideas.Count, "Must generate exactly 8 professional design ideas");
+
+            Assert.AreEqual("hero_split", ideas[0].Id);
+            Assert.AreEqual("Hero Split Đẳng cấp", ideas[0].Title);
+            Assert.AreEqual("Hiện đại", ideas[0].Category);
+
+            Assert.AreEqual("bento_grid", ideas[1].Id);
+            Assert.AreEqual("Bento Grid Đa Năng", ideas[1].Title);
+
+            Assert.AreEqual("dark_obsidian", ideas[2].Id);
+            Assert.AreEqual("Executive Dark Obsidian", ideas[2].Title);
+            Assert.AreEqual(0x0B0F19, ideas[2].BackgroundColor);
+
+            Assert.AreEqual("editorial", ideas[3].Id);
+            Assert.AreEqual("Tạp Chí Nghệ Thuật Tối Giản", ideas[3].Title);
+
+            Assert.AreEqual("process_steps", ideas[4].Id);
+            Assert.AreEqual("Quy Trình 3 Bước Liền Mạch", ideas[4].Title);
+
+            Assert.AreEqual("sunset_header", ideas[5].Id);
+            Assert.AreEqual("Dải Màu Hoàng Hôn Sáng Tạo", ideas[5].Title);
+
+            Assert.AreEqual("kpi_spotlight", ideas[6].Id);
+            Assert.AreEqual("Tiêu Điểm Số Liệu & KPI", ideas[6].Title);
+
+            Assert.AreEqual("dual_comparison", ideas[7].Id);
+            Assert.AreEqual("So Sánh Hai Cột Song Song", ideas[7].Title);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify applying Hero Split layout restructures shapes, preserves text, and marks thumbnail dirty")]
+        public void T1_F37_02_ApplyDesignIdeaHeroSplit()
+        {
+            SlideNode slide = new SlideNode { Id = "slide_2" };
+            slide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                PlaceholderType = "Title",
+                Text = "Kế Hoạch Ra Mắt Sản Phẩm"
+            });
+            slide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Text = "Khởi chạy phiên bản Beta\nChiến dịch truyền thông toàn diện"
+            });
+
+            var ideas = SlideDesignerEngine.GenerateIdeas(slide, 1920f, 1080f);
+            ideas[0].Apply(slide, 1920f, 1080f);
+
+            Assert.IsTrue(slide.IsThumbnailDirty, "Thumbnail cache must be marked dirty after applying layout");
+            Assert.AreEqual(0xF8FAFC, slide.BgColor, "Slide background must match Hero Split theme");
+            Assert.IsTrue(slide.Shapes.Count >= 4, "Must generate background accent, category pill, title, subtitle, and cards");
+
+            var titleShape = slide.Shapes.Find(s => s.PlaceholderType == "Title");
+            Assert.IsNotNull(titleShape, "Title shape must exist");
+            Assert.AreEqual("Kế Hoạch Ra Mắt Sản Phẩm", titleShape.Text, "Title text must be preserved");
+            Assert.AreEqual(0xFFFFFF, titleShape.TextColor, "Title must have crisp white contrast on dark block");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify applying Executive Dark Obsidian layout sets obsidian background and gradient bar")]
+        public void T1_F37_03_ApplyDesignIdeaExecutiveDarkMode()
+        {
+            SlideNode slide = new SlideNode { Id = "slide_3" };
+            slide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Text = "Báo Cáo Tài Chính Thường Niên"
+            });
+
+            var ideas = SlideDesignerEngine.GenerateIdeas(slide, 1920f, 1080f);
+            var darkIdea = ideas.Find(i => i.Id == "dark_obsidian");
+            Assert.IsNotNull(darkIdea);
+
+            darkIdea.Apply(slide, 1920f, 1080f);
+            Assert.AreEqual(0x0B0F19, slide.BgColor, "Obsidian background color 0x0B0F19 must be applied");
+
+            var glowLine = slide.Shapes.Find(s => s.Name == "Dark_GlowLine");
+            Assert.IsNotNull(glowLine, "Glowing accent line must exist");
+            Assert.IsTrue(glowLine.HasGradientFill, "Glow line must feature gradient fill");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify SlidesView Designer pane toggle and ApplyDesignIdea undo support")]
+        public void T1_F37_04_SlidesViewDesignerToggleAndUndo()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation.AddSlide(SlideLayoutType.Blank);
+            sv.ActiveSlideIndex = 0;
+            sv.ActiveSlide.Shapes.Add(new ShapeNode
+            {
+                Type = ShapeType.TextBox,
+                Text = "Dự Án Khởi Nghiệp Công Nghệ"
+            });
+
+            // Toggle Designer Pane
+            Assert.IsTrue(sv.SidebarPanel != SidebarPanelType.Designer, "Designer should not be open initially");
+            sv.ToggleDesignerPane();
+            Assert.AreEqual(SidebarPanelType.Designer, sv.SidebarPanel, "SidebarPanel must switch to Designer");
+            Assert.IsTrue(sv.IsSidebarOpen, "Right sidebar must be open");
+
+            // Apply idea 1 (Bento Grid)
+            int initialUndoCount = sv.UndoStack.Count;
+            sv.ApplyDesignIdea(1);
+            Assert.IsTrue(sv.UndoStack.Count > initialUndoCount, "Undo state must be pushed before applying idea");
+            Assert.AreEqual(0xF1F5F9, sv.ActiveSlide.BgColor, "Bento background must be applied");
+
+            // Undo restores original state
+            sv.Undo();
+            Assert.AreEqual(0xFFFFFF, sv.ActiveSlide.BgColor, "Undo must restore original slide background");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify InsertSlideZoom creates Zoom shape linking to target slide")]
+        public void T1_F37_05_InsertSlideZoomShape()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation.AddSlide(SlideLayoutType.Blank);
+            sv.Presentation.AddSlide(SlideLayoutType.Blank);
+            sv.ActiveSlideIndex = 0;
+
+            ShapeNode zoomShape = sv.InsertSlideZoom(1);
+            Assert.IsNotNull(zoomShape, "Slide Zoom shape must be created");
+            Assert.AreEqual(ShapeType.SlideZoom, zoomShape.Type, "ShapeType must be SlideZoom");
+            Assert.AreEqual(1, zoomShape.ZoomTargetSlideIndex, "Target slide index must link to slide 1");
+            Assert.IsTrue(zoomShape.ZoomReturnToSlide, "ZoomReturnToSlide must be true by default");
+            Assert.IsTrue(zoomShape.ZoomShowBorder, "ZoomShowBorder must be true");
+            Assert.IsTrue(zoomShape.HasShadow, "Slide Zoom must feature elevation drop shadow");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(37, "Slides Designer & Zoom Engine", Milestone.M4)]
+        [Description("Verify InsertSummaryZoom creates interactive visual agenda and handles return navigation")]
+        public void T1_F37_06_InsertSummaryZoomAndNavigationReturn()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation.Slides.Clear();
+            sv.Presentation.AddSlide(SlideLayoutType.Blank); // Slide 0
+            sv.Presentation.AddSlide(SlideLayoutType.Blank); // Slide 1
+            sv.Presentation.AddSlide(SlideLayoutType.Blank); // Slide 2
+            sv.ActiveSlideIndex = 0;
+
+            SlideNode summarySlide = sv.InsertSummaryZoom();
+            Assert.IsNotNull(summarySlide, "Summary agenda slide must be generated");
+            Assert.AreEqual("Mục Lục Tóm Tắt (Summary Zoom)", summarySlide.Title);
+
+            // Verify zoom cards created for all 3 original slides
+            var zoomCards = summarySlide.Shapes.FindAll(s => s.Type == ShapeType.SlideZoom);
+            Assert.AreEqual(3, zoomCards.Count, "Summary zoom must contain 3 zoom thumbnail cards");
+            Assert.AreEqual(0, zoomCards[0].ZoomTargetSlideIndex);
+            Assert.AreEqual(1, zoomCards[1].ZoomTargetSlideIndex);
+            Assert.AreEqual(2, zoomCards[2].ZoomTargetSlideIndex);
+
+            // Test Zoom Navigation in presentation mode
+            sv.IsPresenting = true;
+            sv.TriggerZoomNavigation(2, true);
+            Assert.AreEqual(2, sv.ActiveSlideIndex, "Presentation must navigate directly to target slide 2");
+            Assert.IsTrue(sv.ZoomReturnEnabled, "ZoomReturnEnabled must be active");
+            Assert.AreEqual(1, sv.ZoomReturnSlideIndex, "ZoomReturnSlideIndex must remember previous summary slide index");
+
+            // Advancing past target slide returns to summary slide
+            sv.AdvancePresenterStep();
+            Assert.AreEqual(1, sv.ActiveSlideIndex, "Presentation must return automatically to summary overview slide");
+            Assert.IsFalse(sv.ZoomReturnEnabled, "ZoomReturnEnabled must reset after return");
+        }
+
+        // =========================================================================
+        // FEATURE 38: PDF AcroForms, Redaction, Bates & Bookmarks (Milestone M4)
+        // =========================================================================
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify AcroForms interactive text field and checkbox toggling")]
+        public void T1_F38_01_AcroFormsTextFieldAndCheckboxToggle()
+        {
+            PdfDocument doc = new PdfDocument("TestForm");
+            var page = doc.Pages[0];
+
+            // Add Text Field
+            var txtField = new PdfFormFieldElement(PdfFormFieldType.Text, new RectangleF(50, 50, 200, 30), "FullName", "Nguyễn Văn A");
+            txtField.Tooltip = "Nhập họ và tên";
+            page.FormFields.Add(txtField);
+
+            // Add CheckBox
+            var chkField = new PdfFormFieldElement(PdfFormFieldType.CheckBox, new RectangleF(50, 100, 20, 20), "TermsAgreed", "No");
+            chkField.IsChecked = false;
+            page.FormFields.Add(chkField);
+
+            Assert.AreEqual(2, page.FormFields.Count);
+            Assert.AreEqual("Nguyễn Văn A", txtField.Value);
+            Assert.IsFalse(chkField.IsChecked);
+
+            // Simulate interactive toggling
+            chkField.IsChecked = !chkField.IsChecked;
+            chkField.Value = chkField.IsChecked ? "Yes" : "No";
+            Assert.IsTrue(chkField.IsChecked);
+            Assert.AreEqual("Yes", chkField.Value);
+
+            // Verify deep clone
+            var cloneDoc = doc.Clone();
+            Assert.AreEqual(2, cloneDoc.Pages[0].FormFields.Count);
+            var clonedChk = cloneDoc.Pages[0].FormFields[1];
+            Assert.IsTrue(clonedChk.IsChecked);
+            Assert.AreEqual("TermsAgreed", clonedChk.Name);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify AcroForms radio group mutual exclusion and dropdown option selection")]
+        public void T1_F38_02_AcroFormsRadioGroupMutualExclusion()
+        {
+            PdfDocument doc = new PdfDocument("TestRadio");
+            var page = doc.Pages[0];
+
+            // 3 Radio buttons in same group "DeliveryMethod"
+            var rad1 = new PdfFormFieldElement(PdfFormFieldType.RadioButton, new RectangleF(50, 50, 20, 20), "Delivery_Standard", "Standard");
+            rad1.GroupName = "DeliveryMethod";
+            rad1.ExportValue = "Standard";
+            rad1.IsChecked = true;
+            page.FormFields.Add(rad1);
+
+            var rad2 = new PdfFormFieldElement(PdfFormFieldType.RadioButton, new RectangleF(50, 80, 20, 20), "Delivery_Express", "Express");
+            rad2.GroupName = "DeliveryMethod";
+            rad2.ExportValue = "Express";
+            rad2.IsChecked = false;
+            page.FormFields.Add(rad2);
+
+            var rad3 = new PdfFormFieldElement(PdfFormFieldType.RadioButton, new RectangleF(50, 110, 20, 20), "Delivery_Overnight", "Overnight");
+            rad3.GroupName = "DeliveryMethod";
+            rad3.ExportValue = "Overnight";
+            rad3.IsChecked = false;
+            page.FormFields.Add(rad3);
+
+            // Verify initial state
+            Assert.IsTrue(rad1.IsChecked);
+            Assert.IsFalse(rad2.IsChecked);
+            Assert.IsFalse(rad3.IsChecked);
+
+            // Simulate selecting rad2 (Express) with mutual exclusion
+            foreach (var f in page.FormFields)
+            {
+                if (f.FieldType == PdfFormFieldType.RadioButton && f.GroupName == rad2.GroupName)
+                {
+                    f.IsChecked = (f == rad2);
+                }
+            }
+            Assert.IsFalse(rad1.IsChecked, "Radio 1 must be unselected");
+            Assert.IsTrue(rad2.IsChecked, "Radio 2 must be selected");
+            Assert.IsFalse(rad3.IsChecked, "Radio 3 must be unselected");
+
+            // Dropdown ComboBox with options
+            var combo = new PdfFormFieldElement(PdfFormFieldType.ComboBox, new RectangleF(50, 150, 180, 28), "City", "Hà Nội");
+            combo.Options = new List<string> { "Hà Nội", "Đà Nẵng", "TP. Hồ Chí Minh" };
+            combo.SelectedOptionIndex = 0;
+            page.FormFields.Add(combo);
+
+            // Cycle to Đà Nẵng
+            combo.SelectedOptionIndex = 1;
+            combo.Value = combo.Options[1];
+            Assert.AreEqual("Đà Nẵng", combo.Value);
+            Assert.AreEqual(1, combo.SelectedOptionIndex);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify FlattenFormFields permanently converts interactive fields into static text and shape elements")]
+        public void T1_F38_03_AcroFormsFlattenFieldsToStaticElements()
+        {
+            PdfDocument doc = new PdfDocument("TestFlatten");
+            var page = doc.Pages[0];
+
+            page.FormFields.Add(new PdfFormFieldElement(PdfFormFieldType.Text, new RectangleF(60, 60, 200, 30), "FullName", "Trần Thị B"));
+            var chk = new PdfFormFieldElement(PdfFormFieldType.CheckBox, new RectangleF(60, 100, 20, 20), "Subscribed", "Yes");
+            chk.IsChecked = true;
+            page.FormFields.Add(chk);
+            page.FormFields.Add(new PdfFormFieldElement(PdfFormFieldType.ComboBox, new RectangleF(60, 140, 160, 30), "Role", "Quản trị viên"));
+
+            Assert.AreEqual(3, page.FormFields.Count);
+            int origTextCount = page.TextElements.Count;
+            int origShapeCount = page.ShapeElements.Count;
+
+            // Flatten all form fields
+            int flattenedCount = doc.FlattenFormFields();
+            Assert.AreEqual(3, flattenedCount, "All 3 form fields must be flattened");
+            Assert.AreEqual(0, page.FormFields.Count, "FormFields must be emptied after flattening");
+
+            // Verify static text elements created for text field and combo
+            Assert.IsTrue(page.TextElements.Count > origTextCount, "Static TextElements must be created for form content");
+            bool hasNameText = page.TextElements.Exists(t => t.Text == "Trần Thị B");
+            bool hasRoleText = page.TextElements.Exists(t => t.Text == "Quản trị viên");
+            Assert.IsTrue(hasNameText, "Static text for FullName must exist");
+            Assert.IsTrue(hasRoleText, "Static text for Role must exist");
+
+            // Verify static shape created for checkbox frame
+            Assert.IsTrue(page.ShapeElements.Count > origShapeCount, "Static ShapeElements must be created for checkbox box");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify permanent destructive redaction burns blackout blocks and sanitization clears metadata")]
+        public void T1_F38_04_RedactionPermanentDestructionAndSanitization()
+        {
+            PdfDocument doc = new PdfDocument("TestRedact");
+            var page = doc.Pages[0];
+
+            // Add private text and public text
+            var secretText = new PdfTextElement("MẬT_KHẨU_TỐI_MẬT_123456", new RectangleF(100, 100, 200, 25), "Segoe UI", 12f) { TextColor = Color.Red };
+            page.TextElements.Add(secretText);
+
+            var publicText = new PdfTextElement("Thông tin công khai không che", new RectangleF(100, 300, 220, 25), "Segoe UI", 12f) { TextColor = Color.Black };
+            page.TextElements.Add(publicText);
+
+            // Mark redaction zone over secretText
+            var redactArea = new PdfRedactionElement(new RectangleF(90, 90, 220, 45));
+            page.Redactions.Add(redactArea);
+
+            // Set sensitive metadata
+            doc.Author = "Thanh Tra Quân Sự";
+            doc.Title = "Báo Cáo Mật Chiến Lược";
+            doc.Subject = "Tài Liệu Tuyệt Mật";
+            doc.Keywords = "TopSecret, Classified, EyesOnly";
+
+            // Apply permanent redaction
+            int affectedPages = doc.ApplyRedactions();
+            Assert.AreEqual(1, affectedPages);
+            Assert.AreEqual(0, page.Redactions.Count, "Redaction marks must be cleared after application");
+
+            // Verify secret text destroyed from memory
+            Assert.IsFalse(page.TextElements.Contains(secretText), "Secret text must be permanently destroyed from page TextElements");
+            Assert.IsTrue(page.TextElements.Contains(publicText), "Public text outside redaction must remain intact");
+
+            // Verify blackout rectangle burned
+            var burnedShape = page.ShapeElements.Find(s => s.FillColor == Color.Black && s.Bounds == redactArea.Bounds);
+            Assert.IsNotNull(burnedShape, "Solid blackout rectangle shape must be burned onto page");
+
+            // Sanitize document
+            doc.SanitizeDocument();
+            Assert.AreEqual("", doc.Author, "Author must be sanitized");
+            Assert.AreEqual("", doc.Title, "Title must be sanitized");
+            Assert.AreEqual("", doc.Subject, "Subject must be sanitized");
+            Assert.AreEqual("", doc.Keywords, "Keywords must be sanitized");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify Bates numbering generates sequential legal numbers and removes cleanly")]
+        public void T1_F38_05_BatesNumberingSequentialGenerationAndRemoval()
+        {
+            PdfDocument doc = new PdfDocument("CourtFiling");
+            // Add 2 more blank pages so document has 3 pages total
+            doc.AddBlankPage(1);
+            doc.AddBlankPage(2);
+            Assert.AreEqual(3, doc.Pages.Count);
+
+            PdfBatesConfig config = new PdfBatesConfig
+            {
+                Prefix = "ZENQ-LEGAL-",
+                StartNumber = 50,
+                NumberOfDigits = 6,
+                Position = PdfBatesPosition.BottomRight
+            };
+
+            doc.ApplyBatesNumbering(config);
+            Assert.AreEqual("ZENQ-LEGAL-000050", doc.Pages[0].BatesNumber);
+            Assert.AreEqual("ZENQ-LEGAL-000051", doc.Pages[1].BatesNumber);
+            Assert.AreEqual("ZENQ-LEGAL-000052", doc.Pages[2].BatesNumber);
+            Assert.IsNotNull(doc.ActiveBatesConfig);
+
+            // Remove Bates numbering
+            doc.RemoveBatesNumbering();
+            Assert.IsTrue(string.IsNullOrEmpty(doc.Pages[0].BatesNumber));
+            Assert.IsTrue(string.IsNullOrEmpty(doc.Pages[1].BatesNumber));
+            Assert.IsTrue(string.IsNullOrEmpty(doc.Pages[2].BatesNumber));
+            Assert.IsNull(doc.ActiveBatesConfig);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(38, "PDF AcroForms, Redaction, Bates & Bookmarks", Milestone.M4)]
+        [Description("Verify hierarchical bookmarks creation, search by Id, deletion, and page navigation")]
+        public void T1_F38_06_BookmarksHierarchyAndNavigation()
+        {
+            PdfDocument doc = new PdfDocument("LongDocument");
+            doc.AddBlankPage(1);
+            doc.AddBlankPage(2);
+            doc.AddBlankPage(3);
+            doc.AddBlankPage(4);
+            Assert.AreEqual(5, doc.Pages.Count);
+
+            // Create hierarchical bookmark structure
+            var root1 = doc.AddBookmark("Chương 1: Khởi động dự án", 0);
+            var sec1_1 = doc.AddBookmark("1.1 Mục tiêu & Tầm nhìn", 1, 0f, root1.Id);
+            var sec1_2 = doc.AddBookmark("1.2 Kế hoạch thực hiện", 2, 0f, root1.Id);
+            var root2 = doc.AddBookmark("Chương 2: Thiết kế hệ thống", 3);
+
+            Assert.AreEqual(2, doc.Bookmarks.Count, "Document must have 2 root bookmark chapters");
+            Assert.AreEqual(2, root1.Children.Count, "Chapter 1 must have 2 child sections");
+            Assert.AreEqual(0, root2.Children.Count);
+
+            // Find bookmark by Id
+            var foundNode = doc.FindBookmarkById(sec1_2.Id);
+            Assert.IsNotNull(foundNode);
+            Assert.AreEqual("1.2 Kế hoạch thực hiện", foundNode.Title);
+            Assert.AreEqual(2, foundNode.TargetPageIndex);
+
+            // Navigation via PdfView
+            PdfView pdfView = new PdfView();
+            pdfView.Document = doc;
+            pdfView.ActivePageIndex = 0;
+
+            pdfView.NavigateToBookmark(root2);
+            Assert.AreEqual(3, pdfView.ActivePageIndex, "PdfView must navigate to Chapter 2 target page 3");
+
+            // Remove bookmark
+            bool removed = doc.RemoveBookmark(sec1_1.Id);
+            Assert.IsTrue(removed, "Child bookmark must be removed");
+            Assert.AreEqual(1, root1.Children.Count, "Chapter 1 should now have 1 child remaining");
+        }
+
+        #region Feature 39: Excel 365 Data Validation, Auditing, Scenarios & Names
+        [Test, Tier(TestTier.Tier1_Feature), Feature(39, "Data Validation Engine", Milestone.M4)]
+        [Description("Verify DataValidationRule list checking, range checking, and error styles")]
+        public void T1_F39_01_DataValidationRule_ListAndWholeNumber()
+        {
+            var ruleList = new DataValidationRule(1, 1, 10, 1, DataValidationType.List)
+            {
+                Formula1 = "Hà Nội, Đà Nẵng, TP.HCM",
+                ErrorStyle = DataValidationErrorStyle.Stop
+            };
+
+            var items = ruleList.GetListItems();
+            Assert.AreEqual(3, items.Count, "Should parse 3 list items");
+            Assert.AreEqual("Hà Nội", items[0]);
+
+            var v1 = ruleList.Validate("Đà Nẵng");
+            Assert.IsTrue(v1.IsValid, "Matching list item must be valid");
+
+            var v2 = ruleList.Validate("Cần Thơ");
+            Assert.IsFalse(v2.IsValid, "Non-matching item must be invalid");
+            Assert.AreEqual(DataValidationErrorStyle.Stop, v2.ErrorStyle);
+
+            var ruleNum = new DataValidationRule(1, 2, 10, 2, DataValidationType.WholeNumber)
+            {
+                Operator = DataValidationOperator.Between,
+                Formula1 = "10",
+                Formula2 = "50"
+            };
+
+            Assert.IsTrue(ruleNum.Validate("25").IsValid, "25 is between 10 and 50");
+            Assert.IsFalse(ruleNum.Validate("5").IsValid, "5 is below 10");
+            Assert.IsFalse(ruleNum.Validate("99").IsValid, "99 is above 50");
+            Assert.IsFalse(ruleNum.Validate("abc").IsValid, "abc is not a whole number");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(39, "Formula Auditing Engine", Milestone.M4)]
+        [Description("Verify ExtractPrecedentCells and FormulaContainsCell parsing")]
+        public void T1_F39_02_FormulaAuditing_ExtractPrecedentsAndDependents()
+        {
+            string formula = "=SUM(A1:A3) + B5 * $C$10";
+            var precedents = FormulaAuditingEngine.ExtractPrecedentCells(formula);
+            Assert.IsTrue(precedents.Count >= 5, "Precedents should extract A1, A2, A3, B5, C10");
+
+            Assert.IsTrue(FormulaAuditingEngine.FormulaContainsCell(formula, 1, 1), "Formula contains A1");
+            Assert.IsTrue(FormulaAuditingEngine.FormulaContainsCell(formula, 2, 1), "Formula contains A2");
+            Assert.IsTrue(FormulaAuditingEngine.FormulaContainsCell(formula, 5, 2), "Formula contains B5");
+            Assert.IsTrue(FormulaAuditingEngine.FormulaContainsCell(formula, 10, 3), "Formula contains C10");
+            Assert.IsFalse(FormulaAuditingEngine.FormulaContainsCell(formula, 99, 99), "Formula does not contain cell 99,99");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(39, "Scenario Manager", Milestone.M4)]
+        [Description("Verify ScenarioModel application and summary report sheet generation")]
+        public void T1_F39_03_ScenarioManager_ApplyAndSummaryReport()
+        {
+            CalcView calc = new CalcView();
+            calc.CurrentSheet.SetCellText(1, 1, "Doanh thu");
+            calc.CurrentSheet.SetCellText(1, 2, "1000");
+
+            var scOptimistic = new ScenarioModel { Name = "Lạc quan" };
+            scOptimistic.ChangingCells.Add(Tuple.Create(1u, 2u));
+            scOptimistic.Values.Add("2500");
+            calc.Scenarios.Add(scOptimistic);
+
+            var scPessimistic = new ScenarioModel { Name = "Bi quan" };
+            scPessimistic.ChangingCells.Add(Tuple.Create(1u, 2u));
+            scPessimistic.Values.Add("500");
+            calc.Scenarios.Add(scPessimistic);
+
+            calc.ApplyScenario(0);
+            Assert.AreEqual("2500", calc.CurrentSheet.GetCell(1, 2).GetDisplayText(), "Applying optimistic scenario sets B1 to 2500");
+
+            calc.ApplyScenario(1);
+            Assert.AreEqual("500", calc.CurrentSheet.GetCell(1, 2).GetDisplayText(), "Applying pessimistic scenario sets B1 to 500");
+
+            calc.GenerateScenarioSummaryReport();
+            Assert.IsTrue(calc.SheetNames.Contains("Scenario Summary"), "Summary report creates a new sheet");
+            Assert.IsTrue(calc.CurrentSheet.GetCell(1, 1).GetDisplayText().Contains("BÁO CÁO TỔNG HỢP KỊCH BẢN"));
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(39, "Defined Names & Auditing Arrows", Milestone.M4)]
+        [Description("Verify DefinedNameModel and AuditingArrows storage and toggle")]
+        public void T1_F39_04_DefinedNames_ModelAndStorage()
+        {
+            CalcView calc = new CalcView();
+            calc.DefinedNames.Add(new DefinedNameModel("TaxRate", "=0.1", "Toàn bảng tính"));
+            calc.DefinedNames.Add(new DefinedNameModel("TotalRevenue", "=Sheet1!$B$10", "Toàn bảng tính"));
+
+            Assert.AreEqual(2, calc.DefinedNames.Count);
+            Assert.AreEqual("TaxRate", calc.DefinedNames[0].Name);
+
+            calc.CurrentSheet.SetCellText(1, 1, "100");
+            calc.CurrentSheet.SetCellText(2, 1, "=A1 * 2");
+            calc.TracePrecedents(2, 1);
+            Assert.AreEqual(1, calc.AuditingArrows.Count, "Precedents arrow for B2 should point to A1");
+            Assert.AreEqual(1u, calc.AuditingArrows[0].FromRow);
+            Assert.AreEqual(1u, calc.AuditingArrows[0].FromCol);
+            Assert.AreEqual(2u, calc.AuditingArrows[0].ToRow);
+
+            calc.ClearAuditingArrows();
+            Assert.AreEqual(0, calc.AuditingArrows.Count, "ClearAuditingArrows clears all arrows");
+
+            Assert.IsFalse(calc.ShowFormulas);
+            calc.ToggleShowFormulas();
+            Assert.IsTrue(calc.ShowFormulas);
+        }
+        #endregion
+
+        #region Feature 40: Word 365 Document Compare, Statistics, Cover Page & Drop Cap
+        [Test, Tier(TestTier.Tier1_Feature), Feature(40, "Document Compare Engine", Milestone.M4)]
+        [Description("Verify LCS word diff calculation and comparison metrics")]
+        public void T1_F40_01_DocumentCompareEngine_LcsDiffMetrics()
+        {
+            string orig = "Hợp đồng kinh tế giữa Bên A và Bên B";
+            string rev = "Hợp đồng thương mại quốc tế giữa Bên A và Bên C";
+
+            var result = DocumentCompareEngine.CompareDocuments(orig, rev);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.InsertionsCount > 0, "Should detect new words inserted");
+            Assert.IsTrue(result.DeletionsCount > 0, "Should detect words deleted");
+            Assert.IsTrue(result.UnchangedWordsCount > 0, "Should detect common unchanged words");
+            Assert.IsTrue(result.SimilarityPercentage > 0 && result.SimilarityPercentage < 100, "Similarity should be between 0 and 100");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(40, "Document Compare Track Changes", Milestone.M4)]
+        [Description("Verify comparison results applied to WriterView with revisions")]
+        public void T1_F40_02_DocumentCompare_ApplyToWriterView()
+        {
+            WriterView writer = new WriterView();
+            string orig = "Kính gửi Ban Giám Đốc.";
+            string rev = "Kính gửi Hội Đồng Quản Trị và Ban Giám Đốc.";
+
+            var cmp = DocumentCompareEngine.CompareDocuments(orig, rev);
+            DocumentCompareEngine.ApplyToWriterView(writer, cmp);
+
+            Assert.IsTrue(writer.TrackChanges, "Writer should enable TrackChanges after compare");
+            Assert.IsTrue(writer.Revisions.Count > 0, "Writer should contain recorded revisions");
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(40, "Word Count & Document Statistics", Milestone.M4)]
+        [Description("Verify GetDocumentStatistics pages, words, characters and paragraphs")]
+        public void T1_F40_03_WriterDocumentStatistics_WordCount()
+        {
+            WriterView writer = new WriterView();
+            writer.PieceTable.SetInitialText("Xin chào Việt Nam!\nĐây là bài viết thử nghiệm đếm từ.");
+
+            var stats = writer.GetDocumentStatistics();
+            Assert.IsTrue(stats.Words >= 10, "Should count at least 10 words");
+            Assert.AreEqual(2, stats.Paragraphs, "Should count 2 paragraphs");
+            Assert.IsTrue(stats.CharactersNoSpaces > 0);
+            Assert.IsTrue(stats.CharactersWithSpaces > stats.CharactersNoSpaces);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(40, "Cover Page & Drop Cap", Milestone.M4)]
+        [Description("Verify Cover Page template insertion and Drop Cap formatting")]
+        public void T1_F40_04_WriterCoverPageAndDropCap()
+        {
+            WriterView writer = new WriterView();
+            writer.PieceTable.SetInitialText("Nội dung tài liệu chính.");
+
+            // Insert Cover page
+            writer.InsertCoverPage("Executive");
+            string textWithCover = writer.PieceTable.GetText();
+            Assert.IsTrue(textWithCover.Contains("COVER PAGE START"), "Document should have cover page marker");
+            Assert.IsTrue(textWithCover.Contains("BÁO CÁO ĐIỀU HÀNH"), "Document should have Executive title");
+
+            // Apply Drop Cap to paragraph
+            writer.CursorPosition = textWithCover.IndexOf("Nội dung");
+            writer.ApplyDropCap(true, 3);
+            Assert.IsTrue(writer.FormattedRuns.Count > 0, "Formatted runs should be populated");
+        }
+        #endregion
+
+        #region Feature 41: PowerPoint 365 Recording, Slide/Section Zoom & Custom Dimensions
+        [Test, Tier(TestTier.Tier1_Feature), Feature(41, "PowerPoint Recording Tab & Timings", Milestone.M4)]
+        [Description("Verify Slide AutoAdvance and recording properties on SlideNode")]
+        public void T1_F41_01_SlidesRecording_TabAndState()
+        {
+            SlideNode slide = new SlideNode();
+            slide.AutoAdvance = true;
+            slide.AutoAdvanceSeconds = 8.5f;
+
+            Assert.IsTrue(slide.AutoAdvance, "Slide should have auto advance enabled");
+            Assert.AreEqual(8.5f, slide.AutoAdvanceSeconds, 0.01f);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(41, "Slide and Section Zoom", Milestone.M4)]
+        [Description("Verify SlideZoom and SectionZoom insertion and target configuration")]
+        public void T1_F41_02_SlidesZoom_SlideZoomAndSectionZoom()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation = new PresentationRoot();
+            sv.Presentation.Slides.Clear();
+            sv.Presentation.Slides.Add(new SlideNode { Title = "Slide 1", IsSectionHeader = true, SectionName = "Chương 1" });
+            sv.Presentation.Slides.Add(new SlideNode { Title = "Slide 2", IsSectionHeader = false });
+            sv.Presentation.Slides.Add(new SlideNode { Title = "Slide 3", IsSectionHeader = true, SectionName = "Chương 2" });
+            sv.ActiveSlideIndex = 0;
+
+            // 1. Insert Slide Zoom
+            var slideZoom = sv.InsertSlideZoom(1);
+            Assert.IsNotNull(slideZoom, "SlideZoom shape should be created");
+            Assert.AreEqual(ShapeType.SlideZoom, slideZoom.Type);
+            Assert.AreEqual(1, slideZoom.ZoomTargetSlideIndex);
+            Assert.IsTrue(slideZoom.ZoomReturnToSlide);
+
+            // 2. Insert Section Zoom
+            var sectionZoom = sv.InsertSectionZoom(2);
+            Assert.IsNotNull(sectionZoom, "SectionZoom shape should be created");
+            Assert.AreEqual(ShapeType.SectionZoom, sectionZoom.Type);
+            Assert.AreEqual(2, sectionZoom.ZoomTargetSlideIndex);
+            Assert.IsTrue(sectionZoom.Name.Contains("Chương 2"));
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(41, "Slide Section Management", Milestone.M4)]
+        [Description("Verify Section creation, naming, and collapsing")]
+        public void T1_F41_03_SlidesSection_AddSectionAndHierarchy()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation = new PresentationRoot();
+            sv.Presentation.Slides.Clear();
+            sv.Presentation.Slides.Add(new SlideNode { Title = "Slide 1" });
+            sv.Presentation.Slides.Add(new SlideNode { Title = "Slide 2" });
+
+            sv.Presentation.Slides[0].IsSectionHeader = true;
+            sv.Presentation.Slides[0].SectionName = "Giới thiệu";
+            sv.Presentation.Slides[0].IsSectionCollapsed = false;
+
+            Assert.IsTrue(sv.Presentation.Slides[0].IsSectionHeader);
+            Assert.AreEqual("Giới thiệu", sv.Presentation.Slides[0].SectionName);
+            Assert.IsFalse(sv.Presentation.Slides[0].IsSectionCollapsed);
+
+            sv.Presentation.Slides[0].IsSectionCollapsed = true;
+            Assert.IsTrue(sv.Presentation.Slides[0].IsSectionCollapsed);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(41, "Custom Slide Dimensions", Milestone.M4)]
+        [Description("Verify Custom Slide Dimensions setting on PresentationRoot and SlidesView")]
+        public void T1_F41_04_SlidesDimensions_CustomSlideSize()
+        {
+            SlidesView sv = new SlidesView();
+            sv.Presentation = new PresentationRoot();
+
+            // Set 16:9 Widescreen
+            sv.SetSlideSize(true);
+            Assert.IsTrue(sv.Presentation.IsWidescreen);
+            Assert.AreEqual(1920.0f, sv.Presentation.CanvasWidth, 0.1f);
+            Assert.AreEqual(1080.0f, sv.Presentation.CanvasHeight, 0.1f);
+
+            // Set 4:3 Standard
+            sv.SetSlideSize(false);
+            Assert.IsFalse(sv.Presentation.IsWidescreen);
+            Assert.AreEqual(1440.0f, sv.Presentation.CanvasWidth, 0.1f);
+
+            // Set Custom Size (A4 Landscape: 1560 x 1080)
+            sv.SetCustomSlideSize(1560f, 1080f);
+            Assert.AreEqual(1560.0f, sv.Presentation.CanvasWidth, 0.1f);
+            Assert.AreEqual(1080.0f, sv.Presentation.CanvasHeight, 0.1f);
+        }
+        #endregion
+
+        #region Feature 42: Acrobat Pro & Office 365 PDF Security, Extract, Insert, Converter & Compress
+        [Test, Tier(TestTier.Tier1_Feature), Feature(42, "PDF Password Protection & Permissions", Milestone.M4)]
+        [Description("Verify PDF password protection, permission flags, SHA-256 hash validation and password removal")]
+        public void T1_F42_01_PdfSecurity_PasswordProtectionAndPermissions()
+        {
+            PdfDocument doc = new PdfDocument("TestSecurity.pdf");
+            Assert.IsFalse(doc.SecuritySettings.IsPasswordProtected, "New document should not be password protected");
+
+            // 1. Set Password Protection with restricted printing and modifying
+            doc.SetPasswordProtection("openPass123", "ownerPass456", allowPrinting: false, allowCopying: true, allowModifying: false, keyLength: 256);
+            Assert.IsTrue(doc.SecuritySettings.IsPasswordProtected, "Document should be password protected");
+            Assert.AreEqual(256, doc.SecuritySettings.EncryptionKeyLength);
+            Assert.IsFalse(doc.SecuritySettings.AllowPrinting, "Printing should be disabled");
+            Assert.IsTrue(doc.SecuritySettings.AllowCopying, "Copying should be enabled");
+            Assert.IsFalse(doc.SecuritySettings.AllowModifying, "Modifying should be disabled");
+
+            // 2. Verify Password checks
+            Assert.IsTrue(doc.VerifyPassword("openPass123"), "User open password should verify successfully");
+            Assert.IsTrue(doc.VerifyPassword("ownerPass456"), "Owner password should verify successfully");
+            Assert.IsFalse(doc.VerifyPassword("wrongPassword"), "Incorrect password should fail verification");
+
+            // 3. Clone document preserves security settings
+            var cloned = doc.Clone();
+            Assert.IsTrue(cloned.SecuritySettings.IsPasswordProtected);
+            Assert.IsTrue(cloned.VerifyPassword("openPass123"));
+
+            // 4. Remove Password Protection
+            bool removedWrong = doc.RemovePasswordProtection("invalidPass");
+            Assert.IsFalse(removedWrong, "Removing with wrong password should fail");
+            Assert.IsTrue(doc.SecuritySettings.IsPasswordProtected);
+
+            bool removedCorrect = doc.RemovePasswordProtection("ownerPass456");
+            Assert.IsTrue(removedCorrect, "Removing with correct password should succeed");
+            Assert.IsFalse(doc.SecuritySettings.IsPasswordProtected, "Security should be removed");
+            Assert.IsTrue(doc.SecuritySettings.AllowPrinting);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(42, "PDF Extract Pages & Subsets", Milestone.M4)]
+        [Description("Verify PDF page extraction into standalone document with page renumbering")]
+        public void T1_F42_02_PdfExtractPages_PageSubsetsAndCloning()
+        {
+            PdfDocument doc = new PdfDocument("MasterCatalog.pdf");
+            // Add 4 additional blank pages (Total 5 pages)
+            doc.AddBlankPage();
+            doc.AddBlankPage();
+            doc.AddBlankPage();
+            doc.AddBlankPage();
+            Assert.AreEqual(5, doc.Pages.Count);
+
+            // Extract pages 1, 3, 5 (indices 0, 2, 4)
+            var extracted = doc.ExtractPages(new int[] { 0, 2, 4 });
+            Assert.IsNotNull(extracted);
+            Assert.AreEqual(3, extracted.Pages.Count, "Extracted doc should contain exactly 3 pages");
+            Assert.AreEqual(1, extracted.Pages[0].PageNumber);
+            Assert.AreEqual(2, extracted.Pages[1].PageNumber);
+            Assert.AreEqual(3, extracted.Pages[2].PageNumber);
+            Assert.IsTrue(extracted.Title.Contains("Trích xuất"));
+
+            // Parse page range helper verification
+            var parsed = PdfHandler.ParsePageRange("1-2, 4", 5);
+            Assert.AreEqual(3, parsed.Count);
+            Assert.IsTrue(parsed.Contains(0));
+            Assert.IsTrue(parsed.Contains(1));
+            Assert.IsTrue(parsed.Contains(3));
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(42, "PDF Insert Pages from File", Milestone.M4)]
+        [Description("Verify inserting external PDF document pages into specific index position")]
+        public void T1_F42_03_PdfInsertPages_InsertAtPosition()
+        {
+            PdfDocument doc1 = new PdfDocument("Doc1.pdf"); // 1 page
+            doc1.AddBlankPage(); // Total 2 pages
+
+            PdfDocument doc2 = new PdfDocument("Doc2.pdf"); // 1 page
+            doc2.AddBlankPage();
+            doc2.AddBlankPage(); // Total 3 pages
+
+            // Insert doc2 at index 1 of doc1
+            doc1.InsertDocumentAt(1, doc2);
+            Assert.AreEqual(5, doc1.Pages.Count, "Doc1 should now have 2 + 3 = 5 pages");
+            Assert.AreEqual(1, doc1.Pages[0].PageNumber);
+            Assert.AreEqual(2, doc1.Pages[1].PageNumber);
+            Assert.AreEqual(5, doc1.Pages[4].PageNumber);
+            Assert.IsTrue(doc1.IsModified);
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(42, "PDF Converter & Text Extraction Engine", Milestone.M4)]
+        [Description("Verify PDF text extraction, Word docx export, Excel xlsx export, image rendering")]
+        public void T1_F42_04_PdfConverterEngine_TextExtractionAndExport()
+        {
+            PdfDocument doc = new PdfDocument("Invoice2026.pdf");
+            var p0 = doc.Pages[0];
+            p0.TextElements.Add(new PdfTextElement("CÔNG TY CỔ PHẦN CÔNG NGHỆ ZENQ", new RectangleF(50, 50, 300, 20), "Arial", 16f) { IsBold = true });
+            p0.TextElements.Add(new PdfTextElement("DOANH THU THÁNG 10\t500000000", new RectangleF(50, 80, 300, 20), "Arial", 12f));
+
+            // 1. Text Extraction
+            string text = PdfConverterEngine.ExtractAllText(doc, includePageHeaders: false);
+            Assert.IsFalse(string.IsNullOrEmpty(text), "Extracted text should not be empty");
+            Assert.IsTrue(text.Contains("ZENQ"), "Extracted text should contain document content");
+            Assert.IsTrue(text.Contains("DOANH THU"), "Extracted text should contain line items");
+
+            string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_PdfTest_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                // 2. Export to Text (.txt)
+                string txtPath = Path.Combine(tempDir, "Out.txt");
+                bool txtOk = PdfConverterEngine.ExportToTxt(doc, txtPath);
+                Assert.IsTrue(txtOk && File.Exists(txtPath), "Txt export should succeed");
+                string fileTxt = File.ReadAllText(txtPath);
+                Assert.IsTrue(fileTxt.Contains("ZENQ"));
+
+                // 3. Export to Word (.docx)
+                string docxPath = Path.Combine(tempDir, "Out.docx");
+                bool docxOk = PdfConverterEngine.ExportToDocx(doc, docxPath);
+                Assert.IsTrue(docxOk && File.Exists(docxPath), "Docx export should succeed");
+
+                // 4. Export to Excel (.xlsx)
+                string xlsxPath = Path.Combine(tempDir, "Out.xlsx");
+                bool xlsxOk = PdfConverterEngine.ExportToXlsx(doc, xlsxPath);
+                Assert.IsTrue(xlsxOk && File.Exists(xlsxPath), "Xlsx export should succeed");
+
+                // 5. Render Page Bitmap
+                using (var bmp = PdfConverterEngine.RenderPageBitmap(doc, 0, 96f))
+                {
+                    Assert.IsNotNull(bmp);
+                    Assert.IsTrue(bmp.Width > 100 && bmp.Height > 100, "Rendered page bitmap should have valid dimensions");
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+        }
+
+        [Test, Tier(TestTier.Tier1_Feature), Feature(42, "PDF Compress & Optimize Engine", Milestone.M4)]
+        [Description("Verify PDF image downsampling, metadata stripping and compression engine")]
+        public void T1_F42_05_PdfCompress_OptimizeAndStripMetadata()
+        {
+            PdfDocument doc = new PdfDocument("HeavyPresentation.pdf");
+            doc.Author = "Confidential Author";
+            doc.Keywords = "Secret, Internal";
+
+            // Add sample bitmap to image element
+            using (Bitmap sampleImg = new Bitmap(200, 200))
+            using (Graphics g = Graphics.FromImage(sampleImg))
+            {
+                g.Clear(Color.CornflowerBlue);
+                g.DrawString("Sample Chart", new Font("Arial", 12f), Brushes.White, 10, 10);
+                doc.Pages[0].Images.Add(new PdfImageElement((Bitmap)sampleImg.Clone(), new RectangleF(50, 50, 100, 100)));
+            }
+
+            string tempOut = Path.Combine(Path.GetTempPath(), "GenOffice_Comp_" + Guid.NewGuid().ToString("N") + ".pdf");
+            try
+            {
+                bool compOk = PdfConverterEngine.CompressPdf(doc, tempOut, qualityPercent: 65, maxDpi: 72f, stripMetadata: true);
+                Assert.IsTrue(compOk, "CompressPdf should succeed");
+                Assert.IsTrue(File.Exists(tempOut), "Compressed output file should exist");
+                Assert.IsTrue(new FileInfo(tempOut).Length > 0, "Compressed output file should have nonzero size");
+            }
+            finally
+            {
+                try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch { }
+            }
+        }
+        #endregion
     }
 }
 

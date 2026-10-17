@@ -477,7 +477,7 @@ namespace ZenQOffice
                         }
                         else if (mode == OfficeAppMode.Photo)
                         {
-                            ext = ".psd";
+                            ext = ".svg";
                             namePrefix = "Thiết kế ";
                         }
                         else

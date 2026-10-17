@@ -197,6 +197,89 @@ namespace ZenQOffice.UI
         }
     }
 
+    public enum RevisionType
+    {
+        Insertion = 0,
+        Deletion = 1,
+        Formatting = 2
+    }
+
+    public enum MarkupDisplayMode
+    {
+        AllMarkup = 0,
+        SimpleMarkup = 1,
+        NoMarkup = 2,
+        Original = 3
+    }
+
+    public class DocumentRevision
+    {
+        public int Id { get; set; }
+        public RevisionType Type { get; set; }
+        public string Author { get; set; }
+        public DateTime Timestamp { get; set; }
+        public int StartIndex { get; set; }
+        public int Length { get; set; }
+        public string Text { get; set; }
+        public Color Color { get; set; }
+
+        public DocumentRevision()
+        {
+            Author = Environment.UserName;
+            Timestamp = DateTime.Now;
+            Text = "";
+            Color = Color.Red;
+        }
+
+        public DocumentRevision(int id, RevisionType type, int start, int length, string text, string author = null, Color? color = null)
+        {
+            Id = id;
+            Type = type;
+            StartIndex = start;
+            Length = length;
+            Text = text ?? "";
+            Author = !string.IsNullOrEmpty(author) ? author : Environment.UserName;
+            Timestamp = DateTime.Now;
+            if (color.HasValue)
+            {
+                Color = color.Value;
+            }
+            else
+            {
+                if (type == RevisionType.Insertion) Color = Color.FromArgb(0, 102, 204);
+                else if (type == RevisionType.Deletion) Color = Color.FromArgb(192, 0, 0);
+                else Color = Color.FromArgb(0, 130, 0);
+            }
+        }
+
+        public DocumentRevision Clone()
+        {
+            return new DocumentRevision
+            {
+                Id = this.Id,
+                Type = this.Type,
+                Author = this.Author,
+                Timestamp = this.Timestamp,
+                StartIndex = this.StartIndex,
+                Length = this.Length,
+                Text = this.Text,
+                Color = this.Color
+            };
+        }
+    }
+
+    public class MailMergeField
+    {
+        public string Name { get; set; }
+        public string DisplayName { get; set; }
+
+        public MailMergeField(string name, string displayName = null)
+        {
+            Name = name;
+            DisplayName = !string.IsNullOrEmpty(displayName) ? displayName : name;
+        }
+    }
+
     public class WriterUndoSnapshot
     {
         public string Text { get; set; }
@@ -232,6 +315,7 @@ namespace ZenQOffice.UI
         public List<DocShapeObject> DocumentShapes { get; set; }
         public List<DocChartObject> DocumentCharts { get; set; }
         public List<DocInkStroke> DocumentInkStrokes { get; set; }
+        public List<DocumentRevision> Revisions { get; set; }
 
         public WriterUndoSnapshot()
         {
@@ -265,6 +349,7 @@ namespace ZenQOffice.UI
             DocumentShapes = new List<DocShapeObject>();
             DocumentCharts = new List<DocChartObject>();
             DocumentInkStrokes = new List<DocInkStroke>();
+            Revisions = new List<DocumentRevision>();
         }
 
         public WriterUndoSnapshot(
@@ -337,6 +422,17 @@ namespace ZenQOffice.UI
             for (int i = 0; i < list.Count; i++)
             {
                 if (list[i] != null) copy.Add(list[i].Clone());
+            }
+            return copy;
+        }
+
+        public static List<DocumentRevision> CloneRevisions(List<DocumentRevision> revs)
+        {
+            if (revs == null) return new List<DocumentRevision>();
+            List<DocumentRevision> copy = new List<DocumentRevision>(revs.Count);
+            for (int i = 0; i < revs.Count; i++)
+            {
+                if (revs[i] != null) copy.Add(revs[i].Clone());
             }
             return copy;
         }
@@ -820,6 +916,9 @@ namespace ZenQOffice.UI
         public TextStyleBuffer CopiedTextStyle { get; set; }
         public ShapeStyleBuffer CopiedShapeStyle { get; set; }
 
+        public int LastViewWidth { get; set; } = 1200;
+        public int LastViewHeight { get; set; } = 800;
+
         public float SmoothScrollY = 0f;
         public float TargetScrollY = 0f;
 
@@ -828,6 +927,23 @@ namespace ZenQOffice.UI
             get { return (int)Math.Round(SmoothScrollY); }
             set { SmoothScrollY = value; TargetScrollY = value; }
         }
+
+        public float SmoothScrollX = 0f;
+        public float TargetScrollX = 0f;
+
+        public float ScrollX
+        {
+            get { return (float)Math.Round(SmoothScrollX); }
+            set { SmoothScrollX = value; TargetScrollX = value; }
+        }
+
+        // Horizontal scrollbar bounds and interaction states
+        public Rectangle HScrollBarBounds = Rectangle.Empty;
+        public Rectangle HScrollBarThumbBounds = Rectangle.Empty;
+        public bool IsDraggingHScrollBar = false;
+        public bool IsHoveringHScrollBar = false;
+        private int _hScrollBarDragStartMouseX = 0;
+        private float _hScrollBarDragStartScrollX = 0f;
 
         private float _zoomLevel = 1.0f;
         public float ZoomLevel 
@@ -846,69 +962,177 @@ namespace ZenQOffice.UI
 
         public bool UpdateSmoothScroll()
         {
-            float diff = TargetScrollY - SmoothScrollY;
-            if (Math.Abs(diff) > 0.5f)
+            bool moved = false;
+
+            // 1. Vertical smooth scrolling with subpixel precision and zero-jitter snap
+            TargetScrollY = (float)Math.Round(TargetScrollY);
+            float diffY = TargetScrollY - SmoothScrollY;
+            if (Math.Abs(diffY) > 0.6f)
             {
-                SmoothScrollY += diff * 0.35f;
-                return true;
+                float stepY = diffY * 0.28f;
+                float maxStepY = 90f;
+                if (Math.Abs(stepY) > maxStepY)
+                {
+                    stepY = Math.Sign(stepY) * maxStepY;
+                }
+                SmoothScrollY += stepY;
+                if (Math.Abs(TargetScrollY - SmoothScrollY) < 0.6f)
+                {
+                    SmoothScrollY = TargetScrollY;
+                }
+                moved = true;
             }
             else if (SmoothScrollY != TargetScrollY)
             {
                 SmoothScrollY = TargetScrollY;
-                return true;
+                moved = true;
             }
-            return false;
+
+            // 2. Horizontal smooth scrolling with subpixel precision and zero-jitter snap
+            TargetScrollX = (float)Math.Round(TargetScrollX);
+            float diffX = TargetScrollX - SmoothScrollX;
+            if (Math.Abs(diffX) > 0.6f)
+            {
+                float stepX = diffX * 0.28f;
+                float maxStepX = 90f;
+                if (Math.Abs(stepX) > maxStepX)
+                {
+                    stepX = Math.Sign(stepX) * maxStepX;
+                }
+                SmoothScrollX += stepX;
+                if (Math.Abs(TargetScrollX - SmoothScrollX) < 0.6f)
+                {
+                    SmoothScrollX = TargetScrollX;
+                }
+                moved = true;
+            }
+            else if (SmoothScrollX != TargetScrollX)
+            {
+                SmoothScrollX = TargetScrollX;
+                moved = true;
+            }
+
+            return moved;
         }
 
-        public void ZoomAt(Point mousePos, int delta, RibbonBar ribbon)
+        public void ZoomAt(Point mousePos, int delta, RibbonBar ribbon, int viewWidth = 0, int viewHeight = 0)
         {
             float oldZoom = ZoomLevel;
-            float step = 0.10f;
-            float newZoom = (delta > 0) ? Math.Min(2.5f, ZoomLevel + step) : Math.Max(0.2f, ZoomLevel - step);
-            if (Math.Abs(newZoom - oldZoom) < 0.001f) return;
-
-            int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
-            
-            if (mousePos.Y > topOffset)
+            float step;
+            if (Math.Abs(delta) >= 120)
             {
-                float docPhysicalY = mousePos.Y - topOffset + ScrollY;
-                float logicalY = docPhysicalY / Math.Max(0.01f, oldZoom);
-
-                ZoomLevel = newZoom;
-
-                float newDocPhysicalY = logicalY * newZoom;
-                int maxScroll = GetMaxScrollY(800, ribbon);
-                TargetScrollY = (float)Math.Max(0, Math.Min(maxScroll, newDocPhysicalY - (mousePos.Y - topOffset)));
-                SmoothScrollY = TargetScrollY;
+                // Standard notched mouse wheel
+                step = (delta > 0) ? 0.10f : -0.10f;
             }
             else
             {
-                ZoomLevel = newZoom;
+                // Continuous / precision touchpad gestures
+                step = (float)Math.Round((delta / 120.0f) * 0.10f, 2);
+                if (Math.Abs(step) < 0.02f) step = (delta > 0 ? 0.02f : -0.02f);
+            }
+
+            float newZoom = (float)Math.Round(Math.Max(0.20f, Math.Min(4.00f, oldZoom + step)), 2);
+            ZoomTo(newZoom, mousePos, ribbon, viewWidth, viewHeight);
+        }
+
+        public void ZoomTo(float newZoom, Point centerPos, RibbonBar ribbon, int viewWidth = 0, int viewHeight = 0)
+        {
+            newZoom = (float)Math.Round(Math.Max(0.20f, Math.Min(4.00f, newZoom)), 2);
+            float oldZoom = ZoomLevel;
+            if (Math.Abs(newZoom - oldZoom) < 0.001f) return;
+
+            if (viewWidth <= 0) viewWidth = LastViewWidth > 0 ? LastViewWidth : 1200;
+            if (viewHeight <= 0) viewHeight = LastViewHeight > 0 ? LastViewHeight : 800;
+
+            int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
+            int pageGap = 30;
+
+            float baseW = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+            float baseH = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape)
+            {
+                float tmpW = Math.Max(baseW, baseH);
+                float tmpH = Math.Min(baseW, baseH);
+                baseW = tmpW;
+                baseH = tmpH;
+            }
+            else
+            {
+                float tmpW = Math.Min(baseW, baseH);
+                float tmpH = Math.Max(baseW, baseH);
+                baseW = tmpW;
+                baseH = tmpH;
+            }
+            int stdW = (int)Math.Round(baseW * 96f);
+            int stdH = (int)Math.Round(baseH * 96f);
+
+            int oldPageW = (int)Math.Round(stdW * oldZoom);
+            int oldPageH = (int)Math.Round(stdH * oldZoom);
+            int oldPitch = oldPageH + pageGap;
+
+            int navOffset = ShowNavigationPane ? 280 : 0;
+            int selPaneOffset = ShowSelectionPane ? 260 : 0;
+            int effectiveCanvasW = viewWidth - navOffset - selPaneOffset;
+
+            int oldPageX = (oldPageW + 80 <= effectiveCanvasW)
+                ? navOffset + (effectiveCanvasW - oldPageW) / 2
+                : navOffset + 40 - (int)Math.Round(ScrollX);
+
+            // 1. Vertical anchor: identify exact page and relative logical offset (preserving constant 30px inter-page gaps)
+            float distFromDocTop = centerPos.Y - topOffset + SmoothScrollY;
+            int totalPages = Math.Max(1, TotalPageCount);
+            int targetPage = Math.Max(0, Math.Min(totalPages - 1, (int)(distFromDocTop / Math.Max(1, oldPitch))));
+            float oldPageTopScreen = topOffset - SmoothScrollY + targetPage * oldPitch;
+            float offsetInPageY = centerPos.Y - oldPageTopScreen;
+            float logicalY = Math.Max(0f, offsetInPageY / Math.Max(0.01f, oldZoom));
+
+            // 2. Horizontal anchor: relative logical offset within page
+            float offsetInPageX = centerPos.X - oldPageX;
+            float logicalX = offsetInPageX / Math.Max(0.01f, oldZoom);
+
+            // Apply new zoom level
+            ZoomLevel = newZoom;
+
+            int newPageW = (int)Math.Round(stdW * newZoom);
+            int newPageH = (int)Math.Round(stdH * newZoom);
+            int newPitch = newPageH + pageGap;
+
+            // Preserve vertical screen position of anchor
+            float newOffsetInPageY = logicalY * newZoom;
+            float targetNewScrollY = topOffset + targetPage * newPitch + newOffsetInPageY - centerPos.Y;
+            int maxScrollY = GetMaxScrollY(viewHeight, ribbon);
+            TargetScrollY = Math.Max(0, Math.Min(maxScrollY, targetNewScrollY));
+            SmoothScrollY = TargetScrollY;
+
+            // Preserve horizontal screen position of anchor
+            if (newPageW + 80 <= effectiveCanvasW)
+            {
+                TargetScrollX = 0f;
+                SmoothScrollX = 0f;
+            }
+            else
+            {
+                int maxScrollX = (newPageW + 80) - effectiveCanvasW;
+                float newOffsetInPageX = logicalX * newZoom;
+                float targetNewScrollX = navOffset + 40 + newOffsetInPageX - centerPos.X;
+                TargetScrollX = Math.Max(0f, Math.Min(maxScrollX, targetNewScrollX));
+                SmoothScrollX = TargetScrollX;
             }
         }
 
-        public void ZoomTo(float newZoom, Point centerPos, RibbonBar ribbon)
+        public int GetMaxScrollX(int canvasWidth = 0)
         {
-            if (Math.Abs(newZoom - ZoomLevel) < 0.001f) return;
+            if (ViewMode == 0) return 0;
+            if (canvasWidth <= 0) canvasWidth = LastViewWidth > 0 ? LastViewWidth : 1200;
+            int navOffset = ShowNavigationPane ? 280 : 0;
+            int selPaneOffset = ShowSelectionPane ? 260 : 0;
+            int effectiveCanvasW = canvasWidth - navOffset - selPaneOffset;
 
-            int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
-            
-            if (centerPos.Y > topOffset)
-            {
-                float docPhysicalY = centerPos.Y - topOffset + ScrollY;
-                float logicalY = docPhysicalY / Math.Max(0.01f, ZoomLevel);
+            int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+            GetPageLayoutMetrics(canvasWidth, null, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
 
-                ZoomLevel = newZoom;
-
-                float newDocPhysicalY = logicalY * newZoom;
-                int maxScroll = GetMaxScrollY(800, ribbon);
-                TargetScrollY = (float)Math.Max(0, Math.Min(maxScroll, newDocPhysicalY - (centerPos.Y - topOffset)));
-                SmoothScrollY = TargetScrollY;
-            }
-            else
-            {
-                ZoomLevel = newZoom;
-            }
+            int totalRequiredW = pageW + 80;
+            return Math.Max(0, totalRequiredW - effectiveCanvasW);
         }
 
         public int TotalPageCount { get; set; }
@@ -1107,9 +1331,45 @@ namespace ZenQOffice.UI
             return (pStarts != null && pStarts.Count > 0) ? pStarts[0] : 0;
         }
 
+        public float GetCurrentParagraphLineSpacing()
+        {
+            int pStart = GetCurrentParagraphStart();
+            return ParagraphLineSpacings.ContainsKey(pStart) ? ParagraphLineSpacings[pStart] : 1.15f;
+        }
+
+        public void ApplyParagraphIndents(float left, float right, float firstLine, float hanging)
+        {
+            SaveUndoState();
+            var targetPStarts = GetSelectedOrCurrentParagraphStarts();
+            foreach (int pStart in targetPStarts)
+            {
+                ParagraphLeftIndents[pStart] = left;
+                ParagraphRightIndents[pStart] = right;
+                ParagraphFirstLineIndents[pStart] = firstLine;
+                ParagraphHangingIndents[pStart] = hanging;
+            }
+            InvalidateLayoutAndTextCache();
+        }
+
         // MS Word Navigation Pane (Thanh Tìm Kiếm & Điều Hướng)
-        public bool ShowNavigationPane = false;
-        public int NavActiveTab = 2; // 0 = Headings (Tiêu đề), 1 = Pages (Trang), 2 = Results (Kết quả)
+        private bool _showNavigationPane = false;
+        public bool ShowNavigationPane
+        {
+            get => _showNavigationPane;
+            set
+            {
+                if (_showNavigationPane != value)
+                {
+                    _showNavigationPane = value;
+                    InvalidateLayoutAndTextCache();
+                    if (_showNavigationPane)
+                    {
+                        PerformNavSearch();
+                    }
+                }
+            }
+        }
+        public int NavActiveTab = 0; // 0 = Headings (Tiêu đề), 1 = Pages (Trang), 2 = Results (Kết quả)
         public string NavSearchQuery = "";
         public bool NavSearchFocused = false;
         public int NavSearchResultIndex = -1;
@@ -1124,7 +1384,19 @@ namespace ZenQOffice.UI
         public Rectangle NavClearQueryBtnRect = Rectangle.Empty;
 
         // MS Word Selection Pane (Ngăn Lựa Chọn Đối Tượng)
-        public bool ShowSelectionPane = false;
+        private bool _showSelectionPane = false;
+        public bool ShowSelectionPane
+        {
+            get => _showSelectionPane;
+            set
+            {
+                if (_showSelectionPane != value)
+                {
+                    _showSelectionPane = value;
+                    InvalidateLayoutAndTextCache();
+                }
+            }
+        }
         public int SelectionPaneScrollY = 0;
         public Rectangle SelectionPaneCloseBtnRect = Rectangle.Empty;
         public Rectangle SelectionPaneShowAllBtnRect = Rectangle.Empty;
@@ -3402,6 +3674,7 @@ namespace ZenQOffice.UI
             snap.ParagraphStyles = ParagraphStyles != null ? new Dictionary<int, string>(ParagraphStyles) : new Dictionary<int, string>();
             snap.TextBorders = WriterUndoSnapshot.CloneTextBorders(TextBorders);
             snap.DocumentInkStrokes = WriterUndoSnapshot.CloneInkStrokes(DocumentInkStrokes);
+            snap.Revisions = WriterUndoSnapshot.CloneRevisions(Revisions);
             return snap;
         }
 
@@ -3447,6 +3720,7 @@ namespace ZenQOffice.UI
             DocumentShapes = WriterUndoSnapshot.CloneShapes(prev.DocumentShapes);
             DocumentCharts = WriterUndoSnapshot.CloneCharts(prev.DocumentCharts);
             DocumentInkStrokes = WriterUndoSnapshot.CloneInkStrokes(prev.DocumentInkStrokes);
+            Revisions = WriterUndoSnapshot.CloneRevisions(prev.Revisions);
 
             if (prev.ScrollY >= 0)
             {
@@ -3823,6 +4097,86 @@ namespace ZenQOffice.UI
             SelectionEnd = CursorPosition;
         }
 
+        // ==================== Word 365 Statistics, Compare, Cover Page & Drop Cap ====================
+        public DocumentStatistics GetDocumentStatistics()
+        {
+            string fullText = PieceTable != null ? PieceTable.GetText() : "";
+            int pages = Math.Max(1, TotalPageCount);
+            int charsWithSpaces = fullText.Length;
+            int charsNoSpaces = 0;
+            int words = 0;
+            int paragraphs = 0;
+
+            bool inWord = false;
+            for (int i = 0; i < fullText.Length; i++)
+            {
+                char ch = fullText[i];
+                if (!char.IsWhiteSpace(ch)) charsNoSpaces++;
+
+                if (char.IsLetterOrDigit(ch))
+                {
+                    if (!inWord) { inWord = true; words++; }
+                }
+                else
+                {
+                    inWord = false;
+                }
+
+                if (ch == '\n') paragraphs++;
+            }
+
+            if (fullText.Length > 0 && !fullText.EndsWith("\n")) paragraphs++;
+            paragraphs = Math.Max(1, paragraphs);
+
+            int lines = RenderedLines != null && RenderedLines.Count > 0 ? RenderedLines.Count : Math.Max(1, paragraphs);
+
+            return new DocumentStatistics
+            {
+                Pages = pages,
+                Words = words,
+                CharactersNoSpaces = charsNoSpaces,
+                CharactersWithSpaces = charsWithSpaces,
+                Paragraphs = paragraphs,
+                Lines = lines
+            };
+        }
+
+        public void ShowWordCountDialog(Form parentForm)
+        {
+            var stats = GetDocumentStatistics();
+            using (var dlg = new WordCountDialog(stats))
+            {
+                dlg.ShowDialog(parentForm);
+            }
+        }
+
+        public void ShowDocumentCompareDialog(Form parentForm)
+        {
+            using (var dlg = new DocumentCompareDialog(this))
+            {
+                dlg.ShowDialog(parentForm);
+            }
+        }
+
+        public void ApplyDropCap(bool enable = true, int lines = 3)
+        {
+            SaveUndoState();
+            string fullText = PieceTable != null ? PieceTable.GetText() : "";
+            if (string.IsNullOrEmpty(fullText)) return;
+
+            int curPos = CursorPosition;
+            int pStart = (curPos > 0 && curPos <= fullText.Length) ? fullText.LastIndexOf('\n', Math.Max(0, curPos - 1)) + 1 : 0;
+            while (pStart < fullText.Length && char.IsWhiteSpace(fullText[pStart]) && fullText[pStart] != '\n') pStart++;
+
+            if (pStart < fullText.Length && char.IsLetterOrDigit(fullText[pStart]))
+            {
+                float targetSize = enable ? (lines == 2 ? 24.0f : 36.0f) : 12.0f;
+                bool targetBold = enable;
+                ApplyFormatToRange(pStart, 1, null, targetSize, targetBold, null, null, null, null, null);
+                InvalidateLayoutAndTextCache();
+            }
+        }
+
         public void InsertSectionBreakNextPage()
         {
             SaveUndoState();
@@ -4074,6 +4428,16 @@ namespace ZenQOffice.UI
         private DocInkStroke _currentInkStroke = null;
         public bool IsReadOnly { get; set; }
         public bool TrackChanges { get; set; }
+        public List<DocumentRevision> Revisions = new List<DocumentRevision>();
+        public MarkupDisplayMode DisplayMarkupMode { get; set; } = MarkupDisplayMode.AllMarkup;
+        public string CurrentAuthor { get; set; } = Environment.UserName;
+        private int _nextRevisionId = 1;
+
+        // Mail Merge Engine fields
+        public List<Dictionary<string, string>> MailMergeData = new List<Dictionary<string, string>>();
+        public bool PreviewMailMerge { get; set; } = false;
+        public int CurrentMailMergeIndex { get; set; } = 0;
+        private string _mailMergeTemplateBackup = null;
 
         public string GetWordAtCursor()
         {
@@ -4148,27 +4512,415 @@ namespace ZenQOffice.UI
             SaveUndoState();
         }
 
+        #region Track Changes & Revision Management
+        public void ShiftRevisionsOnInsert(int insStart, int insLen, DocumentRevision excludeRev = null)
+        {
+            if (Revisions == null || Revisions.Count == 0 || insLen <= 0) return;
+            foreach (var rev in Revisions)
+            {
+                if (rev == excludeRev) continue;
+                if (rev.StartIndex >= insStart)
+                {
+                    rev.StartIndex += insLen;
+                }
+                else if (rev.StartIndex + rev.Length > insStart)
+                {
+                    rev.Length += insLen;
+                }
+            }
+        }
+
+        public void ShiftRevisionsOnDelete(int delStart, int delLen)
+        {
+            if (Revisions == null || Revisions.Count == 0 || delLen <= 0) return;
+            for (int i = Revisions.Count - 1; i >= 0; i--)
+            {
+                var rev = Revisions[i];
+                if (rev.StartIndex >= delStart + delLen)
+                {
+                    rev.StartIndex -= delLen;
+                }
+                else if (rev.StartIndex >= delStart && rev.StartIndex + rev.Length <= delStart + delLen)
+                {
+                    Revisions.RemoveAt(i);
+                }
+                else if (rev.StartIndex < delStart && rev.StartIndex + rev.Length > delStart)
+                {
+                    rev.Length = Math.Max(0, rev.Length - delLen);
+                }
+            }
+        }
+
+        public DocumentRevision RecordChange(RevisionType type, int start, int length, string text)
+        {
+            var rev = new DocumentRevision(_nextRevisionId++, type, start, length, text, CurrentAuthor);
+            Revisions.Add(rev);
+            return rev;
+        }
+
+        public DocumentRevision GetRevisionAtOrNearCursor()
+        {
+            if (Revisions == null || Revisions.Count == 0) return null;
+            int selMin = Math.Min(SelectionStart, SelectionEnd);
+            int selMax = Math.Max(SelectionStart, SelectionEnd);
+            foreach (var rev in Revisions)
+            {
+                int rEnd = rev.StartIndex + rev.Length;
+                if ((CursorPosition >= rev.StartIndex && CursorPosition <= rEnd) ||
+                    (selMin < rEnd && selMax > rev.StartIndex))
+                {
+                    return rev;
+                }
+            }
+            DocumentRevision closest = null;
+            int minDist = int.MaxValue;
+            foreach (var rev in Revisions)
+            {
+                int dist = Math.Abs(rev.StartIndex - CursorPosition);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    closest = rev;
+                }
+            }
+            return closest;
+        }
+
+        public void AcceptRevision(DocumentRevision rev)
+        {
+            if (rev == null || !Revisions.Contains(rev)) return;
+            SaveUndoState();
+            if (rev.Type == RevisionType.Insertion)
+            {
+                ApplyFormatToRange(rev.StartIndex, rev.Length, null, 0, null, null, false, null, Color.Black, null);
+                Revisions.Remove(rev);
+            }
+            else if (rev.Type == RevisionType.Deletion)
+            {
+                int delStart = rev.StartIndex;
+                int delLen = rev.Length;
+                Revisions.Remove(rev);
+                PieceTable.Remove(delStart, delLen);
+                AdjustFormattedRunsOnDelete(delStart, delLen);
+                ShiftRevisionsOnDelete(delStart, delLen);
+                if (CursorPosition > delStart) CursorPosition = Math.Max(delStart, CursorPosition - delLen);
+                SelectionStart = CursorPosition;
+                SelectionEnd = CursorPosition;
+            }
+            else
+            {
+                Revisions.Remove(rev);
+            }
+            InvalidateLayoutAndTextCache();
+        }
+
+        public void RejectRevision(DocumentRevision rev)
+        {
+            if (rev == null || !Revisions.Contains(rev)) return;
+            SaveUndoState();
+            if (rev.Type == RevisionType.Insertion)
+            {
+                int delStart = rev.StartIndex;
+                int delLen = rev.Length;
+                Revisions.Remove(rev);
+                PieceTable.Remove(delStart, delLen);
+                AdjustFormattedRunsOnDelete(delStart, delLen);
+                ShiftRevisionsOnDelete(delStart, delLen);
+                if (CursorPosition > delStart) CursorPosition = Math.Max(delStart, CursorPosition - delLen);
+                SelectionStart = CursorPosition;
+                SelectionEnd = CursorPosition;
+            }
+            else if (rev.Type == RevisionType.Deletion)
+            {
+                ApplyFormatToRange(rev.StartIndex, rev.Length, null, 0, null, null, null, false, Color.Black, null);
+                Revisions.Remove(rev);
+            }
+            else
+            {
+                Revisions.Remove(rev);
+            }
+            InvalidateLayoutAndTextCache();
+        }
+
+        public bool AcceptCurrentChange()
+        {
+            var rev = GetRevisionAtOrNearCursor();
+            if (rev != null)
+            {
+                AcceptRevision(rev);
+                return true;
+            }
+            return false;
+        }
+
+        public bool RejectCurrentChange()
+        {
+            var rev = GetRevisionAtOrNearCursor();
+            if (rev != null)
+            {
+                RejectRevision(rev);
+                return true;
+            }
+            return false;
+        }
+
         public void AcceptAllTrackedChanges()
         {
             SaveUndoState();
+            var deletions = new List<DocumentRevision>();
+            var insertions = new List<DocumentRevision>();
+            foreach (var r in Revisions)
+            {
+                if (r.Type == RevisionType.Deletion) deletions.Add(r);
+                else if (r.Type == RevisionType.Insertion) insertions.Add(r);
+            }
+            deletions.Sort((a, b) => b.StartIndex.CompareTo(a.StartIndex));
+
+            foreach (var del in deletions)
+            {
+                PieceTable.Remove(del.StartIndex, del.Length);
+                AdjustFormattedRunsOnDelete(del.StartIndex, del.Length);
+            }
+            foreach (var ins in insertions)
+            {
+                ApplyFormatToRange(ins.StartIndex, ins.Length, null, 0, null, null, false, null, Color.Black, null);
+            }
+            Revisions.Clear();
             if (FormattedRuns != null)
             {
                 foreach (var run in FormattedRuns)
                 {
                     run.Strike = false;
                     run.Underline = false;
-                    if (run.Color == Color.Red || run.Color == Color.Blue)
+                    if (run.Color == Color.Red || run.Color == Color.FromArgb(0, 102, 204) || run.Color == Color.FromArgb(192, 0, 0))
                     {
                         run.Color = Color.Black;
                     }
                 }
             }
+            InvalidateLayoutAndTextCache();
         }
 
         public void RejectAllTrackedChanges()
         {
-            Undo();
+            SaveUndoState();
+            var deletions = new List<DocumentRevision>();
+            var insertions = new List<DocumentRevision>();
+            foreach (var r in Revisions)
+            {
+                if (r.Type == RevisionType.Deletion) deletions.Add(r);
+                else if (r.Type == RevisionType.Insertion) insertions.Add(r);
+            }
+            insertions.Sort((a, b) => b.StartIndex.CompareTo(a.StartIndex));
+
+            foreach (var ins in insertions)
+            {
+                PieceTable.Remove(ins.StartIndex, ins.Length);
+                AdjustFormattedRunsOnDelete(ins.StartIndex, ins.Length);
+            }
+            foreach (var del in deletions)
+            {
+                ApplyFormatToRange(del.StartIndex, del.Length, null, 0, null, null, null, false, Color.Black, null);
+            }
+            Revisions.Clear();
+            InvalidateLayoutAndTextCache();
         }
+
+        public bool NextRevision()
+        {
+            if (Revisions == null || Revisions.Count == 0) return false;
+            var sorted = new List<DocumentRevision>(Revisions);
+            sorted.Sort((a, b) => a.StartIndex.CompareTo(b.StartIndex));
+
+            foreach (var rev in sorted)
+            {
+                if (rev.StartIndex > CursorPosition)
+                {
+                    CursorPosition = rev.StartIndex;
+                    SelectionStart = rev.StartIndex;
+                    SelectionEnd = rev.StartIndex + rev.Length;
+                    return true;
+                }
+            }
+            var first = sorted[0];
+            CursorPosition = first.StartIndex;
+            SelectionStart = first.StartIndex;
+            SelectionEnd = first.StartIndex + first.Length;
+            return true;
+        }
+
+        public bool PreviousRevision()
+        {
+            if (Revisions == null || Revisions.Count == 0) return false;
+            var sorted = new List<DocumentRevision>(Revisions);
+            sorted.Sort((a, b) => a.StartIndex.CompareTo(b.StartIndex));
+
+            for (int i = sorted.Count - 1; i >= 0; i--)
+            {
+                if (sorted[i].StartIndex < CursorPosition)
+                {
+                    var rev = sorted[i];
+                    CursorPosition = rev.StartIndex;
+                    SelectionStart = rev.StartIndex;
+                    SelectionEnd = rev.StartIndex + rev.Length;
+                    return true;
+                }
+            }
+            var last = sorted[sorted.Count - 1];
+            CursorPosition = last.StartIndex;
+            SelectionStart = last.StartIndex;
+            SelectionEnd = last.StartIndex + last.Length;
+            return true;
+        }
+        #endregion
+
+        #region Mail Merge Engine
+        public void InsertMergeField(string fieldName)
+        {
+            if (string.IsNullOrEmpty(fieldName)) return;
+            string clean = fieldName.Trim('«', '»', ' ');
+            InsertText("«" + clean + "»");
+        }
+
+        public List<string> DetectMergeFields()
+        {
+            List<string> fields = new List<string>();
+            if (PieceTable == null) return fields;
+            string full = _mailMergeTemplateBackup != null ? _mailMergeTemplateBackup : PieceTable.GetText();
+            if (string.IsNullOrEmpty(full)) return fields;
+
+            var matches = System.Text.RegularExpressions.Regex.Matches(full, @"\u00AB([^\u00BB]+)\u00BB");
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                string fn = m.Groups[1].Value.Trim();
+                if (!string.IsNullOrEmpty(fn) && !fields.Contains(fn))
+                {
+                    fields.Add(fn);
+                }
+            }
+            return fields;
+        }
+
+        public void LoadMailMergeData(List<Dictionary<string, string>> records)
+        {
+            MailMergeData = records != null ? new List<Dictionary<string, string>>(records) : new List<Dictionary<string, string>>();
+            CurrentMailMergeIndex = 0;
+        }
+
+        public void LoadMailMergeFromCsv(string csvContent)
+        {
+            MailMergeData = new List<Dictionary<string, string>>();
+            CurrentMailMergeIndex = 0;
+            if (string.IsNullOrWhiteSpace(csvContent)) return;
+
+            string[] lines = csvContent.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (lines.Length <= 1) return;
+
+            string[] headers = lines[0].Split(',');
+            for (int h = 0; h < headers.Length; h++) headers[h] = headers[h].Trim().Trim('"');
+
+            for (int i = 1; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                string[] parts = line.Split(',');
+                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                for (int c = 0; c < headers.Length; c++)
+                {
+                    string val = c < parts.Length ? parts[c].Trim().Trim('"') : "";
+                    dict[headers[c]] = val;
+                }
+                MailMergeData.Add(dict);
+            }
+        }
+
+        public string GetMergedDocumentText(int recordIndex, string templateText = null)
+        {
+            string template = templateText != null ? templateText : (_mailMergeTemplateBackup != null ? _mailMergeTemplateBackup : (PieceTable != null ? PieceTable.GetText() : ""));
+            if (string.IsNullOrEmpty(template)) return "";
+            if (MailMergeData == null || MailMergeData.Count == 0) return template;
+            if (recordIndex < 0 || recordIndex >= MailMergeData.Count) return template;
+
+            var rec = MailMergeData[recordIndex];
+            string res = template;
+
+            string name = rec.ContainsKey("Họ và tên") ? rec["Họ và tên"] : (rec.ContainsKey("FullName") ? rec["FullName"] : (rec.ContainsKey("Name") ? rec["Name"] : ""));
+            string addr = rec.ContainsKey("Địa chỉ") ? rec["Địa chỉ"] : (rec.ContainsKey("Address") ? rec["Address"] : "");
+            string co = rec.ContainsKey("Công ty") ? rec["Công ty"] : (rec.ContainsKey("Company") ? rec["Company"] : "");
+            string title = rec.ContainsKey("Chức danh") ? rec["Chức danh"] : (rec.ContainsKey("Title") ? rec["Title"] : "");
+            string phone = rec.ContainsKey("Số điện thoại") ? rec["Số điện thoại"] : (rec.ContainsKey("Phone") ? rec["Phone"] : "");
+            string email = rec.ContainsKey("Email") ? rec["Email"] : "";
+
+            string block = name;
+            if (!string.IsNullOrEmpty(title)) block += "\n" + title;
+            if (!string.IsNullOrEmpty(co)) block += "\n" + co;
+            if (!string.IsNullOrEmpty(addr)) block += "\n" + addr;
+
+            string greeting = "Kính gửi Ông/Bà " + name + ",";
+
+            res = res.Replace("«Khối_Địa_Chỉ»", block).Replace("«Address_Block»", block);
+            res = res.Replace("«Kính_gửi_Họ_Tên»", greeting).Replace("«Greeting_Line»", greeting);
+
+            foreach (var kvp in rec)
+            {
+                res = res.Replace("«" + kvp.Key + "»", kvp.Value);
+            }
+
+            return res;
+        }
+
+        public string FinishAndMergeAllRecords(string pageBreakDelimiter = "\n[--- PAGE BREAK ---]\n")
+        {
+            if (MailMergeData == null || MailMergeData.Count == 0)
+            {
+                return PieceTable != null ? PieceTable.GetText() : "";
+            }
+            string template = _mailMergeTemplateBackup != null ? _mailMergeTemplateBackup : (PieceTable != null ? PieceTable.GetText() : "");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < MailMergeData.Count; i++)
+            {
+                if (i > 0) sb.Append(pageBreakDelimiter);
+                sb.Append(GetMergedDocumentText(i, template));
+            }
+            return sb.ToString();
+        }
+
+        public void ApplyMailMergePreview(int recordIndex)
+        {
+            if (MailMergeData == null || MailMergeData.Count == 0 || PieceTable == null) return;
+            if (recordIndex < 0 || recordIndex >= MailMergeData.Count) return;
+
+            if (_mailMergeTemplateBackup == null)
+            {
+                _mailMergeTemplateBackup = PieceTable.GetText();
+            }
+            PreviewMailMerge = true;
+            CurrentMailMergeIndex = recordIndex;
+
+            string merged = GetMergedDocumentText(recordIndex, _mailMergeTemplateBackup);
+            PieceTable.Clear();
+            PieceTable.Insert(0, merged);
+            CursorPosition = Math.Min(CursorPosition, PieceTable.Length);
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+            InvalidateLayoutAndTextCache();
+        }
+
+        public void ClearMailMergePreview()
+        {
+            if (_mailMergeTemplateBackup != null && PieceTable != null)
+            {
+                PieceTable.Clear();
+                PieceTable.Insert(0, _mailMergeTemplateBackup);
+                _mailMergeTemplateBackup = null;
+            }
+            PreviewMailMerge = false;
+            CursorPosition = Math.Min(CursorPosition, PieceTable.Length);
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+            InvalidateLayoutAndTextCache();
+        }
+        #endregion
 
         public void RunSpellCheck(Form parentForm)
         {
@@ -4642,13 +5394,17 @@ namespace ZenQOffice.UI
 
         public int GetMaxScrollY(int clientHeight, RibbonBar ribbon)
         {
+            if (clientHeight <= 0) clientHeight = LastViewHeight > 0 ? LastViewHeight : 800;
+            int w = LastViewWidth > 0 ? LastViewWidth : 1200;
+
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
-            GetPageLayoutMetrics(800, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+            GetPageLayoutMetrics(w, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
 
             int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
             int pageCount = Math.Max(1, TotalPageCount);
             int lastPageBottomNoScroll = topOffset + (pageCount - 1) * (pageH + 30) + pageH;
-            int targetViewportBottom = (clientHeight - 26) - 25; // 25px đệm xám phía trên thanh trạng thái 26px
+            int maxScrollX = GetMaxScrollX(w);
+            int targetViewportBottom = (clientHeight - 26 - (maxScrollX > 0 ? 12 : 0)) - 25; // 25px đệm xám phía trên thanh trạng thái 26px
             return Math.Max(0, lastPageBottomNoScroll - targetViewportBottom);
         }
 
@@ -4979,11 +5735,22 @@ namespace ZenQOffice.UI
 
         public void InsertText(string text)
         {
+            if (string.IsNullOrEmpty(text)) return;
             SaveUndoState();
             DeleteSelection();
             int insertPos = CursorPosition;
             PieceTable.Insert(insertPos, text);
-            FormattedRuns.Add(new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight));
+            if (TrackChanges)
+            {
+                var rev = RecordChange(RevisionType.Insertion, insertPos, text.Length, text);
+                ShiftRevisionsOnInsert(insertPos, text.Length, rev);
+                FormattedRuns.Add(new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, true, false, rev.Color, TypingHighlight));
+            }
+            else
+            {
+                ShiftRevisionsOnInsert(insertPos, text.Length);
+                FormattedRuns.Add(new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight));
+            }
             CursorPosition += text.Length;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -5824,6 +6591,9 @@ namespace ZenQOffice.UI
                                 ribbon.CustomTopMargin = meta.TopMarginPt / 72.0f;
                                 ribbon.CustomBottomMargin = meta.BottomMarginPt / 72.0f;
                             }
+                            ribbon.LineSpacingFactor = meta.DefaultLineSpacing;
+                            ribbon.ParagraphSpacingBefore = meta.DefaultSpacingBefore;
+                            ribbon.ParagraphSpacingAfter = meta.DefaultSpacingAfter;
                         }
 
                         if (FormattedRuns.Count > 0)
@@ -5965,7 +6735,41 @@ namespace ZenQOffice.UI
                         ParagraphFirstLineIndents,
                         ParagraphLeftIndents,
                         ParagraphRightIndents,
-                        ParagraphHangingIndents);
+                        ParagraphHangingIndents,
+                        ribbon != null ? ribbon.CustomLeftMargin : 1.0f,
+                        ribbon != null ? ribbon.CustomRightMargin : 1.0f,
+                        ribbon != null ? ribbon.CustomTopMargin : 1.0f,
+                        ribbon != null ? ribbon.CustomBottomMargin : 1.0f,
+                        ribbon != null ? ribbon.PaperWidthInches : 0f,
+                        ribbon != null ? ribbon.PaperHeightInches : 0f);
+                }
+                else if (ext == ".pdf")
+                {
+                    saveOk = ExportToPdf(filepath, ribbon);
+                }
+                else if (ext == ".rtf")
+                {
+                    saveOk = ExportToRtf(filepath);
+                }
+                else if (ext == ".odt")
+                {
+                    saveOk = ExportToOdt(filepath, ribbon);
+                }
+                else if (ext == ".md")
+                {
+                    saveOk = ExportToMarkdown(filepath);
+                }
+                else if (ext == ".html" || ext == ".htm")
+                {
+                    saveOk = ExportToHtml(filepath);
+                }
+                else if (ext == ".png")
+                {
+                    saveOk = ExportToImages(filepath, ribbon, allPages: false, isJpeg: false);
+                }
+                else if (ext == ".jpg" || ext == ".jpeg")
+                {
+                    saveOk = ExportToImages(filepath, ribbon, allPages: false, isJpeg: true);
                 }
                 else
                 {
@@ -6058,6 +6862,330 @@ namespace ZenQOffice.UI
             catch (Exception ex)
             {
                 Console.WriteLine("EXPORT PDF ERROR: " + ex.ToString());
+                return false;
+            }
+        }
+
+        public bool ExportToRtf(string filePath)
+        {
+            try
+            {
+                string fullText = PieceTable.GetText();
+                return ZenQOffice.Format.RtfHandler.SaveRtf(
+                    filePath,
+                    fullText,
+                    FormattedRuns,
+                    ParagraphAlignments,
+                    ParagraphLineSpacings,
+                    ParagraphSpacingsBefore,
+                    ParagraphSpacingsAfter,
+                    ParagraphFirstLineIndents,
+                    ParagraphLeftIndents,
+                    ParagraphRightIndents,
+                    DocumentTables);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WriterView.ExportToRtf error: " + ex.Message);
+                return false;
+            }
+        }
+
+        public bool ExportToOdt(string filePath, RibbonBar ribbon = null)
+        {
+            try
+            {
+                string fullText = PieceTable.GetText();
+                return ZenQOffice.Format.OdtHandler.SaveOdt(
+                    filePath,
+                    fullText,
+                    FormattedRuns,
+                    ParagraphAlignments,
+                    ParagraphLineSpacings,
+                    ParagraphSpacingsBefore,
+                    ParagraphSpacingsAfter,
+                    ParagraphFirstLineIndents,
+                    ParagraphLeftIndents,
+                    ParagraphRightIndents,
+                    DocumentTables);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WriterView.ExportToOdt error: " + ex.Message);
+                return false;
+            }
+        }
+
+        public bool ExportToMarkdown(string filePath)
+        {
+            try
+            {
+                string fullText = PieceTable.GetText();
+                string[] paras = fullText.Replace("\r\n", "\n").Split('\n');
+                StringBuilder sb = new StringBuilder();
+                int charOffset = 0;
+
+                for (int p = 0; p < paras.Length; p++)
+                {
+                    string para = paras[p];
+                    if (para.Trim() == "[--- PAGE BREAK ---]" || para.Contains("TRANG TRẮNG MỚI"))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("---");
+                        sb.AppendLine();
+                        charOffset += para.Length + 1;
+                        continue;
+                    }
+
+                    if (para.Trim().StartsWith("|"))
+                    {
+                        sb.AppendLine(para);
+                        charOffset += para.Length + 1;
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(para))
+                    {
+                        sb.AppendLine();
+                        charOffset += para.Length + 1;
+                        continue;
+                    }
+
+                    // Detect Heading
+                    FormattedRun firstRun = GetFormatAt(charOffset);
+                    string prefix = "";
+                    if (firstRun != null && firstRun.Bold)
+                    {
+                        if (firstRun.FontSize >= 16f) prefix = "# ";
+                        else if (firstRun.FontSize >= 14f) prefix = "## ";
+                        else if (firstRun.FontSize >= 12.5f) prefix = "### ";
+                    }
+
+                    sb.Append(prefix);
+                    int cur = 0;
+                    while (cur < para.Length)
+                    {
+                        FormattedRun fmt = GetFormatAt(charOffset + cur);
+                        int runLen = 1;
+                        while (cur + runLen < para.Length && GetFormatAt(charOffset + cur + runLen) == fmt)
+                        {
+                            runLen++;
+                        }
+
+                        string runTxt = para.Substring(cur, runLen);
+                        bool isHeading = !string.IsNullOrEmpty(prefix);
+
+                        if (!isHeading && fmt != null && fmt.Bold && fmt.Italic) runTxt = $"***{runTxt}***";
+                        else if (!isHeading && fmt != null && fmt.Bold) runTxt = $"**{runTxt}**";
+                        else if (!isHeading && fmt != null && fmt.Italic) runTxt = $"*{runTxt}*";
+                        else if (fmt != null && fmt.Strike) runTxt = $"~~{runTxt}~~";
+
+                        sb.Append(runTxt);
+                        cur += runLen;
+                    }
+                    sb.AppendLine();
+                    charOffset += para.Length + 1;
+                }
+
+                File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WriterView.ExportToMarkdown error: " + ex.Message);
+                return false;
+            }
+        }
+
+        public bool ExportToHtml(string filepath)
+        {
+            try
+            {
+                string fullText = PieceTable.GetText();
+                string[] paras = fullText.Replace("\r\n", "\n").Split('\n');
+                StringBuilder htmlSb = new StringBuilder();
+                string title = System.Net.WebUtility.HtmlEncode(Path.GetFileNameWithoutExtension(filepath));
+                htmlSb.AppendLine("<!DOCTYPE html>");
+                htmlSb.AppendLine("<html><head><meta charset=\"utf-8\">");
+                htmlSb.AppendLine($"<title>{title}</title>");
+                htmlSb.AppendLine("<style>");
+                htmlSb.AppendLine("  body { background: #f1f5f9; font-family: 'Times New Roman', serif; margin: 0; padding: 40px 20px; }");
+                htmlSb.AppendLine("  .doc-container { background: #ffffff; max-width: 816px; margin: 0 auto; padding: 72px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 4px; box-sizing: border-box; }");
+                htmlSb.AppendLine("  p { margin: 0 0 10pt 0; line-height: 1.45; font-size: 12pt; color: #1e293b; }");
+                htmlSb.AppendLine("  .page-break { border: 0; border-top: 1px dashed #cbd5e1; margin: 30px 0; }");
+                htmlSb.AppendLine("  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11pt; }");
+                htmlSb.AppendLine("  th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }");
+                htmlSb.AppendLine("  th { background-color: #f8fafc; font-weight: bold; }");
+                htmlSb.AppendLine("</style>");
+                htmlSb.AppendLine("</head><body>");
+                htmlSb.AppendLine("<div class=\"doc-container\">");
+
+                int charOffset = 0;
+                for (int pIdx = 0; pIdx < paras.Length; pIdx++)
+                {
+                    string p = paras[pIdx];
+                    if (p.Trim() == "[--- PAGE BREAK ---]" || p.Contains("TRANG TRẮNG MỚI"))
+                    {
+                        htmlSb.AppendLine("<hr class=\"page-break\" />");
+                        charOffset += p.Length + 1;
+                        continue;
+                    }
+
+                    if (p.Trim().StartsWith("|"))
+                    {
+                        List<string> tableLines = new List<string>();
+                        int tblLen = 0;
+                        while (pIdx < paras.Length && !string.IsNullOrWhiteSpace(paras[pIdx]) && paras[pIdx].Trim().StartsWith("|"))
+                        {
+                            tableLines.Add(paras[pIdx]);
+                            tblLen += paras[pIdx].Length + 1;
+                            pIdx++;
+                        }
+                        pIdx--;
+                        WriteHtmlTable(htmlSb, tableLines);
+                        charOffset += tblLen;
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(p))
+                    {
+                        htmlSb.AppendLine("<p>&nbsp;</p>");
+                        charOffset += p.Length + 1;
+                        continue;
+                    }
+
+                    int pAlign = 0;
+                    if (ParagraphAlignments != null && ParagraphAlignments.ContainsKey(charOffset))
+                    {
+                        pAlign = ParagraphAlignments[charOffset];
+                    }
+                    string alignStyle = pAlign == 1 ? "text-align: center;" : (pAlign == 2 ? "text-align: right;" : (pAlign == 3 ? "text-align: justify;" : "text-align: left;"));
+
+                    htmlSb.Append($"<p style=\"{alignStyle}\">");
+                    int cur = 0;
+                    while (cur < p.Length)
+                    {
+                        FormattedRun fmt = GetFormatAt(charOffset + cur);
+                        int runLen = 1;
+                        while (cur + runLen < p.Length && GetFormatAt(charOffset + cur + runLen) == fmt)
+                        {
+                            runLen++;
+                        }
+
+                        string runTxt = System.Net.WebUtility.HtmlEncode(p.Substring(cur, runLen));
+                        StringBuilder styleSb = new StringBuilder();
+                        if (fmt != null)
+                        {
+                            if (!string.IsNullOrEmpty(fmt.FontName) && fmt.FontName != "Times New Roman") styleSb.Append($"font-family: '{fmt.FontName}'; ");
+                            if (fmt.FontSize > 0 && Math.Abs(fmt.FontSize - 12f) > 0.5f) styleSb.Append($"font-size: {fmt.FontSize:0.#}pt; ");
+                            if (fmt.Color != Color.Empty && fmt.Color != Color.Transparent && fmt.Color != Color.Black)
+                            {
+                                styleSb.Append($"color: #{fmt.Color.R:X2}{fmt.Color.G:X2}{fmt.Color.B:X2}; ");
+                            }
+                            if (fmt.Highlight != Color.Empty && fmt.Highlight != Color.Transparent)
+                            {
+                                styleSb.Append($"background-color: #{fmt.Highlight.R:X2}{fmt.Highlight.G:X2}{fmt.Highlight.B:X2}; ");
+                            }
+                        }
+
+                        if (fmt != null && fmt.Bold) runTxt = $"<b>{runTxt}</b>";
+                        if (fmt != null && fmt.Italic) runTxt = $"<i>{runTxt}</i>";
+                        if (fmt != null && fmt.Underline) runTxt = $"<u>{runTxt}</u>";
+                        if (fmt != null && fmt.Strike) runTxt = $"<s>{runTxt}</s>";
+
+                        if (styleSb.Length > 0)
+                        {
+                            htmlSb.Append($"<span style=\"{styleSb.ToString().Trim()}\">{runTxt}</span>");
+                        }
+                        else
+                        {
+                            htmlSb.Append(runTxt);
+                        }
+
+                        cur += runLen;
+                    }
+                    htmlSb.AppendLine("</p>");
+                    charOffset += p.Length + 1;
+                }
+
+                htmlSb.AppendLine("</div>");
+                htmlSb.AppendLine("</body></html>");
+                File.WriteAllText(filepath, htmlSb.ToString(), Encoding.UTF8);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WriterView.ExportToHtml error: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static void WriteHtmlTable(StringBuilder htmlSb, List<string> tableLines)
+        {
+            htmlSb.AppendLine("<table>");
+            bool isFirst = true;
+            foreach (var line in tableLines)
+            {
+                string tr = line.Trim();
+                if (tr.Length < 2 || !tr.StartsWith("|")) continue;
+                string stripped = tr.Replace("|", "").Replace("-", "").Replace(":", "").Trim();
+                if (string.IsNullOrEmpty(stripped)) continue;
+
+                string[] parts = tr.Split('|');
+                htmlSb.AppendLine("  <tr>");
+                for (int i = 1; i < parts.Length - 1; i++)
+                {
+                    string cell = System.Net.WebUtility.HtmlEncode(parts[i].Trim());
+                    if (isFirst) htmlSb.AppendLine($"    <th>{cell}</th>");
+                    else htmlSb.AppendLine($"    <td>{cell}</td>");
+                }
+                htmlSb.AppendLine("  </tr>");
+                isFirst = false;
+            }
+            htmlSb.AppendLine("</table>");
+        }
+
+        public bool ExportToImages(string filePath, RibbonBar ribbon, bool allPages = true, bool isJpeg = false)
+        {
+            try
+            {
+                string tempPdf = Path.Combine(Path.GetTempPath(), "GenOffice_Export_" + Guid.NewGuid().ToString("N") + ".pdf");
+                if (!ExportToPdf(tempPdf, ribbon)) return false;
+
+                var pdfDoc = ZenQOffice.Format.PdfHandler.LoadPdf(tempPdf);
+                if (pdfDoc == null || pdfDoc.Pages.Count == 0) return false;
+
+                var imgFormat = isJpeg ? System.Drawing.Imaging.ImageFormat.Jpeg : System.Drawing.Imaging.ImageFormat.Png;
+                string ext = isJpeg ? ".jpg" : ".png";
+
+                if (!allPages)
+                {
+                    int targetPage = Math.Max(0, Math.Min(pdfDoc.Pages.Count - 1, CurrentActivePage - 1));
+                    using (Bitmap bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(pdfDoc, targetPage, 150f))
+                    {
+                        bmp.Save(filePath, imgFormat);
+                    }
+                }
+                else
+                {
+                    string folder = Path.GetDirectoryName(filePath);
+                    string baseName = Path.GetFileNameWithoutExtension(filePath);
+                    for (int i = 0; i < pdfDoc.Pages.Count; i++)
+                    {
+                        string outPath = Path.Combine(folder, $"{baseName}_Trang_{i + 1}{ext}");
+                        using (Bitmap bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(pdfDoc, i, 150f))
+                        {
+                            bmp.Save(outPath, imgFormat);
+                        }
+                    }
+                }
+
+                try { File.Delete(tempPdf); } catch { }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WriterView.ExportToImages error: " + ex.Message);
                 return false;
             }
         }
@@ -7737,6 +8865,28 @@ namespace ZenQOffice.UI
             return count;
         }
 
+        public int GetPageFromCharIndex(int charIndex)
+        {
+            if (DocParagraphGaps.Count > 0)
+            {
+                int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+                GetPageLayoutMetrics(LastViewWidth, null, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+                int pitch = Math.Max(100, pageH + 30);
+                for (int i = DocParagraphGaps.Count - 1; i >= 0; i--)
+                {
+                    if (DocParagraphGaps[i].CharIndex <= charIndex)
+                    {
+                        int docY = DocParagraphGaps[i].ScreenY + (int)ScrollY - 165;
+                        return Math.Max(1, (docY / pitch) + 1);
+                    }
+                }
+            }
+            int totalLen = Math.Max(1, PieceTable.Length);
+            int totalPages = Math.Max(1, TotalPageCount);
+            int est = (int)(((float)charIndex / totalLen) * totalPages) + 1;
+            return Math.Max(1, Math.Min(totalPages, est));
+        }
+
         public void PerformNavSearch()
         {
             if (!ShowNavigationPane) return;
@@ -7753,48 +8903,87 @@ namespace ZenQOffice.UI
             {
                 string pStr = paragraphs[p];
                 string trimmed = pStr.Trim();
-                int pg = Math.Max(1, (runningChar / 1800) + 1);
+                int pg = GetPageFromCharIndex(runningChar);
 
                 bool isHeading = false;
                 int level = 1;
                 string title = trimmed;
 
-                if (trimmed.StartsWith("#"))
+                // Check ParagraphStyles (e.g. from DOCX or Ribbon: "Heading 1", "Heading 2", "Tiêu đề 1", "Title", etc.)
+                string pStyle = "";
+                if (ParagraphStyles != null && ParagraphStyles.TryGetValue(runningChar, out pStyle) && !string.IsNullOrEmpty(pStyle))
                 {
-                    isHeading = true;
-                    if (trimmed.StartsWith("###")) { level = 3; title = trimmed.TrimStart('#').Trim(); }
-                    else if (trimmed.StartsWith("##")) { level = 2; title = trimmed.TrimStart('#').Trim(); }
-                    else { level = 1; title = trimmed.TrimStart('#').Trim(); }
+                    if (pStyle.IndexOf("Heading 1", StringComparison.OrdinalIgnoreCase) >= 0 || pStyle.IndexOf("Tiêu đề 1", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        isHeading = true; level = 1;
+                    }
+                    else if (pStyle.IndexOf("Heading 2", StringComparison.OrdinalIgnoreCase) >= 0 || pStyle.IndexOf("Tiêu đề 2", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        isHeading = true; level = 2;
+                    }
+                    else if (pStyle.IndexOf("Heading 3", StringComparison.OrdinalIgnoreCase) >= 0 || pStyle.IndexOf("Tiêu đề 3", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        isHeading = true; level = 3;
+                    }
+                    else if (pStyle.IndexOf("Heading", StringComparison.OrdinalIgnoreCase) >= 0 || pStyle.IndexOf("Tiêu đề", StringComparison.OrdinalIgnoreCase) >= 0 || pStyle.IndexOf("Title", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        isHeading = true; level = 1;
+                    }
                 }
-                else if (trimmed.StartsWith("PHẦN ") || trimmed.StartsWith("CHƯƠNG ") || trimmed.StartsWith("BÀI ") || trimmed.StartsWith("MỤC "))
+
+                if (!isHeading && trimmed.Length > 0 && !trimmed.StartsWith("|") && !trimmed.StartsWith("!["))
                 {
-                    isHeading = true;
-                    level = 1;
-                }
-                else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(\d+(\.\d+)*\.|[I|V|X]+\.)\s*"))
-                {
-                    isHeading = true;
-                    int dotCount = 0;
-                    for (int d = 0; d < trimmed.Length && trimmed[d] != ' '; d++) if (trimmed[d] == '.') dotCount++;
-                    level = Math.Max(1, Math.Min(3, dotCount));
-                }
-                else
-                {
-                    FormattedRun fr = GetFormatAt(runningChar);
-                    if (fr.Bold && trimmed.Length > 0 && trimmed.Length < 100 && !trimmed.StartsWith("|") && !trimmed.StartsWith("!["))
+                    if (trimmed.StartsWith("#"))
                     {
                         isHeading = true;
-                        level = fr.FontSize >= 15.0f ? 1 : (fr.FontSize >= 13.0f ? 2 : 3);
+                        if (trimmed.StartsWith("###")) { level = 3; title = trimmed.TrimStart('#').Trim(); }
+                        else if (trimmed.StartsWith("##")) { level = 2; title = trimmed.TrimStart('#').Trim(); }
+                        else { level = 1; title = trimmed.TrimStart('#').Trim(); }
+                    }
+                    else if (trimmed.StartsWith("PHẦN ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("CHƯƠNG ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("BÀI ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("MỤC ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("CHỦ ĐỀ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("CÂU ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("LESSON ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("UNIT ", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("CHAPTER ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isHeading = true;
+                        if (trimmed.StartsWith("CHỦ ĐỀ", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("PHẦN ", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("CHƯƠNG ", StringComparison.OrdinalIgnoreCase))
+                            level = 1;
+                        else
+                            level = 2;
+                    }
+                    else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(\d+(\.\d+)*\.|[I|V|X]+\.)\s*"))
+                    {
+                        isHeading = true;
+                        int dotCount = 0;
+                        for (int d = 0; d < trimmed.Length && trimmed[d] != ' '; d++) if (trimmed[d] == '.') dotCount++;
+                        level = Math.Max(1, Math.Min(3, dotCount));
+                    }
+                    else
+                    {
+                        FormattedRun fr = GetFormatAt(runningChar);
+                        if ((fr.Bold || fr.Highlight != Color.Transparent || fr.Highlight != Color.Empty) && trimmed.Length >= 2 && trimmed.Length <= 120)
+                        {
+                            isHeading = true;
+                            level = fr.FontSize >= 15.0f ? 1 : (fr.FontSize >= 13.0f ? 2 : 3);
+                        }
                     }
                 }
 
                 if (isHeading && !string.IsNullOrEmpty(title))
                 {
+                    string displayTitle = title;
+                    if (displayTitle.Length > 65) displayTitle = displayTitle.Substring(0, 62) + "...";
+
                     NavHeadings.Add(new NavHeadingItem
                     {
                         CharIndex = runningChar,
                         Level = level,
-                        Title = title,
+                        Title = displayTitle,
                         PageNumber = pg,
                         ClickRect = Rectangle.Empty
                     });
@@ -7813,15 +9002,7 @@ namespace ZenQOffice.UI
                     int found = fullText.IndexOf(NavSearchQuery, searchIdx, StringComparison.OrdinalIgnoreCase);
                     if (found < 0) break;
 
-                    int matchPg = 1;
-                    foreach (var line in RenderedLines)
-                    {
-                        if (found >= line.StartCharIndex && found <= line.StartCharIndex + line.Length)
-                        {
-                            matchPg = Math.Max(1, (line.ScreenY - 195 + (int)ScrollY) / (int)(842 * ZoomLevel + 30) + 1);
-                            break;
-                        }
-                    }
+                    int matchPg = GetPageFromCharIndex(found);
 
                     int sBefore = Math.Max(0, found - 25);
                     int sBeforeLen = found - sBefore;
@@ -7859,26 +9040,73 @@ namespace ZenQOffice.UI
             }
         }
 
+        public void ScrollToCharIndex(int charIndex)
+        {
+            charIndex = Math.Max(0, Math.Min(PieceTable.Length, charIndex));
+            CursorPosition = charIndex;
+            SelectionStart = charIndex;
+            SelectionEnd = charIndex;
+
+            int targetScroll = -1;
+
+            // 1. First attempt: check if char is already in RenderedLines
+            for (int l = 0; l < RenderedLines.Count; l++)
+            {
+                var line = RenderedLines[l];
+                if (charIndex >= line.StartCharIndex && charIndex <= line.StartCharIndex + line.Length)
+                {
+                    int docY = line.ScreenY - 195 + (int)ScrollY;
+                    targetScroll = Math.Max(0, docY - 200);
+                    break;
+                }
+            }
+
+            // 2. Second attempt: search DocParagraphGaps for the closest paragraph
+            if (targetScroll < 0 && DocParagraphGaps.Count > 0)
+            {
+                for (int i = DocParagraphGaps.Count - 1; i >= 0; i--)
+                {
+                    if (DocParagraphGaps[i].CharIndex <= charIndex)
+                    {
+                        int docY = DocParagraphGaps[i].ScreenY + (int)ScrollY;
+                        targetScroll = Math.Max(0, docY - 200);
+                        break;
+                    }
+                }
+            }
+
+            // 3. Fallback: mathematical estimation based on character progress in document
+            if (targetScroll < 0)
+            {
+                int totalLen = Math.Max(1, PieceTable.Length);
+                float progress = (float)charIndex / totalLen;
+                int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+                GetPageLayoutMetrics(LastViewWidth, null, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+                int pitch = Math.Max(100, pageH + 30);
+                int estTotalHeight = Math.Max(1, TotalPageCount) * pitch;
+                int estTargetY = (int)(progress * estTotalHeight);
+                targetScroll = Math.Max(0, estTargetY - 200);
+            }
+
+            TargetScrollY = targetScroll;
+            ScrollY = targetScroll;
+            UpdateSmoothScroll();
+            CursorVisible = true;
+            Invalidate();
+        }
+
         public void JumpToNavMatch(int index)
         {
             if (index < 0 || index >= NavSearchResults.Count) return;
             NavSearchResultIndex = index;
             var item = NavSearchResults[index];
 
+            ScrollToCharIndex(item.CharIndex);
             SelectionStart = item.CharIndex;
             SelectionEnd = item.CharIndex + item.Length;
             CursorPosition = item.CharIndex;
-
-            foreach (var line in RenderedLines)
-            {
-                if (item.CharIndex >= line.StartCharIndex && item.CharIndex <= line.StartCharIndex + line.Length)
-                {
-                    int docY = line.ScreenY - 195 + (int)ScrollY;
-                    TargetScrollY = Math.Max(0, docY - 250);
-                    UpdateSmoothScroll();
-                    break;
-                }
-            }
+            CursorVisible = true;
+            Invalidate();
         }
 
         public void SelectNextNavMatch()
@@ -7897,28 +9125,48 @@ namespace ZenQOffice.UI
 
         public void JumpToNavHeading(int charIndex)
         {
-            CursorPosition = charIndex;
-            SelectionStart = charIndex;
-            SelectionEnd = charIndex;
-
-            foreach (var line in RenderedLines)
-            {
-                if (charIndex >= line.StartCharIndex && charIndex <= line.StartCharIndex + line.Length)
-                {
-                    int docY = line.ScreenY - 195 + (int)ScrollY;
-                    TargetScrollY = Math.Max(0, docY - 200);
-                    UpdateSmoothScroll();
-                    break;
-                }
-            }
+            ScrollToCharIndex(charIndex);
         }
 
         public void JumpToNavPage(int pageNumber)
         {
-            int stdH = 842;
-            int pageH = (int)(stdH * ZoomLevel);
-            TargetScrollY = Math.Max(0, (pageNumber - 1) * (pageH + 30));
+            int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+            GetPageLayoutMetrics(LastViewWidth, null, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+            int pitch = Math.Max(100, pageH + 30);
+            TargetScrollY = Math.Max(0, (pageNumber - 1) * pitch);
+            ScrollY = (int)TargetScrollY;
+            CurrentActivePage = pageNumber;
             UpdateSmoothScroll();
+            Invalidate();
+        }
+
+        public int GetNavMaxScroll(int availContentH = 500)
+        {
+            if (NavActiveTab == 0)
+            {
+                int totalH = NavHeadings.Count * 28 + 20;
+                return Math.Max(0, totalH - availContentH);
+            }
+            else if (NavActiveTab == 1)
+            {
+                int totalPages = Math.Max(1, TotalPageCount);
+                int rows = (totalPages + 1) / 2;
+                int totalH = rows * 165 + 30;
+                return Math.Max(0, totalH - availContentH);
+            }
+            else
+            {
+                int totalH = NavSearchResults.Count * 64 + 40;
+                return Math.Max(0, totalH - availContentH);
+            }
+        }
+
+        public void HandleNavMouseWheel(int delta, int availContentH = 500)
+        {
+            int notches = delta / 120;
+            NavScrollY = Math.Max(0, NavScrollY - notches * 45);
+            int maxS = GetNavMaxScroll(availContentH);
+            NavScrollY = Math.Min(maxS, NavScrollY);
         }
 
         public bool HandleNavMouseDown(int x, int y, int canvasW, int canvasH)
@@ -7958,17 +9206,20 @@ namespace ZenQOffice.UI
             if (NavTabHeadingsRect.Contains(x, y))
             {
                 NavActiveTab = 0;
+                NavScrollY = 0;
                 PerformNavSearch();
                 return true;
             }
             if (NavTabPagesRect.Contains(x, y))
             {
                 NavActiveTab = 1;
+                NavScrollY = 0;
                 return true;
             }
             if (NavTabResultsRect.Contains(x, y))
             {
                 NavActiveTab = 2;
+                NavScrollY = 0;
                 return true;
             }
 
@@ -8184,7 +9435,7 @@ namespace ZenQOffice.UI
                         }
 
                         // Render result cards
-                        int cardY = contentY + 28;
+                        int cardY = contentY + 28 - NavScrollY;
                         for (int i = 0; i < NavSearchResults.Count; i++)
                         {
                             var res = NavSearchResults[i];
@@ -8214,7 +9465,7 @@ namespace ZenQOffice.UI
                             using (Font pgFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
                             using (SolidBrush pgBrush = new SolidBrush(Color.FromArgb(120, 120, 120)))
                             {
-                                g.DrawString("Trang " + res.PageNumber, pgFont, pgBrush, cardRect.Right - 50, cardRect.Y + 4);
+                                g.DrawString("Trang " + res.PageNumber, pgFont, pgBrush, cardRect.Right - 55, cardRect.Y + 4);
                             }
 
                             // Snippet
@@ -8249,37 +9500,69 @@ namespace ZenQOffice.UI
                     int cardW = 105;
                     int cardH = 135;
                     int pX = 18;
-                    int pY = contentY + 10;
+                    int pY = contentY + 10 - NavScrollY;
+                    int totalPages = Math.Max(1, TotalPageCount);
 
-                    for (int pg = 1; pg <= TotalPageCount; pg++)
+                    for (int pg = 1; pg <= totalPages; pg++)
                     {
                         Rectangle pageCardRect = new Rectangle(pX, pY, cardW, cardH);
                         NavPageThumbnails.Add(new NavPageThumbnailItem { PageNumber = pg, ClickRect = pageCardRect });
 
                         bool isCur = (pg == CurrentActivePage);
 
-                        g.FillRectangle(Brushes.White, pageCardRect);
+                        // Card drop shadow
+                        using (SolidBrush shadow = new SolidBrush(Color.FromArgb(25, 0, 0, 0)))
+                        {
+                            g.FillRectangle(shadow, pageCardRect.X + 2, pageCardRect.Y + 2, pageCardRect.Width, pageCardRect.Height);
+                        }
+
+                        // Card background
+                        using (SolidBrush cardBg = new SolidBrush(isCur ? Color.FromArgb(243, 248, 255) : Color.White))
+                        {
+                            g.FillRectangle(cardBg, pageCardRect);
+                        }
+
+                        // Card border
                         using (Pen cardPen = new Pen(isCur ? Color.FromArgb(0, 90, 158) : Color.FromArgb(209, 208, 207), isCur ? 2.0f : 1.0f))
                         {
                             g.DrawRectangle(cardPen, pageCardRect);
                         }
 
-                        // Mini text sketch lines inside page thumbnail
-                        using (Pen linePen = new Pen(Color.FromArgb(220, 220, 220), 2))
+                        // Miniature skeleton lines representing text on this page
+                        using (Pen headingLinePen = new Pen(isCur ? Color.FromArgb(100, 149, 237) : Color.FromArgb(160, 160, 160), 2.5f))
+                        using (Pen bodyLinePen = new Pen(Color.FromArgb(215, 215, 215), 1.5f))
                         {
-                            for (int l = 0; l < 6; l++)
+                            // Page Header bar
+                            g.DrawLine(bodyLinePen, pageCardRect.X + 12, pageCardRect.Y + 12, pageCardRect.X + cardW - 12, pageCardRect.Y + 12);
+
+                            // Heading line
+                            g.DrawLine(headingLinePen, pageCardRect.X + 12, pageCardRect.Y + 22, pageCardRect.X + 60, pageCardRect.Y + 22);
+
+                            // Body text lines
+                            for (int l = 0; l < 5; l++)
                             {
-                                int lY = pageCardRect.Y + 15 + l * 14;
-                                int lW = (l % 2 == 0) ? cardW - 30 : cardW - 45;
-                                g.DrawLine(linePen, pageCardRect.X + 15, lY, pageCardRect.X + 15 + lW, lY);
+                                int lY = pageCardRect.Y + 34 + l * 12;
+                                int lW = (l == 2 || l == 4) ? cardW - 38 : cardW - 24;
+                                g.DrawLine(bodyLinePen, pageCardRect.X + 12, lY, pageCardRect.X + 12 + lW, lY);
+                            }
+
+                            // Image placeholder box on page
+                            Rectangle imgMini = new Rectangle(pageCardRect.X + 16, pageCardRect.Y + 98, cardW - 32, 22);
+                            using (SolidBrush imgBg = new SolidBrush(Color.FromArgb(238, 242, 246)))
+                            using (Pen imgBorder = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                            {
+                                g.FillRectangle(imgBg, imgMini);
+                                g.DrawRectangle(imgBorder, imgMini);
                             }
                         }
 
-                        // Page label
-                        using (Font pgFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-                        using (SolidBrush pBrush = new SolidBrush(Color.FromArgb(50, 49, 48)))
+                        // Page label below card
+                        using (Font pgFont = new Font("Segoe UI", 8.5f, isCur ? FontStyle.Bold : FontStyle.Regular))
+                        using (SolidBrush pBrush = new SolidBrush(isCur ? Color.FromArgb(0, 90, 158) : Color.FromArgb(50, 49, 48)))
                         {
-                            g.DrawString(pg.ToString(), pgFont, pBrush, pageCardRect.X + (cardW / 2) - 4, pageCardRect.Bottom + 4);
+                            string lbl = "Trang " + pg;
+                            SizeF sz = g.MeasureString(lbl, pgFont);
+                            g.DrawString(lbl, pgFont, pBrush, pageCardRect.X + (cardW - sz.Width) / 2f, pageCardRect.Bottom + 4);
                         }
 
                         pX += cardW + 18;
@@ -8297,28 +9580,47 @@ namespace ZenQOffice.UI
                         using (Font guideFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
                         using (SolidBrush guideBrush = new SolidBrush(Color.FromArgb(96, 94, 92)))
                         {
-                            Rectangle guideRect = new Rectangle(14, contentY + 10, paneW - 28, 100);
-                            g.DrawString("Tài liệu chưa có tiêu đề (Headings).\n\nBạn có thể áp dụng các kiểu Tiêu đề (Heading 1, Heading 2...) từ thanh Ribbon để tạo mục lục tự động.", guideFont, guideBrush, guideRect);
+                            Rectangle guideRect = new Rectangle(14, contentY + 10, paneW - 28, 120);
+                            g.DrawString("Tài liệu chưa có tiêu đề được định dạng.\n\nBạn có thể áp dụng các kiểu Tiêu đề (Heading 1, Heading 2...) từ thanh Ribbon hoặc gõ 'Chủ đề:', 'Bài 1', 'Phần 1' để tạo cấu trúc điều hướng tự động.", guideFont, guideBrush, guideRect);
                         }
                     }
                     else
                     {
-                        int hY = contentY + 5;
+                        int hY = contentY + 6 - NavScrollY;
                         using (Font hFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
                         using (Font hBoldFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
                         using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(32, 31, 30)))
                         using (SolidBrush arrBrush = new SolidBrush(Color.FromArgb(96, 94, 92)))
+                        using (SolidBrush pgBrush = new SolidBrush(Color.FromArgb(140, 140, 140)))
                         {
                             for (int i = 0; i < NavHeadings.Count; i++)
                             {
                                 var hItem = NavHeadings[i];
-                                int indent = (hItem.Level - 1) * 14;
-                                Rectangle hRect = new Rectangle(14 + indent, hY, paneW - 28 - indent, 26);
+                                int indent = (hItem.Level - 1) * 12;
+                                Rectangle hRect = new Rectangle(10 + indent, hY, paneW - 20 - indent, 26);
                                 hItem.ClickRect = hRect;
                                 NavHeadings[i] = hItem;
 
-                                g.DrawString("▶", hFont, arrBrush, hRect.X, hRect.Y + 3);
-                                g.DrawString(hItem.Title, hItem.Level == 1 ? hBoldFont : hFont, hBrush, hRect.X + 16, hRect.Y + 3);
+                                bool isCurrent = false;
+                                if (CursorPosition >= hItem.CharIndex && (i == NavHeadings.Count - 1 || CursorPosition < NavHeadings[i + 1].CharIndex))
+                                {
+                                    isCurrent = true;
+                                }
+
+                                if (isCurrent)
+                                {
+                                    using (SolidBrush curBg = new SolidBrush(Color.FromArgb(237, 235, 233)))
+                                    using (SolidBrush barBrush = new SolidBrush(Color.FromArgb(0, 90, 158)))
+                                    {
+                                        g.FillRectangle(curBg, hRect);
+                                        g.FillRectangle(barBrush, hRect.X, hRect.Y, 3, hRect.Height);
+                                    }
+                                }
+
+                                string marker = hItem.Level == 1 ? "▾" : "•";
+                                g.DrawString(marker, hFont, isCurrent ? Brushes.RoyalBlue : arrBrush, hRect.X + 4, hRect.Y + 3);
+                                g.DrawString(hItem.Title, (hItem.Level == 1 || isCurrent) ? hBoldFont : hFont, isCurrent ? Brushes.MidnightBlue : hBrush, hRect.X + 18, hRect.Y + 3);
+                                g.DrawString(hItem.PageNumber.ToString(), hFont, pgBrush, paneW - 26, hRect.Y + 3);
 
                                 hY += 28;
                             }
@@ -8960,8 +10262,42 @@ namespace ZenQOffice.UI
             public int PageIndex;
         }
 
-        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int marginY)
+        private static readonly Dictionary<string, float> _fontLineSpacingRatios = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+
+        public static float GetFontLineSpacingRatio(string fontName)
         {
+            if (string.IsNullOrEmpty(fontName)) fontName = "Times New Roman";
+            float ratio;
+            if (_fontLineSpacingRatios.TryGetValue(fontName, out ratio)) return ratio;
+
+            try
+            {
+                using (var ff = new FontFamily(fontName))
+                {
+                    int em = ff.GetEmHeight(FontStyle.Regular);
+                    if (em > 0)
+                    {
+                        int ascent = ff.GetCellAscent(FontStyle.Regular);
+                        int descent = ff.GetCellDescent(FontStyle.Regular);
+                        ratio = (ascent + descent) / (float)em;
+                        if (ratio >= 1.0f && ratio <= 1.5f)
+                        {
+                            _fontLineSpacingRatios[fontName] = ratio;
+                            return ratio;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            ratio = 1.1074f; // Standard Word fallback for Times New Roman / ECMA-376
+            _fontLineSpacingRatios[fontName] = ratio;
+            return ratio;
+        }
+
+        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int bottomMarginY, int topMarginY = -1)
+        {
+            if (topMarginY < 0) topMarginY = bottomMarginY;
             List<LineSlot> slots = new List<LineSlot>();
 
             // 1. Top and Bottom (WrapMode == 4): Nhảy hoàn toàn xuống dưới đáy của đối tượng
@@ -9010,10 +10346,10 @@ namespace ZenQOffice.UI
                 }
             }
 
-            if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - marginY)
+            if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
             {
                 currentPage++;
-                currentY = startPageY + currentPage * (pageH + 30) + marginY;
+                currentY = startPageY + currentPage * (pageH + 30) + topMarginY;
             }
 
             // 2. Square (1), Tight (2), Through (3): Tính toán các khe trống Trái & Phải
@@ -9086,10 +10422,10 @@ namespace ZenQOffice.UI
             if (slots.Count == 0)
             {
                 currentY = sideObstacle.Bottom + gap;
-                if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - marginY)
+                if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
                 {
                     currentPage++;
-                    currentY = startPageY + currentPage * (pageH + 30) + marginY;
+                    currentY = startPageY + currentPage * (pageH + 30) + topMarginY;
                 }
                 slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
             }
@@ -9102,6 +10438,7 @@ namespace ZenQOffice.UI
             public string Text;
             public float Zoom;
             public int MaxW;
+            public int TextX;
             public float CurrentYOffset;
             public int CurrentPage;
             public List<WrapLineInfo> Lines;
@@ -9113,6 +10450,8 @@ namespace ZenQOffice.UI
         private int _lastLayoutRunsHash = 0;
         private float _lastLayoutZoom = 0;
         private int _lastLayoutMaxW = 0;
+        private int _lastLayoutTextX = -1;
+        private int _lastLayoutPageX = -1;
         private string[] _cachedParagraphs = null;
         private int _cachedParagraphsVersion = -1;
         private int _lastShapesScannedVersion = -1;
@@ -9125,6 +10464,8 @@ namespace ZenQOffice.UI
             _lastLayoutRunsHash = -1;
             _lastLayoutZoom = -1f;
             _lastLayoutMaxW = -1;
+            _lastLayoutTextX = -1;
+            _lastLayoutPageX = -1;
             _lastShapesScannedVersion = -1;
             if (_paraLayoutCache != null) _paraLayoutCache.Clear();
             DocShapeObject.ClearTagParseCache();
@@ -9132,7 +10473,7 @@ namespace ZenQOffice.UI
             if (_wordMeasureCache != null) _wordMeasureCache.Clear();
         }
 
-        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int textX, int maxTextW, D2DGraphics g, RibbonBar ribbon)
+        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int bottomMarginY, int textX, int maxTextW, D2DGraphics g, RibbonBar ribbon)
         {
             float pBefore = (ParagraphSpacingsBefore.ContainsKey(paraStartIndex)) ? ParagraphSpacingsBefore[paraStartIndex] : (ribbon != null ? ribbon.ParagraphSpacingBefore : 0f);
             if (pBefore > 0)
@@ -9152,7 +10493,7 @@ namespace ZenQOffice.UI
             ParaLayoutCache cache = null;
             if (_paraLayoutCache.TryGetValue(paraStartIndex, out cache))
             {
-                if (cache.Text == para && cache.Zoom == ZoomLevel && cache.MaxW == maxTextW && Math.Abs(cache.CurrentYOffset - yOffset) <= 3.0f)
+                if (cache.Text == para && cache.Zoom == ZoomLevel && cache.MaxW == maxTextW && cache.TextX == textX && Math.Abs(cache.CurrentYOffset - yOffset) < 0.05f)
                 {
                     currentY = startPageY + cache.FinalYOffset;
                     currentPage = cache.FinalPage;
@@ -9182,10 +10523,11 @@ namespace ZenQOffice.UI
                         }
                     }
                 }
-                float lH = Math.Max(12.0f * ZoomLevel, pFontSize * 1.25f * ZoomLevel) * pLineSpacing;
+                float fontRatio = GetFontLineSpacingRatio(TypingFont);
+                float lH = Math.Max(12.0f * ZoomLevel, pFontSize * 1.333333f * fontRatio * ZoomLevel) * pLineSpacing;
                 int effStartX = textX + (int)((pLeft + pFirstLine) * ZoomLevel);
                 int effMaxW = Math.Max(40, maxTextW - (int)((pLeft + pFirstLine + pRight) * ZoomLevel));
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, marginY);
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY);
                 var slot = slots[0];
 
                 result.Add(new WrapLineInfo
@@ -9208,7 +10550,7 @@ namespace ZenQOffice.UI
                 }
                 
                 _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                    Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
+                    Text = para, Zoom = ZoomLevel, MaxW = maxTextW, TextX = textX,
                     CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
                     FinalYOffset = currentY - startPageY, FinalPage = currentPage,
                     Lines = result.ConvertAll(l => { var cl = l; cl.LineY -= startPageY; return cl; })
@@ -9392,11 +10734,12 @@ namespace ZenQOffice.UI
                 if (endTok == startTok) endTok = startTok + 1;
 
                 // Step 2: Calculate line height strictly from the tokens that are ON THIS LINE!
-                float lH = Math.Max(Math.Max(13.5f * ZoomLevel, lineMaxFS * 1.333333f * ZoomLevel) * pLineSpacing, 
+                float fontRatio = GetFontLineSpacingRatio(TypingFont);
+                float lH = Math.Max(Math.Max(13.5f * ZoomLevel, lineMaxFS * 1.333333f * fontRatio * ZoomLevel) * pLineSpacing, 
                                     lineMaxShapeH > 0 ? (lineMaxShapeH + 4 * ZoomLevel) : 0);
 
                 // Step 3: Check pagination and floating obstacles for this line height
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, marginY);
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY);
 
                 // Step 4: Populate line(s) into slots
                 foreach (var slot in slots)
@@ -9455,7 +10798,7 @@ namespace ZenQOffice.UI
             }
 
             _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
+                Text = para, Zoom = ZoomLevel, MaxW = maxTextW, TextX = textX,
                 CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
                 FinalYOffset = currentY - startPageY, FinalPage = currentPage,
                 Lines = result.ConvertAll(l => { var cl = l; cl.LineY -= startPageY; return cl; })
@@ -9738,7 +11081,18 @@ namespace ZenQOffice.UI
             int navOffset = ShowNavigationPane ? 280 : 0;
             int selPaneOffset = ShowSelectionPane ? 260 : 0;
             int effectiveCanvasW = canvasW - navOffset - selPaneOffset;
-            pageX = navOffset + Math.Max(40, (effectiveCanvasW - pageW) / 2);
+
+            if (pageW + 80 <= effectiveCanvasW)
+            {
+                pageX = navOffset + (effectiveCanvasW - pageW) / 2;
+                if (ScrollX != 0f) { ScrollX = 0f; TargetScrollX = 0f; SmoothScrollX = 0f; }
+            }
+            else
+            {
+                int maxScrollX = Math.Max(0, (pageW + 80) - effectiveCanvasW);
+                if (ScrollX > maxScrollX) { ScrollX = maxScrollX; TargetScrollX = maxScrollX; SmoothScrollX = maxScrollX; }
+                pageX = navOffset + 40 - (int)Math.Round(ScrollX);
+            }
         }
 
         public void DrawInteractiveRuler(D2DGraphics g, int pageX, int pageW, int marginX, int rightMarginX, int canvasW, int canvasH, RibbonBar ribbon)
@@ -9767,6 +11121,12 @@ namespace ZenQOffice.UI
 
             // Draw Active Tab Stop Symbol inside the Tab Selector Button
             DrawTabGlyph(g, tabBtnX + tabBtnW / 2, rulerY + rulerH / 2, ActiveTabStopSelector, Color.FromArgb(30, 41, 59), 1.8f);
+
+            // Clip horizontal ruler body so it never overlaps the Tab button or Navigation Pane/Selection Pane
+            int rClipX = navOffset + tabBtnW + 4;
+            int rClipW = Math.Max(0, canvasW - rClipX - (ShowSelectionPane ? 260 : 0));
+            GraphicsState rulerClipState = g.Save();
+            g.SetClip(new Rectangle(rClipX, rulerY, rClipW, rulerH));
 
             // 2. Base Ruler Panel (Mặt thước ngang)
             Rectangle fullRulerRect = new Rectangle(pageX, rulerY, pageW, rulerH);
@@ -9980,6 +11340,7 @@ namespace ZenQOffice.UI
                     g.DrawLine(guidePen, RulerGuideLineX, rulerY + rulerH, RulerGuideLineX, canvasH - 30);
                 }
             }
+            g.Restore(rulerClipState);
         }
 
         private void DrawTabGlyph(D2DGraphics g, float cx, float cy, TabStopType type, Color col, float penWidth)
@@ -10248,11 +11609,24 @@ namespace ZenQOffice.UI
             {
                 int min = Math.Min(SelectionStart, SelectionEnd);
                 int len = Math.Abs(SelectionEnd - SelectionStart);
-                PieceTable.Remove(min, len);
-                AdjustFormattedRunsOnDelete(min, len);
-                CursorPosition = min;
-                SelectionStart = min;
-                SelectionEnd = min;
+                if (TrackChanges)
+                {
+                    string delText = PieceTable != null ? PieceTable.GetSubstring(min, len) : "";
+                    var rev = RecordChange(RevisionType.Deletion, min, len, delText);
+                    ApplyFormatToRange(min, len, null, 0, null, null, null, true, rev.Color, null);
+                    CursorPosition = min + len;
+                    SelectionStart = CursorPosition;
+                    SelectionEnd = CursorPosition;
+                }
+                else
+                {
+                    PieceTable.Remove(min, len);
+                    AdjustFormattedRunsOnDelete(min, len);
+                    ShiftRevisionsOnDelete(min, len);
+                    CursorPosition = min;
+                    SelectionStart = min;
+                    SelectionEnd = min;
+                }
             }
         }
 
@@ -10270,6 +11644,8 @@ namespace ZenQOffice.UI
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
             int canvasW = width;
+            LastViewWidth = width;
+            LastViewHeight = height;
 
             // 1. Workspace Background
             Color wsBg = Color.FromArgb(229, 229, 229);
@@ -10283,13 +11659,16 @@ namespace ZenQOffice.UI
             }
 
             int docContentTop = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
-            int docContentH = Math.Max(0, height - docContentTop - 26);
+            int maxScrollX = GetMaxScrollX(width);
+            int docContentH = Math.Max(0, height - docContentTop - 26 - (maxScrollX > 0 ? 12 : 0));
             GraphicsState docClipState = g.Save();
             g.SetClip(new Rectangle(0, docContentTop, width, docContentH));
 
             // 2. Compute Paper Bounds based on ViewMode (Read, Print, Web)
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(canvasW, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+            float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
+            int bottomMarginY = (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
 
             if (CurrentHeaderPreset != HeaderFooterPreset.None || IsEditingHeaderFooter || !string.IsNullOrEmpty(HeaderText))
             {
@@ -10300,12 +11679,14 @@ namespace ZenQOffice.UI
             }
             int maxTextW = pageW - marginX - rightMarginX;
             int startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+            int textX = pageX + marginX;
+            CurrentRenderTextX = textX;
             
             int currentTextVersion = PieceTable.Version;
             int runsHash = FormattedRuns.Count;
             if (FormattedRuns.Count > 0) runsHash ^= FormattedRuns[0].FontSize.GetHashCode() ^ FormattedRuns[FormattedRuns.Count - 1].Length;
             
-            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
+            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || textX != _lastLayoutTextX || pageX != _lastLayoutPageX || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
             if (layoutDirty)
             {
                 _paraLayoutCache.Clear();
@@ -10322,10 +11703,10 @@ namespace ZenQOffice.UI
                 _lastLayoutRunsHash = runsHash;
                 _lastLayoutZoom = ZoomLevel;
                 _lastLayoutMaxW = maxTextW;
+                _lastLayoutTextX = textX;
+                _lastLayoutPageX = pageX;
             }
 
-            int textX = pageX + marginX;
-            CurrentRenderTextX = textX;
             float currentY = startPageY + marginY;
 
             if (_cachedParagraphs == null || currentTextVersion != _cachedParagraphsVersion)
@@ -10632,7 +12013,7 @@ namespace ZenQOffice.UI
                     float yOffset = currentY - startPageY;
                     if (_paraLayoutCache.TryGetValue(paraStartIndex, out pCache))
                     {
-                        if (pCache.Text == para && pCache.Zoom == ZoomLevel && pCache.MaxW == maxTextW && Math.Abs(pCache.CurrentYOffset - yOffset) <= 3.0f)
+                        if (pCache.Text == para && pCache.Zoom == ZoomLevel && pCache.MaxW == maxTextW && Math.Abs(pCache.CurrentYOffset - yOffset) < 0.05f)
                         {
                             float paraScreenTop = startPageY + pCache.CurrentYOffset;
                             float paraScreenBottom = startPageY + pCache.FinalYOffset;
@@ -10967,7 +12348,7 @@ namespace ZenQOffice.UI
 
                         if (chartObj.WrapMode == 0) // Cùng dòng với văn bản (In-Line)
                         {
-                            if (currentY + chartH > startPageY + currentPage * (pageH + 30) + pageH - marginY)
+                            if (currentY + chartH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
                             {
                                 currentPage++;
                                 currentY = startPageY + currentPage * (pageH + 30) + marginY;
@@ -11006,7 +12387,7 @@ namespace ZenQOffice.UI
                         int noteW = maxTextW;
                         int noteH = (int)(60 * ZoomLevel);
 
-                        if (currentY + noteH > startPageY + currentPage * (pageH + 30) + pageH - marginY)
+                        if (currentY + noteH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
                         {
                             currentPage++;
                             currentY = startPageY + currentPage * (pageH + 30) + marginY;
@@ -11049,7 +12430,7 @@ namespace ZenQOffice.UI
                     {
                         int divW = maxTextW;
                         int divH = (int)(14 * ZoomLevel);
-                        if (currentY + divH > startPageY + currentPage * (pageH + 30) + pageH - marginY)
+                        if (currentY + divH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
                         {
                             currentPage++;
                             currentY = startPageY + currentPage * (pageH + 30) + marginY;
@@ -11375,7 +12756,7 @@ namespace ZenQOffice.UI
                             if (tWrap == 0)
                             {
                                 int curPageTopY = startPageY + currentPage * (pageH + 30) + marginY;
-                                int curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - marginY;
+                                int curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY;
 
                                 // If current inline position cannot even fit the first row + margin, push table to start of next page
                                 int firstRowH = (numRows > 0 && TableRowHeights.ContainsKey(tblIdx) && TableRowHeights[tblIdx].Count > 0) ? TableRowHeights[tblIdx][0] : (int)(24 * ZoomLevel);
@@ -11383,7 +12764,7 @@ namespace ZenQOffice.UI
                                 {
                                     currentPage++;
                                     curPageTopY = startPageY + currentPage * (pageH + 30) + marginY;
-                                    curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - marginY;
+                                    curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY;
                                     tableY = curPageTopY;
                                     runY = curPageTopY;
                                 }
@@ -11398,7 +12779,7 @@ namespace ZenQOffice.UI
                                         // SPLIT ROW TO NEXT PAGE!
                                         currentPage++;
                                         curPageTopY = startPageY + currentPage * (pageH + 30) + marginY;
-                                        curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - marginY;
+                                        curPageBottomY = startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY;
                                         runY = curPageTopY;
                                     }
 
@@ -11449,7 +12830,7 @@ namespace ZenQOffice.UI
                             {
                                 if (tWrap == 0)
                                 {
-                                    currentY = tableY + tableH + (int)(6 * ZoomLevel);
+                                    currentY = tableY + tableH + (int)(3 * ZoomLevel);
                                     DocParagraphGaps.Add(new ParagraphGap { ScreenY = (int)Math.Round(currentY), CharIndex = tblParaStart + tblTotalLen, VirtualEntersNeeded = 0 });
                                 }
                                 else
@@ -12351,7 +13732,7 @@ namespace ZenQOffice.UI
                         }
                     }
 
-                    var wrappedLines = LayoutParagraphLines(para, paraStartIndex, ref currentY, ref currentPage, startPageY, pageH, marginY, textX, maxTextW, g, ribbon);
+                    var wrappedLines = LayoutParagraphLines(para, paraStartIndex, ref currentY, ref currentPage, startPageY, pageH, marginY, bottomMarginY, textX, maxTextW, g, ribbon);
 
                     // Render Drop Cap letter if enabled on this paragraph
                     if (ParagraphDropCaps.ContainsKey(paraStartIndex) && wrappedLines.Count > 0 && !string.IsNullOrEmpty(para))
@@ -12456,7 +13837,8 @@ namespace ZenQOffice.UI
 
                         float pLineSpacing = ribbon != null ? ribbon.LineSpacingFactor : 1.15f;
                         if (ParagraphLineSpacings.ContainsKey(paraStartIndex)) pLineSpacing = ParagraphLineSpacings[paraStartIndex];
-                        int textLineHeight = (int)(Math.Max(13.5f * ZoomLevel, line.MaxFontSize * 1.333333f * ZoomLevel) * pLineSpacing);
+                        float fontRatio = GetFontLineSpacingRatio(TypingFont);
+                        int textLineHeight = (int)(Math.Max(13.5f * ZoomLevel, line.MaxFontSize * 1.333333f * fontRatio * ZoomLevel) * pLineSpacing);
                         
                         float yTextOffset = 0;
                         bool lineHasShape = line.Text.IndexOf("![IMAGE:") >= 0 || line.Text.IndexOf("![SHAPE:") >= 0;
@@ -12510,6 +13892,37 @@ namespace ZenQOffice.UI
                                 g.FillRectangle(sBrush, selX, selTop, (float)Math.Round(selW), selH);
                             }
                             g.SmoothingMode = prevSmooth;
+                        }
+
+                        // Navigation Pane Search Highlights in Document Text (Word 365 style: Yellow for matches, Gold for active)
+                        if (ShowNavigationPane && !string.IsNullOrEmpty(NavSearchQuery) && NavSearchResults.Count > 0 && isLineVisible)
+                        {
+                            for (int m = 0; m < NavSearchResults.Count; m++)
+                            {
+                                var match = NavSearchResults[m];
+                                int mStart = match.CharIndex;
+                                int mEnd = match.CharIndex + match.Length;
+                                if (line.Length > 0 && mEnd > line.StartIndex && mStart < line.StartIndex + line.Length)
+                                {
+                                    int msIdx = Math.Max(0, Math.Min(line.Length, mStart - line.StartIndex));
+                                    int meIdx = Math.Max(0, Math.Min(line.Length, mEnd - line.StartIndex));
+                                    if (meIdx > msIdx)
+                                    {
+                                        float mPreW = msIdx > 0 ? MeasureSubstringWidth(g, line.Text, line.StartIndex, 0, msIdx, extraSpaceW) : 0f;
+                                        float mMatchW = MeasureSubstringWidth(g, line.Text, line.StartIndex, msIdx, meIdx - msIdx, extraSpaceW);
+                                        float mX = (float)Math.Round(lineStartX + mPreW);
+                                        float mTop = (float)Math.Round(line.LineY);
+                                        float mH = dynamicLineHeight;
+
+                                        bool isActive = (m == NavSearchResultIndex);
+                                        Color hlCol = isActive ? Color.FromArgb(200, 255, 179, 0) : Color.FromArgb(170, 255, 235, 59);
+                                        using (SolidBrush hlB = new SolidBrush(hlCol))
+                                        {
+                                            g.FillRectangle(hlB, mX, mTop, mMatchW, mH);
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         // Draw line formatted runs
@@ -13007,6 +14420,36 @@ namespace ZenQOffice.UI
                 }
             }
 
+            // 5c. Word 365 Track Changes Change Bars (Vertical revision indicator in left margin)
+            if (Revisions != null && Revisions.Count > 0 && DisplayMarkupMode != MarkupDisplayMode.NoMarkup && RenderedLines.Count > 0)
+            {
+                using (Pen changeBarPen = new Pen(Color.FromArgb(192, 0, 0), Math.Max(2.0f, 2.0f * ZoomLevel)))
+                {
+                    int barMarginX = textX - (int)(14 * ZoomLevel);
+                    for (int li = 0; li < RenderedLines.Count; li++)
+                    {
+                        var rLine = RenderedLines[li];
+                        int lStart = rLine.StartCharIndex;
+                        int lEnd = lStart + rLine.Length;
+                        bool hasRev = false;
+                        for (int ri = 0; ri < Revisions.Count; ri++)
+                        {
+                            var rev = Revisions[ri];
+                            int revEnd = rev.StartIndex + rev.Length;
+                            if (lStart < revEnd && lEnd > rev.StartIndex)
+                            {
+                                hasRev = true;
+                                break;
+                            }
+                        }
+                        if (hasRev && rLine.ScreenY + rLine.ScreenH >= 150 && rLine.ScreenY <= height)
+                        {
+                            g.DrawLine(changeBarPen, barMarginX, rLine.ScreenY, barMarginX, rLine.ScreenY + rLine.ScreenH);
+                        }
+                    }
+                }
+            }
+
 
 
             // 6.5. IN FRONT OF TEXT: Draw Banner On Top of Document Text (Che phủ hoàn toàn văn bản bên dưới)
@@ -13196,14 +14639,13 @@ namespace ZenQOffice.UI
             // 10. INTERACTIVE RULERS (Cố định ở đỉnh & cạnh trái, luôn vẽ đè lên trên trang khi cuộn)
             if (ribbon != null && ribbon.ShowRuler)
             {
-                float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
-                int bottomMarginY = (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
                 DrawInteractiveRuler(g, pageX, pageW, marginX, rightMarginX, width, height, ribbon);
                 DrawVerticalRuler(g, pageX, pageW, pageH, marginY, bottomMarginY, width, height, ribbon);
             }
 
-            // 11. MODERN WORD-STYLE VERTICAL SCROLLBAR (Thanh cuộn bên phải phong cách Word)
+            // 11. MODERN WORD-STYLE SCROLLBARS (Thanh cuộn dọc và ngang phong cách Word)
             DrawWordScrollBar(g, width, height, ribbon);
+            DrawWordHScrollBar(g, width, height, ribbon);
         }
 
         private void DrawInkStroke(D2DGraphics g, DocInkStroke stroke, int pageX, int pageY, float zoom)
@@ -21491,7 +22933,18 @@ namespace ZenQOffice.UI
             }
 
             PieceTable.Insert(curPos, text);
-            AdjustFormattedRunsOnInsert(curPos, text.Length);
+            if (TrackChanges)
+            {
+                var rev = RecordChange(RevisionType.Insertion, curPos, text.Length, text);
+                ShiftRevisionsOnInsert(curPos, text.Length, rev);
+                AdjustFormattedRunsOnInsert(curPos, text.Length);
+                ApplyFormatToRange(curPos, text.Length, null, 0, null, null, true, false, rev.Color, null);
+            }
+            else
+            {
+                ShiftRevisionsOnInsert(curPos, text.Length);
+                AdjustFormattedRunsOnInsert(curPos, text.Length);
+            }
             CursorPosition += text.Length;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -21626,9 +23079,21 @@ namespace ZenQOffice.UI
                     else
                     {
                         SaveUndoState();
-                        PieceTable.Remove(CursorPosition - 1, 1);
-                        AdjustFormattedRunsOnDelete(CursorPosition - 1, 1);
-                        CursorPosition--;
+                        if (TrackChanges)
+                        {
+                            int delPos = CursorPosition - 1;
+                            string delChar = PieceTable.GetSubstring(delPos, 1);
+                            var rev = RecordChange(RevisionType.Deletion, delPos, 1, delChar);
+                            ApplyFormatToRange(delPos, 1, null, 0, null, null, null, true, rev.Color, null);
+                            CursorPosition--;
+                        }
+                        else
+                        {
+                            PieceTable.Remove(CursorPosition - 1, 1);
+                            AdjustFormattedRunsOnDelete(CursorPosition - 1, 1);
+                            ShiftRevisionsOnDelete(CursorPosition - 1, 1);
+                            CursorPosition--;
+                        }
                     }
                 }
             }
@@ -21679,32 +23144,50 @@ namespace ZenQOffice.UI
             }
         }
 
-        public void InsertCoverPage(string templateName)
+        public void InsertCoverPage(string templateName = "Modern")
         {
             RemoveCoverPage();
             SaveUndoState();
             
-            string cp = "[--- COVER PAGE START ---]\n" +
-                        "![SHAPE:RECT:0,0,842,1200:#1a365d]\n" + // Background
-                        "![SHAPE:RECT:0,0,842,200:#2b6cb0]\n" + // Top Bar
-                        "\n\n\n\n\n\n[Document Title]\n\n[Subtitle]\n\n\n\n\n\n\n\n\n[Author]\n[Date]\n" +
-                        "[--- COVER PAGE END ---]\n[--- PAGE BREAK ---]\n";
+            string dateStr = DateTime.Now.ToString("dd/MM/yyyy");
+            string cp;
+            if (templateName == "Executive")
+            {
+                cp = "[--- COVER PAGE START ---]\n" +
+                     "![SHAPE:RECT:0,0,842,1200:#0f172a]\n" + // Slate Dark
+                     "![SHAPE:RECT:0,0,842,160:#1e3a8a]\n" +  // Navy Banner
+                     "\n\n\n\n\n[BÁO CÁO ĐIỀU HÀNH CHIẾN LƯỢC]\n\n[EXECUTIVE SUMMARY REPORT]\n\n\n\n\n\n\n\n\n[Tác giả / Lãnh đạo]\n[" + dateStr + "]\n" +
+                     "[--- COVER PAGE END ---]\n[--- PAGE BREAK ---]\n";
+            }
+            else if (templateName == "Elegant")
+            {
+                cp = "[--- COVER PAGE START ---]\n" +
+                     "![SHAPE:RECT:0,0,842,1200:#fefefe]\n" + // Elegant Off-white
+                     "![SHAPE:RECT:40,40,762,1120:#107c41]\n" + // Thin Emerald Accent Frame
+                     "\n\n\n\n\n[TIÊU ĐỀ TÀI LIỆU XUẤT BẢN]\n\n[Phụ đề chi tiết chuyên đề]\n\n\n\n\n\n\n\n\n[Biên soạn: Tác giả]\n[" + dateStr + "]\n" +
+                     "[--- COVER PAGE END ---]\n[--- PAGE BREAK ---]\n";
+            }
+            else // Modern / Corporate
+            {
+                cp = "[--- COVER PAGE START ---]\n" +
+                     "![SHAPE:RECT:0,0,842,1200:#1a365d]\n" + // Background
+                     "![SHAPE:RECT:0,0,842,200:#2b6cb0]\n" + // Top Bar
+                     "\n\n\n\n\n\n[Document Title]\n\n[Subtitle]\n\n\n\n\n\n\n\n\n[Author]\n[" + dateStr + "]\n" +
+                     "[--- COVER PAGE END ---]\n[--- PAGE BREAK ---]\n";
+            }
 
             PieceTable.Insert(0, cp);
 
-            int titleIdx = cp.IndexOf("[Document Title]");
-            int subIdx = cp.IndexOf("[Subtitle]");
-            int authorIdx = cp.IndexOf("[Author]");
-            int dateIdx = cp.IndexOf("[Date]");
-
-            ApplyFormatToRange(titleIdx, 16, "Segoe UI", 48.0f, true, false, false, false, Color.White, Color.Transparent);
-            ApplyFormatToRange(subIdx, 10, "Segoe UI", 24.0f, false, false, false, false, Color.LightGray, Color.Transparent);
-            ApplyFormatToRange(authorIdx, 8, "Segoe UI", 16.0f, false, true, false, false, Color.White, Color.Transparent);
-            ApplyFormatToRange(dateIdx, 6, "Segoe UI", 16.0f, false, false, false, false, Color.LightGray, Color.Transparent);
+            int titleIdx = cp.IndexOf("[");
+            if (titleIdx >= 0)
+            {
+                ApplyFormatToRange(titleIdx, Math.Min(30, cp.Length - titleIdx), "Segoe UI", 36.0f, true, false, false, false, Color.White, Color.Transparent);
+            }
 
             CursorPosition += cp.Length;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
+            InvalidateLayoutAndTextCache();
         }
 
         public bool HandleKeyDown(Keys key, RibbonBar ribbon = null, int clientHeight = 800)
@@ -22453,8 +23936,19 @@ namespace ZenQOffice.UI
                     else
                     {
                         SaveUndoState();
-                        PieceTable.Remove(CursorPosition, 1);
-                        AdjustFormattedRunsOnDelete(CursorPosition, 1);
+                        if (TrackChanges)
+                        {
+                            int delPos = CursorPosition;
+                            string delChar = PieceTable.GetSubstring(delPos, 1);
+                            var rev = RecordChange(RevisionType.Deletion, delPos, 1, delChar);
+                            ApplyFormatToRange(delPos, 1, null, 0, null, null, null, true, rev.Color, null);
+                        }
+                        else
+                        {
+                            PieceTable.Remove(CursorPosition, 1);
+                            AdjustFormattedRunsOnDelete(CursorPosition, 1);
+                            ShiftRevisionsOnDelete(CursorPosition, 1);
+                        }
                     }
                 }
                 LastCursorScreenX = -1;
@@ -22488,7 +23982,8 @@ namespace ZenQOffice.UI
             int barW = 12;
             int barX = width - rightOffset - barW - 2;
             int topY = (ribbon != null && ribbon.ShowRuler ? 190 : 165);
-            int bottomY = height - 26; // Status bar is 26px
+            int maxScrollX = GetMaxScrollX(width);
+            int bottomY = height - 26 - (maxScrollX > 0 ? 12 : 0); // Status bar is 26px, leave 12px for HScrollBar if active
             int barH = bottomY - topY;
             if (barH < 40) return;
 
@@ -22652,6 +24147,148 @@ namespace ZenQOffice.UI
             if (IsDraggingScrollBar)
             {
                 IsDraggingScrollBar = false;
+                return true;
+            }
+            return false;
+        }
+
+        public void DrawWordHScrollBar(D2DGraphics g, int width, int height, RibbonBar ribbon)
+        {
+            if (ViewMode == 0) return;
+
+            int maxScrollX = GetMaxScrollX(width);
+            if (maxScrollX <= 0)
+            {
+                HScrollBarBounds = Rectangle.Empty;
+                HScrollBarThumbBounds = Rectangle.Empty;
+                return;
+            }
+
+            int navOffset = ShowNavigationPane ? 280 : 0;
+            int rightOffset = ShowSelectionPane ? 260 : 0;
+            int maxScrollY = GetMaxScrollY(height, ribbon);
+            int vBarReservation = (maxScrollY > 0) ? 14 : 2;
+
+            int barH = 10;
+            int barY = height - 26 - barH;
+            int barX = navOffset + 2;
+            int barW = width - navOffset - rightOffset - vBarReservation - 4;
+            if (barW < 40) return;
+
+            HScrollBarBounds = new Rectangle(barX, barY, barW, barH);
+
+            int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+            GetPageLayoutMetrics(width, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+
+            int effectiveW = width - navOffset - rightOffset;
+            float viewRatio = (float)effectiveW / Math.Max(effectiveW + 1, pageW + 80);
+            int thumbW = Math.Max(32, Math.Min(barW - 10, (int)(barW * viewRatio)));
+
+            float scrollFrac = (float)ScrollX / (float)maxScrollX;
+            scrollFrac = Math.Max(0f, Math.Min(1f, scrollFrac));
+
+            int thumbX = barX + (int)((barW - thumbW) * scrollFrac);
+            int thumbH = 6;
+            int thumbY = barY + (barH - thumbH) / 2;
+            HScrollBarThumbBounds = new Rectangle(thumbX, thumbY, thumbW, thumbH);
+
+            // Track background on hover / drag
+            if (IsHoveringHScrollBar || IsDraggingHScrollBar)
+            {
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
+                {
+                    FillRoundedRectangle(g, trackBg, new RectangleF(barX, barY, barW, barH), 3f);
+                }
+            }
+
+            // Modern pill thumb
+            Color thumbColor;
+            if (IsDraggingHScrollBar)
+                thumbColor = Color.FromArgb(118, 118, 118);
+            else if (IsHoveringHScrollBar)
+                thumbColor = Color.FromArgb(166, 166, 166);
+            else
+                thumbColor = Color.FromArgb(205, 205, 205);
+
+            using (SolidBrush thumbBrush = new SolidBrush(thumbColor))
+            {
+                FillRoundedRectangle(g, thumbBrush, new RectangleF(thumbX, thumbY, thumbW, thumbH), 3f);
+            }
+        }
+
+        public bool HandleHScrollBarMouseDown(int mouseX, int mouseY, int width, int height, RibbonBar ribbon)
+        {
+            if (ViewMode == 0 || HScrollBarBounds.IsEmpty) return false;
+            if (HScrollBarBounds.Contains(mouseX, mouseY))
+            {
+                int maxScrollX = GetMaxScrollX(width);
+                if (maxScrollX <= 0) return true;
+
+                if (HScrollBarThumbBounds.Contains(mouseX, mouseY))
+                {
+                    IsDraggingHScrollBar = true;
+                    _hScrollBarDragStartMouseX = mouseX;
+                    _hScrollBarDragStartScrollX = TargetScrollX;
+                    return true;
+                }
+                else
+                {
+                    int barW = HScrollBarBounds.Width;
+                    int thumbW = Math.Max(20, HScrollBarThumbBounds.Width);
+                    int trackScrollW = Math.Max(1, barW - thumbW);
+                    float frac = (float)(mouseX - HScrollBarBounds.X - thumbW / 2) / trackScrollW;
+                    frac = Math.Max(0f, Math.Min(1f, frac));
+                    TargetScrollX = (int)(frac * maxScrollX);
+                    SmoothScrollX = TargetScrollX;
+
+                    IsDraggingHScrollBar = true;
+                    _hScrollBarDragStartMouseX = mouseX;
+                    _hScrollBarDragStartScrollX = TargetScrollX;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool HandleHScrollBarMouseMove(int mouseX, int mouseY, int width, int height, RibbonBar ribbon)
+        {
+            if (ViewMode == 0 || HScrollBarBounds.IsEmpty) return false;
+            if (IsDraggingHScrollBar)
+            {
+                int barW = HScrollBarBounds.Width;
+                int thumbW = Math.Max(20, HScrollBarThumbBounds.Width);
+                int trackScrollW = Math.Max(1, barW - thumbW);
+                int deltaMouseX = mouseX - _hScrollBarDragStartMouseX;
+                int maxScrollX = GetMaxScrollX(width);
+                float deltaScroll = ((float)deltaMouseX / trackScrollW) * maxScrollX;
+                TargetScrollX = Math.Max(0f, Math.Min(maxScrollX, _hScrollBarDragStartScrollX + deltaScroll));
+                SmoothScrollX = TargetScrollX;
+                Cursor.Current = Cursors.Default;
+                return true;
+            }
+
+            bool isInside = HScrollBarBounds.Contains(mouseX, mouseY);
+            if (isInside)
+            {
+                if (!IsHoveringHScrollBar)
+                {
+                    IsHoveringHScrollBar = true;
+                }
+                Cursor.Current = Cursors.Default;
+                return true;
+            }
+            else if (IsHoveringHScrollBar)
+            {
+                IsHoveringHScrollBar = false;
+            }
+            return false;
+        }
+
+        public bool HandleHScrollBarMouseUp()
+        {
+            if (IsDraggingHScrollBar)
+            {
+                IsDraggingHScrollBar = false;
                 return true;
             }
             return false;

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using GenOffice.Core;
-using GenOffice.Format;
-using GenOffice.UI;
+using ZenQOffice.Core;
+using ZenQOffice.Format;
+using ZenQOffice.UI;
 
 namespace GenOffice.Tests
 {

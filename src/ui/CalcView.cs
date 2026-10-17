@@ -278,6 +278,14 @@ namespace ZenQOffice.UI
         public int CurrentCaretScreenY { get; set; }
         public int CurrentCaretScreenH { get; set; }
 
+        // Excel 365 Data Validation, Auditing, Scenarios & Names
+        public List<DataValidationRule> DataValidations { get; set; } = new List<DataValidationRule>();
+        public bool CircleInvalidData { get; set; } = false;
+        public List<FormulaAuditingArrow> AuditingArrows { get; set; } = new List<FormulaAuditingArrow>();
+        public bool ShowFormulas { get; set; } = false;
+        public List<ScenarioModel> Scenarios { get; set; } = new List<ScenarioModel>();
+        public List<DefinedNameModel> DefinedNames { get; set; } = new List<DefinedNameModel>();
+
         // Shapes & Pictures (Drawing Objects)
         public List<DocShapeObject> Shapes { get; set; }
         public List<DocShapeObject> FloatingObjects
@@ -1406,6 +1414,14 @@ namespace ZenQOffice.UI
                 {
                     CellData cell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
                     string fDisplay = IsEditing ? EditText : (cell != null ? (!string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "")) : "");
+                    if (!IsEditing && cell != null && cell.IsSpilledChild)
+                    {
+                        CellData originCell = CurrentSheet.GetCell(cell.SpillOriginRow, cell.SpillOriginCol);
+                        if (originCell != null && !string.IsNullOrEmpty(originCell.FormulaStr))
+                        {
+                            fDisplay = originCell.FormulaStr;
+                        }
+                    }
                     Rectangle fTextBounds = new Rectangle(fBox.X + 8, fBox.Y + 4, fBox.Width - 16, fBox.Height - 8);
                     TextFormatFlags fFlags = TextFormatFlags.Left | TextFormatFlags.NoPadding;
                     if (IsFormulaBarExpanded)
@@ -1658,7 +1674,15 @@ namespace ZenQOffice.UI
                     {
                         if (cell != null && (!string.IsNullOrEmpty(cell.EvaluatedStr) || !string.IsNullOrEmpty(cell.RawValue) || (cell.Format != null && cell.Format.IsDiagonalHeader)))
                         {
-                            string dispText = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : (cell.RawValue ?? "");
+                            string dispText;
+                            if (ShowFormulas && !string.IsNullOrEmpty(cell.RawValue) && cell.RawValue.StartsWith("="))
+                            {
+                                dispText = cell.RawValue;
+                            }
+                            else
+                            {
+                                dispText = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : (cell.RawValue ?? "");
+                            }
                             int tc = (cell.Format != null && cell.Format.TextColor != 0) ? cell.Format.TextColor : unchecked((int)0xFF000000);
                             if ((tc & unchecked((int)0xFF000000)) == 0 && tc != 0) tc |= unchecked((int)0xFF000000);
                             Color txtColor = Color.FromArgb(tc);
@@ -1780,11 +1804,10 @@ namespace ZenQOffice.UI
                                     }
 
                                     // Strict clipping prevents any vertical bleeding onto rows below or across neighboring data cells
-                                    Region prevCellClip = g.Clip;
                                     Rectangle cellClip = new Rectangle(curX, curY, textRenderW, renderH);
-                                    g.SetClip(cellClip, CombineMode.Intersect);
+                                    g.PushClip(cellClip);
                                     TextRenderer.DrawText(g, textToDraw, font, textBounds, txtColor, flags);
-                                    g.Clip = prevCellClip;
+                                    g.PopClip();
                                 }
                             }
                         }
@@ -1836,6 +1859,23 @@ namespace ZenQOffice.UI
                         }
                     }
 
+                    // Circle Invalid Data (Red oval)
+                    if (CircleInvalidData)
+                    {
+                        var dvRule = GetDataValidationRule(rowIdx, colIdx);
+                        if (dvRule != null)
+                        {
+                            var vRes = dvRule.Validate(cell != null ? cell.RawValue : "", CurrentSheet, rowIdx, colIdx);
+                            if (!vRes.IsValid)
+                            {
+                                using (Pen circlePen = new Pen(Color.FromArgb(220, 38, 38), 1.5f))
+                                {
+                                    g.DrawEllipse(circlePen, curX + 2, curY + 2, cW - 4, rH - 4);
+                                }
+                            }
+                        }
+                    }
+
                     curX += cW;
                     colIdx++;
                 }
@@ -1874,17 +1914,43 @@ namespace ZenQOffice.UI
                     g.DrawRectangle(selPen, selX1, selY1, selW, selH);
                 }
 
+                // ==================== Excel 365 Dynamic Array Spill Border ====================
+                uint origR, origC;
+                int spillRows, spillCols;
+                if (CurrentSheet != null && CurrentSheet.IsCellSpilled(SelectedRow, SelectedCol, out origR, out origC, out spillRows, out spillCols))
+                {
+                    if (spillRows > 1 || spillCols > 1)
+                    {
+                        int spX = GetColScreenX(origC, headerW);
+                        int spY = GetRowScreenY(origR, startY, headerH);
+                        int spW = 0;
+                        for (uint c = origC; c < origC + (uint)spillCols; c++) spW += GetColWidth(c);
+                        int spH = 0;
+                        for (uint r = origR; r < origR + (uint)spillRows; r++) spH += GetRowHeight(r);
+
+                        if (spW > 0 && spH > 0)
+                        {
+                            using (Pen spillPen = new Pen(Color.FromArgb(17, 108, 228), 1.5f))
+                            {
+                                g.DrawRectangle(spillPen, spX, spY, spW, spH);
+                            }
+                        }
+                    }
+                }
+
                 // Excel Fill Handle (Square dot at bottom-right corner - larger in Touch Mode)
                 int handleSize = AppSettings.Instance.TouchModeEnabled ? 10 : 6;
                 Rectangle handleRect = new Rectangle(selX1 + selW - handleSize / 2, selY1 + selH - handleSize / 2, handleSize, handleSize);
                 g.FillRectangle(Color.FromArgb(16, 124, 65).ToBrush(), handleRect);
                 g.DrawRectangle(Pens.White, handleRect);
 
-                // Dropdown Content Viewer Chevron Button [ ▾ ] (when active cell has long text or newlines)
+                // Dropdown Content Viewer Chevron Button [ ▾ ] (when active cell has long text or newlines, or Data Validation List)
                 CellData activeCell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
                 string activeText = activeCell != null ? (!string.IsNullOrEmpty(activeCell.EvaluatedStr) ? activeCell.EvaluatedStr : (!string.IsNullOrEmpty(activeCell.FormulaStr) ? activeCell.FormulaStr : (activeCell.RawValue ?? ""))) : "";
+                var activeDvRule = GetDataValidationRule(SelectedRow, SelectedCol);
+                bool hasDvList = activeDvRule != null && activeDvRule.ValidationType == DataValidationType.List && activeDvRule.ShowDropdown;
                 bool isLongOrMultiline = activeText.Length > 20 || activeText.Contains("\n") || activeText.Contains("\r");
-                if (isLongOrMultiline && minSelR == maxSelR && minSelC == maxSelC && selW >= 32 && selH >= 18)
+                if ((hasDvList || isLongOrMultiline) && minSelR == maxSelR && minSelC == maxSelC && selW >= 24 && selH >= 18)
                 {
                     int btnSize = 16;
                     Rectangle dropBtn = new Rectangle(selX1 + selW - btnSize - 1, selY1 + selH - btnSize - 1, btnSize, btnSize);
@@ -1987,9 +2053,8 @@ namespace ZenQOffice.UI
 
                 using (Font edFont = new Font(edFName, edFSize * ZoomFactor, edFStyle))
                 {
-                    Region prevEdClip = g.Clip;
                     Rectangle clipBox = new Rectangle(editingCellRect.X + 2, editingCellRect.Y + 2, Math.Max(1, editingCellRect.Width - 4), Math.Max(1, editingCellRect.Height - 4));
-                    g.SetClip(clipBox, CombineMode.Intersect);
+                    g.PushClip(clipBox);
 
                     // Selection highlight in editing cell
                     if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
@@ -2032,7 +2097,7 @@ namespace ZenQOffice.UI
                     CurrentCaretScreenY = editingCellRect.Bottom + 2;
                     CurrentCaretScreenH = editingCellRect.Height;
 
-                    g.Clip = prevEdClip;
+                    g.PopClip();
                 }
 
                 // Floating Formula Suggestions Popup
@@ -2132,6 +2197,31 @@ namespace ZenQOffice.UI
                 }
 
                 g.Restore(gsGrid);
+            }
+
+            // ==================== 3.4 Excel 365 Formula Auditing Arrows ====================
+            if (AuditingArrows != null && AuditingArrows.Count > 0)
+            {
+                GraphicsState gsAudit = g.Save();
+                Rectangle gridClip = new Rectangle(headerW, startY + headerH, width - headerW - vScrollW, maxGridY - (startY + headerH));
+                g.SetClip(gridClip);
+                foreach (var arr in AuditingArrows)
+                {
+                    int x1 = GetColScreenX(arr.FromCol, headerW) + GetColWidth(arr.FromCol) / 2;
+                    int y1 = GetRowScreenY(arr.FromRow, startY, headerH) + GetRowHeight(arr.FromRow) / 2;
+                    int x2 = GetColScreenX(arr.ToCol, headerW) + GetColWidth(arr.ToCol) / 2;
+                    int y2 = GetRowScreenY(arr.ToRow, startY, headerH) + GetRowHeight(arr.ToRow) / 2;
+
+                    Color col = arr.IsError ? Color.FromArgb(220, 38, 38) : arr.ArrowColor;
+                    using (Pen p = new Pen(col, 2.0f))
+                    using (SolidBrush dotBr = new SolidBrush(col))
+                    {
+                        g.FillEllipse(dotBr, x1 - 3, y1 - 3, 6, 6);
+                        p.CustomEndCap = new AdjustableArrowCap(5, 5, true);
+                        g.DrawLine(p, x1, y1, x2, y2);
+                    }
+                }
+                g.Restore(gsAudit);
             }
 
             // ==================== 4. Vertical Scrollbar (Right Edge) ====================
@@ -2956,11 +3046,11 @@ namespace ZenQOffice.UI
                 // Exit in-cell editing if active so keystrokes don't leak into background cells
                 if (IsEditing)
                 {
-                    SaveUndoState();
-                    CurrentSheet.SetCellText(SelectedRow, SelectedCol, EditText);
-                    FormulaEngine.EvaluateSheet(CurrentSheet);
-                    IsEditing = false;
-                    EditSelLength = 0;
+                    if (!CommitCurrentEditCell(true))
+                    {
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
                 }
 
                 DragStartMouse = new Point(x, y);
@@ -3055,11 +3145,11 @@ namespace ZenQOffice.UI
 
                 if (IsEditing)
                 {
-                    SaveUndoState();
-                    CurrentSheet.SetCellText(SelectedRow, SelectedCol, EditText);
-                    FormulaEngine.EvaluateSheet(CurrentSheet);
-                    IsEditing = false;
-                    EditSelLength = 0;
+                    if (!CommitCurrentEditCell(true))
+                    {
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
                 }
 
                 SelectedCol = cIdx;
@@ -4068,13 +4158,8 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
+                    if (!CommitCurrentEditCell(true)) return;
                 }
-
-                FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
-                IsEditing = false;
-                EditSelLength = 0;
             }
             SelectedRow = (uint)Math.Max(1, (int)SelectedRow + deltaRow);
             SelectedCol = (uint)Math.Max(1, (int)SelectedCol + deltaCol);
@@ -4586,6 +4671,19 @@ namespace ZenQOffice.UI
                     return;
                 }
 
+                // Format Cells: Ctrl+1 (Excel Standard Shortcut)
+                if (ctrl && !shift && (rawKey == Keys.D1 || rawKey == Keys.NumPad1))
+                {
+                    using (var fcDlg = new FormatCellsDialogForm(this, 0))
+                    {
+                        if (fcDlg.ShowDialog(Form.ActiveForm) == DialogResult.OK)
+                        {
+                            this.Invalidate();
+                        }
+                    }
+                    return;
+                }
+
                 // Number Format shortcuts: Ctrl+Shift+1 (! Number), Ctrl+Shift+3 (# Date), Ctrl+Shift+4 ($ Currency), Ctrl+Shift+5 (% Percent), Ctrl+Shift+~ (General)
                 if (ctrl && shift && rawKey == Keys.D1) { SetNumberFormat("Comma", 2); return; }
                 if (ctrl && shift && rawKey == Keys.D3) { SetNumberFormat("Date", 0); return; }
@@ -5019,6 +5117,37 @@ namespace ZenQOffice.UI
 
         public void OpenCellDropdownViewer(Form parentForm)
         {
+            var dvRule = GetDataValidationRule(SelectedRow, SelectedCol);
+            if (dvRule != null && dvRule.ValidationType == DataValidationType.List && dvRule.ShowDropdown)
+            {
+                var items = dvRule.GetListItems(CurrentSheet);
+                if (items != null && items.Count > 0)
+                {
+                    ContextMenuStrip menu = new ContextMenuStrip();
+                    menu.Font = new Font("Segoe UI", 9.5f);
+                    foreach (var item in items)
+                    {
+                        string val = item;
+                        var mi = menu.Items.Add(val);
+                        mi.Click += (s, e) =>
+                        {
+                            SetCellTextExplicit(SelectedRow, SelectedCol, val);
+                            if (parentForm != null) parentForm.Invalidate();
+                        };
+                    }
+                    int fBarY0 = 155;
+                    int headerH0 = ShowHeadings ? 26 : 0;
+                    int headerW0 = ShowHeadings ? 48 : 0;
+                    int startY0 = fBarY0 + FormulaBarHeight;
+                    int cellX0 = GetColScreenX(SelectedCol, headerW0);
+                    int cellY0 = GetRowScreenY(SelectedRow, startY0, headerH0);
+                    int cellH0 = GetRowHeight(SelectedRow);
+                    Point pt0 = parentForm != null ? parentForm.PointToScreen(new Point(cellX0, cellY0 + cellH0 + 2)) : new Point(cellX0, cellY0 + cellH0 + 2);
+                    menu.Show(pt0);
+                    return;
+                }
+            }
+
             CellData cell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
             string txt = cell != null ? (!string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "")) : "";
             
@@ -6144,6 +6273,274 @@ namespace ZenQOffice.UI
             dlg.ShowDialog(parentForm);
         }
 
+        // ==================== Excel 365 Data Validation, Auditing, Scenarios & Names ====================
+        public DataValidationRule GetDataValidationRule(uint row, uint col)
+        {
+            if (DataValidations == null || DataValidations.Count == 0) return null;
+            for (int i = DataValidations.Count - 1; i >= 0; i--)
+            {
+                if (DataValidations[i].ContainsCell(row, col))
+                    return DataValidations[i];
+            }
+            return null;
+        }
+
+        public DataValidationResult ValidateCellInput(uint row, uint col, object val)
+        {
+            var rule = GetDataValidationRule(row, col);
+            if (rule == null) return new DataValidationResult { IsValid = true };
+            return rule.Validate(val, CurrentSheet, row, col);
+        }
+
+        public bool CommitCurrentEditCell(bool preventOnStop = true)
+        {
+            if (!IsEditing) return true;
+            string finalVal = EditText ?? "";
+
+            // Excel 365 Data Validation Check
+            var dvRule = GetDataValidationRule(SelectedRow, SelectedCol);
+            if (dvRule != null)
+            {
+                var valRes = dvRule.Validate(finalVal, CurrentSheet, SelectedRow, SelectedCol);
+                if (!valRes.IsValid && dvRule.ShowErrorMessage)
+                {
+                    if (dvRule.ErrorStyle == DataValidationErrorStyle.Stop)
+                    {
+                        MessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                        if (preventOnStop) return false;
+                    }
+                    else if (dvRule.ErrorStyle == DataValidationErrorStyle.Warning)
+                    {
+                        var dr = MessageBox.Show(valRes.ErrorMessage + "\n\nBạn có muốn tiếp tục áp dụng không?", dvRule.ErrorTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        if (dr == DialogResult.No)
+                        {
+                            if (preventOnStop) return false;
+                        }
+                    }
+                    else if (dvRule.ErrorStyle == DataValidationErrorStyle.Information)
+                    {
+                        MessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+
+            SaveUndoState();
+            CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            IsEditing = false;
+            EditSelLength = 0;
+            return true;
+        }
+
+        public void ShowDataValidationDialog(Form parentForm)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+
+            DataValidationRule existing = GetDataValidationRule(SelectedRow, SelectedCol);
+            using (var dlg = new DataValidationDialog(existing, minR, minC, maxR, maxC))
+            {
+                if (dlg.ShowDialog(parentForm) == DialogResult.OK)
+                {
+                    if (dlg.IsCleared)
+                    {
+                        DataValidations.RemoveAll(r => r.ContainsCell(minR, minC));
+                    }
+                    else if (dlg.Rule != null)
+                    {
+                        DataValidations.RemoveAll(r => r.StartRow == minR && r.StartCol == minC && r.EndRow == maxR && r.EndCol == maxC);
+                        DataValidations.Add(dlg.Rule);
+                    }
+                    if (parentForm != null) parentForm.Invalidate();
+                }
+            }
+        }
+
+        public void ToggleCircleInvalidData()
+        {
+            CircleInvalidData = !CircleInvalidData;
+        }
+
+        public void ClearValidationCircles()
+        {
+            CircleInvalidData = false;
+        }
+
+        public void TracePrecedents(uint row, uint col)
+        {
+            if (CurrentSheet == null) return;
+            var cell = CurrentSheet.GetCell(row, col);
+            if (cell == null) return;
+            string formula = !string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "");
+            if (!formula.StartsWith("=")) return;
+
+            var precedents = FormulaAuditingEngine.ExtractPrecedentCells(formula);
+            foreach (var prec in precedents)
+            {
+                AuditingArrows.Add(new FormulaAuditingArrow
+                {
+                    FromRow = prec.Item1,
+                    FromCol = prec.Item2,
+                    ToRow = row,
+                    ToCol = col,
+                    ArrowColor = Color.FromArgb(37, 99, 235)
+                });
+            }
+        }
+
+        public void TraceDependents(uint row, uint col)
+        {
+            if (CurrentSheet == null) return;
+            foreach (var kvp in CurrentSheet.GetAllCells())
+            {
+                var cell = kvp.Value;
+                if (cell == null) continue;
+                string formula = !string.IsNullOrEmpty(cell.FormulaStr) ? cell.FormulaStr : (cell.RawValue ?? "");
+                if (formula.StartsWith("=") && FormulaAuditingEngine.FormulaContainsCell(formula, row, col))
+                {
+                    var coord = SparseMatrix.DecodeKey(kvp.Key);
+                    AuditingArrows.Add(new FormulaAuditingArrow
+                    {
+                        FromRow = row,
+                        FromCol = col,
+                        ToRow = coord.Item1,
+                        ToCol = coord.Item2,
+                        ArrowColor = Color.FromArgb(37, 99, 235)
+                    });
+                }
+            }
+        }
+
+        public void ClearAuditingArrows()
+        {
+            AuditingArrows.Clear();
+        }
+
+        public void ToggleShowFormulas()
+        {
+            ShowFormulas = !ShowFormulas;
+        }
+
+        public void ApplyScenario(int index)
+        {
+            if (Scenarios == null || index < 0 || index >= Scenarios.Count) return;
+            ApplyScenario(Scenarios[index]);
+        }
+
+        public void ApplyScenario(ScenarioModel sc)
+        {
+            if (sc == null || CurrentSheet == null) return;
+            SaveUndoState();
+            for (int i = 0; i < sc.ChangingCells.Count && i < sc.Values.Count; i++)
+            {
+                var cell = sc.ChangingCells[i];
+                CurrentSheet.SetCellText(cell.Item1, cell.Item2, sc.Values[i]);
+            }
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+        }
+
+        public void GenerateScenarioSummaryReport()
+        {
+            if (Scenarios == null || Scenarios.Count == 0) return;
+            SaveUndoState();
+            string summarySheetName = "Scenario Summary";
+            int counter = 1;
+            while (SheetNames.Contains(summarySheetName))
+            {
+                summarySheetName = "Scenario Summary " + (++counter);
+            }
+            AddSheet(summarySheetName);
+            int sheetIdx = SheetNames.IndexOf(summarySheetName);
+            if (sheetIdx >= 0) ActiveSheetIndex = sheetIdx;
+
+            CurrentSheet.SetCellText(1, 1, "BÁO CÁO TỔNG HỢP KỊCH BẢN (SCENARIO SUMMARY REPORT)");
+            var c1 = CurrentSheet.GetOrCreateCell(1, 1);
+            c1.Format.Bold = true;
+            c1.Format.FontSize = 14;
+
+            CurrentSheet.SetCellText(3, 1, "Ô thay đổi (Changing Cells)");
+            var cHeader = CurrentSheet.GetOrCreateCell(3, 1);
+            cHeader.Format.Bold = true;
+            cHeader.Format.BgColor = unchecked((int)0xFFE2E8F0);
+
+            for (int i = 0; i < Scenarios.Count; i++)
+            {
+                CurrentSheet.SetCellText(3, (uint)(2 + i), Scenarios[i].Name);
+                var scHeader = CurrentSheet.GetOrCreateCell(3, (uint)(2 + i));
+                scHeader.Format.Bold = true;
+                scHeader.Format.BgColor = unchecked((int)0xFFE2E8F0);
+            }
+
+            var allChanging = new List<Tuple<uint, uint>>();
+            foreach (var sc in Scenarios)
+            {
+                foreach (var cell in sc.ChangingCells)
+                {
+                    bool exists = false;
+                    foreach (var existing in allChanging)
+                    {
+                        if (existing.Item1 == cell.Item1 && existing.Item2 == cell.Item2) { exists = true; break; }
+                    }
+                    if (!exists) allChanging.Add(cell);
+                }
+            }
+
+            uint curRow = 4;
+            foreach (var cell in allChanging)
+            {
+                string addr = "$" + SparseMatrix.ColIndexToName(cell.Item2) + "$" + cell.Item1;
+                CurrentSheet.SetCellText(curRow, 1, addr);
+                for (int i = 0; i < Scenarios.Count; i++)
+                {
+                    var sc = Scenarios[i];
+                    int idx = sc.ChangingCells.FindIndex(c => c.Item1 == cell.Item1 && c.Item2 == cell.Item2);
+                    string val = idx >= 0 && idx < sc.Values.Count ? sc.Values[idx] : "";
+                    CurrentSheet.SetCellText(curRow, (uint)(2 + i), val);
+                }
+                curRow++;
+            }
+
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+        }
+
+        public void ShowScenarioManagerDialog(Form parentForm)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            using (var dlg = new ScenarioManagerDialog(this))
+            {
+                dlg.ShowDialog(parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+            }
+        }
+
+        public void ShowNameManagerDialog(Form parentForm)
+        {
+            if (IsSheetProtected)
+            {
+                ShowSheetProtectedWarning();
+                return;
+            }
+            using (var dlg = new NameManagerDialog(this))
+            {
+                dlg.ShowDialog(parentForm);
+                if (parentForm != null) parentForm.Invalidate();
+            }
+        }
+
         public void ExecuteRemoveDuplicates(uint minR, uint maxR, uint minC, uint maxC, List<uint> checkedCols, bool hasHeaders, out int dupCount, out int uniqueCount)
         {
             dupCount = 0;
@@ -7217,7 +7614,7 @@ namespace ZenQOffice.UI
             FormulaEngine.EvaluateSheet(CurrentSheet);
         }
 
-        private void ForEachSelectedCell(Action<CellData> action)
+        public void ForEachSelectedCell(Action<CellData> action)
         {
             uint minR = Math.Min(SelectedRow, SelEndRow);
             uint maxR = Math.Max(SelectedRow, SelEndRow);

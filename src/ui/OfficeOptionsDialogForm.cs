@@ -65,14 +65,19 @@ namespace ZenQOffice.UI
                 Height = 60,
                 BackColor = Color.FromArgb(37, 99, 235) // Modern Royal Blue
             };
+            headerPanel.Paint += (s, e) =>
+            {
+                // Windows 11 Fluent Gear Icon
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE713', new Rectangle(20, 14, 32, 32), Color.White, 24f);
+            };
             this.Controls.Add(headerPanel);
 
             Label lblHeaderTitle = new Label
             {
-                Text = "⚙ TÙY CHỌN HỆ THỐNG VÀ THIẾT LẬP ỨNG DỤNG",
+                Text = "TÙY CHỌN HỆ THỐNG VÀ THIẾT LẬP ỨNG DỤNG",
                 Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(20, 10),
+                Location = new Point(62, 10),
                 AutoSize = true
             };
             headerPanel.Controls.Add(lblHeaderTitle);
@@ -82,7 +87,7 @@ namespace ZenQOffice.UI
                 Text = "Tùy biến giao diện thanh công cụ, cơ chế tự động lưu, hiển thị và trợ lý AI NextGen",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(219, 234, 254),
-                Location = new Point(21, 34),
+                Location = new Point(63, 34),
                 AutoSize = true
             };
             headerPanel.Controls.Add(lblHeaderSub);
@@ -103,10 +108,15 @@ namespace ZenQOffice.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(130, 36),
-                Location = new Point(bottomPanel.Width - 275, 10),
+                Size = new Size(145, 36),
+                Location = new Point(bottomPanel.Width - 290, 10),
                 Anchor = AnchorStyles.Right | AnchorStyles.Top,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE74E', 16, 16, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnSave.FlatAppearance.BorderSize = 0;
             btnSave.Click += (s, e) => SaveSettings();
@@ -119,11 +129,16 @@ namespace ZenQOffice.UI
                 ForeColor = Color.FromArgb(51, 65, 85),
                 BackColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(100, 36),
-                Location = new Point(bottomPanel.Width - 130, 10),
+                Size = new Size(110, 36),
+                Location = new Point(bottomPanel.Width - 135, 10),
                 Anchor = AnchorStyles.Right | AnchorStyles.Top,
                 DialogResult = DialogResult.Cancel,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 14, 14, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0)
             };
             btnCancel.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnCancel.Click += (s, e) => this.Close();
@@ -133,21 +148,30 @@ namespace ZenQOffice.UI
             _navListBox = new ListBox
             {
                 Dock = DockStyle.Left,
-                Width = 190,
+                Width = 205,
                 Font = new Font("Segoe UI", 10.0f, FontStyle.Regular),
                 BackColor = Color.FromArgb(248, 250, 252),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 BorderStyle = BorderStyle.None,
-                ItemHeight = 36,
+                ItemHeight = 38,
                 DrawMode = DrawMode.OwnerDrawFixed
             };
-            _navListBox.Items.Add("🎨 Giao diện & Chủ đề");
-            _navListBox.Items.Add("💾 Lưu trữ & Tự động lưu");
-            _navListBox.Items.Add("📐 Soạn thảo & Hiển thị");
-            _navListBox.Items.Add("🤖 Trí tuệ nhân tạo (AI)");
-            _navListBox.Items.Add("📂 Mặc định & Lối tắt");
-            _navListBox.Items.Add("⌨ Phím tắt & Trợ giúp");
+            _navListBox.Items.Add("Giao diện & Chủ đề");
+            _navListBox.Items.Add("Lưu trữ & Tự động lưu");
+            _navListBox.Items.Add("Soạn thảo & Hiển thị");
+            _navListBox.Items.Add("Trí tuệ nhân tạo (AI)");
+            _navListBox.Items.Add("Mặc định & Lối tắt");
+            _navListBox.Items.Add("Phím tắt & Trợ giúp");
             _navListBox.SelectedIndex = 0;
+
+            char[] navGlyphs = new char[] {
+                '\uE790', // Giao diện & Chủ đề (Color / Palette)
+                '\uE74E', // Lưu trữ & Tự động lưu (Save)
+                '\uE70F', // Soạn thảo & Hiển thị (Edit / Document)
+                '\uE781', // Trí tuệ nhân tạo (AI / Copilot / Sparkle)
+                '\uE71D', // Mặc định & Lối tắt (Apps / Tiles)
+                '\uE765'  // Phím tắt & Trợ giúp (Keyboard)
+            };
 
             _navListBox.DrawItem += (s, e) =>
             {
@@ -163,10 +187,19 @@ namespace ZenQOffice.UI
                         e.Graphics.FillRectangle(bar, e.Bounds.X, e.Bounds.Y + 4, 4, e.Bounds.Height - 8);
                     }
                 }
+
+                // Render genuine Windows 11 Fluent Icon
+                if (e.Index >= 0 && e.Index < navGlyphs.Length)
+                {
+                    int iconY = e.Bounds.Y + (e.Bounds.Height - 18) / 2;
+                    FluentIconRenderer.DrawGlyph(e.Graphics, navGlyphs[e.Index], new Rectangle(e.Bounds.X + 14, iconY, 18, 18), fg, 15f);
+                }
+
                 using (SolidBrush txtBr = new SolidBrush(fg))
                 using (Font itemF = new Font("Segoe UI", 9.5f, isSelected ? FontStyle.Bold : FontStyle.Regular))
                 {
-                    e.Graphics.DrawString(_navListBox.Items[e.Index].ToString(), itemF, txtBr, e.Bounds.X + 16, e.Bounds.Y + 8);
+                    int textY = e.Bounds.Y + (e.Bounds.Height - 18) / 2;
+                    e.Graphics.DrawString(_navListBox.Items[e.Index].ToString(), itemF, txtBr, e.Bounds.X + 40, textY);
                 }
             };
 
@@ -333,14 +366,19 @@ namespace ZenQOffice.UI
 
             Button btnApiConfig = new Button
             {
-                Text = "🔑 Cấu hình Khóa API & Máy chủ AI...",
+                Text = "Cấu hình Khóa API & Máy chủ AI...",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(37, 99, 235),
                 BackColor = Color.FromArgb(239, 246, 255),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(270, 34),
                 Location = new Point(16, 115),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE8D7', 16, 16, Color.FromArgb(37, 99, 235)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnApiConfig.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnApiConfig.Click += (s, e) =>
@@ -400,14 +438,19 @@ namespace ZenQOffice.UI
 
             Button btnSetDefault = new Button
             {
-                Text = "🔗 Đặt ZenQ Office làm mặc định ngay",
+                Text = "Đặt ZenQ Office làm mặc định ngay",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(240, 32),
+                Size = new Size(250, 32),
                 Location = new Point(16, 118),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE71B', 16, 16, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnSetDefault.FlatAppearance.BorderSize = 0;
             btnSetDefault.Click += (s, e) =>
@@ -426,14 +469,19 @@ namespace ZenQOffice.UI
 
             Button btnOpenWinSettings = new Button
             {
-                Text = "⚙ Mở Cài đặt Windows...",
+                Text = "Mở Cài đặt Windows...",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(180, 32),
-                Location = new Point(266, 118),
-                Cursor = Cursors.Hand
+                Size = new Size(185, 32),
+                Location = new Point(274, 118),
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE713', 15, 15, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnOpenWinSettings.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnOpenWinSettings.Click += (s, e) =>
@@ -467,14 +515,19 @@ namespace ZenQOffice.UI
 
             Button btnCreateAll = new Button
             {
-                Text = "📌 Tạo ĐẦY ĐỦ lối tắt ra Desktop (App mẹ + 4 App nhánh)",
+                Text = "Tạo ĐẦY ĐỦ lối tắt ra Desktop (App mẹ + 4 App nhánh)",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(454, 34),
                 Location = new Point(16, 68),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE718', 16, 16, Color.White),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnCreateAll.FlatAppearance.BorderSize = 0;
             btnCreateAll.Click += (s, e) =>
@@ -493,14 +546,19 @@ namespace ZenQOffice.UI
 
             Button btnCreateHubOnly = new Button
             {
-                Text = "🏠 Chỉ tạo icon App mẹ (ZenQ Office)",
+                Text = "Chỉ tạo icon App mẹ (ZenQ Office)",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(222, 32),
                 Location = new Point(16, 110),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE80F', 15, 15, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0)
             };
             btnCreateHubOnly.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnCreateHubOnly.Click += (s, e) =>
@@ -519,14 +577,19 @@ namespace ZenQOffice.UI
 
             Button btnCreateBranchesOnly = new Button
             {
-                Text = "📂 Chỉ tạo 4 icon App nhánh riêng",
+                Text = "Chỉ tạo 4 icon App nhánh riêng",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(222, 32),
                 Location = new Point(248, 110),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE838', 15, 15, Color.FromArgb(51, 65, 85)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(6, 0, 6, 0)
             };
             btnCreateBranchesOnly.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnCreateBranchesOnly.Click += (s, e) =>
@@ -566,14 +629,19 @@ namespace ZenQOffice.UI
 
             Button btnOpenShortcuts = new Button
             {
-                Text = "⌨ Mở Bảng Tổng Hợp Phím Tắt",
+                Text = "Mở Bảng Tổng Hợp Phím Tắt",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(37, 99, 235),
                 BackColor = Color.FromArgb(239, 246, 255),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(240, 32),
                 Location = new Point(16, 64),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Image = FluentIconRenderer.GetGlyphBitmap('\uE765', 16, 16, Color.FromArgb(37, 99, 235)),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnOpenShortcuts.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnOpenShortcuts.Click += (s, e) =>

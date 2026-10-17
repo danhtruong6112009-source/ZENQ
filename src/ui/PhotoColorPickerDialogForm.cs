@@ -28,6 +28,7 @@ namespace ZenQOffice.UI
         public Color SelectedColor { get; private set; }
 
         private Color _initialColor;
+        private int _alpha = 255;
         private float _hue = 0f;        // 0..360
         private float _sat = 1f;        // 0..1
         private float _val = 1f;        // 0..1
@@ -39,6 +40,8 @@ namespace ZenQOffice.UI
 
         private NumericUpDown _numR, _numG, _numB;
         private NumericUpDown _numH, _numS, _numL;
+        private TrackBar _tbAlpha;
+        private NumericUpDown _numAlpha;
         private TextBox _txtHex;
         private bool _isUpdating = false;
         private Bitmap _spectrumBmp;
@@ -48,6 +51,7 @@ namespace ZenQOffice.UI
         public PhotoColorPickerDialogForm(Color initialColor)
         {
             _initialColor = initialColor;
+            _alpha = initialColor.A;
             SelectedColor = initialColor;
             ColorToHsv(initialColor, out _hue, out _sat, out _val);
 
@@ -59,12 +63,12 @@ namespace ZenQOffice.UI
 
         private void InitializeUI()
         {
-            Text = "Bảng chọn màu sắc";
+            Text = "Bảng chọn màu sắc & Kênh Alpha (Color & Transparency)";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(540, 390);
+            ClientSize = new Size(540, 440);
             BackColor = Color.FromArgb(248, 250, 252);
             Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
@@ -109,12 +113,15 @@ namespace ZenQOffice.UI
             RenderSpectrumBitmap();
 
 
-            // 3. Preview Area (New vs Old)
-            Label lblPreview = new Label { Text = "Màu sắc", Location = new Point(312, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            // 3. Preview Area (New vs Old) với nền trong suốt Checkerboard
+            Label lblPreview = new Label { Text = "Màu sắc & Độ trong", Location = new Point(312, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             Controls.Add(lblPreview);
 
             _pnlPreviewNew = new ColorDoubleBufferedPanel { Location = new Point(314, 38), Size = new Size(95, 34), BorderStyle = BorderStyle.FixedSingle };
-            _pnlPreviewOld = new ColorDoubleBufferedPanel { Location = new Point(415, 38), Size = new Size(95, 34), BorderStyle = BorderStyle.FixedSingle, BackColor = _initialColor };
+            _pnlPreviewOld = new ColorDoubleBufferedPanel { Location = new Point(415, 38), Size = new Size(95, 34), BorderStyle = BorderStyle.FixedSingle };
+            _pnlPreviewNew.Paint += PnlPreviewNew_Paint;
+            _pnlPreviewOld.Paint += PnlPreviewOld_Paint;
+
             Label lblNew = new Label { Text = "Màu mới", Location = new Point(314, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
             Label lblOld = new Label { Text = "Hiện tại", Location = new Point(415, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
             Controls.Add(_pnlPreviewNew);
@@ -165,7 +172,51 @@ namespace ZenQOffice.UI
             _numS.ValueChanged += (s, e) => OnHslChanged();
             _numL.ValueChanged += (s, e) => OnHslChanged();
 
-            // 7. Bảng màu cơ bản (Quick Swatches)
+            // 7. Kênh Alpha / Độ trong suốt (0 - 100%)
+            Label lblAlphaSec = new Label { Text = "Độ đục / Alpha (Opacity):", Location = new Point(312, 250), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Controls.Add(lblAlphaSec);
+
+            _tbAlpha = new TrackBar
+            {
+                Location = new Point(310, 272),
+                Size = new Size(150, 30),
+                Minimum = 0,
+                Maximum = 255,
+                Value = _alpha,
+                TickFrequency = 32
+            };
+            _tbAlpha.ValueChanged += (s, e) =>
+            {
+                if (_isUpdating) return;
+                _alpha = _tbAlpha.Value;
+                SelectedColor = Color.FromArgb(_alpha, SelectedColor.R, SelectedColor.G, SelectedColor.B);
+                _isUpdating = true;
+                _numAlpha.Value = (decimal)Math.Round(_alpha / 2.55f);
+                _isUpdating = false;
+                _pnlPreviewNew.Invalidate();
+                UpdateHexText();
+            };
+            Controls.Add(_tbAlpha);
+
+            _numAlpha = CreateNumeric(465, 273, 0, 100);
+            _numAlpha.Value = (decimal)Math.Round(_alpha / 2.55f);
+            _numAlpha.ValueChanged += (s, e) =>
+            {
+                if (_isUpdating) return;
+                _alpha = Math.Max(0, Math.Min(255, (int)Math.Round((float)_numAlpha.Value * 2.55f)));
+                _isUpdating = true;
+                _tbAlpha.Value = _alpha;
+                _isUpdating = false;
+                SelectedColor = Color.FromArgb(_alpha, SelectedColor.R, SelectedColor.G, SelectedColor.B);
+                _pnlPreviewNew.Invalidate();
+                UpdateHexText();
+            };
+            Controls.Add(_numAlpha);
+
+            Label lblPct = new Label { Text = "%", Location = new Point(518, 276), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139) };
+            Controls.Add(lblPct);
+
+            // 8. Bảng màu cơ bản (Quick Swatches)
             Label lblSw = new Label { Text = "Màu cơ bản:", Location = new Point(16, 270), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             Controls.Add(lblSw);
 
@@ -191,18 +242,61 @@ namespace ZenQOffice.UI
                 };
                 sw.Click += (s, e) =>
                 {
-                    SetColor(sc);
+                    SetColor(Color.FromArgb(_alpha, sc.R, sc.G, sc.B));
                 };
                 Controls.Add(sw);
             }
 
-            // 8. Buttons OK / Cancel
+            // Nút nhanh trong suốt 50% và 0%
+            Button btn50 = new Button
+            {
+                Text = "Trong suốt 50%",
+                Location = new Point(16, 328),
+                Size = new Size(110, 26),
+                BackColor = Color.FromArgb(241, 245, 249),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8f)
+            };
+            btn50.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btn50.Click += (s, e) =>
+            {
+                _alpha = 128;
+                _tbAlpha.Value = _alpha;
+                _numAlpha.Value = 50;
+                SelectedColor = Color.FromArgb(_alpha, SelectedColor.R, SelectedColor.G, SelectedColor.B);
+                _pnlPreviewNew.Invalidate();
+                UpdateHexText();
+            };
+            Controls.Add(btn50);
+
+            Button btn100 = new Button
+            {
+                Text = "Đậm đặc 100%",
+                Location = new Point(132, 328),
+                Size = new Size(110, 26),
+                BackColor = Color.FromArgb(241, 245, 249),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8f)
+            };
+            btn100.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btn100.Click += (s, e) =>
+            {
+                _alpha = 255;
+                _tbAlpha.Value = _alpha;
+                _numAlpha.Value = 100;
+                SelectedColor = Color.FromArgb(_alpha, SelectedColor.R, SelectedColor.G, SelectedColor.B);
+                _pnlPreviewNew.Invalidate();
+                UpdateHexText();
+            };
+            Controls.Add(btn100);
+
+            // 9. Buttons OK / Cancel
             Button btnOk = new Button
             {
                 Text = "Đồng ý",
                 DialogResult = DialogResult.OK,
-                Location = new Point(328, 340),
-                Size = new Size(88, 30),
+                Location = new Point(328, 385),
+                Size = new Size(88, 32),
                 BackColor = Color.FromArgb(30, 41, 59),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -214,8 +308,8 @@ namespace ZenQOffice.UI
             {
                 Text = "Hủy bỏ",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(426, 340),
-                Size = new Size(88, 30),
+                Location = new Point(426, 385),
+                Size = new Size(88, 32),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 FlatStyle = FlatStyle.Flat
@@ -274,7 +368,8 @@ namespace ZenQOffice.UI
         {
             _sat = Math.Max(0f, Math.Min(1f, (float)x / _pnlSpectrum.Width));
             _val = Math.Max(0f, Math.Min(1f, 1f - ((float)y / _pnlSpectrum.Height)));
-            SelectedColor = HsvToRgb(_hue, _sat, _val);
+            Color rgb = HsvToRgb(_hue, _sat, _val);
+            SelectedColor = Color.FromArgb(_alpha, rgb.R, rgb.G, rgb.B);
             _pnlSpectrum.Invalidate();
             UpdateAllInputs();
         }
@@ -313,7 +408,8 @@ namespace ZenQOffice.UI
         {
             _hue = Math.Max(0f, Math.Min(360f, (float)y / _pnlHue.Height * 360f));
             RenderSpectrumBitmap();
-            SelectedColor = HsvToRgb(_hue, _sat, _val);
+            Color rgb = HsvToRgb(_hue, _sat, _val);
+            SelectedColor = Color.FromArgb(_alpha, rgb.R, rgb.G, rgb.B);
             _pnlHue.Invalidate();
             _pnlSpectrum.Invalidate();
             UpdateAllInputs();
@@ -321,6 +417,7 @@ namespace ZenQOffice.UI
 
         private void SetColor(Color c)
         {
+            _alpha = c.A;
             SelectedColor = c;
             ColorToHsv(c, out _hue, out _sat, out _val);
             RenderSpectrumBitmap();
@@ -391,12 +488,16 @@ namespace ZenQOffice.UI
             if (_isUpdating) return;
             _isUpdating = true;
 
-            _pnlPreviewNew.BackColor = SelectedColor;
-            _txtHex.Text = $"#{SelectedColor.R:X2}{SelectedColor.G:X2}{SelectedColor.B:X2}";
+            _pnlPreviewNew.Invalidate();
+            _pnlPreviewOld.Invalidate();
+            UpdateHexText();
 
             _numR.Value = SelectedColor.R;
             _numG.Value = SelectedColor.G;
             _numB.Value = SelectedColor.B;
+
+            if (_tbAlpha != null) _tbAlpha.Value = _alpha;
+            if (_numAlpha != null) _numAlpha.Value = (decimal)Math.Round(_alpha / 2.55f);
 
             RgbToHsl(SelectedColor, out float h, out float s, out float l);
             _numH.Value = (decimal)Math.Round(h);
@@ -406,10 +507,18 @@ namespace ZenQOffice.UI
             _isUpdating = false;
         }
 
+        private void UpdateHexText()
+        {
+            if (_alpha < 255)
+                _txtHex.Text = $"#{SelectedColor.A:X2}{SelectedColor.R:X2}{SelectedColor.G:X2}{SelectedColor.B:X2}";
+            else
+                _txtHex.Text = $"#{SelectedColor.R:X2}{SelectedColor.G:X2}{SelectedColor.B:X2}";
+        }
+
         private void OnRgbChanged()
         {
             if (_isUpdating) return;
-            Color c = Color.FromArgb((int)_numR.Value, (int)_numG.Value, (int)_numB.Value);
+            Color c = Color.FromArgb(_alpha, (int)_numR.Value, (int)_numG.Value, (int)_numB.Value);
             SetColor(c);
         }
 
@@ -419,7 +528,8 @@ namespace ZenQOffice.UI
             float h = (float)_numH.Value;
             float s = (float)_numS.Value / 100f;
             float l = (float)_numL.Value / 100f;
-            Color c = HslToRgb(h, s, l);
+            Color rgb = HslToRgb(h, s, l);
+            Color c = Color.FromArgb(_alpha, rgb.R, rgb.G, rgb.B);
             SetColor(c);
         }
 
@@ -427,16 +537,63 @@ namespace ZenQOffice.UI
         {
             if (_isUpdating) return;
             string hex = _txtHex.Text.Trim().TrimStart('#');
-            if (hex.Length == 6)
+            if (hex.Length == 8)
+            {
+                try
+                {
+                    int a = Convert.ToInt32(hex.Substring(0, 2), 16);
+                    int r = Convert.ToInt32(hex.Substring(2, 2), 16);
+                    int g = Convert.ToInt32(hex.Substring(4, 2), 16);
+                    int b = Convert.ToInt32(hex.Substring(6, 2), 16);
+                    SetColor(Color.FromArgb(a, r, g, b));
+                }
+                catch { }
+            }
+            else if (hex.Length == 6)
             {
                 try
                 {
                     int r = Convert.ToInt32(hex.Substring(0, 2), 16);
                     int g = Convert.ToInt32(hex.Substring(2, 2), 16);
                     int b = Convert.ToInt32(hex.Substring(4, 2), 16);
-                    SetColor(Color.FromArgb(r, g, b));
+                    SetColor(Color.FromArgb(_alpha, r, g, b));
                 }
                 catch { }
+            }
+        }
+
+        private void PnlPreviewNew_Paint(object sender, PaintEventArgs e)
+        {
+            DrawCheckerboard(e.Graphics, _pnlPreviewNew.ClientRectangle);
+            using (SolidBrush b = new SolidBrush(SelectedColor))
+            {
+                e.Graphics.FillRectangle(b, _pnlPreviewNew.ClientRectangle);
+            }
+        }
+
+        private void PnlPreviewOld_Paint(object sender, PaintEventArgs e)
+        {
+            DrawCheckerboard(e.Graphics, _pnlPreviewOld.ClientRectangle);
+            using (SolidBrush b = new SolidBrush(_initialColor))
+            {
+                e.Graphics.FillRectangle(b, _pnlPreviewOld.ClientRectangle);
+            }
+        }
+
+        private static void DrawCheckerboard(Graphics g, Rectangle r)
+        {
+            int sq = 6;
+            using (SolidBrush wB = new SolidBrush(Color.White))
+            using (SolidBrush gB = new SolidBrush(Color.FromArgb(226, 232, 240)))
+            {
+                for (int py = r.Y; py < r.Bottom; py += sq)
+                {
+                    for (int px = r.X; px < r.Right; px += sq)
+                    {
+                        bool alt = ((px / sq) + (py / sq)) % 2 == 0;
+                        g.FillRectangle(alt ? wB : gB, px, py, Math.Min(sq, r.Right - px), Math.Min(sq, r.Bottom - py));
+                    }
+                }
             }
         }
 

@@ -35,11 +35,12 @@ namespace ZenQOffice.UI
         public float ShapeStrokeWidth { get; set; } = 2.0f;
         public float ShapeCornerRadius { get; set; } = 0.0f;
         public int ActiveShapePointCount { get; set; } = 5;
-        public Color ShapeFillColor { get; set; } = Color.Transparent;
-        public Color ShapeStrokeColor { get; set; } = Color.FromArgb(51, 65, 85);
+        public Color ShapeFillColor { get; set; } = Color.FromArgb(59, 130, 246);
+        public Color ShapeStrokeColor { get; set; } = Color.FromArgb(37, 99, 235);
         public VectorFillType ShapeFillType { get; set; } = VectorFillType.Solid;
         public Color ShapeFillColor2 { get; set; } = Color.FromArgb(147, 197, 253);
         public float ShapeFillGradientAngle { get; set; } = 0f;
+        public List<PhotoGradientStop> ShapeGradientStops { get; set; } = new List<PhotoGradientStop>();
         public VectorStrokeType ShapeStrokeType { get; set; } = VectorStrokeType.Solid;
         public DashStyle ShapeStrokeDashStyle { get; set; } = DashStyle.Solid;
         public LineJoin ShapeStrokeLineJoin { get; set; } = LineJoin.Round;
@@ -93,6 +94,36 @@ namespace ZenQOffice.UI
         private bool _nodeUnitIsMm = false;
         private const float PxPerMm = 96.0f / 25.4f;
 
+        // Multi-Layer Dragging & Inkscape Selection
+        private readonly Dictionary<PhotoLayer, RectangleF> _multiDragInitialBounds = new Dictionary<PhotoLayer, RectangleF>();
+        private readonly Dictionary<PhotoLayer, float> _multiDragInitialRotations = new Dictionary<PhotoLayer, float>();
+        private readonly Dictionary<PhotoLayer, List<PointF>> _multiDragInitialPoints = new Dictionary<PhotoLayer, List<PointF>>();
+        private readonly Dictionary<PhotoLayer, List<VectorSubPath>> _multiDragInitialSubPaths = new Dictionary<PhotoLayer, List<VectorSubPath>>();
+
+        // Interactive Inkscape Bezier Pen Tool State
+        private PointF _penHoverPt = PointF.Empty;
+        private bool _isPenDraggingHandle = false;
+
+        // Direct Segment Bending State (Inkscape curve dragging)
+        private int _dragSegmentSubPathIndex = -1;
+        private int _dragSegmentIndex = -1;
+
+        // Snapping & Alignment Guides
+        public bool SnapToGrid { get; set; } = false;
+        public float GridSize { get; set; } = 20f;
+        public bool SnapToObjects { get; set; } = true;
+        public bool ShowGrid { get; set; } = false;
+        public bool ShowRulers { get; set; } = true;
+        public const int RulerThickness = 18;
+        public List<float> HorizontalGuides { get; } = new List<float>();
+        public List<float> VerticalGuides { get; } = new List<float>();
+        public bool IsSpaceHeld { get; set; } = false;
+        private bool _isDraggingRulerGuideH = false;
+        private bool _isDraggingRulerGuideV = false;
+        private float _currentDraggingGuidePos = 0f;
+        public PointF CurrentMouseCanvasPoint { get; set; } = PointF.Empty;
+        private readonly List<(PointF Start, PointF End, Color Col)> _activeSmartGuides = new List<(PointF, PointF, Color)>();
+
         // Crop Tool State
         public RectangleF CropRect { get; set; } = RectangleF.Empty;
         public bool IsCropping { get; set; } = false;
@@ -104,6 +135,20 @@ namespace ZenQOffice.UI
         private int _hoverToolIndex = -1;
         private int _hoverFilterIndex = -1;
         private int _layerScrollY = 0;
+
+        // Workspace Scrollbar State (Thanh cuộn ngang & dọc chuẩn Slide)
+        public Rectangle HScrollBarTrackRect { get; private set; } = Rectangle.Empty;
+        public Rectangle HScrollBarThumbRect { get; private set; } = Rectangle.Empty;
+        public Rectangle VScrollBarTrackRect { get; private set; } = Rectangle.Empty;
+        public Rectangle VScrollBarThumbRect { get; private set; } = Rectangle.Empty;
+        public bool IsDraggingHScrollBar { get; private set; } = false;
+        public bool IsDraggingVScrollBar { get; private set; } = false;
+        public bool IsHoverHScrollBarThumb { get; private set; } = false;
+        public bool IsHoverVScrollBarThumb { get; private set; } = false;
+        private int _scrollBarDragStartMouseX = 0;
+        private int _scrollBarDragStartMouseY = 0;
+        private float _scrollBarDragStartPanX = 0f;
+        private float _scrollBarDragStartPanY = 0f;
 
         // Layout Constants
         public const int LeftToolbarWidth = 52;
@@ -168,6 +213,54 @@ namespace ZenQOffice.UI
             PanX = (availW - renderedW) / 2.0f;
             PanY = (availH - renderedH) / 2.0f;
         }
+
+        public void GetScrollLimits(int width, int height, out float minPanX, out float maxPanX, out float minPanY, out float maxPanY)
+        {
+            if (Document == null)
+            {
+                minPanX = maxPanX = minPanY = maxPanY = 0f;
+                return;
+            }
+
+            float availW = Math.Max(100f, width - LeftToolbarWidth - RightInspectorWidth);
+            float availH = Math.Max(100f, height - RibbonHeight - TopOptionsBarHeight - BottomStatusHeight);
+            float docRenderedW = Document.Width * Zoom;
+            float docRenderedH = Document.Height * Zoom;
+
+            float marginX = Math.Max(40f, availW * 0.12f);
+            float marginY = Math.Max(40f, availH * 0.12f);
+
+            if (docRenderedW + marginX * 2 > availW)
+            {
+                minPanX = availW - docRenderedW - marginX;
+                maxPanX = marginX;
+            }
+            else
+            {
+                float center = (availW - docRenderedW) / 2f;
+                minPanX = center;
+                maxPanX = center;
+            }
+
+            if (docRenderedH + marginY * 2 > availH)
+            {
+                minPanY = availH - docRenderedH - marginY;
+                maxPanY = marginY;
+            }
+            else
+            {
+                float center = (availH - docRenderedH) / 2f;
+                minPanY = center;
+                maxPanY = center;
+            }
+        }
+
+        public void ClampPan(int width, int height)
+        {
+            GetScrollLimits(width, height, out float minX, out float maxX, out float minY, out float maxY);
+            PanX = Math.Max(minX, Math.Min(maxX, PanX));
+            PanY = Math.Max(minY, Math.Min(maxY, PanY));
+        }
         #endregion
 
         #region 100% PURE Direct2D Rendering Loop
@@ -224,6 +317,7 @@ namespace ZenQOffice.UI
                         FillColor = ShapeFillColor,
                         FillColor2 = ShapeFillColor2,
                         FillGradientAngle = ShapeFillGradientAngle,
+                        GradientStops = ShapeGradientStops?.Select(s => s.Clone()).ToList() ?? new List<PhotoGradientStop>(),
                         StrokeType = ShapeStrokeType,
                         StrokeColor = ShapeStrokeColor,
                         StrokeWidth = ShapeStrokeWidth,
@@ -235,6 +329,22 @@ namespace ZenQOffice.UI
                         Opacity = 0.85f
                     };
                     RenderLayerD2D(g, previewLayer);
+                }
+            }
+
+            // Draw Interactive Gradient Vector Line
+            if (_isDrawing && SelectedTool == PhotoTool.Gradient)
+            {
+                using (Pen gPen = new Pen(Color.FromArgb(59, 130, 246), 2.0f / Zoom))
+                using (SolidBrush gBrush = new SolidBrush(Color.FromArgb(59, 130, 246)))
+                using (SolidBrush wBrush = new SolidBrush(Color.White))
+                {
+                    gPen.DashStyle = DashStyle.Dash;
+                    g.DrawLine(gPen, _dragStartPt.X, _dragStartPt.Y, _currentDragPt.X, _currentDragPt.Y);
+                    float r = 5.0f / Zoom;
+                    g.FillEllipse(wBrush, _dragStartPt.X - r, _dragStartPt.Y - r, r * 2, r * 2);
+                    g.DrawEllipse(gPen, _dragStartPt.X - r, _dragStartPt.Y - r, r * 2, r * 2);
+                    g.FillEllipse(gBrush, _currentDragPt.X - r, _currentDragPt.Y - r, r * 2, r * 2);
                 }
             }
 
@@ -251,10 +361,76 @@ namespace ZenQOffice.UI
 
             g.Restore(canvasState);
 
-            // 4. Render Active Layer Transform Handles
+            // 4. Render Grid & Smart Guides
+            if (ShowGrid)
+            {
+                using var gridPen = new Pen(Color.FromArgb(226, 232, 240), 0.8f);
+                for (float gx = 0; gx <= Document.Width; gx += GridSize)
+                {
+                    PointF p1 = CanvasToScreen(gx, 0, width, height);
+                    PointF p2 = CanvasToScreen(gx, Document.Height, width, height);
+                    g.DrawLine(gridPen, p1.X, p1.Y, p2.X, p2.Y);
+                }
+                for (float gy = 0; gy <= Document.Height; gy += GridSize)
+                {
+                    PointF p1 = CanvasToScreen(0, gy, width, height);
+                    PointF p2 = CanvasToScreen(Document.Width, gy, width, height);
+                    g.DrawLine(gridPen, p1.X, p1.Y, p2.X, p2.Y);
+                }
+            }
+
+            if (_activeSmartGuides != null && _activeSmartGuides.Count > 0)
+            {
+                using var guidePen = new Pen(Color.FromArgb(236, 72, 153), 1.2f) { DashStyle = DashStyle.Dash };
+                foreach (var gLine in _activeSmartGuides)
+                {
+                    PointF p1 = CanvasToScreen(gLine.Start.X, gLine.Start.Y, width, height);
+                    PointF p2 = CanvasToScreen(gLine.End.X, gLine.End.Y, width, height);
+                    g.DrawLine(guidePen, p1.X, p1.Y, p2.X, p2.Y);
+                }
+            }
+
+            // 4b. Render User Measurement Guides (Inkscape/Photoshop Guidelines)
+            if (ShowRulers)
+            {
+                using var userGuidePen = new Pen(Color.FromArgb(0, 180, 240), 1.2f) { DashStyle = DashStyle.Dash };
+                foreach (var gy in HorizontalGuides)
+                {
+                    PointF p = CanvasToScreen(0, gy, width, height);
+                    g.DrawLine(userGuidePen, LeftToolbarWidth, p.Y, width - RightInspectorWidth, p.Y);
+                }
+                foreach (var gx in VerticalGuides)
+                {
+                    PointF p = CanvasToScreen(gx, 0, width, height);
+                    g.DrawLine(userGuidePen, p.X, RibbonHeight + TopOptionsBarHeight, p.X, height - BottomStatusHeight);
+                }
+                if (_isDraggingRulerGuideH)
+                {
+                    PointF p = CanvasToScreen(0, _currentDraggingGuidePos, width, height);
+                    g.DrawLine(userGuidePen, LeftToolbarWidth, p.Y, width - RightInspectorWidth, p.Y);
+                }
+                if (_isDraggingRulerGuideV)
+                {
+                    PointF p = CanvasToScreen(_currentDraggingGuidePos, 0, width, height);
+                    g.DrawLine(userGuidePen, p.X, RibbonHeight + TopOptionsBarHeight, p.X, height - BottomStatusHeight);
+                }
+            }
+
+            // 5. Render Active Layer Transform Handles & Multi-Selection Boxes
             if ((SelectedTool == PhotoTool.Move || SelectedTool == PhotoTool.Rectangle) && Document.ActiveLayer != null)
             {
-                DrawTransformBoundingBox(g, Document.ActiveLayer, width, height);
+                if (Document.SelectedLayers.Count > 1)
+                {
+                    foreach (var sel in Document.SelectedLayers)
+                    {
+                        DrawTransformBoundingBox(g, sel, width, height, isSecondary: true);
+                    }
+                    DrawCombinedTransformBoundingBox(g, width, height);
+                }
+                else
+                {
+                    DrawTransformBoundingBox(g, Document.ActiveLayer, width, height, isSecondary: false);
+                }
             }
             else if (SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null)
             {
@@ -262,16 +438,75 @@ namespace ZenQOffice.UI
             }
             else if (SelectedTool == PhotoTool.Pen && Document.ActiveLayer != null && Document.ActiveLayer.ShapeType == VectorShapeType.Path)
             {
-                foreach(var pt in Document.ActiveLayer.PathPoints)
+                var curPath = Document.ActiveLayer;
+                curPath.EnsureNodesInitialized();
+
+                if (curPath.SubPaths != null && curPath.SubPaths.Count > 0)
                 {
-                    PointF screenPt = CanvasToScreen(pt.X, pt.Y, width, height);
-                    using (SolidBrush b = new SolidBrush(Color.FromArgb(59, 130, 246))) // Blue-500
+                    var lastSp = curPath.SubPaths[curPath.SubPaths.Count - 1];
+                    if (lastSp.Nodes != null && lastSp.Nodes.Count > 0)
                     {
-                        g.FillRectangle(b, screenPt.X - 3, screenPt.Y - 3, 6, 6);
-                    }
-                    using (Pen p = new Pen(Color.White, 1f))
-                    {
-                        g.DrawRectangle(p, screenPt.X - 3, screenPt.Y - 3, 6, 6);
+                        using (Pen penArm = new Pen(Color.FromArgb(99, 102, 241), 1f))
+                        using (SolidBrush knobB = new SolidBrush(Color.FromArgb(59, 130, 246)))
+                        using (Pen knobP = new Pen(Color.FromArgb(15, 23, 42), 1f))
+                        using (SolidBrush nodeB = new SolidBrush(Color.White))
+                        using (Pen nodeP = new Pen(Color.FromArgb(15, 23, 42), 1.2f))
+                        {
+                            for (int ni = 0; ni < lastSp.Nodes.Count; ni++)
+                            {
+                                var n = lastSp.Nodes[ni];
+                                PointF sPt = CanvasToScreen(n.Point.X, n.Point.Y, width, height);
+
+                                if (n.HasInHandle)
+                                {
+                                    PointF sIn = CanvasToScreen(n.InHandle.X, n.InHandle.Y, width, height);
+                                    g.DrawLine(penArm, sPt.X, sPt.Y, sIn.X, sIn.Y);
+                                    g.FillEllipse(knobB, sIn.X - 3, sIn.Y - 3, 6, 6);
+                                    g.DrawEllipse(knobP, sIn.X - 3, sIn.Y - 3, 6, 6);
+                                }
+                                if (n.HasOutHandle)
+                                {
+                                    PointF sOut = CanvasToScreen(n.OutHandle.X, n.OutHandle.Y, width, height);
+                                    g.DrawLine(penArm, sPt.X, sPt.Y, sOut.X, sOut.Y);
+                                    g.FillEllipse(knobB, sOut.X - 3, sOut.Y - 3, 6, 6);
+                                    g.DrawEllipse(knobP, sOut.X - 3, sOut.Y - 3, 6, 6);
+                                }
+
+                                g.FillRectangle(nodeB, sPt.X - 3.5f, sPt.Y - 3.5f, 7, 7);
+                                g.DrawRectangle(nodeP, sPt.X - 3.5f, sPt.Y - 3.5f, 7, 7);
+                            }
+                        }
+
+                        // Rubberband preview line from last node to mouse cursor
+                        if (!_penHoverPt.IsEmpty && !lastSp.IsClosed)
+                        {
+                            var lastNode = lastSp.Nodes[lastSp.Nodes.Count - 1];
+                            PointF sLast = CanvasToScreen(lastNode.Point.X, lastNode.Point.Y, width, height);
+                            PointF sMouse = CanvasToScreen(_penHoverPt.X, _penHoverPt.Y, width, height);
+
+                            using (Pen rubberPen = new Pen(Color.FromArgb(59, 130, 246), 1.2f))
+                            {
+                                rubberPen.DashStyle = DashStyle.Dash;
+                                g.DrawLine(rubberPen, sLast.X, sLast.Y, sMouse.X, sMouse.Y);
+                            }
+
+                            // Close-path snap indicator when near start node
+                            if (lastSp.Nodes.Count > 1)
+                            {
+                                var firstNode = lastSp.Nodes[0];
+                                float distSq = (_penHoverPt.X - firstNode.Point.X) * (_penHoverPt.X - firstNode.Point.X) +
+                                               (_penHoverPt.Y - firstNode.Point.Y) * (_penHoverPt.Y - firstNode.Point.Y);
+                                float snapTol = 12f / Math.Max(0.1f, Zoom);
+                                if (distSq <= snapTol * snapTol)
+                                {
+                                    PointF sFirst = CanvasToScreen(firstNode.Point.X, firstNode.Point.Y, width, height);
+                                    using (Pen snapPen = new Pen(Color.FromArgb(16, 185, 129), 2f))
+                                    {
+                                        g.DrawEllipse(snapPen, sFirst.X - 8, sFirst.Y - 8, 16, 16);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -298,11 +533,118 @@ namespace ZenQOffice.UI
 
             g.ResetClip();
 
+            // 6b. Render Workspace Scrollbars (Thanh cuộn ngang & dọc chuẩn Slide)
+            DrawWorkspaceScrollbars(g, width, height);
+
             // 7. Render Modern Light UI Controls
             DrawTopOptionsBar(g, width);
             DrawLeftToolbar(g, height);
             DrawRightInspector(g, width, height);
             DrawBottomColorPalette(g, width, height);
+            DrawRulers(g, width, height);
+        }
+
+        private void DrawRulers(D2DGraphics g, int width, int height)
+        {
+            if (!ShowRulers || Document == null) return;
+
+            int rulerTop = RibbonHeight + TopOptionsBarHeight;
+            int rulerLeft = LeftToolbarWidth;
+            int availW = width - LeftToolbarWidth - RightInspectorWidth;
+            int availH = height - rulerTop - BottomStatusHeight;
+
+            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            using (Pen tickPen = new Pen(Color.FromArgb(148, 163, 184), 1f))
+            using (Pen cursorPen = new Pen(Color.FromArgb(239, 68, 68), 1.2f))
+            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            using (Font numFont = new Font("Segoe UI", 6.8f, FontStyle.Regular))
+            {
+                // 1. Top Ruler
+                Rectangle topRulerRect = new Rectangle(rulerLeft, rulerTop, availW, RulerThickness);
+                g.FillRectangle(bgBrush, topRulerRect);
+                g.DrawLine(borderPen, rulerLeft, rulerTop + RulerThickness, rulerLeft + availW, rulerTop + RulerThickness);
+
+                // 2. Left Ruler
+                Rectangle leftRulerRect = new Rectangle(rulerLeft, rulerTop + RulerThickness, RulerThickness, availH - RulerThickness);
+                g.FillRectangle(bgBrush, leftRulerRect);
+                g.DrawLine(borderPen, rulerLeft + RulerThickness, rulerTop + RulerThickness, rulerLeft + RulerThickness, rulerTop + availH);
+
+                // 3. Corner Box (Intersection)
+                Rectangle cornerRect = new Rectangle(rulerLeft, rulerTop, RulerThickness, RulerThickness);
+                using (SolidBrush cornerBrush = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                {
+                    g.FillRectangle(cornerBrush, cornerRect);
+                    g.DrawRectangle(borderPen, cornerRect);
+                }
+
+                // Ticks interval calculation
+                float step = 100f;
+                if (Zoom >= 2.5f) step = 20f;
+                else if (Zoom >= 1.2f) step = 50f;
+                else if (Zoom >= 0.5f) step = 100f;
+                else step = 200f;
+
+                // Draw Top Ruler Ticks & Numbers
+                float minCanvasX = ScreenToCanvas(rulerLeft + RulerThickness, rulerTop, width, height).X;
+                float maxCanvasX = ScreenToCanvas(rulerLeft + availW, rulerTop, width, height).X;
+                float startX = (float)Math.Floor(minCanvasX / step) * step;
+
+                for (float cx = startX; cx <= maxCanvasX; cx += step)
+                {
+                    PointF sp = CanvasToScreen(cx, 0, width, height);
+                    if (sp.X >= rulerLeft + RulerThickness && sp.X <= rulerLeft + availW)
+                    {
+                        g.DrawLine(tickPen, sp.X, rulerTop + RulerThickness - 7, sp.X, rulerTop + RulerThickness);
+                        g.DrawString(((int)cx).ToString(), numFont, textBrush, sp.X + 2, rulerTop + 1);
+                    }
+                    float midX = cx + step / 2f;
+                    PointF midSp = CanvasToScreen(midX, 0, width, height);
+                    if (midSp.X >= rulerLeft + RulerThickness && midSp.X <= rulerLeft + availW)
+                    {
+                        g.DrawLine(tickPen, midSp.X, rulerTop + RulerThickness - 4, midSp.X, rulerTop + RulerThickness);
+                    }
+                }
+
+                // Draw Left Ruler Ticks & Numbers
+                float minCanvasY = ScreenToCanvas(rulerLeft, rulerTop + RulerThickness, width, height).Y;
+                float maxCanvasY = ScreenToCanvas(rulerLeft, rulerTop + availH, width, height).Y;
+                float startY = (float)Math.Floor(minCanvasY / step) * step;
+
+                for (float cy = startY; cy <= maxCanvasY; cy += step)
+                {
+                    PointF sp = CanvasToScreen(0, cy, width, height);
+                    if (sp.Y >= rulerTop + RulerThickness && sp.Y <= rulerTop + availH)
+                    {
+                        g.DrawLine(tickPen, rulerLeft + RulerThickness - 7, sp.Y, rulerLeft + RulerThickness, sp.Y);
+                        string numStr = ((int)cy).ToString();
+                        if (numStr.Length > 0)
+                        {
+                            g.DrawString(numStr[0].ToString(), numFont, textBrush, rulerLeft + 2, sp.Y + 1);
+                        }
+                    }
+                    float midY = cy + step / 2f;
+                    PointF midSp = CanvasToScreen(0, midY, width, height);
+                    if (midSp.Y >= rulerTop + RulerThickness && midSp.Y <= rulerTop + availH)
+                    {
+                        g.DrawLine(tickPen, rulerLeft + RulerThickness - 4, midSp.Y, rulerLeft + RulerThickness, midSp.Y);
+                    }
+                }
+
+                // Cursor tracking ticks on rulers
+                if (CurrentMouseCanvasPoint != PointF.Empty)
+                {
+                    PointF mouseScr = CanvasToScreen(CurrentMouseCanvasPoint.X, CurrentMouseCanvasPoint.Y, width, height);
+                    if (mouseScr.X >= rulerLeft + RulerThickness && mouseScr.X <= rulerLeft + availW)
+                    {
+                        g.DrawLine(cursorPen, mouseScr.X, rulerTop, mouseScr.X, rulerTop + RulerThickness);
+                    }
+                    if (mouseScr.Y >= rulerTop + RulerThickness && mouseScr.Y <= rulerTop + availH)
+                    {
+                        g.DrawLine(cursorPen, rulerLeft, mouseScr.Y, rulerLeft + RulerThickness, mouseScr.Y);
+                    }
+                }
+            }
         }
 
         private void DrawCheckerboardGrid(D2DGraphics g, RectangleF rect, float cellSize)
@@ -347,6 +689,15 @@ namespace ZenQOffice.UI
                 g.TranslateTransform(center.X, center.Y);
                 g.RotateTransform(l.Rotation);
                 g.TranslateTransform(-center.X, -center.Y);
+            }
+
+            // Clip Mask
+            if (l.ClipMask != null)
+            {
+                using (GraphicsPath clipGp = l.ClipMask.BuildGraphicsPath())
+                {
+                    g.SetClip(clipGp, CombineMode.Intersect);
+                }
             }
 
             if (l.Type == LayerType.Raster && l.Image != null)
@@ -394,6 +745,16 @@ namespace ZenQOffice.UI
                         {
                             using (LinearGradientBrush lgb = new LinearGradientBrush(b, fill, fill2, l.FillGradientAngle))
                             {
+                                if (l.GradientStops != null && l.GradientStops.Count >= 2)
+                                {
+                                    var sorted = l.GradientStops.OrderBy(s => s.Position).ToList();
+                                    ColorBlend cb = new ColorBlend(sorted.Count);
+                                    cb.Colors = sorted.Select(s => Color.FromArgb((int)(alpha * (s.Color.A / 255f)), s.Color.R, s.Color.G, s.Color.B)).ToArray();
+                                    cb.Positions = sorted.Select(s => Math.Max(0f, Math.Min(1f, s.Position))).ToArray();
+                                    cb.Positions[0] = 0f;
+                                    cb.Positions[cb.Positions.Length - 1] = 1f;
+                                    lgb.InterpolationColors = cb;
+                                }
                                 g.FillPath(lgb, path);
                             }
                         }
@@ -405,8 +766,21 @@ namespace ZenQOffice.UI
                         {
                             using (PathGradientBrush pgb = new PathGradientBrush(path))
                             {
-                                pgb.CenterColor = fill;
-                                pgb.SurroundColors = new Color[] { fill2 };
+                                if (l.GradientStops != null && l.GradientStops.Count >= 2)
+                                {
+                                    var sorted = l.GradientStops.OrderBy(s => s.Position).ToList();
+                                    ColorBlend cb = new ColorBlend(sorted.Count);
+                                    cb.Colors = sorted.Select(s => Color.FromArgb((int)(alpha * (s.Color.A / 255f)), s.Color.R, s.Color.G, s.Color.B)).ToArray();
+                                    cb.Positions = sorted.Select(s => Math.Max(0f, Math.Min(1f, s.Position))).ToArray();
+                                    cb.Positions[0] = 0f;
+                                    cb.Positions[cb.Positions.Length - 1] = 1f;
+                                    pgb.InterpolationColors = cb;
+                                }
+                                else
+                                {
+                                    pgb.CenterColor = fill;
+                                    pgb.SurroundColors = new Color[] { fill2 };
+                                }
                                 g.FillPath(pgb, path);
                             }
                         }
@@ -432,18 +806,133 @@ namespace ZenQOffice.UI
                 Color col = Color.FromArgb((int)(alpha * (l.TextColor.A / 255f)), l.TextColor.R, l.TextColor.G, l.TextColor.B);
                 using (Font f = new Font(l.FontName ?? "Segoe UI", Math.Max(6f, l.FontSize), l.FontStyle))
                 using (SolidBrush tb = new SolidBrush(col))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Near })
                 {
-                    g.DrawString(l.TextContent, f, tb, l.Bounds, sf);
+                    if (l.IsTextOnPath && l.TextPathSubPaths != null && l.TextPathSubPaths.Count > 0)
+                    {
+                        RenderTextOnPathD2D(g, l, f, tb);
+                    }
+                    else
+                    {
+                        using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Near })
+                        {
+                            g.DrawString(l.TextContent, f, tb, l.Bounds, sf);
+                        }
+                    }
                 }
             }
 
             g.Restore(state);
         }
 
+        private void RenderTextOnPathD2D(D2DGraphics g, PhotoLayer l, Font font, Brush brush)
+        {
+            if (l.TextPathSubPaths == null || l.TextPathSubPaths.Count == 0 || string.IsNullOrEmpty(l.TextContent)) return;
+
+            var sp = l.TextPathSubPaths[0];
+            VectorPathModel.SampleSubPath(sp, 400, out var samplePoints, out var cumDistances);
+            if (samplePoints.Count < 2 || cumDistances.Count < 2) return;
+
+            float totalPathLength = cumDistances[cumDistances.Count - 1];
+            if (totalPathLength <= 1f) return;
+
+            string text = l.TextContent;
+            float currentDist = 0f;
+
+            for (int chIdx = 0; chIdx < text.Length; chIdx++)
+            {
+                string chStr = text[chIdx].ToString();
+                SizeF charSize = g.MeasureString(chStr, font);
+                float charW = Math.Max(3f, charSize.Width * 0.72f);
+                float midDist = currentDist + charW / 2f;
+
+                if (midDist > totalPathLength)
+                {
+                    if (!sp.IsClosed) break;
+                    midDist %= totalPathLength;
+                }
+
+                int k = 0;
+                while (k < cumDistances.Count - 2 && cumDistances[k + 1] < midDist)
+                {
+                    k++;
+                }
+
+                float d0 = cumDistances[k];
+                float d1 = cumDistances[k + 1];
+                float segLen = d1 - d0;
+                float t = (segLen > 0.0001f) ? (midDist - d0) / segLen : 0f;
+
+                PointF p0 = samplePoints[k];
+                PointF p1 = samplePoints[k + 1];
+                PointF pt = new PointF(p0.X + (p1.X - p0.X) * t, p0.Y + (p1.Y - p0.Y) * t);
+
+                float dx = p1.X - p0.X;
+                float dy = p1.Y - p0.Y;
+                if (Math.Abs(dx) < 0.0001f && Math.Abs(dy) < 0.0001f && k + 2 < samplePoints.Count)
+                {
+                    dx = samplePoints[k + 2].X - p0.X;
+                    dy = samplePoints[k + 2].Y - p0.Y;
+                }
+                float angleDeg = (float)(Math.Atan2(dy, dx) * 180.0 / Math.PI);
+
+                GraphicsState chState = g.Save();
+                g.TranslateTransform(pt.X, pt.Y);
+                g.RotateTransform(angleDeg);
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Far })
+                {
+                    g.DrawString(chStr, font, brush, 0, 0, sf);
+                }
+                g.Restore(chState);
+
+                currentDist += charW;
+            }
+        }
+
+        public RectangleF GetCombinedSelectionBounds()
+        {
+            if (Document == null || Document.SelectedLayers.Count == 0) return RectangleF.Empty;
+            var layers = Document.SelectedLayers;
+            if (layers.Count == 1) return layers[0].Bounds;
+
+            float minX = layers.Min(l => l.Bounds.Left);
+            float minY = layers.Min(l => l.Bounds.Top);
+            float maxX = layers.Max(l => l.Bounds.Right);
+            float maxY = layers.Max(l => l.Bounds.Bottom);
+            return new RectangleF(minX, minY, Math.Max(2f, maxX - minX), Math.Max(2f, maxY - minY));
+        }
+
         private int CheckTransformHandles(int x, int y, int viewW, int viewH)
         {
             if (Document.ActiveLayer == null) return -1;
+
+            if (Document.SelectedLayers.Count > 1)
+            {
+                RectangleF comb = GetCombinedSelectionBounds();
+                PointF pTL = CanvasToScreen(comb.X, comb.Y, viewW, viewH);
+                PointF pBR = CanvasToScreen(comb.Right, comb.Bottom, viewW, viewH);
+                RectangleF sRectComb = new RectangleF(pTL.X, pTL.Y, pBR.X - pTL.X, pBR.Y - pTL.Y);
+
+                PointF[] combHandles = GetHandlePoints(sRectComb);
+                float hSz = 12f;
+                for (int i = 0; i < 8; i++)
+                {
+                    RectangleF hRect = new RectangleF(combHandles[i].X - hSz / 2f, combHandles[i].Y - hSz / 2f, hSz, hSz);
+                    if (hRect.Contains(x, y)) return i;
+                }
+
+                if (SelectedTool == PhotoTool.Move)
+                {
+                    PointF rotPin = new PointF(sRectComb.X + sRectComb.Width / 2f, sRectComb.Y - 18f);
+                    RectangleF rotRect = new RectangleF(rotPin.X - 8f, rotPin.Y - 8f, 16f, 16f);
+                    if (rotRect.Contains(x, y)) return 8;
+                }
+
+                PointF canvasPt = ScreenToCanvas(x, y, viewW, viewH);
+                if (comb.Contains(canvasPt)) return 9; // Move body
+
+                return -1;
+            }
+
             PhotoLayer layer = Document.ActiveLayer;
 
             float mx = x;
@@ -502,7 +991,57 @@ namespace ZenQOffice.UI
             return -1;
         }
 
-        private void DrawTransformBoundingBox(D2DGraphics g, PhotoLayer layer, int viewW, int viewH)
+        private void DrawCombinedTransformBoundingBox(D2DGraphics g, int viewW, int viewH)
+        {
+            RectangleF comb = GetCombinedSelectionBounds();
+            if (comb.IsEmpty) return;
+
+            PointF pTopLeft = CanvasToScreen(comb.X, comb.Y, viewW, viewH);
+            PointF pBottomRight = CanvasToScreen(comb.Right, comb.Bottom, viewW, viewH);
+            RectangleF sRect = new RectangleF(pTopLeft.X, pTopLeft.Y, pBottomRight.X - pTopLeft.X, pBottomRight.Y - pTopLeft.Y);
+
+            using (Pen boxPen = new Pen(Color.FromArgb(59, 130, 246), 1.2f))
+            {
+                g.DrawRectangle(boxPen, sRect.X, sRect.Y, sRect.Width, sRect.Height);
+            }
+
+            float cx = sRect.X + sRect.Width / 2f;
+            float cy = sRect.Y + sRect.Height / 2f;
+            using (Pen xPen = new Pen(Color.FromArgb(148, 163, 184), 1.2f))
+            {
+                g.DrawLine(xPen, cx - 4, cy - 4, cx + 4, cy + 4);
+                g.DrawLine(xPen, cx - 4, cy + 4, cx + 4, cy - 4);
+            }
+
+            float hSize = 7f;
+            PointF[] handles = GetHandlePoints(sRect);
+            using (SolidBrush hBrush = new SolidBrush(Color.White))
+            using (Pen hPen = new Pen(Color.FromArgb(59, 130, 246), 1.2f))
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    RectangleF hRect = new RectangleF(handles[i].X - hSize / 2f, handles[i].Y - hSize / 2f, hSize, hSize);
+                    g.FillRectangle(hBrush, hRect);
+                    g.DrawRectangle(hPen, hRect.X, hRect.Y, hRect.Width, hRect.Height);
+                }
+
+                if (SelectedTool == PhotoTool.Move)
+                {
+                    PointF rotPin = new PointF(sRect.X + sRect.Width / 2f, sRect.Y - 18f);
+                    PointF topMid = new PointF(sRect.X + sRect.Width / 2f, sRect.Y);
+                    using (Pen stemPen = new Pen(Color.FromArgb(59, 130, 246), 1.0f))
+                    {
+                        stemPen.DashStyle = DashStyle.Dot;
+                        g.DrawLine(stemPen, topMid.X, topMid.Y, rotPin.X, rotPin.Y);
+                    }
+                    RectangleF rotRect = new RectangleF(rotPin.X - 4f, rotPin.Y - 4f, 8f, 8f);
+                    g.FillEllipse(hBrush, rotRect);
+                    g.DrawEllipse(hPen, rotRect);
+                }
+            }
+        }
+
+        private void DrawTransformBoundingBox(D2DGraphics g, PhotoLayer layer, int viewW, int viewH, bool isSecondary = false)
         {
             GraphicsState state = g.Save();
 
@@ -518,6 +1057,17 @@ namespace ZenQOffice.UI
             PointF pBottomRight = CanvasToScreen(layer.Bounds.Right, layer.Bounds.Bottom, viewW, viewH);
 
             RectangleF sRect = new RectangleF(pTopLeft.X, pTopLeft.Y, pBottomRight.X - pTopLeft.X, pBottomRight.Y - pTopLeft.Y);
+
+            if (isSecondary)
+            {
+                using (Pen secPen = new Pen(Color.FromArgb(99, 102, 241), 1.2f))
+                {
+                    secPen.DashStyle = DashStyle.Dash;
+                    g.DrawRectangle(secPen, sRect.X, sRect.Y, sRect.Width, sRect.Height);
+                }
+                g.Restore(state);
+                return;
+            }
 
             bool isRectShape = (layer.Type == LayerType.VectorShape && 
                 (layer.ShapeType == VectorShapeType.Rectangle || layer.ShapeType == VectorShapeType.RoundedRect));
@@ -750,9 +1300,8 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawTopBarNodeIconButton(D2DGraphics g, int x, int y, string symbol, Action action, bool isActive = false)
+        private void DrawTopBarNodeIconButton(D2DGraphics g, int x, int y, string symbol, Action action, bool isActive = false, int w = 32)
         {
-            int w = 28;
             int h = 26;
             Rectangle r = new Rectangle(x, y, w, h);
             _topBarClickables.Add((r, action));
@@ -763,9 +1312,9 @@ namespace ZenQOffice.UI
 
             using (SolidBrush b = new SolidBrush(bgColor))
             using (Pen p = new Pen(borderColor, 1f))
-            using (Font font = new Font("Segoe UI", 9f, FontStyle.Bold))
+            using (Font font = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (SolidBrush tb = new SolidBrush(textColor))
-            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             {
                 g.FillRoundedRectangle(b, r, 4f);
                 g.DrawRoundedRectangle(p, r, 4f);
@@ -806,7 +1355,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private int DrawTopBarValueBox(D2DGraphics g, int x, int y, string label, string valStr, Action onDec, Action onInc, Action onEdit = null, int boxWidth = 76)
+        private int DrawTopBarValueBox(D2DGraphics g, int x, int y, string label, string valStr, Action onDec, Action onInc, Action onEdit = null, int boxWidth = 80)
         {
             using (Font lblFont = new Font("Segoe UI", 9f, FontStyle.Regular))
             using (Font valFont = new Font("Segoe UI", 8.8f, FontStyle.Bold))
@@ -826,8 +1375,8 @@ namespace ZenQOffice.UI
                 g.FillRoundedRectangle(boxBg, boxRect, 4f);
                 g.DrawRoundedRectangle(borderPen, boxRect, 4f);
 
-                Rectangle valRect = new Rectangle(boxRect.X + 3, boxRect.Y, boxWidth - 32, h);
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                Rectangle valRect = new Rectangle(boxRect.X + 2, boxRect.Y, boxWidth - 31, h);
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
                 {
                     g.DrawString(valStr, valFont, valB, valRect, sf);
                 }
@@ -1155,7 +1704,7 @@ namespace ZenQOffice.UI
                         }
                     }
 
-                    // 3. ƯU TIÊN 3: Hit-test thân đoạn cong / thẳng trên mọi SubPath
+                    // 3. ƯU TIÊN 3: Hit-test thân đoạn cong / thẳng trên mọi SubPath (Kéo uốn cong trực tiếp - Chuẩn Inkscape)
                     int hitSubPathIdx;
                     int hitSegIdx = VectorPathModel.HitTestSegment(layer, canvasPt, hitToleranceCanvas, out hitSubPathIdx);
                     if (hitSegIdx >= 0 && hitSubPathIdx >= 0 && hitSubPathIdx < layer.SubPaths.Count)
@@ -1177,6 +1726,29 @@ namespace ZenQOffice.UI
                             int nextIdx = (hitSegIdx + 1) % subNodes.Count;
                             subNodes[hitSegIdx].IsSelected = true;
                             subNodes[nextIdx].IsSelected = true;
+
+                            Document.SaveUndoSnapshot();
+                            _nodeDragTarget = NodeDragTarget.Segment;
+                            _dragSegmentSubPathIndex = hitSubPathIdx;
+                            _dragSegmentIndex = hitSegIdx;
+                            _isNodeToolDragging = true;
+
+                            var nA = subNodes[hitSegIdx];
+                            var nB = subNodes[nextIdx];
+
+                            if (!nA.HasOutHandle)
+                            {
+                                nA.OutHandle = new PointF(nA.Point.X + (nB.Point.X - nA.Point.X) / 3f, nA.Point.Y + (nB.Point.Y - nA.Point.Y) / 3f);
+                                nA.HasOutHandle = true;
+                            }
+                            if (!nB.HasInHandle)
+                            {
+                                nB.InHandle = new PointF(nB.Point.X - (nB.Point.X - nA.Point.X) / 3f, nB.Point.Y - (nB.Point.Y - nA.Point.Y) / 3f);
+                                nB.HasInHandle = true;
+                            }
+
+                            _nodeDragInitialOutHandles[nA] = nA.OutHandle;
+                            _nodeDragInitialInHandles[nB] = nB.InHandle;
                             return;
                         }
                     }
@@ -1273,6 +1845,31 @@ namespace ZenQOffice.UI
                     }
                     break;
 
+                case NodeDragTarget.Segment:
+                    if (layer.SubPaths != null && _dragSegmentSubPathIndex >= 0 && _dragSegmentSubPathIndex < layer.SubPaths.Count)
+                    {
+                        var subPath = layer.SubPaths[_dragSegmentSubPathIndex];
+                        if (subPath.Nodes != null && _dragSegmentIndex >= 0 && _dragSegmentIndex < subPath.Nodes.Count)
+                        {
+                            var nA = subPath.Nodes[_dragSegmentIndex];
+                            int nextIdx = (_dragSegmentIndex + 1) % subPath.Nodes.Count;
+                            var nB = subPath.Nodes[nextIdx];
+
+                            if (_nodeDragInitialOutHandles.TryGetValue(nA, out PointF origOutA))
+                            {
+                                nA.OutHandle = new PointF(origOutA.X + dx, origOutA.Y + dy);
+                                nA.HasOutHandle = true;
+                            }
+                            if (_nodeDragInitialInHandles.TryGetValue(nB, out PointF origInB))
+                            {
+                                nB.InHandle = new PointF(origInB.X + dx, origInB.Y + dy);
+                                nB.HasInHandle = true;
+                            }
+                            VectorPathModel.UpdateLayerBounds(layer);
+                        }
+                    }
+                    break;
+
                 case NodeDragTarget.Marquee:
                     _currentDragPt = canvasPt;
                     RectangleF marqueeBounds = NormalizeRect(_dragStartPt, _currentDragPt);
@@ -1335,6 +1932,8 @@ namespace ZenQOffice.UI
 
             _isNodeToolDragging = false;
             _nodeDragTarget = NodeDragTarget.None;
+            _dragSegmentSubPathIndex = -1;
+            _dragSegmentIndex = -1;
             _activeDragNode = null;
             _pendingSingleSelectNode = null;
             _nodeDragInitialPoints.Clear();
@@ -1389,7 +1988,7 @@ namespace ZenQOffice.UI
                     }, () => {
                         float? v = ShowNumberInputDialog("Chiều rộng (R)", curW);
                         if (v.HasValue && v.Value > 0 && l != null) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, v.Value, l.Bounds.Height); }
-                    }, 68);
+                    }, 82);
 
                     // 3. Chiều cao C: [162.000] - +
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "C:", curH.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
@@ -1401,7 +2000,7 @@ namespace ZenQOffice.UI
                     }, () => {
                         float? v = ShowNumberInputDialog("Chiều cao (C)", curH);
                         if (v.HasValue && v.Value > 0 && l != null) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, l.Bounds.Width, v.Value); }
-                    }, 68);
+                    }, 82);
 
                     // 4. Bán kính bo góc ngang Rx: [0.000] - +
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Rx:", curRx.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
@@ -1434,7 +2033,7 @@ namespace ZenQOffice.UI
                                 l.ShapeType = (nextR > 0) ? VectorShapeType.RoundedRect : VectorShapeType.Rectangle;
                             }
                         }
-                    }, 68);
+                    }, 82);
 
                     // 5. Bán kính bo góc dọc Ry: [35.400] - +
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Ry:", curRy.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
@@ -1467,7 +2066,7 @@ namespace ZenQOffice.UI
                                 l.ShapeType = (nextR > 0) ? VectorShapeType.RoundedRect : VectorShapeType.Rectangle;
                             }
                         }
-                    }, 68);
+                    }, 82);
 
                     // 6. Đơn vị px
                     g.DrawString("px", lblFont, lblB, curX, RibbonHeight + 13);
@@ -1509,7 +2108,7 @@ namespace ZenQOffice.UI
                     }, () => {
                         float? v = ShowNumberInputDialog("Độ dày viền", curSw);
                         if (v.HasValue && v.Value > 0) SetStrokeWidth(v.Value);
-                    }, 62);
+                    }, 82);
 
                     // 9. Màu Tô
                     g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
@@ -1556,7 +2155,7 @@ namespace ZenQOffice.UI
                         }, () => {
                             float? v = ShowNumberInputDialog("Tọa độ X", curX_l);
                             if (v.HasValue) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(v.Value, l.Bounds.Y, l.Bounds.Width, l.Bounds.Height); }
-                        }, 62);
+                        }, 80);
 
                         curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Y:", curY_l.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
                             Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, curY_l - 5f, l.Bounds.Width, l.Bounds.Height);
@@ -1565,7 +2164,7 @@ namespace ZenQOffice.UI
                         }, () => {
                             float? v = ShowNumberInputDialog("Tọa độ Y", curY_l);
                             if (v.HasValue) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, v.Value, l.Bounds.Width, l.Bounds.Height); }
-                        }, 62);
+                        }, 80);
 
                         curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "R:", curW.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
                             float nw = Math.Max(5f, curW - 5f);
@@ -1576,7 +2175,7 @@ namespace ZenQOffice.UI
                         }, () => {
                             float? v = ShowNumberInputDialog("Chiều rộng (R)", curW);
                             if (v.HasValue && v.Value > 0) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, v.Value, l.Bounds.Height); }
-                        }, 62);
+                        }, 80);
 
                         curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "C:", curH.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
                             float nh = Math.Max(5f, curH - 5f);
@@ -1587,7 +2186,7 @@ namespace ZenQOffice.UI
                         }, () => {
                             float? v = ShowNumberInputDialog("Chiều cao (C)", curH);
                             if (v.HasValue && v.Value > 0) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, l.Bounds.Width, v.Value); }
-                        }, 62);
+                        }, 80);
 
                         g.DrawString("px", lblFont, lblB, curX, RibbonHeight + 13);
                         curX += (int)g.MeasureString("px", lblFont).Width + 8;
@@ -1729,7 +2328,7 @@ namespace ZenQOffice.UI
                     }, () => {
                         float nw = curW + 5f;
                         if (l != null) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, nw, l.Bounds.Height); }
-                    }, null, 62);
+                    }, null, 82);
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "C:", curH.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
                         float nh = Math.Max(5f, curH - 5f);
@@ -1737,7 +2336,7 @@ namespace ZenQOffice.UI
                     }, () => {
                         float nh = curH + 5f;
                         if (l != null) { Document.SaveUndoSnapshot(); l.Bounds = new RectangleF(l.Bounds.X, l.Bounds.Y, l.Bounds.Width, nh); }
-                    }, null, 62);
+                    }, null, 82);
 
                     g.DrawString("px", lblFont, lblB, curX, RibbonHeight + 13);
                     curX += (int)g.MeasureString("px", lblFont).Width + 8;
@@ -1746,7 +2345,7 @@ namespace ZenQOffice.UI
                         SetStrokeWidth(Math.Max(0.5f, curSw - 0.5f));
                     }, () => {
                         SetStrokeWidth(Math.Min(50f, curSw + 0.5f));
-                    }, null, 58);
+                    }, null, 80);
 
                     g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
                     curX += (int)g.MeasureString("Tô:", lblFont).Width + 5;
@@ -1843,131 +2442,132 @@ namespace ZenQOffice.UI
                     int selCount = selNodes.Count;
 
                     // Nhóm 1: Thao tác neo (6 nút biểu tượng 28x26 chuẩn Inkscape)
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "+", () => {
+                    // Nhóm 1: Thao tác neo (6 nút chuẩn Inkscape với nhãn rõ ràng)
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "+ Neo", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.InsertNodeAtMidpoint(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 46);
+                    curX += 50;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "−", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "− Neo", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.DeleteSelectedNodes(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 46);
+                    curX += 50;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⧉", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⧉ Nối", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.JoinSelectedNodes(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 46);
+                    curX += 50;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✂", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✂ Tách", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.BreakPathAtSelectedNodes(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 48);
+                    curX += 52;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌢", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌢ Nối đầu", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.ConnectEndpoints(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 60);
+                    curX += 64;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✕", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✕ Xóa đoạn", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.DeleteSelectedSegment(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 68);
+                    curX += 72;
 
                     DrawTopBarSeparator(g, ref curX);
 
-                    // Nhóm 2: Kiểu điểm neo (4 nút biểu tượng 28x26)
+                    // Nhóm 2: Kiểu điểm neo (4 kiểu chuẩn Inkscape)
                     bool isCornerActive = selCount > 0 && selNodes.TrueForAll(n => n.NodeType == VectorNodeType.Corner);
                     bool isSmoothActive = selCount > 0 && selNodes.TrueForAll(n => n.NodeType == VectorNodeType.Smooth);
                     bool isSymmActive = selCount > 0 && selNodes.TrueForAll(n => n.NodeType == VectorNodeType.Symmetric);
                     bool isAutoActive = selCount > 0 && selNodes.TrueForAll(n => n.NodeType == VectorNodeType.AutoSmooth);
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌟", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌟ Góc", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.SetSelectedNodesType(Document.ActiveLayer, VectorNodeType.Corner);
                         }
-                    }, isCornerActive);
-                    curX += 30;
+                    }, isCornerActive, 46);
+                    curX += 50;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "〜", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "〜 Mượt", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.SetSelectedNodesType(Document.ActiveLayer, VectorNodeType.Smooth);
                         }
-                    }, isSmoothActive);
-                    curX += 30;
+                    }, isSmoothActive, 52);
+                    curX += 56;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⚬", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⚬ Đ.xứng", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.SetSelectedNodesType(Document.ActiveLayer, VectorNodeType.Symmetric);
                         }
-                    }, isSymmActive);
-                    curX += 30;
+                    }, isSymmActive, 56);
+                    curX += 60;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✦", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "✦ Tự uốn", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.SetSelectedNodesType(Document.ActiveLayer, VectorNodeType.AutoSmooth);
                         }
-                    }, isAutoActive);
-                    curX += 30;
+                    }, isAutoActive, 56);
+                    curX += 60;
 
                     DrawTopBarSeparator(g, ref curX);
 
-                    // Nhóm 3: Đoạn vẽ (2 nút biểu tượng 28x26)
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "╱", () => {
+                    // Nhóm 3: Đoạn vẽ (Thẳng / Cong)
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "╱ Thẳng", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.ConvertSegmentToLine(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 52);
+                    curX += 56;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌒", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⌒ Cong", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.ConvertSegmentToCurve(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 50);
+                    curX += 54;
 
                     DrawTopBarSeparator(g, ref curX);
 
-                    // Nhóm 4: Chuyển đổi đối tượng (2 nút biểu tượng 28x26)
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⎔", () => {
+                    // Nhóm 4: Chuyển đổi đối tượng (Object to Path / Stroke to Path)
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "⎔ Ra Path", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.ObjectToPath(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 60);
+                    curX += 64;
 
-                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "║", () => {
+                    DrawTopBarNodeIconButton(g, curX, RibbonHeight + 8, "║ Viền Path", () => {
                         if (Document.ActiveLayer != null) {
                             Document.SaveUndoSnapshot();
                             VectorPathModel.StrokeToPath(Document.ActiveLayer);
                         }
-                    });
-                    curX += 30;
+                    }, false, 66);
+                    curX += 70;
 
                     DrawTopBarSeparator(g, ref curX);
 
@@ -2005,7 +2605,7 @@ namespace ZenQOffice.UI
                                 VectorPathModel.MoveSelectedNodes(Document.ActiveLayer, deltaX, 0f);
                             }
                         }
-                    }, 66);
+                    }, 82);
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Y:", strY, () => {
                         if (selCount > 0 && Document.ActiveLayer != null) {
@@ -2027,13 +2627,13 @@ namespace ZenQOffice.UI
                                 VectorPathModel.MoveSelectedNodes(Document.ActiveLayer, 0f, deltaY);
                             }
                         }
-                    }, 66);
+                    }, 82);
 
                     string unitBtnText = _nodeUnitIsMm ? "mm" : "px";
-                    DrawTopBarButton(g, curX, RibbonHeight + 9, 36, 26, unitBtnText, () => {
+                    DrawTopBarButton(g, curX, RibbonHeight + 9, 38, 26, unitBtnText, () => {
                         _nodeUnitIsMm = !_nodeUnitIsMm;
                     }, _nodeUnitIsMm);
-                    curX += 42;
+                    curX += 44;
                 }
                 else if (SelectedTool == PhotoTool.Text)
                 {
@@ -2102,6 +2702,8 @@ namespace ZenQOffice.UI
                     curX += 90;
                     DrawTopBarButton(g, curX, RibbonHeight + 10, 76, 24, "Tỏa tròn", () => SetFillType(VectorFillType.RadialGradient), ShapeFillType == VectorFillType.RadialGradient);
                     curX += 82;
+                    DrawTopBarButton(g, curX, RibbonHeight + 10, 140, 24, "Chỉnh Dải Màu & Alpha...", () => OpenGradientEditor(), false);
+                    curX += 146;
                 }
                 else if (SelectedTool == PhotoTool.Eyedropper)
                 {
@@ -2434,7 +3036,21 @@ namespace ZenQOffice.UI
             // Action Buttons
             int btnY = y;
             DrawInspButton(g, x + 10, btnY, 52, 28, "+ Thêm", () => {
-                Document.AddVectorShape(VectorShapeType.Rectangle, new RectangleF(150, 150, 200, 150), ShapeFillColor, ShapeStrokeColor, ShapeStrokeWidth, ShapeCornerRadius, ActiveShapePointCount);
+                ContextMenuStrip menu = new ContextMenuStrip();
+                var itemRect = new ToolStripMenuItem("Thêm hình chữ nhật vector");
+                itemRect.Click += (s, e) => Document?.AddVectorShape(VectorShapeType.Rectangle, new RectangleF(150, 150, 200, 150), ShapeFillColor, ShapeStrokeColor, ShapeStrokeWidth, ShapeCornerRadius, ActiveShapePointCount);
+                var itemEllipse = new ToolStripMenuItem("Thêm hình tròn / Elip vector");
+                itemEllipse.Click += (s, e) => Document?.AddVectorShape(VectorShapeType.Ellipse, new RectangleF(150, 150, 180, 180), ShapeFillColor, ShapeStrokeColor, ShapeStrokeWidth, ShapeCornerRadius, ActiveShapePointCount);
+                var itemText = new ToolStripMenuItem("Thêm văn bản nghệ thuật");
+                itemText.Click += (s, e) => Document?.AddText("ZenQ Vector Text", 150, 150, ActiveFontSize, ForegroundColor);
+                var itemImg = new ToolStripMenuItem("🖼️ Chèn hình ảnh (Chuẩn Inkscape)...");
+                itemImg.Click += (s, e) => PromptInsertImage();
+                menu.Items.Add(itemRect);
+                menu.Items.Add(itemEllipse);
+                menu.Items.Add(itemText);
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add(itemImg);
+                menu.Show(Cursor.Position);
             });
             DrawInspButton(g, x + 66, btnY, 64, 28, "Nhân bản", () => {
                 Document.DuplicateActiveLayer();
@@ -2500,6 +3116,10 @@ namespace ZenQOffice.UI
                         VectorShapeType.Ellipse => "Hình tròn / Elip",
                         VectorShapeType.Star => "Ngôi sao",
                         VectorShapeType.Polygon => "Đa giác",
+                        VectorShapeType.Spiral => "Đường xoắn ốc",
+                        VectorShapeType.Arrow => "Mũi tên vector",
+                        VectorShapeType.Heart => "Trái tim",
+                        VectorShapeType.Line => "Đoạn thẳng",
                         VectorShapeType.Path => "Đường vẽ Bezier",
                         _ => "Lớp đồ họa"
                     };
@@ -2619,6 +3239,11 @@ namespace ZenQOffice.UI
                             SetGradientAngle(ang);
                         });
                     }
+
+                    secY += 38;
+                    DrawInspButton(g, x + 12, secY, 240, 28, "Chỉnh Gradient & Alpha nhiều màu...", () => {
+                        OpenGradientEditor();
+                    });
 
                     secY += 38;
                     g.DrawString("BẢNG MÀU CHỌN NHANH", titleF, tb, x + 12, secY);
@@ -3084,12 +3709,30 @@ namespace ZenQOffice.UI
         private void SetFillColor(Color c)
         {
             ShapeFillColor = c;
-            ShapeFillType = (c.A == 0) ? VectorFillType.None : VectorFillType.Solid;
             if (Document.ActiveLayer != null && Document.ActiveLayer.Type == LayerType.VectorShape)
             {
                 Document.SaveUndoSnapshot();
                 Document.ActiveLayer.FillColor = c;
-                Document.ActiveLayer.FillType = (c.A == 0) ? VectorFillType.None : VectorFillType.Solid;
+                if (Document.ActiveLayer.FillType != VectorFillType.LinearGradient && 
+                    Document.ActiveLayer.FillType != VectorFillType.RadialGradient)
+                {
+                    Document.ActiveLayer.FillType = (c.A == 0) ? VectorFillType.None : VectorFillType.Solid;
+                }
+                else if (Document.ActiveLayer.GradientStops != null && Document.ActiveLayer.GradientStops.Count > 0)
+                {
+                    Document.ActiveLayer.GradientStops[0].Color = c;
+                }
+            }
+            else
+            {
+                if (ShapeFillType != VectorFillType.LinearGradient && ShapeFillType != VectorFillType.RadialGradient)
+                {
+                    ShapeFillType = (c.A == 0) ? VectorFillType.None : VectorFillType.Solid;
+                }
+                else if (ShapeGradientStops != null && ShapeGradientStops.Count > 0)
+                {
+                    ShapeGradientStops[0].Color = c;
+                }
             }
         }
 
@@ -3100,6 +3743,62 @@ namespace ZenQOffice.UI
             {
                 Document.SaveUndoSnapshot();
                 Document.ActiveLayer.FillColor2 = c;
+                if (Document.ActiveLayer.GradientStops != null && Document.ActiveLayer.GradientStops.Count >= 2)
+                {
+                    Document.ActiveLayer.GradientStops[Document.ActiveLayer.GradientStops.Count - 1].Color = c;
+                }
+            }
+            else
+            {
+                if (ShapeGradientStops != null && ShapeGradientStops.Count >= 2)
+                {
+                    ShapeGradientStops[ShapeGradientStops.Count - 1].Color = c;
+                }
+            }
+        }
+
+        public void OpenGradientEditor(IWin32Window parent = null)
+        {
+            var l = Document.ActiveLayer;
+            VectorFillType curType = (l != null && l.Type == LayerType.VectorShape) ? l.FillType : ShapeFillType;
+            if (curType != VectorFillType.LinearGradient && curType != VectorFillType.RadialGradient)
+            {
+                curType = VectorFillType.LinearGradient;
+            }
+            float curAngle = (l != null && l.Type == LayerType.VectorShape) ? l.FillGradientAngle : ShapeFillGradientAngle;
+            Color c1 = (l != null && l.Type == LayerType.VectorShape) ? l.FillColor : ShapeFillColor;
+            Color c2 = (l != null && l.Type == LayerType.VectorShape) ? l.FillColor2 : ShapeFillColor2;
+            List<PhotoGradientStop> stops = (l != null && l.Type == LayerType.VectorShape && l.GradientStops != null && l.GradientStops.Count >= 2)
+                ? l.GradientStops
+                : ShapeGradientStops;
+
+            using (var dlg = new GradientEditorDialogForm(curType, curAngle, c1, c2, stops))
+            {
+                DialogResult res = (parent != null) ? dlg.ShowDialog(parent) : dlg.ShowDialog();
+                if (res == DialogResult.OK)
+                {
+                    ShapeFillType = dlg.SelectedFillType;
+                    ShapeFillGradientAngle = dlg.SelectedAngle;
+                    ShapeGradientStops = dlg.SelectedStops.Select(s => s.Clone()).ToList();
+                    if (ShapeGradientStops.Count >= 2)
+                    {
+                        ShapeFillColor = ShapeGradientStops[0].Color;
+                        ShapeFillColor2 = ShapeGradientStops[ShapeGradientStops.Count - 1].Color;
+                    }
+
+                    if (Document.ActiveLayer != null && Document.ActiveLayer.Type == LayerType.VectorShape)
+                    {
+                        Document.SaveUndoSnapshot();
+                        Document.ActiveLayer.FillType = dlg.SelectedFillType;
+                        Document.ActiveLayer.FillGradientAngle = dlg.SelectedAngle;
+                        Document.ActiveLayer.GradientStops = dlg.SelectedStops.Select(s => s.Clone()).ToList();
+                        if (Document.ActiveLayer.GradientStops.Count >= 2)
+                        {
+                            Document.ActiveLayer.FillColor = Document.ActiveLayer.GradientStops[0].Color;
+                            Document.ActiveLayer.FillColor2 = Document.ActiveLayer.GradientStops[Document.ActiveLayer.GradientStops.Count - 1].Color;
+                        }
+                    }
+                }
             }
         }
 
@@ -3279,6 +3978,45 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
         public void HandleMouseDown(int x, int y, MouseButtons button, Keys modifiers, int viewW, int viewH)
         {
+            // 0. Check Horizontal & Vertical Workspace Scrollbars Click
+            if (!HScrollBarThumbRect.IsEmpty && HScrollBarThumbRect.Contains(x, y))
+            {
+                IsDraggingHScrollBar = true;
+                _scrollBarDragStartMouseX = x;
+                _scrollBarDragStartPanX = PanX;
+                return;
+            }
+            if (!HScrollBarTrackRect.IsEmpty && HScrollBarTrackRect.Contains(x, y))
+            {
+                GetScrollLimits(viewW, viewH, out float minX, out float maxX, out float minY, out float maxY);
+                float availW = Math.Max(100f, viewW - LeftToolbarWidth - RightInspectorWidth);
+                if (x < HScrollBarThumbRect.X)
+                    PanX = Math.Min(maxX, PanX + availW * 0.75f);
+                else
+                    PanX = Math.Max(minX, PanX - availW * 0.75f);
+                ClampPan(viewW, viewH);
+                return;
+            }
+
+            if (!VScrollBarThumbRect.IsEmpty && VScrollBarThumbRect.Contains(x, y))
+            {
+                IsDraggingVScrollBar = true;
+                _scrollBarDragStartMouseY = y;
+                _scrollBarDragStartPanY = PanY;
+                return;
+            }
+            if (!VScrollBarTrackRect.IsEmpty && VScrollBarTrackRect.Contains(x, y))
+            {
+                GetScrollLimits(viewW, viewH, out float minX, out float maxX, out float minY, out float maxY);
+                float availH = Math.Max(100f, viewH - RibbonHeight - TopOptionsBarHeight - BottomStatusHeight);
+                if (y < VScrollBarThumbRect.Y)
+                    PanY = Math.Min(maxY, PanY + availH * 0.75f);
+                else
+                    PanY = Math.Max(minY, PanY - availH * 0.75f);
+                ClampPan(viewW, viewH);
+                return;
+            }
+
             // 1. Check Left Toolbar Clicks
             if (x < LeftToolbarWidth && y >= RibbonHeight)
             {
@@ -3391,8 +4129,28 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 return;
             }
 
-            // 5. Middle Mouse Button or Hand Tool: Pan Canvas
-            if (button == MouseButtons.Middle || SelectedTool == PhotoTool.Hand || (modifiers & Keys.Space) == Keys.Space)
+            // Check Ruler Clicks (Drag out new guidelines)
+            if (ShowRulers)
+            {
+                int rulerStartY = RibbonHeight + TopOptionsBarHeight;
+                // Top Ruler (Drag Horizontal Guide)
+                if (x >= LeftToolbarWidth + RulerThickness && x < viewW - RightInspectorWidth && y >= rulerStartY && y < rulerStartY + RulerThickness)
+                {
+                    _isDraggingRulerGuideH = true;
+                    _currentDraggingGuidePos = ScreenToCanvas(x, y, viewW, viewH).Y;
+                    return;
+                }
+                // Left Ruler (Drag Vertical Guide)
+                if (x >= LeftToolbarWidth && x < LeftToolbarWidth + RulerThickness && y >= rulerStartY + RulerThickness && y < viewH - BottomStatusHeight)
+                {
+                    _isDraggingRulerGuideV = true;
+                    _currentDraggingGuidePos = ScreenToCanvas(x, y, viewW, viewH).X;
+                    return;
+                }
+            }
+
+            // 5. Middle Mouse Button, Hand Tool, or Spacebar held: Pan Canvas
+            if (button == MouseButtons.Middle || SelectedTool == PhotoTool.Hand || (modifiers & Keys.Space) == Keys.Space || IsSpaceHeld)
             {
                 IsPanning = true;
                 _lastPanPoint = new Point(x, y);
@@ -3405,7 +4163,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             _currentDragPt = canvasPt;
 
             // Kiểm tra tương tác với các handle biến đổi (Bo góc, Thay đổi kích thước, Xoay)
-            if (Document.ActiveLayer != null && (SelectedTool == PhotoTool.Rectangle || SelectedTool == PhotoTool.Move))
+            if (Document.ActiveLayer != null && (IsShapeTool(SelectedTool) || SelectedTool == PhotoTool.Move))
             {
                 int hitH = CheckTransformHandles(x, y, viewW, viewH);
                 if (hitH >= 0)
@@ -3427,26 +4185,37 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 }
             }
 
-            if (SelectedTool == PhotoTool.Rectangle)
+            if (IsShapeTool(SelectedTool))
             {
-                // Nếu click vào một hình chữ nhật khác trên canvas thì chọn nó
+                // Nếu click vào một hình vector khác trên canvas thì chọn nó
                 for (int i = Document.Layers.Count - 1; i >= 0; i--)
                 {
                     var l = Document.Layers[i];
-                    if (l.Type == LayerType.VectorShape && 
-                        (l.ShapeType == VectorShapeType.Rectangle || l.ShapeType == VectorShapeType.RoundedRect) &&
-                        l.Bounds.Contains(canvasPt))
+                    if (l.Type == LayerType.VectorShape && l.Bounds.Contains(canvasPt))
                     {
                         Document.ActiveLayerIndex = i;
                         ShapeCornerRadius = l.CornerRadius;
                         ShapeFillColor = l.FillColor;
+                        ShapeFillColor2 = l.FillColor2;
+                        ShapeFillType = l.FillType;
+                        ShapeFillGradientAngle = l.FillGradientAngle;
                         ShapeStrokeColor = l.StrokeColor;
                         ShapeStrokeWidth = l.StrokeWidth;
+                        if (l.GradientStops != null && l.GradientStops.Count > 0)
+                        {
+                            ShapeGradientStops = l.GradientStops.Select(s => s.Clone()).ToList();
+                        }
                         _isDrawing = false;
                         return;
                     }
                 }
-                // Nếu click vào vùng trống, bắt đầu vẽ hình chữ nhật mới
+                // Nếu click vào vùng trống, bắt đầu vẽ hình vector mới
+                _selectedTransformHandle = -1;
+                _isDrawing = true;
+                return;
+            }
+            else if (SelectedTool == PhotoTool.Gradient)
+            {
                 _selectedTransformHandle = -1;
                 _isDrawing = true;
                 return;
@@ -3521,41 +4290,69 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                     Document.ActiveLayer.PathPoints.Add(canvasPt);
                     if (Document.ActiveLayer.SubPaths == null) Document.ActiveLayer.SubPaths = new List<VectorSubPath>();
                     if (Document.ActiveLayer.SubPaths.Count == 0) Document.ActiveLayer.SubPaths.Add(new VectorSubPath(false));
-                    Document.ActiveLayer.SubPaths[0].Nodes.Add(new VectorPathNode(canvasPt, VectorNodeType.Corner));
+                    var n = new VectorPathNode(canvasPt, VectorNodeType.Corner);
+                    Document.ActiveLayer.SubPaths[0].Nodes.Add(n);
+                    _activeDragNode = n;
                 }
                 else
                 {
-                    Document.SaveUndoSnapshot();
-                    Document.ActiveLayer.PathPoints.Add(canvasPt);
-                    if (Document.ActiveLayer.SubPaths == null) Document.ActiveLayer.SubPaths = new List<VectorSubPath>();
-                    if (Document.ActiveLayer.SubPaths.Count == 0) Document.ActiveLayer.SubPaths.Add(new VectorSubPath(false));
-                    Document.ActiveLayer.SubPaths[0].Nodes.Add(new VectorPathNode(canvasPt, VectorNodeType.Corner));
-                    // Update bounds
-                    float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
-                    foreach(var p in Document.ActiveLayer.PathPoints)
+                    var curLayer = Document.ActiveLayer;
+                    curLayer.EnsureNodesInitialized();
+                    var sp = (curLayer.SubPaths != null && curLayer.SubPaths.Count > 0) ? curLayer.SubPaths[curLayer.SubPaths.Count - 1] : null;
+
+                    // Nếu click gần điểm đầu tiên của phân đoạn -> Đóng đường dẫn (Close Path)!
+                    if (sp != null && sp.Nodes != null && sp.Nodes.Count > 1 && !sp.IsClosed)
                     {
-                        if(p.X < minX) minX = p.X;
-                        if(p.Y < minY) minY = p.Y;
-                        if(p.X > maxX) maxX = p.X;
-                        if(p.Y > maxY) maxY = p.Y;
+                        var firstNode = sp.Nodes[0];
+                        float distSq = (canvasPt.X - firstNode.Point.X) * (canvasPt.X - firstNode.Point.X) +
+                                       (canvasPt.Y - firstNode.Point.Y) * (canvasPt.Y - firstNode.Point.Y);
+                        float snapTol = 12f / Math.Max(0.1f, Zoom);
+                        if (distSq <= snapTol * snapTol)
+                        {
+                            Document.SaveUndoSnapshot();
+                            sp.IsClosed = true;
+                            VectorPathModel.UpdateLayerBounds(curLayer);
+                            _isDrawing = false;
+                            _isPenDraggingHandle = false;
+                            _activeDragNode = null;
+                            return;
+                        }
                     }
-                    Document.ActiveLayer.Bounds = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
+
+                    Document.SaveUndoSnapshot();
+                    curLayer.PathPoints.Add(canvasPt);
+                    if (curLayer.SubPaths == null) curLayer.SubPaths = new List<VectorSubPath>();
+                    if (curLayer.SubPaths.Count == 0) curLayer.SubPaths.Add(new VectorSubPath(false));
+                    var n = new VectorPathNode(canvasPt, VectorNodeType.Corner);
+                    curLayer.SubPaths[curLayer.SubPaths.Count - 1].Nodes.Add(n);
+                    _activeDragNode = n;
+                    VectorPathModel.UpdateLayerBounds(curLayer);
                 }
                 _isDrawing = true;
+                _isPenDraggingHandle = true;
+                _dragStartPt = canvasPt;
             }
             else if (SelectedTool == PhotoTool.Move)
             {
                 _selectedTransformHandle = CheckTransformHandles(x, y, viewW, viewH);
                 if (_selectedTransformHandle < 0)
                 {
-                    SelectLayerAt(canvasPt);
+                    bool isShift = (modifiers & Keys.Shift) == Keys.Shift;
+                    SelectLayerAt(canvasPt, isShift);
                     if (Document.ActiveLayer != null) _selectedTransformHandle = 9;
                 }
 
                 if (Document.ActiveLayer != null)
                 {
                     Document.SaveUndoSnapshot();
-                    _dragInitialBounds = Document.ActiveLayer.Bounds;
+                    if (Document.SelectedLayers.Count > 1)
+                    {
+                        _dragInitialBounds = GetCombinedSelectionBounds();
+                    }
+                    else
+                    {
+                        _dragInitialBounds = Document.ActiveLayer.Bounds;
+                    }
                     _dragInitialRotation = Document.ActiveLayer.Rotation;
                     if (Document.ActiveLayer.PathPoints != null)
                     {
@@ -3564,6 +4361,18 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                     if (Document.ActiveLayer.SubPaths != null)
                     {
                         _dragInitialSubPaths = Document.ActiveLayer.SubPaths.Select(sp => sp.Clone()).ToList();
+                    }
+
+                    _multiDragInitialBounds.Clear();
+                    _multiDragInitialRotations.Clear();
+                    _multiDragInitialPoints.Clear();
+                    _multiDragInitialSubPaths.Clear();
+                    foreach (var sel in Document.SelectedLayers)
+                    {
+                        _multiDragInitialBounds[sel] = sel.Bounds;
+                        _multiDragInitialRotations[sel] = sel.Rotation;
+                        if (sel.PathPoints != null) _multiDragInitialPoints[sel] = new List<PointF>(sel.PathPoints);
+                        if (sel.SubPaths != null) _multiDragInitialSubPaths[sel] = sel.SubPaths.Select(sp => sp.Clone()).ToList();
                     }
                 }
                 _isDrawing = true;
@@ -3581,6 +4390,41 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
         public void HandleMouseMove(int x, int y, MouseButtons button, Keys modifiers, int viewW, int viewH)
         {
+            if (IsDraggingHScrollBar)
+            {
+                int deltaX = x - _scrollBarDragStartMouseX;
+                int trackW = HScrollBarTrackRect.Width;
+                int thumbW = HScrollBarThumbRect.Width;
+                int availTravel = trackW - thumbW;
+                if (availTravel > 0)
+                {
+                    GetScrollLimits(viewW, viewH, out float minX, out float maxX, out float minY, out float maxY);
+                    float scrollSpan = maxX - minX;
+                    PanX = _scrollBarDragStartPanX - (deltaX / (float)availTravel) * scrollSpan;
+                    ClampPan(viewW, viewH);
+                }
+                return;
+            }
+
+            if (IsDraggingVScrollBar)
+            {
+                int deltaY = y - _scrollBarDragStartMouseY;
+                int trackH = VScrollBarTrackRect.Height;
+                int thumbH = VScrollBarThumbRect.Height;
+                int availTravel = trackH - thumbH;
+                if (availTravel > 0)
+                {
+                    GetScrollLimits(viewW, viewH, out float minX, out float maxX, out float minY, out float maxY);
+                    float scrollSpan = maxY - minY;
+                    PanY = _scrollBarDragStartPanY - (deltaY / (float)availTravel) * scrollSpan;
+                    ClampPan(viewW, viewH);
+                }
+                return;
+            }
+
+            IsHoverHScrollBarThumb = !HScrollBarThumbRect.IsEmpty && HScrollBarThumbRect.Contains(x, y);
+            IsHoverVScrollBarThumb = !VScrollBarThumbRect.IsEmpty && VScrollBarThumbRect.Contains(x, y);
+
             if (_isDraggingBrushSizeSlider)
             {
                 UpdateBrushSizeFromSlider(x);
@@ -3598,7 +4442,20 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             }
 
             PointF canvasPt = ScreenToCanvas(x, y, viewW, viewH);
+            CurrentMouseCanvasPoint = canvasPt;
             _currentDragPt = canvasPt;
+            _penHoverPt = canvasPt;
+
+            if (_isDraggingRulerGuideH)
+            {
+                _currentDraggingGuidePos = canvasPt.Y;
+                return;
+            }
+            if (_isDraggingRulerGuideV)
+            {
+                _currentDraggingGuidePos = canvasPt.X;
+                return;
+            }
 
             if (IsPanning)
             {
@@ -3616,6 +4473,22 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
             if (_isDrawing && button == MouseButtons.Left)
             {
+                if (SelectedTool == PhotoTool.Pen && _isPenDraggingHandle && _activeDragNode != null)
+                {
+                    float dx = canvasPt.X - _dragStartPt.X;
+                    float dy = canvasPt.Y - _dragStartPt.Y;
+                    if (Math.Abs(dx) > 1f / Zoom || Math.Abs(dy) > 1f / Zoom)
+                    {
+                        _activeDragNode.OutHandle = canvasPt;
+                        _activeDragNode.HasOutHandle = true;
+                        _activeDragNode.InHandle = new PointF(2 * _activeDragNode.Point.X - canvasPt.X, 2 * _activeDragNode.Point.Y - canvasPt.Y);
+                        _activeDragNode.HasInHandle = true;
+                        _activeDragNode.NodeType = VectorNodeType.Smooth;
+                        if (Document.ActiveLayer != null) VectorPathModel.UpdateLayerBounds(Document.ActiveLayer);
+                    }
+                    return;
+                }
+
                 if (SelectedTool == PhotoTool.Brush || SelectedTool == PhotoTool.Eraser)
                 {
                     PaintBrushLine(_lastBrushPt, canvasPt);
@@ -3669,29 +4542,145 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
                     if (_selectedTransformHandle == 9) // Move
                     {
-                        Document.ActiveLayer.Bounds = new RectangleF(b.X + dx, b.Y + dy, b.Width, b.Height);
-                        if (_dragInitialPathPoints != null && Document.ActiveLayer.PathPoints != null && Document.ActiveLayer.PathPoints.Count == _dragInitialPathPoints.Count)
+                        if (SnapToGrid && GridSize > 0f)
                         {
-                            for (int pIdx = 0; pIdx < _dragInitialPathPoints.Count; pIdx++)
+                            float targetX = (float)Math.Round((b.X + dx) / GridSize) * GridSize;
+                            float targetY = (float)Math.Round((b.Y + dy) / GridSize) * GridSize;
+                            dx = targetX - b.X;
+                            dy = targetY - b.Y;
+                        }
+
+                        _activeSmartGuides.Clear();
+                        if (SnapToObjects)
+                        {
+                            float snapTol = 6f / Math.Max(0.1f, Zoom);
+                            RectangleF movingBox = new RectangleF(b.X + dx, b.Y + dy, b.Width, b.Height);
+                            float[] testX = new float[] { movingBox.Left, movingBox.Left + movingBox.Width / 2f, movingBox.Right };
+                            float[] testY = new float[] { movingBox.Top, movingBox.Top + movingBox.Height / 2f, movingBox.Bottom };
+
+                            var targetXList = new List<float> { 0f, Document.Width / 2f, Document.Width };
+                            var targetYList = new List<float> { 0f, Document.Height / 2f, Document.Height };
+
+                            foreach (var lyr in Document.Layers)
                             {
-                                Document.ActiveLayer.PathPoints[pIdx] = new PointF(_dragInitialPathPoints[pIdx].X + dx, _dragInitialPathPoints[pIdx].Y + dy);
+                                if (!lyr.IsVisible || Document.SelectedLayers.Contains(lyr)) continue;
+                                targetXList.Add(lyr.Bounds.Left);
+                                targetXList.Add(lyr.Bounds.Left + lyr.Bounds.Width / 2f);
+                                targetXList.Add(lyr.Bounds.Right);
+                                targetYList.Add(lyr.Bounds.Top);
+                                targetYList.Add(lyr.Bounds.Top + lyr.Bounds.Height / 2f);
+                                targetYList.Add(lyr.Bounds.Bottom);
+                            }
+
+                            // Best X snap
+                            float bestDiffX = float.MaxValue;
+                            float snapDeltaX = 0f;
+                            float guideX = 0f;
+                            foreach (float tx in testX)
+                            {
+                                foreach (float target in targetXList)
+                                {
+                                    float diff = Math.Abs(tx - target);
+                                    if (diff < snapTol && diff < bestDiffX)
+                                    {
+                                        bestDiffX = diff;
+                                        snapDeltaX = target - tx;
+                                        guideX = target;
+                                    }
+                                }
+                            }
+                            if (bestDiffX < snapTol)
+                            {
+                                dx += snapDeltaX;
+                                _activeSmartGuides.Add((new PointF(guideX, 0f), new PointF(guideX, Document.Height), Color.FromArgb(236, 72, 153)));
+                            }
+
+                            // Best Y snap
+                            float bestDiffY = float.MaxValue;
+                            float snapDeltaY = 0f;
+                            float guideY = 0f;
+                            foreach (float ty in testY)
+                            {
+                                foreach (float target in targetYList)
+                                {
+                                    float diff = Math.Abs(ty - target);
+                                    if (diff < snapTol && diff < bestDiffY)
+                                    {
+                                        bestDiffY = diff;
+                                        snapDeltaY = target - ty;
+                                        guideY = target;
+                                    }
+                                }
+                            }
+                            if (bestDiffY < snapTol)
+                            {
+                                dy += snapDeltaY;
+                                _activeSmartGuides.Add((new PointF(0f, guideY), new PointF(Document.Width, guideY), Color.FromArgb(236, 72, 153)));
                             }
                         }
-                        if (_dragInitialSubPaths != null && Document.ActiveLayer.SubPaths != null && Document.ActiveLayer.SubPaths.Count == _dragInitialSubPaths.Count)
+
+                        if (Document.SelectedLayers.Count > 1)
                         {
-                            for (int spIdx = 0; spIdx < _dragInitialSubPaths.Count; spIdx++)
+                            foreach (var sel in Document.SelectedLayers)
                             {
-                                var initSp = _dragInitialSubPaths[spIdx];
-                                var curSp = Document.ActiveLayer.SubPaths[spIdx];
-                                if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
+                                if (_multiDragInitialBounds.TryGetValue(sel, out var origB))
                                 {
-                                    for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                    sel.Bounds = new RectangleF(origB.X + dx, origB.Y + dy, origB.Width, origB.Height);
+                                }
+                                if (_multiDragInitialPoints.TryGetValue(sel, out var origPts) && sel.PathPoints != null && sel.PathPoints.Count == origPts.Count)
+                                {
+                                    for (int pIdx = 0; pIdx < origPts.Count; pIdx++)
                                     {
-                                        var initN = initSp.Nodes[nIdx];
-                                        var curN = curSp.Nodes[nIdx];
-                                        curN.Point = new PointF(initN.Point.X + dx, initN.Point.Y + dy);
-                                        curN.InHandle = new PointF(initN.InHandle.X + dx, initN.InHandle.Y + dy);
-                                        curN.OutHandle = new PointF(initN.OutHandle.X + dx, initN.OutHandle.Y + dy);
+                                        sel.PathPoints[pIdx] = new PointF(origPts[pIdx].X + dx, origPts[pIdx].Y + dy);
+                                    }
+                                }
+                                if (_multiDragInitialSubPaths.TryGetValue(sel, out var origSubs) && sel.SubPaths != null && sel.SubPaths.Count == origSubs.Count)
+                                {
+                                    for (int spIdx = 0; spIdx < origSubs.Count; spIdx++)
+                                    {
+                                        var initSp = origSubs[spIdx];
+                                        var curSp = sel.SubPaths[spIdx];
+                                        if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
+                                        {
+                                            for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                            {
+                                                var initN = initSp.Nodes[nIdx];
+                                                var curN = curSp.Nodes[nIdx];
+                                                curN.Point = new PointF(initN.Point.X + dx, initN.Point.Y + dy);
+                                                curN.InHandle = new PointF(initN.InHandle.X + dx, initN.InHandle.Y + dy);
+                                                curN.OutHandle = new PointF(initN.OutHandle.X + dx, initN.OutHandle.Y + dy);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Document.ActiveLayer.Bounds = new RectangleF(b.X + dx, b.Y + dy, b.Width, b.Height);
+                            if (_dragInitialPathPoints != null && Document.ActiveLayer.PathPoints != null && Document.ActiveLayer.PathPoints.Count == _dragInitialPathPoints.Count)
+                            {
+                                for (int pIdx = 0; pIdx < _dragInitialPathPoints.Count; pIdx++)
+                                {
+                                    Document.ActiveLayer.PathPoints[pIdx] = new PointF(_dragInitialPathPoints[pIdx].X + dx, _dragInitialPathPoints[pIdx].Y + dy);
+                                }
+                            }
+                            if (_dragInitialSubPaths != null && Document.ActiveLayer.SubPaths != null && Document.ActiveLayer.SubPaths.Count == _dragInitialSubPaths.Count)
+                            {
+                                for (int spIdx = 0; spIdx < _dragInitialSubPaths.Count; spIdx++)
+                                {
+                                    var initSp = _dragInitialSubPaths[spIdx];
+                                    var curSp = Document.ActiveLayer.SubPaths[spIdx];
+                                    if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
+                                    {
+                                        for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                        {
+                                            var initN = initSp.Nodes[nIdx];
+                                            var curN = curSp.Nodes[nIdx];
+                                            curN.Point = new PointF(initN.Point.X + dx, initN.Point.Y + dy);
+                                            curN.InHandle = new PointF(initN.InHandle.X + dx, initN.InHandle.Y + dy);
+                                            curN.OutHandle = new PointF(initN.OutHandle.X + dx, initN.OutHandle.Y + dy);
+                                        }
                                     }
                                 }
                             }
@@ -3703,11 +4692,37 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                         float angleStart = (float)Math.Atan2(_dragStartPt.Y - center.Y, _dragStartPt.X - center.X);
                         float angleEnd = (float)Math.Atan2(canvasPt.Y - center.Y, canvasPt.X - center.X);
                         float angleDiff = (angleEnd - angleStart) * 180f / (float)Math.PI;
-                        Document.ActiveLayer.Rotation = _dragInitialRotation + angleDiff;
+
+                        if (Document.SelectedLayers.Count > 1)
+                        {
+                            float rad = angleDiff * (float)Math.PI / 180f;
+                            float cosR = (float)Math.Cos(rad);
+                            float sinR = (float)Math.Sin(rad);
+
+                            foreach (var sel in Document.SelectedLayers)
+                            {
+                                if (_multiDragInitialBounds.TryGetValue(sel, out var origB) &&
+                                    _multiDragInitialRotations.TryGetValue(sel, out var origRot))
+                                {
+                                    PointF lyrCenter0 = new PointF(origB.X + origB.Width / 2f, origB.Y + origB.Height / 2f);
+                                    float dcX = lyrCenter0.X - center.X;
+                                    float dcY = lyrCenter0.Y - center.Y;
+                                    float newCenterCx = center.X + dcX * cosR - dcY * sinR;
+                                    float newCenterCy = center.Y + dcX * sinR + dcY * cosR;
+
+                                    sel.Bounds = new RectangleF(newCenterCx - origB.Width / 2f, newCenterCy - origB.Height / 2f, origB.Width, origB.Height);
+                                    sel.Rotation = (origRot + angleDiff + 360f) % 360f;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Document.ActiveLayer.Rotation = (_dragInitialRotation + angleDiff + 360f) % 360f;
+                        }
                     }
                     else if (_selectedTransformHandle >= 0 && _selectedTransformHandle <= 7) // Resize
                     {
-                        if (Document.ActiveLayer.Rotation != 0f)
+                        if (Document.ActiveLayer.Rotation != 0f && Document.SelectedLayers.Count <= 1)
                         {
                             float angle = -Document.ActiveLayer.Rotation * (float)Math.PI / 180f;
                             float localDx = (float)(dx * Math.Cos(angle) - dy * Math.Sin(angle));
@@ -3738,36 +4753,91 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                         if (newW < 2f) { newX = b.X + b.Width - 2f; newW = 2f; }
                         if (newH < 2f) { newY = b.Y + b.Height - 2f; newH = 2f; }
 
-                        Document.ActiveLayer.Bounds = new RectangleF(newX, newY, newW, newH);
-
-                        if (b.Width > 0f && b.Height > 0f)
+                        if (Document.SelectedLayers.Count > 1)
                         {
-                            float sx = newW / b.Width;
-                            float sy = newH / b.Height;
-                            if (_dragInitialPathPoints != null && Document.ActiveLayer.PathPoints != null && Document.ActiveLayer.PathPoints.Count == _dragInitialPathPoints.Count)
+                            if (b.Width > 0f && b.Height > 0f)
                             {
-                                for (int pIdx = 0; pIdx < _dragInitialPathPoints.Count; pIdx++)
+                                float sx = newW / b.Width;
+                                float sy = newH / b.Height;
+                                foreach (var sel in Document.SelectedLayers)
                                 {
-                                    float relX = _dragInitialPathPoints[pIdx].X - b.X;
-                                    float relY = _dragInitialPathPoints[pIdx].Y - b.Y;
-                                    Document.ActiveLayer.PathPoints[pIdx] = new PointF(newX + relX * sx, newY + relY * sy);
+                                    if (_multiDragInitialBounds.TryGetValue(sel, out var origB))
+                                    {
+                                        float relX = origB.X - b.X;
+                                        float relY = origB.Y - b.Y;
+                                        float lyrNewX = newX + relX * sx;
+                                        float lyrNewY = newY + relY * sy;
+                                        float lyrNewW = Math.Max(2f, origB.Width * sx);
+                                        float lyrNewH = Math.Max(2f, origB.Height * sy);
+                                        sel.Bounds = new RectangleF(lyrNewX, lyrNewY, lyrNewW, lyrNewH);
+
+                                        if (_multiDragInitialPoints.TryGetValue(sel, out var origPts) && sel.PathPoints != null && sel.PathPoints.Count == origPts.Count)
+                                        {
+                                            for (int pIdx = 0; pIdx < origPts.Count; pIdx++)
+                                            {
+                                                sel.PathPoints[pIdx] = new PointF(
+                                                    newX + (origPts[pIdx].X - b.X) * sx,
+                                                    newY + (origPts[pIdx].Y - b.Y) * sy
+                                                );
+                                            }
+                                        }
+
+                                        if (_multiDragInitialSubPaths.TryGetValue(sel, out var origSubs) && sel.SubPaths != null && sel.SubPaths.Count == origSubs.Count)
+                                        {
+                                            for (int spIdx = 0; spIdx < origSubs.Count; spIdx++)
+                                            {
+                                                var initSp = origSubs[spIdx];
+                                                var curSp = sel.SubPaths[spIdx];
+                                                if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
+                                                {
+                                                    for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                                    {
+                                                        var initN = initSp.Nodes[nIdx];
+                                                        var curN = curSp.Nodes[nIdx];
+                                                        curN.Point = new PointF(newX + (initN.Point.X - b.X) * sx, newY + (initN.Point.Y - b.Y) * sy);
+                                                        curN.InHandle = new PointF(newX + (initN.InHandle.X - b.X) * sx, newY + (initN.InHandle.Y - b.Y) * sy);
+                                                        curN.OutHandle = new PointF(newX + (initN.OutHandle.X - b.X) * sx, newY + (initN.OutHandle.Y - b.Y) * sy);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            if (_dragInitialSubPaths != null && Document.ActiveLayer.SubPaths != null && Document.ActiveLayer.SubPaths.Count == _dragInitialSubPaths.Count)
+                        }
+                        else
+                        {
+                            Document.ActiveLayer.Bounds = new RectangleF(newX, newY, newW, newH);
+
+                            if (b.Width > 0f && b.Height > 0f)
                             {
-                                for (int spIdx = 0; spIdx < _dragInitialSubPaths.Count; spIdx++)
+                                float sx = newW / b.Width;
+                                float sy = newH / b.Height;
+                                if (_dragInitialPathPoints != null && Document.ActiveLayer.PathPoints != null && Document.ActiveLayer.PathPoints.Count == _dragInitialPathPoints.Count)
                                 {
-                                    var initSp = _dragInitialSubPaths[spIdx];
-                                    var curSp = Document.ActiveLayer.SubPaths[spIdx];
-                                    if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
+                                    for (int pIdx = 0; pIdx < _dragInitialPathPoints.Count; pIdx++)
                                     {
-                                        for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                        float relX = _dragInitialPathPoints[pIdx].X - b.X;
+                                        float relY = _dragInitialPathPoints[pIdx].Y - b.Y;
+                                        Document.ActiveLayer.PathPoints[pIdx] = new PointF(newX + relX * sx, newY + relY * sy);
+                                    }
+                                }
+                                if (_dragInitialSubPaths != null && Document.ActiveLayer.SubPaths != null && Document.ActiveLayer.SubPaths.Count == _dragInitialSubPaths.Count)
+                                {
+                                    for (int spIdx = 0; spIdx < _dragInitialSubPaths.Count; spIdx++)
+                                    {
+                                        var initSp = _dragInitialSubPaths[spIdx];
+                                        var curSp = Document.ActiveLayer.SubPaths[spIdx];
+                                        if (initSp.Nodes != null && curSp.Nodes != null && initSp.Nodes.Count == curSp.Nodes.Count)
                                         {
-                                            var initN = initSp.Nodes[nIdx];
-                                            var curN = curSp.Nodes[nIdx];
-                                            curN.Point = new PointF(newX + (initN.Point.X - b.X) * sx, newY + (initN.Point.Y - b.Y) * sy);
-                                            curN.InHandle = new PointF(newX + (initN.InHandle.X - b.X) * sx, newY + (initN.InHandle.Y - b.Y) * sy);
-                                            curN.OutHandle = new PointF(newX + (initN.OutHandle.X - b.X) * sx, newY + (initN.OutHandle.Y - b.Y) * sy);
+                                            for (int nIdx = 0; nIdx < initSp.Nodes.Count; nIdx++)
+                                            {
+                                                var initN = initSp.Nodes[nIdx];
+                                                var curN = curSp.Nodes[nIdx];
+                                                curN.Point = new PointF(newX + (initN.Point.X - b.X) * sx, newY + (initN.Point.Y - b.Y) * sy);
+                                                curN.InHandle = new PointF(newX + (initN.InHandle.X - b.X) * sx, newY + (initN.InHandle.Y - b.Y) * sy);
+                                                curN.OutHandle = new PointF(newX + (initN.OutHandle.X - b.X) * sx, newY + (initN.OutHandle.Y - b.Y) * sy);
+                                            }
                                         }
                                     }
                                 }
@@ -3780,11 +4850,46 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
         public void HandleMouseUp(int x, int y, MouseButtons button, int viewW, int viewH)
         {
+            if (IsDraggingHScrollBar || IsDraggingVScrollBar)
+            {
+                IsDraggingHScrollBar = false;
+                IsDraggingVScrollBar = false;
+                return;
+            }
+
+            if (_isPenDraggingHandle)
+            {
+                _isPenDraggingHandle = false;
+                _activeDragNode = null;
+                return;
+            }
+
             if (_isDraggingBrushSizeSlider || _isDraggingRadiusSlider || _isDraggingFontSizeSlider)
             {
                 _isDraggingBrushSizeSlider = false;
                 _isDraggingRadiusSlider = false;
                 _isDraggingFontSizeSlider = false;
+                return;
+            }
+
+            if (_isDraggingRulerGuideH)
+            {
+                PointF pt = ScreenToCanvas(x, y, viewW, viewH);
+                if (pt.Y >= 0 && pt.Y <= Document.Height)
+                {
+                    HorizontalGuides.Add((float)Math.Round(pt.Y));
+                }
+                _isDraggingRulerGuideH = false;
+                return;
+            }
+            if (_isDraggingRulerGuideV)
+            {
+                PointF pt = ScreenToCanvas(x, y, viewW, viewH);
+                if (pt.X >= 0 && pt.X <= Document.Width)
+                {
+                    VerticalGuides.Add((float)Math.Round(pt.X));
+                }
+                _isDraggingRulerGuideV = false;
                 return;
             }
 
@@ -3807,30 +4912,59 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 {
                     _selectedTransformHandle = -1;
                     _isDrawing = false;
+                    _multiDragInitialBounds.Clear();
+                    _multiDragInitialRotations.Clear();
+                    _multiDragInitialPoints.Clear();
+                    _multiDragInitialSubPaths.Clear();
+                    _activeSmartGuides.Clear();
                     return;
                 }
                 PointF canvasPt = ScreenToCanvas(x, y, viewW, viewH);
                 if (IsShapeTool(SelectedTool))
                 {
                     RectangleF finalBounds = NormalizeRect(_dragStartPt, canvasPt);
-                    if (finalBounds.Width > 3 && finalBounds.Height > 3)
+                    if (finalBounds.Width <= 3 && finalBounds.Height <= 3)
                     {
-                        VectorShapeType pType = GetShapeTypeForTool(SelectedTool);
-                        Document.AddVectorShape(
-                            pType,
-                            finalBounds,
-                            ShapeFillColor,
-                            ShapeStrokeColor,
-                            ShapeStrokeWidth,
-                            ShapeCornerRadius,
-                            ActiveShapePointCount,
-                            ShapeFillType,
-                            ShapeFillColor2,
-                            ShapeFillGradientAngle,
-                            ShapeStrokeType,
-                            ShapeStrokeDashStyle,
-                            ShapeStrokeLineJoin,
-                            ShapeStrokeLineCap);
+                        float defSize = 120f;
+                        finalBounds = new RectangleF(canvasPt.X - defSize / 2f, canvasPt.Y - defSize / 2f, defSize, defSize);
+                    }
+                    VectorShapeType pType = GetShapeTypeForTool(SelectedTool);
+                    Document.AddVectorShape(
+                        pType,
+                        finalBounds,
+                        ShapeFillColor,
+                        ShapeStrokeColor,
+                        ShapeStrokeWidth,
+                        ShapeCornerRadius,
+                        ActiveShapePointCount,
+                        ShapeFillType,
+                        ShapeFillColor2,
+                        ShapeFillGradientAngle,
+                        ShapeStrokeType,
+                        ShapeStrokeDashStyle,
+                        ShapeStrokeLineJoin,
+                        ShapeStrokeLineCap,
+                        ShapeGradientStops);
+                }
+                else if (SelectedTool == PhotoTool.Gradient)
+                {
+                    float dx = canvasPt.X - _dragStartPt.X;
+                    float dy = canvasPt.Y - _dragStartPt.Y;
+                    if (Math.Abs(dx) > 3 || Math.Abs(dy) > 3)
+                    {
+                        float angle = (float)(Math.Atan2(dy, dx) * 180.0 / Math.PI);
+                        if (angle < 0) angle += 360f;
+                        ShapeFillGradientAngle = angle;
+                        if (Document.ActiveLayer != null && Document.ActiveLayer.Type == LayerType.VectorShape)
+                        {
+                            Document.SaveUndoSnapshot();
+                            Document.ActiveLayer.FillGradientAngle = angle;
+                            if (Document.ActiveLayer.FillType != VectorFillType.LinearGradient && 
+                                Document.ActiveLayer.FillType != VectorFillType.RadialGradient)
+                            {
+                                Document.ActiveLayer.FillType = VectorFillType.LinearGradient;
+                            }
+                        }
                     }
                 }
                 else if (SelectedTool == PhotoTool.Marquee)
@@ -3950,37 +5084,224 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
         public void HandleMouseWheel(int x, int y, int delta, Keys modifiers, int viewW, int viewH)
         {
-            float oldZoom = Zoom;
-            float zoomFactor = (delta > 0) ? 1.15f : 0.85f;
-            Zoom = Math.Max(0.05f, Math.Min(32.0f, Zoom * zoomFactor));
+            float availW = Math.Max(100f, viewW - LeftToolbarWidth - RightInspectorWidth);
+            float availH = Math.Max(100f, viewH - RibbonHeight - TopOptionsBarHeight - BottomStatusHeight);
 
-            // Zoom centered on cursor
-            PanX = x - (x - PanX) * (Zoom / oldZoom);
-            PanY = y - (y - PanY) * (Zoom / oldZoom);
+            if ((modifiers & Keys.Control) == Keys.Control)
+            {
+                // Stable Inkscape-style zoom centered exactly at viewport center (stable, deterministic)
+                float oldZoom = Zoom;
+                float zoomFactor = (delta > 0) ? 1.15f : (1f / 1.15f);
+                Zoom = Math.Max(0.05f, Math.Min(32.0f, Zoom * zoomFactor));
+
+                float vcX = availW / 2f;
+                float vcY = availH / 2f;
+                PanX = vcX - (vcX - PanX) * (Zoom / oldZoom);
+                PanY = vcY - (vcY - PanY) * (Zoom / oldZoom);
+                ClampPan(viewW, viewH);
+            }
+            else if ((modifiers & Keys.Shift) == Keys.Shift)
+            {
+                // Standard horizontal scroll / pan (clamped)
+                PanX += (delta > 0 ? 90f : -90f);
+                ClampPan(viewW, viewH);
+            }
+            else
+            {
+                // Standard vertical scroll / pan (clamped)
+                PanY += (delta > 0 ? 90f : -90f);
+                ClampPan(viewW, viewH);
+            }
+        }
+
+        public Cursor GetCursorAtPoint(int x, int y, int viewW, int viewH)
+        {
+            if (IsDraggingHScrollBar || IsDraggingVScrollBar ||
+                (!HScrollBarThumbRect.IsEmpty && HScrollBarThumbRect.Contains(x, y)) ||
+                (!VScrollBarThumbRect.IsEmpty && VScrollBarThumbRect.Contains(x, y)))
+            {
+                return Cursors.Default;
+            }
+
+            // If in toolbar, inspector, top option bar, or status bar -> Default
+            if (x < 56 || x > viewW - RightInspectorWidth || y < RibbonHeight + TopOptionsBarHeight || y > viewH - BottomStatusHeight)
+            {
+                return Cursors.Default;
+            }
+
+            if (IsPanning || SelectedTool == PhotoTool.Hand || (Control.ModifierKeys & Keys.Space) == Keys.Space || IsSpaceHeld)
+            {
+                return Cursors.Hand;
+            }
+
+            // Check transform handles if an object is selected
+            if (Document != null && Document.ActiveLayer != null && (SelectedTool == PhotoTool.Move || IsShapeTool(SelectedTool)))
+            {
+                int hit = CheckTransformHandles(x, y, viewW, viewH);
+                switch (hit)
+                {
+                    case 0: return Cursors.SizeNWSE; // Top-Left
+                    case 1: return Cursors.SizeNS;   // Top-Mid
+                    case 2: return Cursors.SizeNESW; // Top-Right
+                    case 3: return Cursors.SizeWE;   // Mid-Right
+                    case 4: return Cursors.SizeNWSE; // Bottom-Right
+                    case 5: return Cursors.SizeNS;   // Bottom-Mid
+                    case 6: return Cursors.SizeNESW; // Bottom-Left
+                    case 7: return Cursors.SizeWE;   // Mid-Left
+                    case 8: return Cursors.Hand;     // Rotate handle
+                    case 9: return (SelectedTool == PhotoTool.Move) ? Cursors.SizeAll : Cursors.Default;  // Move body
+                    case 10: return Cursors.SizeNS;  // Round pin Y
+                    case 11: return Cursors.SizeWE;  // Round pin X
+                }
+            }
+
+            switch (SelectedTool)
+            {
+                case PhotoTool.Rectangle:
+                case PhotoTool.Ellipse:
+                case PhotoTool.Star:
+                case PhotoTool.Shape:
+                case PhotoTool.Pen:
+                case PhotoTool.Brush:
+                case PhotoTool.Eraser:
+                case PhotoTool.Marquee:
+                case PhotoTool.Crop:
+                case PhotoTool.Gradient:
+                    return Cursors.Cross;
+                case PhotoTool.Text:
+                    return Cursors.IBeam;
+                case PhotoTool.Eyedropper:
+                case PhotoTool.Bucket:
+                case PhotoTool.Hand:
+                    return Cursors.Hand;
+                case PhotoTool.NodeTool:
+                    return Cursors.Cross;
+                case PhotoTool.Move:
+                default:
+                    return Cursors.Default;
+            }
         }
 
         public void HandleKeyDown(Keys key, Keys modifiers)
         {
+            if (Document == null) return;
+
             if ((modifiers & Keys.Control) == Keys.Control)
             {
                 if (key == Keys.Z) Document.Undo();
                 else if (key == Keys.Y) Document.Redo();
-                else if (key == Keys.J) Document.DuplicateActiveLayer();
-                else if (key == Keys.E) Document.MergeDown();
-                else if (key == Keys.A && SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null && Document.ActiveLayer.SubPaths != null)
+                else if (key == Keys.C) Document.CopySelected();
+                else if (key == Keys.X) Document.CutSelected();
+                else if (key == Keys.V) Document.Paste();
+                else if (key == Keys.D)
                 {
-                    foreach (var sp in Document.ActiveLayer.SubPaths)
+                    if (IsCropping) { IsCropping = false; CropRect = RectangleF.Empty; }
+                    else if (Document.SelectedLayers.Count > 1) { Document.SelectedLayerIds.Clear(); }
+                    else Document.DuplicateSelectedLayers();
+                }
+                else if (key == Keys.J) Document.DuplicateSelectedLayers();
+                else if (key == Keys.G)
+                {
+                    if ((modifiers & Keys.Shift) == Keys.Shift) Document.UngroupSelectedLayers();
+                    else Document.GroupSelectedLayers();
+                }
+                else if (key == Keys.U) Document.UngroupSelectedLayers();
+                else if (key == Keys.T) SelectedTool = PhotoTool.Move;
+                else if (key == Keys.R) ShowRulers = !ShowRulers;
+                else if (key == Keys.D0 || key == Keys.NumPad0) CenterCanvas(1920, 1080);
+                else if (key == Keys.D1 || key == Keys.NumPad1) Zoom = 1.0f;
+                else if (key == Keys.OemOpenBrackets)
+                {
+                    if ((modifiers & Keys.Shift) == Keys.Shift) Document.SendActiveLayerToBack();
+                    else Document.MoveLayerDown();
+                }
+                else if (key == Keys.OemCloseBrackets)
+                {
+                    if ((modifiers & Keys.Shift) == Keys.Shift) Document.BringActiveLayerToFront();
+                    else Document.MoveLayerUp();
+                }
+                else if ((modifiers & Keys.Shift) == Keys.Shift && (key == Keys.D9 || key == Keys.OemOpenBrackets)) Document.InsetActivePath();
+                else if ((modifiers & Keys.Shift) == Keys.Shift && (key == Keys.D0 || key == Keys.OemCloseBrackets)) Document.OutsetActivePath();
+                else if (key == Keys.Oemcomma) Document.InsetActivePath();
+                else if (key == Keys.OemPeriod) Document.OutsetActivePath();
+                else if (key == Keys.E) Document.MergeDown();
+                else if (key == Keys.A)
+                {
+                    if (SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null && Document.ActiveLayer.SubPaths != null)
                     {
-                        if (sp.Nodes != null)
+                        foreach (var sp in Document.ActiveLayer.SubPaths)
                         {
-                            foreach (var n in sp.Nodes) n.IsSelected = true;
+                            if (sp.Nodes != null)
+                            {
+                                foreach (var n in sp.Nodes) n.IsSelected = true;
+                            }
                         }
                     }
+                    else
+                    {
+                        Document.SelectAllLayers();
+                    }
                 }
+                // Inkscape Đại số đường vẽ (Path Booleans) hoặc Thu phóng
+                else if (key == Keys.Oemplus || key == Keys.Add)
+                {
+                    if ((modifiers & Keys.Shift) == 0 && (modifiers & Keys.Alt) == 0 && Document.SelectedLayers.Count <= 1)
+                    {
+                        Zoom = Math.Min(32.0f, Zoom * 1.25f);
+                    }
+                    else
+                    {
+                        Document.ApplyBooleanOperation(BooleanOpType.Union);
+                    }
+                }
+                else if (key == Keys.OemMinus || key == Keys.Subtract)
+                {
+                    if ((modifiers & Keys.Shift) == 0 && (modifiers & Keys.Alt) == 0 && Document.SelectedLayers.Count <= 1)
+                    {
+                        Zoom = Math.Max(0.05f, Zoom / 1.25f);
+                    }
+                    else
+                    {
+                        Document.ApplyBooleanOperation(BooleanOpType.Difference);
+                    }
+                }
+                else if ((modifiers & Keys.Shift) == Keys.Shift && (key == Keys.D8 || key == Keys.Multiply))
+                {
+                    Document.ApplyBooleanOperation(BooleanOpType.Intersection);
+                }
+                else if ((modifiers & Keys.Shift) == Keys.Shift && key == Keys.D6)
+                {
+                    Document.ApplyBooleanOperation(BooleanOpType.Exclusion);
+                }
+                else if (key == Keys.Oem2 || key == Keys.Divide || key == Keys.OemQuestion)
+                {
+                    Document.ApplyBooleanOperation(BooleanOpType.Division);
+                }
+                else if (key == Keys.K)
+                {
+                    if ((modifiers & Keys.Shift) == Keys.Shift) Document.BreakApartActivePath();
+                    else Document.CombineSelectedPaths();
+                }
+                else if (key == Keys.L) Document.SimplifyActivePath();
+                else if (key == Keys.OemQuotes || key == Keys.Oem7) ShowGrid = !ShowGrid;
+                else if ((modifiers & Keys.Shift) == Keys.Shift && key == Keys.C) Document.ObjectToPathActive();
+                else if ((modifiers & Keys.Alt) == Keys.Alt && key == Keys.C) Document.StrokeToPathActive();
             }
             else
             {
-                if (key == Keys.V) SelectedTool = PhotoTool.Move;
+                // Phím chuyển đổi bắt dính Inkscape (%)
+                if ((modifiers & Keys.Shift) == Keys.Shift && key == Keys.D5) SnapToObjects = !SnapToObjects;
+                // Phím xếp lớp Inkscape (Z-order)
+                else if (key == Keys.Home) Document.BringActiveLayerToFront();
+                else if (key == Keys.End) Document.SendActiveLayerToBack();
+                else if (key == Keys.PageUp) Document.MoveLayerUp();
+                else if (key == Keys.PageDown) Document.MoveLayerDown();
+                // Phím Lật Inkscape (Flip)
+                else if (key == Keys.H && SelectedTool != PhotoTool.Text) Document.FlipActive(true);
+                else if ((modifiers & Keys.Shift) == Keys.Shift && key == Keys.V && SelectedTool != PhotoTool.Text) Document.FlipActive(false);
+                // Các công cụ tiêu chuẩn Photoshop/Illustrator
+                else if (key == Keys.V) SelectedTool = PhotoTool.Move;
+                else if (key == Keys.A) ActivateNodeTool();
                 else if (key == Keys.M) SelectedTool = PhotoTool.Marquee;
                 else if (key == Keys.B) SelectedTool = PhotoTool.Brush;
                 else if (key == Keys.E) SelectedTool = PhotoTool.Eraser;
@@ -3989,9 +5310,71 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 else if (key == Keys.T) SelectedTool = PhotoTool.Text;
                 else if (key == Keys.U) SelectedTool = PhotoTool.Shape;
                 else if (key == Keys.I) SelectedTool = PhotoTool.Eyedropper;
-                else if (key == Keys.C) SelectedTool = PhotoTool.Crop;
-                else if (key == Keys.H) SelectedTool = PhotoTool.Hand;
+                else if (key == Keys.C)
+                {
+                    SelectedTool = PhotoTool.Crop;
+                    IsCropping = true;
+                    CropRect = new RectangleF(Document.Width * 0.05f, Document.Height * 0.05f, Document.Width * 0.9f, Document.Height * 0.9f);
+                }
                 else if (key == Keys.P) SelectedTool = PhotoTool.Pen;
+                else if (key == Keys.H) SelectedTool = PhotoTool.Hand;
+                else if (key == Keys.Z) Zoom = Math.Min(32.0f, Zoom * 1.25f);
+                // Dịch chuyển Nudge bằng phím mũi tên (1px mặc định, 10px nếu giữ Shift)
+                else if (key == Keys.Left || key == Keys.Right || key == Keys.Up || key == Keys.Down)
+                {
+                    float step = ((modifiers & Keys.Shift) == Keys.Shift) ? 10f : 1f;
+                    float dx = (key == Keys.Left) ? -step : (key == Keys.Right ? step : 0f);
+                    float dy = (key == Keys.Up) ? -step : (key == Keys.Down ? step : 0f);
+
+                    if (SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null && Document.ActiveLayer.SubPaths != null)
+                    {
+                        Document.SaveUndoSnapshot();
+                        foreach (var sp in Document.ActiveLayer.SubPaths)
+                        {
+                            if (sp.Nodes != null)
+                            {
+                                foreach (var n in sp.Nodes)
+                                {
+                                    if (n.IsSelected)
+                                    {
+                                        n.Point = new PointF(n.Point.X + dx, n.Point.Y + dy);
+                                        n.InHandle = new PointF(n.InHandle.X + dx, n.InHandle.Y + dy);
+                                        n.OutHandle = new PointF(n.OutHandle.X + dx, n.OutHandle.Y + dy);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var selected = Document.SelectedLayers;
+                        if (selected.Count == 0 && Document.ActiveLayer != null) selected = new List<PhotoLayer> { Document.ActiveLayer };
+                        if (selected.Count > 0)
+                        {
+                            Document.SaveUndoSnapshot();
+                            foreach (var l in selected)
+                            {
+                                var b = l.Bounds;
+                                l.Bounds = new RectangleF(b.X + dx, b.Y + dy, b.Width, b.Height);
+                                if (l.SubPaths != null)
+                                {
+                                    foreach (var sp in l.SubPaths)
+                                    {
+                                        if (sp.Nodes != null)
+                                        {
+                                            foreach (var n in sp.Nodes)
+                                            {
+                                                n.Point = new PointF(n.Point.X + dx, n.Point.Y + dy);
+                                                n.InHandle = new PointF(n.InHandle.X + dx, n.InHandle.Y + dy);
+                                                n.OutHandle = new PointF(n.OutHandle.X + dx, n.OutHandle.Y + dy);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 else if (key == Keys.Delete || key == Keys.Back)
                 {
                     bool hasSelectedNode = false;
@@ -4018,14 +5401,26 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                         Document.DeleteActiveLayer();
                     }
                 }
-                else if (key == Keys.Escape && SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null && Document.ActiveLayer.SubPaths != null)
+                else if (key == Keys.Escape)
                 {
-                    foreach (var sp in Document.ActiveLayer.SubPaths)
+                    if (IsCropping)
                     {
-                        if (sp.Nodes != null)
+                        IsCropping = false;
+                        CropRect = RectangleF.Empty;
+                    }
+                    else if (SelectedTool == PhotoTool.NodeTool && Document.ActiveLayer != null && Document.ActiveLayer.SubPaths != null)
+                    {
+                        foreach (var sp in Document.ActiveLayer.SubPaths)
                         {
-                            foreach (var n in sp.Nodes) n.IsSelected = false;
+                            if (sp.Nodes != null)
+                            {
+                                foreach (var n in sp.Nodes) n.IsSelected = false;
+                            }
                         }
+                    }
+                    else
+                    {
+                        Document.SelectedLayerIds.Clear();
                     }
                 }
                 else if (key == Keys.Oem4) { BrushSize = Math.Max(1f, BrushSize - 5f); ActiveFontSize = Math.Max(8f, ActiveFontSize - 2f); } // [ (Decrease size)
@@ -4217,14 +5612,14 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             return -1;
         }
 
-        private void SelectLayerAt(PointF pt)
+        private void SelectLayerAt(PointF pt, bool addToSelection = false)
         {
             if (Document == null || Document.Layers == null) return;
             float tol = 6f / Math.Max(0.1f, Zoom);
             int vecIdx = HitTestVectorLayerAt(pt, tol);
             if (vecIdx >= 0)
             {
-                Document.ActiveLayerIndex = vecIdx;
+                Document.SelectLayer(Document.Layers[vecIdx], addToSelection);
                 return;
             }
 
@@ -4232,11 +5627,15 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             {
                 if (Document.Layers[i].IsVisible && Document.Layers[i].Bounds.Contains(pt) && Document.Layers[i].Name != "Lớp nền")
                 {
-                    Document.ActiveLayerIndex = i;
+                    Document.SelectLayer(Document.Layers[i], addToSelection);
                     return;
                 }
             }
-            Document.ActiveLayerIndex = -1;
+            if (!addToSelection)
+            {
+                Document.ClearSelection();
+                Document.ActiveLayerIndex = -1;
+            }
         }
 
         private void ApplyPresetFilter(string name)
@@ -4470,6 +5869,227 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 g.DrawString(text, f, tb, r.X + (r.Width - sz.Width) / 2f, r.Y + (r.Height - sz.Height) / 2f);
             }
         }
+        #endregion
+
+        #region Inkscape Image & Vector Import
+        public void PromptInsertImage(IWin32Window owner = null)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Title = "Chèn hình ảnh vào đồ họa - Chuẩn Inkscape";
+                ofd.Filter = "Tất cả tệp hình ảnh & Vector (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg|Đồ họa Vector SVG (*.svg)|*.svg|Hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Tất cả tệp (*.*)|*.*";
+                if (ofd.ShowDialog(owner) == DialogResult.OK)
+                {
+                    InsertImageFromFile(ofd.FileName, owner);
+                }
+            }
+        }
+
+        public void InsertImageFromFile(string filePath, IWin32Window owner = null)
+        {
+            if (Document == null || string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+
+            try
+            {
+                Bitmap bmp = null;
+                string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                if (ext == ".svg")
+                {
+                    string svgContent = File.ReadAllText(filePath);
+                    bmp = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgContent, Document.Width, Document.Height)
+                       ?? ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(filePath, Document.Width, Document.Height);
+                }
+                else
+                {
+                    using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                    using (var orig = Image.FromStream(stream))
+                    {
+                        bmp = new Bitmap(orig);
+                    }
+                }
+
+                if (bmp == null)
+                {
+                    MessageBox.Show(owner, "Không thể đọc định dạng hình ảnh này.", "Lỗi tải ảnh", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using (var dlg = new PhotoInsertImageDialogForm(filePath, bmp, Document.Width, Document.Height))
+                {
+                    if (dlg.ShowDialog(owner) == DialogResult.OK)
+                    {
+                        float targetW = bmp.Width;
+                        float targetH = bmp.Height;
+
+                        if (dlg.SizeMode == ImageSizeMode.FitCanvas)
+                        {
+                            float maxW = Document.Width * 0.8f;
+                            float maxH = Document.Height * 0.8f;
+                            float scale = Math.Min(maxW / bmp.Width, maxH / bmp.Height);
+                            if (scale < 1.0f || !dlg.LockAspectRatio)
+                            {
+                                targetW = bmp.Width * scale;
+                                targetH = bmp.Height * scale;
+                            }
+                        }
+
+                        float posX = Math.Max(0f, (Document.Width - targetW) / 2f);
+                        float posY = Math.Max(0f, (Document.Height - targetH) / 2f);
+
+                        Document.SaveUndoSnapshot();
+                        var newLayer = new PhotoLayer
+                        {
+                            Name = Path.GetFileName(filePath),
+                            Type = LayerType.Raster,
+                            Bounds = new RectangleF(posX, posY, targetW, targetH),
+                            Image = bmp,
+                            ImagePath = (dlg.ImportMode == ImageImportMode.Link) ? filePath : null,
+                            IsLinkedImage = (dlg.ImportMode == ImageImportMode.Link),
+                            Opacity = 1.0f,
+                            IsVisible = true
+                        };
+
+                        Document.Layers.Add(newLayer);
+                        Document.ActiveLayerIndex = Document.Layers.Count - 1;
+                    }
+                    else
+                    {
+                        bmp.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(owner, "Lỗi khi chèn ảnh: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #region Workspace Scrollbars Drawing
+        private void DrawWorkspaceScrollbars(D2DGraphics g, int width, int height)
+        {
+            if (Document == null)
+            {
+                HScrollBarTrackRect = Rectangle.Empty;
+                HScrollBarThumbRect = Rectangle.Empty;
+                VScrollBarTrackRect = Rectangle.Empty;
+                VScrollBarThumbRect = Rectangle.Empty;
+                return;
+            }
+
+            int vX = LeftToolbarWidth;
+            int vY = RibbonHeight + TopOptionsBarHeight;
+            int vW = Math.Max(100, width - LeftToolbarWidth - RightInspectorWidth);
+            int vH = Math.Max(100, height - RibbonHeight - TopOptionsBarHeight - BottomStatusHeight);
+
+            float docW = Document.Width * Zoom;
+            float docH = Document.Height * Zoom;
+
+            GetScrollLimits(width, height, out float minX, out float maxX, out float minY, out float maxY);
+
+            bool hasHScroll = (docW + 30f > vW) || (maxX > minX + 5f);
+            bool hasVScroll = (docH + 30f > vH) || (maxY > minY + 5f);
+
+            int sbSize = 14;
+
+            if (hasHScroll)
+            {
+                int hTrackW = hasVScroll ? (vW - sbSize) : vW;
+                int hTrackX = vX;
+                int hTrackY = vY + vH - sbSize;
+                HScrollBarTrackRect = new Rectangle(hTrackX, hTrackY, hTrackW, sbSize);
+
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 244, 246)))
+                using (Pen trackBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                {
+                    g.FillRectangle(trackBg, HScrollBarTrackRect);
+                    g.DrawLine(trackBorder, hTrackX, hTrackY, hTrackX + hTrackW, hTrackY);
+                }
+
+                float totalSpanX = maxX - minX + vW;
+                int thumbW = Math.Max(36, (int)((vW / Math.Max(1f, totalSpanX)) * hTrackW));
+                thumbW = Math.Min(thumbW, hTrackW);
+
+                float fracX = (maxX > minX) ? (maxX - PanX) / (maxX - minX) : 0f;
+                fracX = Math.Max(0f, Math.Min(1f, fracX));
+                int thumbX = hTrackX + (int)(fracX * (hTrackW - thumbW));
+                HScrollBarThumbRect = new Rectangle(thumbX + 2, hTrackY + 2, Math.Max(16, thumbW - 4), sbSize - 4);
+
+                Color thumbCol = IsDraggingHScrollBar ? Color.FromArgb(100, 116, 139) :
+                                 (IsHoverHScrollBarThumb ? Color.FromArgb(148, 163, 184) : Color.FromArgb(188, 195, 206));
+                using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                {
+                    FillRoundedScrollThumb(g, thumbBrush, HScrollBarThumbRect);
+                }
+            }
+            else
+            {
+                HScrollBarTrackRect = Rectangle.Empty;
+                HScrollBarThumbRect = Rectangle.Empty;
+            }
+
+            if (hasVScroll)
+            {
+                int vTrackH = hasHScroll ? (vH - sbSize) : vH;
+                int vTrackX = vX + vW - sbSize;
+                int vTrackY = vY;
+                VScrollBarTrackRect = new Rectangle(vTrackX, vTrackY, sbSize, vTrackH);
+
+                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 244, 246)))
+                using (Pen trackBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                {
+                    g.FillRectangle(trackBg, VScrollBarTrackRect);
+                    g.DrawLine(trackBorder, vTrackX, vTrackY, vTrackX, vTrackY + vTrackH);
+                }
+
+                float totalSpanY = maxY - minY + vH;
+                int thumbH = Math.Max(36, (int)((vH / Math.Max(1f, totalSpanY)) * vTrackH));
+                thumbH = Math.Min(thumbH, vTrackH);
+
+                float fracY = (maxY > minY) ? (maxY - PanY) / (maxY - minY) : 0f;
+                fracY = Math.Max(0f, Math.Min(1f, fracY));
+                int thumbY = vTrackY + (int)(fracY * (vTrackH - thumbH));
+                VScrollBarThumbRect = new Rectangle(vTrackX + 2, thumbY + 2, sbSize - 4, Math.Max(16, thumbH - 4));
+
+                Color thumbCol = IsDraggingVScrollBar ? Color.FromArgb(100, 116, 139) :
+                                 (IsHoverVScrollBarThumb ? Color.FromArgb(148, 163, 184) : Color.FromArgb(188, 195, 206));
+                using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
+                {
+                    FillRoundedScrollThumb(g, thumbBrush, VScrollBarThumbRect);
+                }
+            }
+            else
+            {
+                VScrollBarTrackRect = Rectangle.Empty;
+                VScrollBarThumbRect = Rectangle.Empty;
+            }
+
+            if (hasHScroll && hasVScroll)
+            {
+                Rectangle cornerRect = new Rectangle(vX + vW - sbSize, vY + vH - sbSize, sbSize, sbSize);
+                using (SolidBrush cornerBg = new SolidBrush(Color.FromArgb(243, 244, 246)))
+                {
+                    g.FillRectangle(cornerBg, cornerRect);
+                }
+            }
+        }
+
+        private void FillRoundedScrollThumb(D2DGraphics g, SolidBrush brush, Rectangle rect)
+        {
+            if (rect.Width <= 0 || rect.Height <= 0) return;
+            float r = Math.Min(rect.Width, rect.Height) / 2f;
+            r = Math.Min(r, 4f);
+            using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+            {
+                float d = r * 2f;
+                path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+                path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+                path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+                path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+                path.CloseFigure();
+                g.FillPath(brush, path);
+            }
+        }
+        #endregion
         #endregion
 
     }

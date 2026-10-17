@@ -1082,7 +1082,7 @@ namespace ZenQOffice.UI
             if (prov != AiProviderType.Ollama)
             {
                 cboModel.Text = "";
-                SetStatus("⚡ Nhấn 'Kiểm tra kết nối' để kiểm tra chuỗi API Key và đo độ trễ phản hồi.", Color.FromArgb(71, 85, 105));
+                SetStatus("Nhấn 'Kiểm tra kết nối' để kiểm tra chuỗi API Key và đo độ trễ phản hồi.", Color.FromArgb(71, 85, 105));
             }
             RelayoutControls();
             Invalidate();
@@ -1102,7 +1102,7 @@ namespace ZenQOffice.UI
                 cboModel.SelectedIndex = -1;
                 cboModel.Text = "";
 
-                SetStatus("⏳ Đang quét danh sách các model Ollama cục bộ có sẵn trên máy...", Color.FromArgb(79, 70, 229));
+                SetStatus("Đang quét danh sách các model Ollama cục bộ có sẵn trên máy...", Color.FromArgb(79, 70, 229));
 
                 AiService.ScanLocalOllamaModelsAsync((models, err) =>
                 {
@@ -1117,11 +1117,11 @@ namespace ZenQOffice.UI
                             {
                                 cboModel.Items.Add(m);
                             }
-                            SetStatus(string.Format("✅ Đã phát hiện {0} model Ollama trên máy sẵn sàng chạy offline: {1}", models.Count, string.Join(", ", models.ToArray())), Color.FromArgb(22, 163, 74));
+                            SetStatus(string.Format("Đã phát hiện {0} model Ollama trên máy sẵn sàng chạy offline: {1}", models.Count, string.Join(", ", models.ToArray())), Color.FromArgb(22, 163, 74));
                         }
                         else
                         {
-                            SetStatus("⚠️ Chưa thấy model nào đang chạy. Bạn có thể chọn deepseek-r1:7b hoặc gõ tên model rồi bấm Enter.", Color.FromArgb(217, 119, 6));
+                            SetStatus("Chưa thấy model nào đang chạy. Bạn có thể chọn deepseek-r1:7b hoặc gõ tên model rồi bấm Enter.", Color.FromArgb(217, 119, 6));
                         }
                         RebuildModelChips();
                     });
@@ -1237,7 +1237,7 @@ namespace ZenQOffice.UI
             _currentProfile = newProf;
             BindProfileToUi(newProf);
 
-            SetStatus("📝 Hãy điền đầy đủ thông tin rồi bấm \"Lưu cấu hình\".", Color.FromArgb(79, 70, 229));
+            SetStatus("Hãy điền đầy đủ thông tin rồi bấm \"Lưu cấu hình\".", Color.FromArgb(79, 70, 229));
         }
 
         private void DeleteCurrentKeyProfile()
@@ -1258,7 +1258,7 @@ namespace ZenQOffice.UI
                 _config.RemoveProfile(_currentProfile.Id);
                 _config.Save();
                 ReloadProfilesToUi();
-                SetStatus("🗑 Đã xóa cấu hình Key thành công.", Color.FromArgb(220, 38, 38));
+                SetStatus("Đã xóa cấu hình Key thành công.", Color.FromArgb(220, 38, 38));
             }
         }
 
@@ -1267,7 +1267,7 @@ namespace ZenQOffice.UI
             EnsureProfileExistsForSimpleMode();
             if (_currentProfile == null)
             {
-                SetStatus("❌ Chưa có cấu hình nào. Hãy nhập API Key trước.", Color.FromArgb(220, 38, 38));
+                SetStatus("Chưa có cấu hình nào. Hãy nhập API Key trước.", Color.FromArgb(220, 38, 38));
                 return;
             }
 
@@ -1275,12 +1275,12 @@ namespace ZenQOffice.UI
 
             if ((int)_currentProfile.Provider < 0)
             {
-                SetStatus("❌ Chưa xác định Nhà cung cấp AI.", Color.FromArgb(220, 38, 38));
+                SetStatus("Chưa xác định Nhà cung cấp AI.", Color.FromArgb(220, 38, 38));
                 return;
             }
             if (string.IsNullOrWhiteSpace(_currentProfile.SelectedModel) && _currentProfile.SavedModels.Count == 0)
             {
-                SetStatus("❌ Chưa chọn Model AI nào.", Color.FromArgb(220, 38, 38));
+                SetStatus("Chưa chọn Model AI nào.", Color.FromArgb(220, 38, 38));
                 return;
             }
             if (string.IsNullOrWhiteSpace(_currentProfile.SelectedModel) && _currentProfile.SavedModels.Count > 0)
@@ -1288,7 +1288,7 @@ namespace ZenQOffice.UI
                 _currentProfile.SelectedModel = _currentProfile.SavedModels[0];
             }
 
-            SetStatus("⏳ Đang gửi yêu cầu kiểm tra kết nối tới " + _currentProfile.SelectedModel + "...", Color.FromArgb(79, 70, 229));
+            SetStatus("Đang gửi yêu cầu kiểm tra kết nối tới " + _currentProfile.SelectedModel + "...", Color.FromArgb(79, 70, 229));
             btnTest.Enabled = false;
 
             AiService.TestConnectionAsync(_config, (success, latencyMs, message) =>
@@ -1299,11 +1299,11 @@ namespace ZenQOffice.UI
                     btnTest.Enabled = true;
                     if (success)
                     {
-                        SetStatus(string.Format("✅ Kết nối thành công! Phản hồi sau {0} ms từ {1}.", latencyMs, _currentProfile.SelectedModel), Color.FromArgb(22, 163, 74));
+                        SetStatus(string.Format("Kết nối thành công! Phản hồi sau {0} ms từ {1}.", latencyMs, _currentProfile.SelectedModel), Color.FromArgb(22, 163, 74));
                     }
                     else
                     {
-                        SetStatus("❌ " + message, Color.FromArgb(220, 38, 38));
+                        SetStatus(message, Color.FromArgb(220, 38, 38));
                     }
                 }));
             });
@@ -1334,7 +1334,7 @@ namespace ZenQOffice.UI
                     errorMsg += "• " + errors[i] + "\n";
                 }
                 MessageBox.Show(errorMsg, "Lỗi cấu hình", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                SetStatus("❌ " + string.Join(" | ", errors.ToArray()), Color.FromArgb(220, 38, 38));
+                SetStatus(string.Join(" | ", errors.ToArray()), Color.FromArgb(220, 38, 38));
                 return;
             }
 
@@ -1361,7 +1361,7 @@ namespace ZenQOffice.UI
 
             if (showPrompt)
             {
-                SetStatus("✅ Đã lưu thiết lập thành công! Model: " + _currentProfile.SelectedModel, Color.FromArgb(22, 163, 74));
+                SetStatus("Đã lưu thiết lập thành công! Model: " + _currentProfile.SelectedModel, Color.FromArgb(22, 163, 74));
                 MessageBox.Show("Đã lưu thiết lập AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             if (_appForm != null)
