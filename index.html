@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZENQ OFFICE - Bộ Ứng Dụng Văn Phòng Hiện Đại Cho Windows</title>
+  <meta name="description" content="ZenQ Office - Bộ ứng dụng văn phòng hiện đại cho Windows. Soạn thảo văn bản, bảng tính, trình chiếu và đọc PDF. Bảo mật ngoại tuyến 100%, tương thích hoàn hảo chuẩn Microsoft Office.">
+  <meta name="keywords" content="ZenQ Office, ZenQ Writer, ZenQ Calc, ZenQ Slides, ZenQ PDF, phần mềm văn phòng Việt Nam, văn phòng miễn phí, thay thế Microsoft Office">
+  <meta property="og:title" content="ZENQ OFFICE - Bộ Ứng Dụng Văn Phòng Hiện Đại Cho Windows">
+  <meta property="og:description" content="Trải nghiệm mượt mà, bảo mật ngoại tuyến 100% và tương thích hoàn toàn chuẩn tệp Microsoft Office.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://danhtruong6112009-source.github.io/ZENQ/">
+
+  <!-- Google Fonts: Inter & Google Sans style -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="icon/ZENQOFFICE.png">
+</head>
+<body>
+  <!-- Google 4-Color Signature Accent Strip -->
+  <div class="google-accent-strip"></div>
+
+  <!-- Ambient Soft Lighting Layer -->
+  <div class="bg-ambient-layer">
+    <div class="ambient-orb ambient-orb-1"></div>
+    <div class="ambient-orb ambient-orb-2"></div>
+    <div class="ambient-orb ambient-orb-3"></div>
+  </div>
+  <div class="bg-grid-overlay"></div>
+
+  <!-- Navigation Bar (Google Workspace Style) -->
+  <nav class="navbar" id="navbar">
+    <div class="container navbar-inner">
+      <a href="#home" class="nav-brand">
+        <img src="icon/ZENQOFFICE.png" alt="ZenQ Office Logo" class="nav-brand-icon">
+        <div class="nav-brand-text">
+          <span class="nav-brand-title" data-i18n="nav_brand">ZENQ OFFICE</span>
+          <span class="nav-brand-tag">v4.0</span>
+        </div>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#home" class="nav-link active" data-i18n="nav_home">Trang chủ</a></li>
+        <li><a href="#features" class="nav-link" data-i18n="nav_features">Ứng dụng</a></li>
+        <li><a href="#highlights" class="nav-link" data-i18n="nav_architecture">Đặc điểm nổi bật</a></li>
+        <li><a href="#about" class="nav-link" data-i18n="nav_about">Về chúng tôi</a></li>
+        <li><a href="#faq" class="nav-link" data-i18n="nav_faq">Hỏi & Đáp</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <!-- Language Switcher (Google Pill) -->
+        <button class="lang-btn" id="langToggleBtn" title="Chuyển đổi ngôn ngữ / Switch language">
+          <span class="lang-flag">🇺🇸</span>
+          <span class="lang-btn-text">English</span>
+        </button>
+
+        <a href="#download" class="nav-cta-btn" data-i18n="nav_download">Tải ứng dụng</a>
+
+        <!-- Mobile Toggle -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ===================================================================
+         HERO SECTION (Google Workspace Clean Aesthetic)
+         =================================================================== -->
+    <section class="hero-section" id="home">
+      <div class="container">
+        <div class="hero-badge-wrap">
+          <div class="hero-badge">
+            <span class="hero-badge-dot"></span>
+            <span data-i18n="hero_badge">Phiên bản chính thức v4.0 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới</span>
+          </div>
+        </div>
+
+        <h1 class="hero-title">
+          <span data-i18n="hero_title_1">Bộ Ứng Dụng Văn Phòng</span><br>
+          <span class="hero-title-gradient" data-i18n="hero_title_accent">Hiện Đại Cho Windows</span>
+        </h1>
+
+        <!-- Live Typewriter Effect Box -->
+        <div class="hero-typewriter-box">
+          <span id="typewriterText">Soạn thảo văn bản chuẩn in ấn</span><span class="typewriter-cursor"></span>
+        </div>
+
+        <p class="hero-desc" data-i18n="hero_desc">
+          Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu Microsoft Office và bảo mật ngoại tuyến 100%.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#download" class="btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            <span data-i18n="hero_cta_download">Tải ZenQ Office Cho Windows</span>
+          </a>
+
+          <a href="#features" class="btn-secondary">
+            <span data-i18n="hero_cta_explore">Khám Phá Tính Năng</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <p class="hero-subtext" data-i18n="hero_subtext">
+          Miễn phí trọn đời • Hoạt động ngoại tuyến không cần Internet • Tối ưu cho Windows 10 & 11
+        </p>
+
+        <!-- Real PNG App Icons Quick-Launch Chips (Only 4 Core Apps) -->
+        <div class="hero-app-strip">
+          <div class="hero-app-chip chip-writer" onclick="switchSuiteTab('writer')">
+            <img src="icon/writer.png" alt="ZenQ Writer" class="hero-app-chip-icon">
+            <span>ZenQ Writer</span>
+            <span class="hero-app-chip-badge">.DOCX</span>
+          </div>
+
+          <div class="hero-app-chip chip-calc" onclick="switchSuiteTab('calc')">
+            <img src="icon/calc.png" alt="ZenQ Calc" class="hero-app-chip-icon">
+            <span>ZenQ Calc</span>
+            <span class="hero-app-chip-badge">.XLSX</span>
+          </div>
+
+          <div class="hero-app-chip chip-slides" onclick="switchSuiteTab('slides')">
+            <img src="icon/present.png" alt="ZenQ Slides" class="hero-app-chip-icon">
+            <span>ZenQ Slides</span>
+            <span class="hero-app-chip-badge">.PPTX</span>
+          </div>
+
+          <div class="hero-app-chip chip-pdf" onclick="switchSuiteTab('pdf')">
+            <img src="icon/pdf.png" alt="ZenQ PDF" class="hero-app-chip-icon">
+            <span>ZenQ PDF</span>
+            <span class="hero-app-chip-badge">.PDF</span>
+          </div>
+        </div>
+
+        <!-- Interactive Google-Style Mockup Window -->
+        <div class="mockup-wrapper">
+          <div class="mockup-glow"></div>
+          <div class="mockup-window">
+            <div class="mockup-titlebar">
+              <div class="window-dots">
+                <span class="window-dot window-dot-red"></span>
+                <span class="window-dot window-dot-yellow"></span>
+                <span class="window-dot window-dot-green"></span>
+              </div>
+              <div class="window-title">
+                <img src="icon/writer.png" alt="Writer Icon" class="window-title-icon" id="mockupAppIcon">
+                <span id="mockupDocTitle">Bao_Cao_Chien_Luoc_Q4.docx — ZenQ Writer</span>
+              </div>
+              <div class="window-controls-mock">
+                <span data-i18n="mockup_prop_format_val">Chuẩn Microsoft Office</span>
+              </div>
+            </div>
+
+            <div class="mockup-ribbon" id="mockupRibbon">
+              <button class="ribbon-btn active" onclick="setMockupTab('home')">Trang đầu</button>
+              <button class="ribbon-btn" onclick="setMockupTab('insert')">Chèn</button>
+              <button class="ribbon-btn" onclick="setMockupTab('layout')">Bố trí trang</button>
+              <button class="ribbon-btn" onclick="setMockupTab('ref')">Tham khảo</button>
+              <button class="ribbon-btn" onclick="setMockupTab('review')">Xem lại</button>
+              <button class="ribbon-btn" onclick="setMockupTab('view')">Xem</button>
+            </div>
+
+            <div class="mockup-body" id="mockupBody">
+              <div class="mockup-sheet" id="mockupSheet">
+                <div class="mockup-text-line title"></div>
+                <div class="mockup-text-line w90"></div>
+                <div class="mockup-text-line w80"></div>
+                <div class="mockup-text-line w90"></div>
+                <div class="mockup-text-line w70"></div>
+                <div style="height: 12px;"></div>
+                <div class="mockup-text-line w80"></div>
+                <div class="mockup-text-line w50"></div>
+              </div>
+
+              <div class="mockup-sidebar">
+                <div class="mockup-card-mini">
+                  <div class="mockup-mini-label" data-i18n="mockup_prop_format_lbl">Định dạng tệp</div>
+                  <div class="mockup-mini-val" style="color: var(--google-blue);" data-i18n="mockup_prop_format_val">Chuẩn Microsoft Office</div>
+                </div>
+                <div class="mockup-card-mini">
+                  <div class="mockup-mini-label" data-i18n="mockup_prop_save_lbl">Trạng thái lưu</div>
+                  <div class="mockup-mini-val" style="color: var(--google-green);" data-i18n="mockup_prop_save_val">Đã lưu tự động an toàn</div>
+                </div>
+                <div class="mockup-card-mini">
+                  <div class="mockup-mini-label" data-i18n="mockup_prop_view_lbl">Chế độ xem</div>
+                  <div class="mockup-mini-val" style="color: var(--google-purple);" data-i18n="mockup_prop_view_val">Khổ giấy in ấn A4 chuẩn</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         HIGHLIGHTS BAR (Clean High-Contrast Cards)
+         =================================================================== -->
+    <section class="metrics-section">
+      <div class="container">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-number highlight-blue" data-i18n="stat_apps_val">4 Ứng dụng</div>
+            <div class="metric-label" data-i18n="stat_apps_lbl">Bộ công cụ toàn diện</div>
+            <div class="metric-sub" data-i18n="stat_apps_sub">Writer, Calc, Slides và PDF</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-number highlight-cyan" data-i18n="stat_compat_val">100%</div>
+            <div class="metric-label" data-i18n="stat_compat_lbl">Tương thích chuẩn Office</div>
+            <div class="metric-sub" data-i18n="stat_compat_sub">Định dạng .docx, .xlsx, .pptx, .pdf</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-number highlight-emerald" data-i18n="stat_privacy_val">100%</div>
+            <div class="metric-label" data-i18n="stat_privacy_lbl">Bảo mật ngoại tuyến</div>
+            <div class="metric-sub" data-i18n="stat_privacy_sub">Dữ liệu lưu an toàn trên máy bạn</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-number highlight-purple" data-i18n="stat_free_val">Miễn phí</div>
+            <div class="metric-label" data-i18n="stat_free_lbl">Không quảng cáo phiền toái</div>
+            <div class="metric-sub" data-i18n="stat_free_sub">Trải nghiệm làm việc thuần khiết</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         APPS SUITE SHOWCASE (4 CORE APPS ONLY)
+         =================================================================== -->
+    <section class="apps-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge" data-i18n="apps_section_badge">BỘ ỨNG DỤNG VĂN PHÒNG</div>
+          <h2 class="section-title" data-i18n="apps_section_title">Bốn Phân Hệ Cốt Lõi Cho Mọi Nhu Cầu Công Việc</h2>
+          <p class="section-desc" data-i18n="apps_section_desc">
+            ZenQ Office cho phép mở từng ứng dụng độc lập từ lối tắt Desktop hoặc sử dụng chung trong giao diện Tab thông minh. Thao tác tiện lợi, không cửa sổ thừa.
+          </p>
+        </div>
+
+        <div class="apps-tabs-nav">
+          <button class="app-tab-btn active" data-tab="writer">
+            <img src="icon/writer.png" alt="ZenQ Writer" class="app-tab-btn-icon">
+            <span data-i18n="app_tab_writer">ZenQ Writer</span>
+          </button>
+
+          <button class="app-tab-btn" data-tab="calc">
+            <img src="icon/calc.png" alt="ZenQ Calc" class="app-tab-btn-icon">
+            <span data-i18n="app_tab_calc">ZenQ Calc</span>
+          </button>
+
+          <button class="app-tab-btn" data-tab="slides">
+            <img src="icon/present.png" alt="ZenQ Slides" class="app-tab-btn-icon">
+            <span data-i18n="app_tab_slides">ZenQ Slides</span>
+          </button>
+
+          <button class="app-tab-btn" data-tab="pdf">
+            <img src="icon/pdf.png" alt="ZenQ PDF" class="app-tab-btn-icon">
+            <span data-i18n="app_tab_pdf">ZenQ PDF</span>
+          </button>
+        </div>
+
+        <!-- Panel 1: Writer -->
+        <div class="app-tab-content-panel active" data-panel="writer">
+          <div class="app-detail-content">
+            <div class="app-detail-header">
+              <img src="icon/writer.png" alt="ZenQ Writer Icon" class="app-detail-icon-large">
+              <h3 class="app-detail-title" data-i18n="writer_title">ZenQ Writer — Soạn thảo văn bản chuẩn in ấn đỉnh cao</h3>
+            </div>
+            <p class="app-detail-desc" data-i18n="writer_desc">
+              Xử lý định dạng .docx, .doc, .rtf, .txt với độ trung thực tuyệt đối. Hỗ trợ dàn trang hai mặt, bảng biểu tự động điều chỉnh, bộ đếm từ trực tiếp, và tính năng dự đoán từ thông minh giúp đẩy nhanh tốc độ gõ phím.
+            </p>
+            <ul class="app-feature-list">
+              <li class="app-feature-item">
+                <svg class="check-icon check-writer" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="writer_feat_1">Tương thích 100% chuẩn OpenXML Microsoft Word</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-writer" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="writer_feat_2">Dự đoán từ thông minh song ngữ Việt - Anh thời gian thực</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-writer" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="writer_feat_3">Hỗ trợ chèn công thức toán học, bảng biểu phức tạp và hình vẽ vector</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-writer" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="writer_feat_4">Tự động lưu bản thảo an toàn, phòng chống mất dữ liệu khi mất điện</span>
+              </li>
+            </ul>
+          </div>
+          <div class="app-preview-canvas">
+            <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--google-blue); margin-bottom: 14px; font-weight: 700;">// ZenQ Document Engine</div>
+            <div style="background: #ffffff; padding: 22px; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 1px 4px rgba(60,64,67,0.08);">
+              <div style="color: var(--text-primary); font-weight: 700; font-size: 1rem; margin-bottom: 4px;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+              <div style="color: var(--text-secondary); font-size: 0.86rem; margin-bottom: 12px;">Độc lập - Tự do - Hạnh phúc</div>
+              <div style="color: var(--google-blue); font-weight: 600; font-size: 0.95rem; margin-bottom: 6px;">Kế Hoạch Nâng Tầm Trải Nghiệm Văn Phòng 2026</div>
+              <div style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6;">
+                Tự động căn chỉnh lề in ấn tiêu chuẩn. Hỗ trợ đầy đủ bảng biểu phức tạp, phông chữ tiếng Việt Unicode và xuất file PDF chất lượng cao...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Calc -->
+        <div class="app-tab-content-panel" data-panel="calc">
+          <div class="app-detail-content">
+            <div class="app-detail-header">
+              <img src="icon/calc.png" alt="ZenQ Calc Icon" class="app-detail-icon-large">
+              <h3 class="app-detail-title" data-i18n="calc_title">ZenQ Calc — Bảng tính điện tử thông minh & mạnh mẽ</h3>
+            </div>
+            <p class="app-detail-desc" data-i18n="calc_desc">
+              Xử lý các tập dữ liệu bảng tính .xlsx nhanh chóng và chính xác. Hệ thống công thức tài chính, logic, tìm kiếm chuẩn mực kết hợp cùng bộ vẽ biểu đồ phân tích trực quan hóa dữ liệu hiện đại.
+            </p>
+            <ul class="app-feature-list">
+              <li class="app-feature-item">
+                <svg class="check-icon check-calc" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="calc_feat_1">Đọc và ghi tệp .xlsx, .xls, .csv, .tsv chuẩn xác</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-calc" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="calc_feat_2">Hơn 300+ hàm tính toán chuẩn Excel (SUM, VLOOKUP, XLOOKUP, IF, INDEX/MATCH)</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-calc" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="calc_feat_3">Vẽ biểu đồ cột, tròn, đường nét và phân tán thời gian thực</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-calc" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="calc_feat_4">Định dạng có điều kiện, cố định dòng cột và lọc dữ liệu thông minh</span>
+              </li>
+            </ul>
+          </div>
+          <div class="app-preview-canvas">
+            <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--google-green); margin-bottom: 14px; font-weight: 700;">// ZenQ Spreadsheet Grid</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: var(--font-mono); font-size: 0.88rem;">
+              <div style="background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">A1: 14,500,000</div>
+              <div style="background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">B1: 22,100,000</div>
+              <div style="background: var(--google-green-surface); color: var(--google-green); padding: 10px; border-radius: 6px; font-weight: 700; border: 1px solid var(--google-green-border);">C1: =SUM(A1:B1)</div>
+              <div style="background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">A2: Doanh số Q1</div>
+              <div style="background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">B2: 104.2%</div>
+              <div style="background: var(--google-green-surface); color: var(--google-green); padding: 10px; border-radius: 6px; font-weight: 700; border: 1px solid var(--google-green-border);">C2: "ĐẠT CHỈ TIÊU"</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Slides -->
+        <div class="app-tab-content-panel" data-panel="slides">
+          <div class="app-detail-content">
+            <div class="app-detail-header">
+              <img src="icon/present.png" alt="ZenQ Slides Icon" class="app-detail-icon-large">
+              <h3 class="app-detail-title" data-i18n="slides_title">ZenQ Slides — Thiết kế bài thuyết trình chuyên nghiệp</h3>
+            </div>
+            <p class="app-detail-desc" data-i18n="slides_desc">
+              Bộ công cụ thiết kế bài trình chiếu ấn tượng với chuyển động chuyển trang tinh tế, hỗ trợ vector shape, bảng biểu biểu diễn, chế độ Người thuyết trình 2 màn hình và hỗ trợ điều khiển từ xa bằng điện thoại.
+            </p>
+            <ul class="app-feature-list">
+              <li class="app-feature-item">
+                <svg class="check-icon check-slides" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="slides_feat_1">Mở và biên tập tệp .pptx, .ppt giữ nguyên bố cục và phông chữ</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-slides" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="slides_feat_2">Chế độ Người thuyết trình chuẩn mực (Ghi chú, đồng hồ đếm, xem trước slide kế tiếp)</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-slides" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="slides_feat_3">Hiển thị chuyển động hoạt họa slide mượt mà, sắc nét từng chi tiết</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-slides" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="slides_feat_4">Bộ sưu tập hình khối chuẩn và công cụ căn chỉnh nam châm thông minh</span>
+              </li>
+            </ul>
+          </div>
+          <div class="app-preview-canvas">
+            <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--google-amber); margin-bottom: 14px; font-weight: 700;">// Presenter Mode [Projector Output]</div>
+            <div style="background: #ffffff; border-radius: 8px; padding: 22px; border: 1px solid var(--border-color); box-shadow: 0 1px 4px rgba(60,64,67,0.08);">
+              <div style="color: var(--text-primary); font-size: 1.1rem; font-weight: 700; margin-bottom: 6px;">Kỷ Nguyên Số & Đổi Mới Giáo Dục 2026</div>
+              <div style="color: var(--text-secondary); font-size: 0.88rem;">Slide 1 / 24 • Đang trình chiếu chuẩn 16:9 sắc nét</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 4: PDF -->
+        <div class="app-tab-content-panel" data-panel="pdf">
+          <div class="app-detail-content">
+            <div class="app-detail-header">
+              <img src="icon/pdf.png" alt="ZenQ PDF Icon" class="app-detail-icon-large">
+              <h3 class="app-detail-title" data-i18n="pdf_title">ZenQ PDF — Đọc & Biên tập tài liệu bảo mật tuyệt đối</h3>
+            </div>
+            <p class="app-detail-desc" data-i18n="pdf_desc">
+              Mở các tệp tài liệu PDF dung lượng lớn nhanh chóng. Tích hợp công cụ tìm kiếm từ khóa, đánh dấu văn bản, xoay trang, xuất ảnh chất lượng cao và bảo vệ quyền riêng tư không gửi tệp lên máy chủ đám mây.
+            </p>
+            <ul class="app-feature-list">
+              <li class="app-feature-item">
+                <svg class="check-icon check-pdf" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="pdf_feat_1">Động cơ kết xuất PDF chuyên dụng cho độ nét văn bản tối đa</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-pdf" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="pdf_feat_2">Tìm kiếm từ khóa tức thì và xem trước thumbnail trang tiện lợi</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-pdf" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="pdf_feat_3">Đăng ký ứng dụng đọc PDF mặc định Windows 10 & Windows 11 dễ dàng</span>
+              </li>
+              <li class="app-feature-item">
+                <svg class="check-icon check-pdf" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <span data-i18n="pdf_feat_4">Bảo mật nội bộ 100%, không lo rò rỉ tài liệu nhạy cảm</span>
+              </li>
+            </ul>
+          </div>
+          <div class="app-preview-canvas">
+            <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--google-red); margin-bottom: 14px; font-weight: 700;">// High-Res PDF Document Viewer</div>
+            <div style="background: #ffffff; border-radius: 8px; padding: 22px; border: 1px solid var(--border-color); box-shadow: 0 1px 4px rgba(60,64,67,0.08);">
+              <div style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin-bottom: 6px;">ISO 32000-1 Document Reader</div>
+              <div style="color: var(--text-secondary); font-size: 0.85rem;">Chứng chỉ mã hóa bảo mật • 100% Ngoại tuyến • An toàn tuyệt đối</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         HIGHLIGHTS SECTION (GHI THẲNG TÊN ZENQ OFFICE, BỎ BẢNG SO SÁNH)
+         =================================================================== -->
+    <section class="highlights-section" id="highlights">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge" data-i18n="highlights_section_badge">TÍNH NĂNG VƯỢT TRỘI</div>
+          <h2 class="section-title" data-i18n="highlights_section_title">Những Giá Trị Cốt Lõi Của ZenQ Office</h2>
+          <p class="section-desc" data-i18n="highlights_section_desc">
+            Được xây dựng với tiêu chuẩn cao nhất nhằm mang lại sự tiện nghi, an toàn và hiệu quả công việc tối đa cho bạn.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-wrap icon-blue">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <h3 class="feature-card-title" data-i18n="feature_card1_title">Tương Thích Tuyệt Đối Chuẩn Microsoft Office</h3>
+            <p class="feature-card-desc" data-i18n="feature_card1_desc">
+              Đọc, chỉnh sửa và lưu các định dạng tệp .docx, .xlsx, .pptx, .pdf với bố cục, bảng biểu và phông chữ chuẩn xác. Dễ dàng trao đổi tài liệu với đồng nghiệp mà không lo lệch trang hay lỗi định dạng.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrap icon-green">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <h3 class="feature-card-title" data-i18n="feature_card2_title">An Toàn Tuyệt Đối & 100% Ngoại Tuyến</h3>
+            <p class="feature-card-desc" data-i18n="feature_card2_desc">
+              ZenQ Office hoạt động hoàn toàn cục bộ trên máy tính của bạn. Không bắt buộc đăng nhập tài khoản, không gửi tệp lên máy chủ bên thứ ba và không thu thập bất kỳ dữ liệu cá nhân nào.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrap icon-amber">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <h3 class="feature-card-title" data-i18n="feature_card3_title">Lối Tắt Ứng Dụng Nhánh & Giao Diện Tab</h3>
+            <p class="feature-card-desc" data-i18n="feature_card3_desc">
+              Bạn có thể mở trực tiếp tài liệu Word vào ZenQ Writer hoặc bảng tính vào ZenQ Calc từ lối tắt ngoài Desktop mà không bị vướng bận, hoặc gộp chung tất cả trong một cửa sổ Tab làm việc thông minh.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrap icon-red">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <h3 class="feature-card-title" data-i18n="feature_card4_title">Hoàn Toàn Miễn Phí & Không Quảng Cáo</h3>
+            <p class="feature-card-desc" data-i18n="feature_card4_desc">
+              Cam kết phục vụ trọn đời cho học sinh, sinh viên, giáo viên và cộng đồng người dùng. Trải nghiệm làm việc thuần túy, sạch sẽ, không có bất kỳ quảng cáo chen ngang hay chi phí ẩn nào.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         ABOUT US SECTION
+         =================================================================== -->
+    <section class="about-section" id="about">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge" data-i18n="about_section_badge">VỀ CHÚNG TÔI</div>
+          <h2 class="section-title" data-i18n="about_section_title">Khát Vọng Phần Mềm Văn Phòng Việt Nam Vươn Tầm Quốc Tế</h2>
+        </div>
+
+        <div class="about-lead-box" data-i18n="about_lead">
+          Được sáng lập bởi đội ngũ NextGenEduSpace Studio, ZenQ Office ra đời từ một câu hỏi giản đơn nhưng đầy trăn trở: Tại sao người dùng phải chịu đựng những bộ phần mềm văn phòng cồng kềnh, ép buộc đăng ký tài khoản đám mây và chứa đầy quảng cáo phiền toái?
+        </div>
+
+        <div class="about-story-grid">
+          <div class="about-card">
+            <h3 data-i18n="about_story_title">Câu Chuyện Khởi Nguồn</h3>
+            <p data-i18n="about_story_p1">
+              Trong kỷ nguyên số, tài liệu là tri thức và công cụ làm việc cốt lõi của mỗi học sinh, sinh viên, giáo viên và chuyên gia. Tuy nhiên, các giải pháp hiện tại ngày càng trở nên nặng nề, phụ thuộc vào kết nối mạng liên tục và yêu cầu cấu hình máy tính đắt tiền.
+            </p>
+            <p data-i18n="about_story_p2">
+              Chúng tôi bắt đầu dự án ZenQ Office với mục tiêu duy nhất: Tái định nghĩa trải nghiệm văn phòng trên Windows bằng công nghệ hiện đại, mang lại sự mượt mà tối đa, đồng thời tôn trọng tuyệt đối quyền riêng tư và quyền tự chủ tài liệu của người sử dụng.
+            </p>
+          </div>
+
+          <div class="about-card">
+            <h3 data-i18n="about_vision_title">Tầm Nhìn & Sứ Mệnh</h3>
+            <p data-i18n="about_vision_desc">
+              Trở thành bộ ứng dụng văn phòng bản địa hóa chuẩn mực cao nhất tại Việt Nam, mang đến giải pháp phần mềm độc lập, an toàn và hoàn toàn miễn phí trọn đời cho nền giáo dục nước nhà.
+            </p>
+          </div>
+        </div>
+
+        <div class="values-grid">
+          <div class="value-card">
+            <h4 data-i18n="about_val1_title">1. Tiện Lợi & Mượt Mà</h4>
+            <p data-i18n="about_val1_desc">
+              Mọi thao tác soạn thảo, tính toán và trình chiếu đều được tối ưu hóa để diễn ra liền mạch, phản hồi tức thì và không làm gián đoạn dòng suy nghĩ của bạn.
+            </p>
+          </div>
+
+          <div class="value-card">
+            <h4 data-i18n="about_val2_title">2. Quyền Riêng Tư Bất Khả Xâm Phạm</h4>
+            <p data-i18n="about_val2_desc">
+              Dữ liệu của bạn chỉ nằm trên máy của bạn. Chúng tôi không bao giờ cài cắm mã theo dõi hành vi, không bán quảng cáo và không yêu cầu đăng ký tài khoản bắt buộc.
+            </p>
+          </div>
+
+          <div class="value-card">
+            <h4 data-i18n="about_val3_title">3. Tinh Tế & Chuẩn Mực</h4>
+            <p data-i18n="about_val3_desc">
+              Giao diện tuân thủ tiêu chuẩn thiết kế hiện đại, màu sắc hài hòa, thao tác trực quan quen thuộc giúp bạn làm việc ngay mà không mất thời gian học lại.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         FAQ SECTION (ACCORDION)
+         =================================================================== -->
+    <section class="faq-section" id="faq">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge" data-i18n="faq_section_badge">CÂU HỎI THƯỜNG GẶP</div>
+          <h2 class="section-title" data-i18n="faq_section_title">Giải Đáp Mọi Thắc Mắc Về ZenQ Office</h2>
+          <p class="section-desc" data-i18n="faq_section_desc">
+            Tìm câu trả lời nhanh chóng cho các vấn đề kỹ thuật, bản quyền, cài đặt và tính năng thường gặp.
+          </p>
+        </div>
+
+        <div class="faq-filters">
+          <button class="faq-filter-btn active" data-category="all" data-i18n="faq_filter_all">Tất cả câu hỏi</button>
+          <button class="faq-filter-btn" data-category="install" data-i18n="faq_filter_install">Cài đặt & Bản quyền</button>
+          <button class="faq-filter-btn" data-category="compat" data-i18n="faq_filter_compat">Định dạng & Tương thích</button>
+          <button class="faq-filter-btn" data-category="security" data-i18n="faq_filter_security">Bảo mật & Quyền riêng tư</button>
+          <button class="faq-filter-btn" data-category="perf" data-i18n="faq_filter_perf">Trải nghiệm & Tính năng</button>
+        </div>
+
+        <div class="faq-accordion-wrap">
+          <!-- Q1 -->
+          <div class="faq-item" data-category="install">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q1">ZenQ Office có thực sự miễn phí không? Có bị thu phí ẩn sau này không?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a1">
+                ZenQ Office là phần mềm hoàn toàn miễn phí, không có bất kỳ khoản phí ẩn nào, không yêu cầu thẻ tín dụng và không giới hạn thời gian dùng thử. Chúng tôi cam kết duy trì phiên bản cốt lõi này miễn phí vĩnh viễn cho học sinh, sinh viên và cộng đồng người dùng.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q2 -->
+          <div class="faq-item" data-category="compat">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q2">ZenQ Office có mở được file Word (.docx), Excel (.xlsx), PowerPoint (.pptx) không?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a2">
+                Có, hoàn toàn tương thích 100%. ZenQ Office đọc và ghi chuẩn định dạng OpenXML quốc tế của Microsoft Office (.docx, .doc, .rtf, .txt, .xlsx, .xls, .csv, .pptx, .ppt, .pdf). Bố cục văn bản, bảng biểu, công thức toán và định dạng slide được giữ nguyên vẹn khi bạn gửi tệp cho đối tác sử dụng Microsoft Office.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q3 -->
+          <div class="faq-item" data-category="install">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q3">Làm thế nào để đặt ZenQ PDF hoặc các ứng dụng ZenQ làm app mặc định trên Windows?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a3">
+                Trong ZenQ Office, bạn chỉ cần vào menu Cài đặt -> Ứng dụng mặc định, sau đó gạt công tắc cho phân hệ mong muốn (Writer, Calc, Slides, PDF). Trên Windows 10/11, hệ thống sẽ mở hộp thoại hoặc trang Windows Settings chỉ định tới ZenQ Office để bạn xác nhận chỉ bằng một lần nhấp chuột.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q4 -->
+          <div class="faq-item" data-category="security">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q4">ZenQ Office có an toàn không? Có thu thập dữ liệu cá nhân hay tài liệu không?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a4">
+                An toàn tuyệt đối. ZenQ Office là ứng dụng chạy cục bộ ngoại tuyến 100%. Không có bất kỳ dòng lệnh nào gửi tệp hay nội dung tài liệu của bạn lên máy chủ internet. Bộ cài đặt đã được quét sạch virus và đáp ứng các tiêu chuẩn bảo mật khắt khe nhất của hệ điều hành Windows.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q5 -->
+          <div class="faq-item" data-category="perf">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q5">Máy tính cấu hình bình thường hoặc máy tính cũ dùng có mượt không?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a5">
+                Rất mượt mà! ZenQ Office được tối ưu hóa tinh gọn, vận hành trơn tru và nhẹ nhàng ngay cả trên các dòng máy tính, laptop văn phòng có cấu hình khiêm tốn.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q6 -->
+          <div class="faq-item" data-category="compat">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q6">ZenQ Office có hỗ trợ in ấn và xuất file PDF không?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a6">
+                Có. Cả ba phân hệ Writer, Calc và Slides đều tích hợp sẵn bộ xuất file chuẩn PDF chất lượng cao, đồng thời hỗ trợ hộp thoại in ấn tiêu chuẩn của Windows với đầy đủ tùy chọn khổ giấy A4, A3, in hai mặt và tỷ lệ trang.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q7 -->
+          <div class="faq-item" data-category="install">
+            <div class="faq-header">
+              <span class="faq-question" data-i18n="faq_q7">Làm sao để cập nhật lên phiên bản ZenQ Office mới nhất?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="faq-body">
+              <div class="faq-body-inner" data-i18n="faq_a7">
+                ZenQ Office tích hợp sẵn cơ chế kiểm tra cập nhật thông minh. Bạn có thể nhấn vào nút Cập nhật ở góc dưới màn hình chính hoặc trong Cài đặt để nâng cấp phiên bản mới nhất một cách nhanh chóng.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         DOWNLOAD SECTION
+         =================================================================== -->
+    <section class="download-section" id="download">
+      <div class="container">
+        <div class="download-box">
+          <div class="section-badge" data-i18n="dl_section_badge">TẢI VỀ NGAY</div>
+          <h2 class="section-title" data-i18n="dl_section_title">Trải Nghiệm ZenQ Office Cho Windows</h2>
+          <p class="section-desc" data-i18n="dl_section_desc">
+            Tải bản cài đặt chính thức v4.0. Cài đặt nhanh chóng và bắt đầu làm việc hiệu quả ngay hôm nay.
+          </p>
+
+          <div class="download-cta-group">
+            <a href="https://github.com/danhtruong6112009-source/ZENQ/releases/download/v4.0/ZenQOffice-Setup.exe" class="btn-primary" style="padding: 16px 36px; font-size: 1.05rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              <span data-i18n="dl_btn_main">Tải Bộ Cài Đặt (ZenQOffice-Setup.exe)</span>
+            </a>
+
+            <a href="https://github.com/danhtruong6112009-source/ZENQ/releases" class="btn-secondary" style="padding: 16px 30px; font-size: 1.05rem;" data-i18n="dl_btn_portable">
+              Tải Bản Portable (.zip)
+            </a>
+          </div>
+
+          <div class="download-metadata">
+            <span class="meta-item"><span data-i18n="dl_meta_ver">Phiên bản:</span> <strong>v4.0 Release</strong></span>
+            <span class="meta-item"><span data-i18n="dl_meta_os">Hệ điều hành:</span> <strong data-i18n="dl_meta_os_val">Windows 10 / 11 (64-bit)</strong></span>
+            <span class="meta-item"><span data-i18n="dl_meta_formats">Định dạng:</span> <strong data-i18n="dl_meta_formats_val">DOCX, XLSX, PPTX, PDF</strong></span>
+            <span class="meta-item"><span data-i18n="dl_meta_license">Bản quyền:</span> <strong data-i18n="dl_meta_license_val">Miễn phí trọn đời</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================================
+       FOOTER
+       =================================================================== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <img src="icon/ZENQOFFICE.png" alt="ZenQ Office" class="footer-brand-icon">
+            <span>ZENQ OFFICE</span>
+          </div>
+          <p class="footer-desc" data-i18n="footer_desc">
+            Bộ ứng dụng văn phòng thế hệ mới cho Windows. Tối ưu trải nghiệm, bảo mật ngoại tuyến và miễn phí trọn đời.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h5 data-i18n="footer_col_products">Sản phẩm</h5>
+          <ul>
+            <li><a href="#features">ZenQ Writer</a></li>
+            <li><a href="#features">ZenQ Calc</a></li>
+            <li><a href="#features">ZenQ Slides</a></li>
+            <li><a href="#features">ZenQ PDF</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5 data-i18n="footer_col_resources">Tài nguyên</h5>
+          <ul>
+            <li><a href="#highlights">Đặc điểm nổi bật</a></li>
+            <li><a href="#faq">Câu hỏi thường gặp</a></li>
+            <li><a href="#download">Tải xuống v4.0</a></li>
+            <li><a href="https://github.com/danhtruong6112009-source/ZENQ" target="_blank" rel="noopener">GitHub Repository</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5 data-i18n="footer_col_company">Tổ chức</h5>
+          <ul>
+            <li><a href="#about">NextGenEduSpace Studio</a></li>
+            <li><a href="#about">Sứ mệnh Giáo dục</a></li>
+            <li><a href="#about">Chính sách bảo mật</a></li>
+            <li><a href="mailto:support@zenqoffice.vn">Liên hệ hỗ trợ</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p data-i18n="footer_copy">© 2026 NextGenEduSpace Studio. Đã đăng ký bản quyền. Được phát triển tự hào tại Việt Nam.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="dictionary.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
