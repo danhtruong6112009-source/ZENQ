@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -585,7 +585,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawButtonContent(Graphics g, int idx, Rectangle r, string curFont, float curSize, bool isHover, bool isActive)
+        private void DrawButtonContent(D2DGraphics g, int idx, Rectangle r, string curFont, float curSize, bool isHover, bool isActive)
         {
             Color iconCol = Color.FromArgb(51, 51, 51);
             using (Font fBold = new Font("Segoe UI", 9f, FontStyle.Bold))
@@ -725,19 +725,19 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArrowDown(Graphics g, int x, int y, Color col)
+        private void DrawArrowDown(D2DGraphics g, int x, int y, Color col)
         {
             Point[] pts = new Point[] { new Point(x - 3, y - 1), new Point(x + 3, y - 1), new Point(x, y + 2) };
             using (SolidBrush b = new SolidBrush(col)) g.FillPolygon(b, pts);
         }
 
-        private void DrawArrowUp(Graphics g, int x, int y, Color col)
+        private void DrawArrowUp(D2DGraphics g, int x, int y, Color col)
         {
             Point[] pts = new Point[] { new Point(x, y - 3), new Point(x - 3, y + 1), new Point(x + 3, y + 1) };
             using (SolidBrush b = new SolidBrush(col)) g.FillPolygon(b, pts);
         }
 
-        private void DrawBrushIcon(Graphics g, int x, int y, int size)
+        private void DrawBrushIcon(D2DGraphics g, int x, int y, int size)
         {
             using (Pen p = new Pen(Color.FromArgb(16, 110, 190), 1.3f))
             {
@@ -747,7 +747,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPencilIcon(Graphics g, int x, int y, int size)
+        private void DrawPencilIcon(D2DGraphics g, int x, int y, int size)
         {
             using (Pen p = new Pen(Color.FromArgb(55, 65, 81), 1.2f))
             {
@@ -756,7 +756,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawCommentIcon(Graphics g, int x, int y, int size)
+        private void DrawCommentIcon(D2DGraphics g, int x, int y, int size)
         {
             using (Pen p = new Pen(Color.FromArgb(16, 124, 65), 1.2f))
             {

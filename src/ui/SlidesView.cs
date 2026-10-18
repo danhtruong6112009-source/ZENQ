@@ -2159,8 +2159,6 @@ namespace ZenQOffice.UI
         private int _cachedTransFromIdx = -1;
         private int _cachedTransToIdx = -1;
         private Size _cachedTransSize = Size.Empty;
-        private Bitmap _elementsDrawerBmp = null;
-
         public void ClearTransitionCache()
         {
             if (_cachedTransBmpA != null)
@@ -5643,12 +5641,6 @@ namespace ZenQOffice.UI
             if (isAlreadyOpen)
             {
                 IsElementsDrawerOpen = false;
-                if (_elementsDrawerBmp != null)
-                {
-                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                    try { _elementsDrawerBmp.Dispose(); } catch { }
-                    _elementsDrawerBmp = null;
-                }
             }
             else
             {
@@ -5674,12 +5666,6 @@ namespace ZenQOffice.UI
             if (isAlreadyOpen)
             {
                 IsElementsDrawerOpen = false;
-                if (_elementsDrawerBmp != null)
-                {
-                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                    try { _elementsDrawerBmp.Dispose(); } catch { }
-                    _elementsDrawerBmp = null;
-                }
             }
             else
             {
@@ -5705,12 +5691,6 @@ namespace ZenQOffice.UI
                 if (IsElementsDrawerOpen && ElementsDrawerSelectedTab == targetTab && !IsElementsDrawerCollapsed)
                 {
                     IsElementsDrawerOpen = false;
-                    if (_elementsDrawerBmp != null)
-                    {
-                        try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                        try { _elementsDrawerBmp.Dispose(); } catch { }
-                        _elementsDrawerBmp = null;
-                    }
                 }
                 else
                 {
@@ -5723,12 +5703,6 @@ namespace ZenQOffice.UI
             {
                 IsElementsDrawerOpen = !IsElementsDrawerOpen;
                 if (IsElementsDrawerOpen) IsElementsDrawerCollapsed = false;
-                else if (_elementsDrawerBmp != null)
-                {
-                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                    try { _elementsDrawerBmp.Dispose(); } catch { }
-                    _elementsDrawerBmp = null;
-                }
             }
             ZoomToFit();
             if (InvalidateCallback != null) InvalidateCallback();
@@ -5745,12 +5719,6 @@ namespace ZenQOffice.UI
             if (ShapeTaskPane != null)
             {
                 ShapeTaskPane.SearchText = "";
-            }
-            if (_elementsDrawerBmp != null)
-            {
-                try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                try { _elementsDrawerBmp.Dispose(); } catch { }
-                _elementsDrawerBmp = null;
             }
             ZoomToFit();
             if (InvalidateCallback != null) InvalidateCallback();
@@ -6060,32 +6028,15 @@ namespace ZenQOffice.UI
                     return;
                 }
 
-                // 1. Khi đang ở Tab 1 (Thành phần & Hình dạng), kết xuất toàn diện qua WPF Task Pane với hơn 500+ hình dạng
+                // 1. Khi đang ở Tab 1 (Thành phần & Hình dạng), kết xuất trực tiếp 100% bằng GPU Direct2D
                 if (ElementsDrawerSelectedTab == 1)
                 {
                     if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
                     try
                     {
-                        if (totalW > 0 && contentY + totalH > 0)
+                        if (totalW > 0 && totalH > 0)
                         {
-                            int targetBmpH = contentY + totalH;
-                            if (_elementsDrawerBmp == null || _elementsDrawerBmp.Width != totalW || _elementsDrawerBmp.Height != targetBmpH)
-                            {
-                                if (_elementsDrawerBmp != null)
-                                {
-                                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                                    try { _elementsDrawerBmp.Dispose(); } catch { }
-                                }
-                                _elementsDrawerBmp = new Bitmap(totalW, targetBmpH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                            }
-
-                            using (Graphics bmpG = Graphics.FromImage(_elementsDrawerBmp))
-                            {
-                                bmpG.Clear(Color.Transparent);
-                                ShapeTaskPane.Draw(bmpG, new Rectangle(0, contentY, totalW, totalH));
-                            }
-                            try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
-                            g.DrawImage(_elementsDrawerBmp, 0, 0, totalW, targetBmpH);
+                            ShapeTaskPane.Draw(g, new Rectangle(0, contentY, totalW, totalH));
                         }
                     }
                     catch (Exception ex)

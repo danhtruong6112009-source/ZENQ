@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -121,7 +121,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawButtonContent(Graphics g, int idx, Rectangle r, CalcSelectionFormat summary, bool isHover, bool isActive)
+        private void DrawButtonContent(D2DGraphics g, int idx, Rectangle r, CalcSelectionFormat summary, bool isHover, bool isActive)
         {
             Color iconCol = Color.FromArgb(51, 51, 51);
             using (Font fBold = new Font("Segoe UI", 9f, FontStyle.Bold))
@@ -265,19 +265,19 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArrowDown(Graphics g, int x, int y, Color col)
+        private void DrawArrowDown(D2DGraphics g, int x, int y, Color col)
         {
             Point[] pts = new Point[] { new Point(x - 3, y - 1), new Point(x + 3, y - 1), new Point(x, y + 2) };
             using (SolidBrush b = new SolidBrush(col)) g.FillPolygon(b, pts);
         }
 
-        private void DrawArrowUp(Graphics g, int x, int y, Color col)
+        private void DrawArrowUp(D2DGraphics g, int x, int y, Color col)
         {
             Point[] pts = new Point[] { new Point(x, y - 3), new Point(x - 3, y + 1), new Point(x + 3, y + 1) };
             using (SolidBrush b = new SolidBrush(col)) g.FillPolygon(b, pts);
         }
 
-        private void DrawBucketIcon(Graphics g, int x, int y, int size)
+        private void DrawBucketIcon(D2DGraphics g, int x, int y, int size)
         {
             using (Pen p = new Pen(Color.FromArgb(60, 60, 60), 1.2f))
             {
@@ -287,7 +287,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawBrushIcon(Graphics g, int x, int y, int size)
+        private void DrawBrushIcon(D2DGraphics g, int x, int y, int size)
         {
             using (Pen p = new Pen(Color.FromArgb(16, 110, 190), 1.3f))
             {

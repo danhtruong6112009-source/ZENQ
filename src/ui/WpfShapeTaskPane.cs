@@ -424,9 +424,18 @@ namespace ZenQOffice.UI
         /// </summary>
         public void Draw(Graphics g, Rectangle bounds)
         {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, bounds.Width, bounds.Height))
+            {
+                Draw(d2d, bounds);
+            }
+        }
+
+        public void Draw(D2DGraphics g, Rectangle bounds)
+        {
             if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
 
-            // Thiết lập chế độ chống răng cưa tối đa cho Graphics
+            // Thiết lập chế độ chống răng cưa tối đa cho D2DGraphics
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
@@ -638,8 +647,7 @@ namespace ZenQOffice.UI
             int contentH = h - (headerH + tabsH + searchH + 16);
             Rectangle contentClip = new Rectangle(x, contentY, w, contentH);
 
-            Region oldClip = g.Clip;
-            g.SetClip(contentClip);
+            g.PushClip(contentClip);
 
             int currentY = contentY - ScrollY;
 
@@ -723,7 +731,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            g.Clip = oldClip;
+            g.PopClip();
 
             // Tính toán MaxScrollY
             int totalContentH = (currentY + ScrollY) - contentY;
@@ -769,7 +777,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private int RenderCategoryRow(Graphics g, int rx, int ry, int rw, ShapeCategoryGroup cat)
+        private int RenderCategoryRow(D2DGraphics g, int rx, int ry, int rw, ShapeCategoryGroup cat)
         {
             if (cat == null || cat.Items == null || cat.Items.Count == 0) return ry;
 
@@ -817,7 +825,7 @@ namespace ZenQOffice.UI
             return itemY + cardH;
         }
 
-        private int RenderShapeGrid(Graphics g, int rx, int ry, int rw, List<ShapePresetItem> items, string headerTitle)
+        private int RenderShapeGrid(D2DGraphics g, int rx, int ry, int rw, List<ShapePresetItem> items, string headerTitle)
         {
             if (!string.IsNullOrEmpty(headerTitle))
             {
@@ -876,7 +884,7 @@ namespace ZenQOffice.UI
             return ry + totalRows * (cardH + cardSpacing);
         }
 
-        private void DrawShapeCard(Graphics g, Rectangle rect, ShapePresetItem item)
+        private void DrawShapeCard(D2DGraphics g, Rectangle rect, ShapePresetItem item)
         {
             bool isHovered = (item.Id == HoveredItemId);
             Color cardBg = isHovered ? Color.FromArgb(238, 242, 255) : Color.FromArgb(255, 255, 255);

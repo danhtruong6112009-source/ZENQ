@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -312,210 +312,210 @@ namespace ZenQOffice.UI
         }
 
         
-        private Dictionary<string, Action<Graphics, Rectangle>> previewDispatch;
+        private Dictionary<string, Action<D2DGraphics, Rectangle>> previewDispatch;
 
         private void InitPreviewDispatch()
         {
-            previewDispatch = new Dictionary<string, Action<Graphics, Rectangle>>();
-            previewDispatch["List_AlternatingHexagon"] = delegate(Graphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "List_AlternatingHexagon"); };
-            previewDispatch["List_BasicBlock"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_BasicBlock"); };
-            previewDispatch["List_BendingPictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_BendingPictureAccent"); };
-            previewDispatch["List_ContinuousPicture"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_ContinuousPicture"); };
-            previewDispatch["List_DescendingBlock"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "List_DescendingBlock"); };
-            previewDispatch["List_DetailedProcess"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "List_DetailedProcess"); };
-            previewDispatch["List_Grouped"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Grouped(_g, _r); };
-            previewDispatch["List_Hierarchy"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "List_Hierarchy"); };
-            previewDispatch["List_HorizontalBullet"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_HorizontalBullet"); };
-            previewDispatch["List_HorizontalPicture"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_HorizontalPicture"); };
-            previewDispatch["List_IncreasingCircle"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_IncreasingCircles(_g, _r); };
-            previewDispatch["List_Lined"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Lined(_g, _r); };
-            previewDispatch["List_PictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_PictureAccent"); };
-            previewDispatch["List_PictureCaption"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_PictureCaption"); };
-            previewDispatch["List_PieProcess"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Pie(_g, _r); };
-            previewDispatch["List_PlusMinus"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_PlusMinus(_g, _r); };
-            previewDispatch["List_Pyramid"] = delegate(Graphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "List_Pyramid"); };
-            previewDispatch["List_Reverse"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Reverse(_g, _r); };
-            previewDispatch["List_SegmentedProcess"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "List_SegmentedProcess"); };
-            previewDispatch["List_Stacked"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Stacked(_g, _r); };
-            previewDispatch["List_SquareAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_SquareAccent(_g, _r); };
-            previewDispatch["List_Tab"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["List_TableHierarchy"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["List_Table"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["List_Target"] = delegate(Graphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
-            previewDispatch["List_Trapezoid"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_Trapezoid"); };
-            previewDispatch["List_VaryingWidth"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_VaryingWidth(_g, _r); };
-            previewDispatch["List_VerticalBox"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBox"); };
-            previewDispatch["List_VerticalBlock"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBlock"); };
-            previewDispatch["List_VerticalBracket"] = delegate(Graphics _g, Rectangle _r) { DrawBracketPreview(_g, _r); };
-            previewDispatch["List_VerticalBullet"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBullet"); };
-            previewDispatch["List_VerticalChevron"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "List_VerticalChevron"); };
-            previewDispatch["List_VerticalPictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_VerticalPictureAccent"); };
-            previewDispatch["List_VerticalPicture"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_VerticalPicture"); };
-            previewDispatch["List_VerticalAccent"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "List_VerticalAccent"); };
-            previewDispatch["List_VerticalArrow"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_ContinuousArrow(_g, _r); };
-            previewDispatch["List_VerticalCircle"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_IncreasingCircles(_g, _r); };
-            previewDispatch["List_VerticalCurved"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalCurved"); };
-            previewDispatch["Process_Accent"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Accent"); };
-            previewDispatch["Process_AlternatingFlow"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_AlternatingFlow"); };
-            previewDispatch["Process_ArrowRibbon"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ArrowRibbon"); };
-            previewDispatch["Process_AscendingPictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_AscendingPictureAccent"); };
-            previewDispatch["Process_BasicBending"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_BasicBending"); };
-            previewDispatch["Process_BasicChevron"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_BasicChevron"); };
-            previewDispatch["Process_Basic"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Basic"); };
-            previewDispatch["Process_BasicTimeline"] = delegate(Graphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_BasicTimeline"); };
-            previewDispatch["Process_ChevronAccent"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ChevronAccent"); };
-            previewDispatch["Process_ChevronList"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ChevronList"); };
-            previewDispatch["Process_CircularBending"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_CircularBending"); };
-            previewDispatch["Process_ClosedChevron"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ClosedChevron"); };
-            previewDispatch["Process_CircleAccentTimeline"] = delegate(Graphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_CircleAccentTimeline"); };
-            previewDispatch["Process_CircleArrow"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_CircleArrow(_g, _r); };
-            previewDispatch["Process_ContinuousArrow"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_ContinuousArrow(_g, _r); };
-            previewDispatch["Process_ContinuousBlock"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ContinuousBlock"); };
-            previewDispatch["Process_ContinuousPictureList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Process_ContinuousPictureList"); };
-            previewDispatch["Process_ConvergingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ConvergingArrows"); };
-            previewDispatch["Process_ConvergingText"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ConvergingText"); };
-            previewDispatch["Process_Descending"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_Descending"); };
-            previewDispatch["Process_Detailed"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Detailed"); };
-            previewDispatch["Process_DivergingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_DivergingArrows"); };
-            previewDispatch["Process_Equation"] = delegate(Graphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Process_Equation"); };
-            previewDispatch["Process_Funnel"] = delegate(Graphics _g, Rectangle _r) { DrawFunnelPreview(_g, _r); };
-            previewDispatch["Process_Gear"] = delegate(Graphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
-            previewDispatch["Process_IncreasingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_IncreasingArrows"); };
-            previewDispatch["Process_InterconnectedBlock"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_InterconnectedBlock"); };
-            previewDispatch["Process_OpposingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_OpposingArrows"); };
-            previewDispatch["Process_Phased"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Phased(_g, _r); };
-            previewDispatch["Process_PictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Process_PictureAccent"); };
-            previewDispatch["Process_PieProcess"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Pie(_g, _r); };
-            previewDispatch["Process_ProcessArrows"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ProcessArrows"); };
-            previewDispatch["Process_ProcessList"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ProcessList"); };
-            previewDispatch["Process_RandomToResult"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_RandomToResult"); };
-            previewDispatch["Process_RepeatingBending"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_RepeatingBending"); };
-            previewDispatch["Process_Segmented"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Segmented"); };
-            previewDispatch["Process_Staggered"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_Staggered"); };
-            previewDispatch["Process_StepDown"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_StepDown"); };
-            previewDispatch["Process_StepUp"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_StepUp"); };
-            previewDispatch["Process_SubStep"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_SubStep"); };
-            previewDispatch["Process_TimelinePipe"] = delegate(Graphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_TimelinePipe"); };
-            previewDispatch["Process_UpwardArrow"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_UpwardArrow"); };
-            previewDispatch["Process_VerticalArrowList"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_VerticalProcess(_g, _r); };
-            previewDispatch["Process_VerticalBending"] = delegate(Graphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_VerticalBending"); };
-            previewDispatch["Process_VerticalChevronList"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_VerticalChevronList"); };
-            previewDispatch["Process_VerticalEquation"] = delegate(Graphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Process_VerticalEquation"); };
-            previewDispatch["Process_Vertical"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_VerticalProcess(_g, _r); };
-            previewDispatch["Cycle_Basic"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Basic"); };
-            previewDispatch["Cycle_BasicPie"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_BasicPie"); };
-            previewDispatch["Cycle_BasicRadial"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_BasicRadial"); };
-            previewDispatch["Cycle_Block"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Block"); };
-            previewDispatch["Cycle_CircleArrowProcess"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_CircleArrow(_g, _r); };
-            previewDispatch["Cycle_Continuous"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Continuous"); };
-            previewDispatch["Cycle_CycleMatrix"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Cycle_CycleMatrix"); };
-            previewDispatch["Cycle_DivergingRadial"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Cycle_DivergingRadial"); };
-            previewDispatch["Cycle_Gear"] = delegate(Graphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
-            previewDispatch["Cycle_Multidirectional"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Multidirectional"); };
-            previewDispatch["Cycle_Nondirectional"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Nondirectional"); };
-            previewDispatch["Cycle_RadialCluster"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_RadialCluster"); };
-            previewDispatch["Cycle_Radial"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Radial"); };
-            previewDispatch["Cycle_RadialVenn"] = delegate(Graphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Cycle_RadialVenn"); };
-            previewDispatch["Cycle_Segmented"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Segmented"); };
-            previewDispatch["Cycle_Text"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Text"); };
-            previewDispatch["Hierarchy_Tree"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Tree"); };
-            previewDispatch["Hierarchy_PictureOrgChart"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_PictureOrgChart"); };
-            previewDispatch["Hierarchy_NameTitleOrg"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_NameTitleOrg"); };
-            previewDispatch["Hierarchy_HalfCircleOrg"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HalfCircleOrg"); };
-            previewDispatch["Hierarchy_CirclePicture"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_CirclePicture"); };
-            previewDispatch["Hierarchy_Architecture"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Architecture"); };
-            previewDispatch["Hierarchy_Labeled"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Labeled"); };
-            previewDispatch["Hierarchy_Table"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["Hierarchy_Horizontal"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Horizontal"); };
-            previewDispatch["Hierarchy_HorizontalOrg"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalOrg"); };
-            previewDispatch["Hierarchy_HorizontalLabeled"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalLabeled"); };
-            previewDispatch["Hierarchy_HorizontalMultiLevel"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalMultiLevel"); };
-            previewDispatch["Hierarchy_List"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_List"); };
-            previewDispatch["Hierarchy_LinedList"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_LinedList"); };
-            previewDispatch["Hierarchy_Basic"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Basic"); };
-            previewDispatch["Rel_Balance"] = delegate(Graphics _g, Rectangle _r) { DrawBalancePreview(_g, _r); };
-            previewDispatch["Rel_RadialCluster"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialCluster"); };
-            previewDispatch["Rel_Funnel"] = delegate(Graphics _g, Rectangle _r) { DrawFunnelPreview(_g, _r); };
-            previewDispatch["Rel_Gear"] = delegate(Graphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
-            previewDispatch["Rel_HexagonCluster"] = delegate(Graphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Rel_HexagonCluster"); };
-            previewDispatch["Rel_CounterbalanceArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_CounterbalanceArrows"); };
-            previewDispatch["Rel_OpposingIdeas"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_OpposingIdeas"); };
-            previewDispatch["Rel_ArrowRibbon"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ArrowRibbon"); };
-            previewDispatch["Rel_BasicPie"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_BasicPie"); };
-            previewDispatch["Rel_BasicRadial"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_BasicRadial"); };
-            previewDispatch["Rel_BasicTarget"] = delegate(Graphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
-            previewDispatch["Rel_BasicVenn"] = delegate(Graphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_BasicVenn"); };
-            previewDispatch["Rel_CircleRelationship"] = delegate(Graphics _g, Rectangle _r) { DrawListPreview(_g, _r, "Rel_CircleRelationship"); };
-            previewDispatch["Rel_ContinuousPictureList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Rel_ContinuousPictureList"); };
-            previewDispatch["Rel_ConvergingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ConvergingArrows"); };
-            previewDispatch["Rel_ConvergingRadial"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ConvergingRadial"); };
-            previewDispatch["Rel_CycleMatrix"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Rel_CycleMatrix"); };
-            previewDispatch["Rel_DivergingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_DivergingArrows"); };
-            previewDispatch["Rel_DivergingRadial"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_DivergingRadial"); };
-            previewDispatch["Rel_Equation"] = delegate(Graphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Rel_Equation"); };
-            previewDispatch["Rel_GroupedList"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Grouped(_g, _r); };
-            previewDispatch["Rel_HierarchyList"] = delegate(Graphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Rel_HierarchyList"); };
-            previewDispatch["Rel_LinearVenn"] = delegate(Graphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_LinearVenn"); };
-            previewDispatch["Rel_NestedTarget"] = delegate(Graphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
-            previewDispatch["Rel_NondirectionalCycle"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_NondirectionalCycle"); };
-            previewDispatch["Rel_OpposingArrows"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_OpposingArrows"); };
-            previewDispatch["Rel_PictureAccentList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Rel_PictureAccentList"); };
-            previewDispatch["Rel_RadialCycle"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialCycle"); };
-            previewDispatch["Rel_RadialList"] = delegate(Graphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialList"); };
-            previewDispatch["Rel_RadialVenn"] = delegate(Graphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_RadialVenn"); };
-            previewDispatch["Rel_SegmentedPyramid"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_SegmentedPyramid(_g, _r); };
-            previewDispatch["Rel_StackedVenn"] = delegate(Graphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_StackedVenn"); };
-            previewDispatch["Rel_TableHierarchy"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["Rel_TargetList"] = delegate(Graphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
-            previewDispatch["Matrix_Basic"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Basic"); };
-            previewDispatch["Matrix_Cycle"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Cycle"); };
-            previewDispatch["Matrix_Grid"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Grid"); };
-            previewDispatch["Matrix_Titled"] = delegate(Graphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Titled"); };
-            previewDispatch["Pyramid_Basic"] = delegate(Graphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_Basic"); };
-            previewDispatch["Pyramid_Inverted"] = delegate(Graphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_Inverted"); };
-            previewDispatch["Pyramid_List"] = delegate(Graphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_List"); };
-            previewDispatch["Pyramid_Segmented"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_SegmentedPyramid(_g, _r); };
-            previewDispatch["Picture_Accented"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Accented"); };
-            previewDispatch["Picture_AlternatingBlocks"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_AlternatingBlocks(_g, _r); };
-            previewDispatch["Picture_AlternatingCircles"] = delegate(Graphics _g, Rectangle _r) { DrawBubblePreview(_g, _r); };
-            previewDispatch["Picture_AscendingAccentProcess"] = delegate(Graphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Picture_AscendingAccentProcess"); };
-            previewDispatch["Picture_BendingAccentList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingAccentList"); };
-            previewDispatch["Picture_BendingBlocks"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingBlocks"); };
-            previewDispatch["Picture_BendingCaption"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingCaption"); };
-            previewDispatch["Picture_BendingCaptionList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingCaptionList"); };
-            previewDispatch["Picture_BendingSemiTransparent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingSemiTransparent"); };
-            previewDispatch["Picture_BubbleList"] = delegate(Graphics _g, Rectangle _r) { DrawBubblePreview(_g, _r); };
-            previewDispatch["Picture_Captioned"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Captioned"); };
-            previewDispatch["Picture_CircleHierarchy"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CircleHierarchy"); };
-            previewDispatch["Picture_CircularCallout"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CircularCallout"); };
-            previewDispatch["Picture_ContinuousList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_ContinuousList"); };
-            previewDispatch["Picture_FramedText"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_FramedText"); };
-            previewDispatch["Picture_HexagonCluster"] = delegate(Graphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Picture_HexagonCluster"); };
-            previewDispatch["Picture_HorizontalList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_HorizontalList"); };
-            previewDispatch["Picture_AccentBlocks"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentBlocks"); };
-            previewDispatch["Picture_AccentList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentList"); };
-            previewDispatch["Picture_AccentProcess"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentProcess"); };
-            previewDispatch["Picture_CaptionList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CaptionList"); };
-            previewDispatch["Picture_Grid"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Grid"); };
-            previewDispatch["Picture_Lineup"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Lineup"); };
-            previewDispatch["Picture_Strips"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_VerticalPictureStrips(_g, _r); };
-            previewDispatch["Picture_SnapshotList"] = delegate(Graphics _g, Rectangle _r) { DrawSnapshotPreview(_g, _r); };
-            previewDispatch["Picture_Spiral"] = delegate(Graphics _g, Rectangle _r) { DrawPreview_Spiral(_g, _r); };
-            previewDispatch["Picture_TitledAccentList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitledAccentList"); };
-            previewDispatch["Picture_TitleLineup"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitleLineup"); };
-            previewDispatch["Picture_TitledBlocks"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitledBlocks"); };
-            previewDispatch["Picture_VerticalAccentList"] = delegate(Graphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Picture_VerticalAccentList"); };
-            previewDispatch["Picture_VerticalList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_VerticalList"); };
-            previewDispatch["Office_CircleProcess"] = delegate(Graphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_CircleProcess"); };
-            previewDispatch["Office_ConvergingText"] = delegate(Graphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Office_ConvergingText"); };
-            previewDispatch["Office_HexagonRadial"] = delegate(Graphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Office_HexagonRadial"); };
-            previewDispatch["Office_InterconnectedBlockProcess"] = delegate(Graphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_InterconnectedBlockProcess"); };
-            previewDispatch["Office_PictureFrame"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_PictureFrame"); };
-            previewDispatch["Office_RadialPictureList"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_RadialPictureList"); };
-            previewDispatch["Office_TabList"] = delegate(Graphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
-            previewDispatch["Office_ThemePictureAccent"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_ThemePictureAccent"); };
-            previewDispatch["Office_ThemeAlternatingAccent"] = delegate(Graphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_ThemeAlternatingAccent"); };
-            previewDispatch["Office_ThemePictureGrid"] = delegate(Graphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_ThemePictureGrid"); };
+            previewDispatch = new Dictionary<string, Action<D2DGraphics, Rectangle>>();
+            previewDispatch["List_AlternatingHexagon"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "List_AlternatingHexagon"); };
+            previewDispatch["List_BasicBlock"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_BasicBlock"); };
+            previewDispatch["List_BendingPictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_BendingPictureAccent"); };
+            previewDispatch["List_ContinuousPicture"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_ContinuousPicture"); };
+            previewDispatch["List_DescendingBlock"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "List_DescendingBlock"); };
+            previewDispatch["List_DetailedProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "List_DetailedProcess"); };
+            previewDispatch["List_Grouped"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Grouped(_g, _r); };
+            previewDispatch["List_Hierarchy"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "List_Hierarchy"); };
+            previewDispatch["List_HorizontalBullet"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_HorizontalBullet"); };
+            previewDispatch["List_HorizontalPicture"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_HorizontalPicture"); };
+            previewDispatch["List_IncreasingCircle"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_IncreasingCircles(_g, _r); };
+            previewDispatch["List_Lined"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Lined(_g, _r); };
+            previewDispatch["List_PictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_PictureAccent"); };
+            previewDispatch["List_PictureCaption"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_PictureCaption"); };
+            previewDispatch["List_PieProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Pie(_g, _r); };
+            previewDispatch["List_PlusMinus"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_PlusMinus(_g, _r); };
+            previewDispatch["List_Pyramid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "List_Pyramid"); };
+            previewDispatch["List_Reverse"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Reverse(_g, _r); };
+            previewDispatch["List_SegmentedProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "List_SegmentedProcess"); };
+            previewDispatch["List_Stacked"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Stacked(_g, _r); };
+            previewDispatch["List_SquareAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_SquareAccent(_g, _r); };
+            previewDispatch["List_Tab"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["List_TableHierarchy"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["List_Table"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["List_Target"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
+            previewDispatch["List_Trapezoid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_Trapezoid"); };
+            previewDispatch["List_VaryingWidth"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_VaryingWidth(_g, _r); };
+            previewDispatch["List_VerticalBox"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBox"); };
+            previewDispatch["List_VerticalBlock"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBlock"); };
+            previewDispatch["List_VerticalBracket"] = delegate(D2DGraphics _g, Rectangle _r) { DrawBracketPreview(_g, _r); };
+            previewDispatch["List_VerticalBullet"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalBullet"); };
+            previewDispatch["List_VerticalChevron"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "List_VerticalChevron"); };
+            previewDispatch["List_VerticalPictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_VerticalPictureAccent"); };
+            previewDispatch["List_VerticalPicture"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "List_VerticalPicture"); };
+            previewDispatch["List_VerticalAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "List_VerticalAccent"); };
+            previewDispatch["List_VerticalArrow"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_ContinuousArrow(_g, _r); };
+            previewDispatch["List_VerticalCircle"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_IncreasingCircles(_g, _r); };
+            previewDispatch["List_VerticalCurved"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "List_VerticalCurved"); };
+            previewDispatch["Process_Accent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Accent"); };
+            previewDispatch["Process_AlternatingFlow"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_AlternatingFlow"); };
+            previewDispatch["Process_ArrowRibbon"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ArrowRibbon"); };
+            previewDispatch["Process_AscendingPictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_AscendingPictureAccent"); };
+            previewDispatch["Process_BasicBending"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_BasicBending"); };
+            previewDispatch["Process_BasicChevron"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_BasicChevron"); };
+            previewDispatch["Process_Basic"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Basic"); };
+            previewDispatch["Process_BasicTimeline"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_BasicTimeline"); };
+            previewDispatch["Process_ChevronAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ChevronAccent"); };
+            previewDispatch["Process_ChevronList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ChevronList"); };
+            previewDispatch["Process_CircularBending"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_CircularBending"); };
+            previewDispatch["Process_ClosedChevron"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_ClosedChevron"); };
+            previewDispatch["Process_CircleAccentTimeline"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_CircleAccentTimeline"); };
+            previewDispatch["Process_CircleArrow"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_CircleArrow(_g, _r); };
+            previewDispatch["Process_ContinuousArrow"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_ContinuousArrow(_g, _r); };
+            previewDispatch["Process_ContinuousBlock"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ContinuousBlock"); };
+            previewDispatch["Process_ContinuousPictureList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Process_ContinuousPictureList"); };
+            previewDispatch["Process_ConvergingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ConvergingArrows"); };
+            previewDispatch["Process_ConvergingText"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_ConvergingText"); };
+            previewDispatch["Process_Descending"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_Descending"); };
+            previewDispatch["Process_Detailed"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Detailed"); };
+            previewDispatch["Process_DivergingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_DivergingArrows"); };
+            previewDispatch["Process_Equation"] = delegate(D2DGraphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Process_Equation"); };
+            previewDispatch["Process_Funnel"] = delegate(D2DGraphics _g, Rectangle _r) { DrawFunnelPreview(_g, _r); };
+            previewDispatch["Process_Gear"] = delegate(D2DGraphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
+            previewDispatch["Process_IncreasingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_IncreasingArrows"); };
+            previewDispatch["Process_InterconnectedBlock"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_InterconnectedBlock"); };
+            previewDispatch["Process_OpposingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Process_OpposingArrows"); };
+            previewDispatch["Process_Phased"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Phased(_g, _r); };
+            previewDispatch["Process_PictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Process_PictureAccent"); };
+            previewDispatch["Process_PieProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Pie(_g, _r); };
+            previewDispatch["Process_ProcessArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ProcessArrows"); };
+            previewDispatch["Process_ProcessList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_ProcessList"); };
+            previewDispatch["Process_RandomToResult"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_RandomToResult"); };
+            previewDispatch["Process_RepeatingBending"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_RepeatingBending"); };
+            previewDispatch["Process_Segmented"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_Segmented"); };
+            previewDispatch["Process_Staggered"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_Staggered"); };
+            previewDispatch["Process_StepDown"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_StepDown"); };
+            previewDispatch["Process_StepUp"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_StepUp"); };
+            previewDispatch["Process_SubStep"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_SubStep"); };
+            previewDispatch["Process_TimelinePipe"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTimelinePreview(_g, _r, "Process_TimelinePipe"); };
+            previewDispatch["Process_UpwardArrow"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Process_UpwardArrow"); };
+            previewDispatch["Process_VerticalArrowList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_VerticalProcess(_g, _r); };
+            previewDispatch["Process_VerticalBending"] = delegate(D2DGraphics _g, Rectangle _r) { DrawProcessPreview(_g, _r, "Process_VerticalBending"); };
+            previewDispatch["Process_VerticalChevronList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Process_VerticalChevronList"); };
+            previewDispatch["Process_VerticalEquation"] = delegate(D2DGraphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Process_VerticalEquation"); };
+            previewDispatch["Process_Vertical"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_VerticalProcess(_g, _r); };
+            previewDispatch["Cycle_Basic"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Basic"); };
+            previewDispatch["Cycle_BasicPie"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_BasicPie"); };
+            previewDispatch["Cycle_BasicRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_BasicRadial"); };
+            previewDispatch["Cycle_Block"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Block"); };
+            previewDispatch["Cycle_CircleArrowProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_CircleArrow(_g, _r); };
+            previewDispatch["Cycle_Continuous"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Continuous"); };
+            previewDispatch["Cycle_CycleMatrix"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Cycle_CycleMatrix"); };
+            previewDispatch["Cycle_DivergingRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Cycle_DivergingRadial"); };
+            previewDispatch["Cycle_Gear"] = delegate(D2DGraphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
+            previewDispatch["Cycle_Multidirectional"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Multidirectional"); };
+            previewDispatch["Cycle_Nondirectional"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Nondirectional"); };
+            previewDispatch["Cycle_RadialCluster"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_RadialCluster"); };
+            previewDispatch["Cycle_Radial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Radial"); };
+            previewDispatch["Cycle_RadialVenn"] = delegate(D2DGraphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Cycle_RadialVenn"); };
+            previewDispatch["Cycle_Segmented"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Segmented"); };
+            previewDispatch["Cycle_Text"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Cycle_Text"); };
+            previewDispatch["Hierarchy_Tree"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Tree"); };
+            previewDispatch["Hierarchy_PictureOrgChart"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_PictureOrgChart"); };
+            previewDispatch["Hierarchy_NameTitleOrg"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_NameTitleOrg"); };
+            previewDispatch["Hierarchy_HalfCircleOrg"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HalfCircleOrg"); };
+            previewDispatch["Hierarchy_CirclePicture"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_CirclePicture"); };
+            previewDispatch["Hierarchy_Architecture"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Architecture"); };
+            previewDispatch["Hierarchy_Labeled"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Labeled"); };
+            previewDispatch["Hierarchy_Table"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["Hierarchy_Horizontal"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Horizontal"); };
+            previewDispatch["Hierarchy_HorizontalOrg"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalOrg"); };
+            previewDispatch["Hierarchy_HorizontalLabeled"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalLabeled"); };
+            previewDispatch["Hierarchy_HorizontalMultiLevel"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_HorizontalMultiLevel"); };
+            previewDispatch["Hierarchy_List"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_List"); };
+            previewDispatch["Hierarchy_LinedList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_LinedList"); };
+            previewDispatch["Hierarchy_Basic"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Hierarchy_Basic"); };
+            previewDispatch["Rel_Balance"] = delegate(D2DGraphics _g, Rectangle _r) { DrawBalancePreview(_g, _r); };
+            previewDispatch["Rel_RadialCluster"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialCluster"); };
+            previewDispatch["Rel_Funnel"] = delegate(D2DGraphics _g, Rectangle _r) { DrawFunnelPreview(_g, _r); };
+            previewDispatch["Rel_Gear"] = delegate(D2DGraphics _g, Rectangle _r) { DrawGearPreview(_g, _r); };
+            previewDispatch["Rel_HexagonCluster"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Rel_HexagonCluster"); };
+            previewDispatch["Rel_CounterbalanceArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_CounterbalanceArrows"); };
+            previewDispatch["Rel_OpposingIdeas"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_OpposingIdeas"); };
+            previewDispatch["Rel_ArrowRibbon"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ArrowRibbon"); };
+            previewDispatch["Rel_BasicPie"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_BasicPie"); };
+            previewDispatch["Rel_BasicRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_BasicRadial"); };
+            previewDispatch["Rel_BasicTarget"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
+            previewDispatch["Rel_BasicVenn"] = delegate(D2DGraphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_BasicVenn"); };
+            previewDispatch["Rel_CircleRelationship"] = delegate(D2DGraphics _g, Rectangle _r) { DrawListPreview(_g, _r, "Rel_CircleRelationship"); };
+            previewDispatch["Rel_ContinuousPictureList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Rel_ContinuousPictureList"); };
+            previewDispatch["Rel_ConvergingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ConvergingArrows"); };
+            previewDispatch["Rel_ConvergingRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_ConvergingRadial"); };
+            previewDispatch["Rel_CycleMatrix"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Rel_CycleMatrix"); };
+            previewDispatch["Rel_DivergingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_DivergingArrows"); };
+            previewDispatch["Rel_DivergingRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_DivergingRadial"); };
+            previewDispatch["Rel_Equation"] = delegate(D2DGraphics _g, Rectangle _r) { DrawEquationPreview(_g, _r, "Rel_Equation"); };
+            previewDispatch["Rel_GroupedList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Grouped(_g, _r); };
+            previewDispatch["Rel_HierarchyList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHierarchyPreview(_g, _r, "Rel_HierarchyList"); };
+            previewDispatch["Rel_LinearVenn"] = delegate(D2DGraphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_LinearVenn"); };
+            previewDispatch["Rel_NestedTarget"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
+            previewDispatch["Rel_NondirectionalCycle"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_NondirectionalCycle"); };
+            previewDispatch["Rel_OpposingArrows"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Rel_OpposingArrows"); };
+            previewDispatch["Rel_PictureAccentList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Rel_PictureAccentList"); };
+            previewDispatch["Rel_RadialCycle"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialCycle"); };
+            previewDispatch["Rel_RadialList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawCyclePreview(_g, _r, "Rel_RadialList"); };
+            previewDispatch["Rel_RadialVenn"] = delegate(D2DGraphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_RadialVenn"); };
+            previewDispatch["Rel_SegmentedPyramid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_SegmentedPyramid(_g, _r); };
+            previewDispatch["Rel_StackedVenn"] = delegate(D2DGraphics _g, Rectangle _r) { DrawVennPreview(_g, _r, "Rel_StackedVenn"); };
+            previewDispatch["Rel_TableHierarchy"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["Rel_TargetList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTargetPreview(_g, _r); };
+            previewDispatch["Matrix_Basic"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Basic"); };
+            previewDispatch["Matrix_Cycle"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Cycle"); };
+            previewDispatch["Matrix_Grid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Grid"); };
+            previewDispatch["Matrix_Titled"] = delegate(D2DGraphics _g, Rectangle _r) { DrawMatrixPreview(_g, _r, "Matrix_Titled"); };
+            previewDispatch["Pyramid_Basic"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_Basic"); };
+            previewDispatch["Pyramid_Inverted"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_Inverted"); };
+            previewDispatch["Pyramid_List"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPyramidPreview(_g, _r, "Pyramid_List"); };
+            previewDispatch["Pyramid_Segmented"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_SegmentedPyramid(_g, _r); };
+            previewDispatch["Picture_Accented"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Accented"); };
+            previewDispatch["Picture_AlternatingBlocks"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_AlternatingBlocks(_g, _r); };
+            previewDispatch["Picture_AlternatingCircles"] = delegate(D2DGraphics _g, Rectangle _r) { DrawBubblePreview(_g, _r); };
+            previewDispatch["Picture_AscendingAccentProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawStepPreview(_g, _r, "Picture_AscendingAccentProcess"); };
+            previewDispatch["Picture_BendingAccentList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingAccentList"); };
+            previewDispatch["Picture_BendingBlocks"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingBlocks"); };
+            previewDispatch["Picture_BendingCaption"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingCaption"); };
+            previewDispatch["Picture_BendingCaptionList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingCaptionList"); };
+            previewDispatch["Picture_BendingSemiTransparent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_BendingSemiTransparent"); };
+            previewDispatch["Picture_BubbleList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawBubblePreview(_g, _r); };
+            previewDispatch["Picture_Captioned"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Captioned"); };
+            previewDispatch["Picture_CircleHierarchy"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CircleHierarchy"); };
+            previewDispatch["Picture_CircularCallout"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CircularCallout"); };
+            previewDispatch["Picture_ContinuousList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_ContinuousList"); };
+            previewDispatch["Picture_FramedText"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_FramedText"); };
+            previewDispatch["Picture_HexagonCluster"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Picture_HexagonCluster"); };
+            previewDispatch["Picture_HorizontalList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_HorizontalList"); };
+            previewDispatch["Picture_AccentBlocks"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentBlocks"); };
+            previewDispatch["Picture_AccentList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentList"); };
+            previewDispatch["Picture_AccentProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_AccentProcess"); };
+            previewDispatch["Picture_CaptionList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_CaptionList"); };
+            previewDispatch["Picture_Grid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Grid"); };
+            previewDispatch["Picture_Lineup"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_Lineup"); };
+            previewDispatch["Picture_Strips"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_VerticalPictureStrips(_g, _r); };
+            previewDispatch["Picture_SnapshotList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawSnapshotPreview(_g, _r); };
+            previewDispatch["Picture_Spiral"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPreview_Spiral(_g, _r); };
+            previewDispatch["Picture_TitledAccentList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitledAccentList"); };
+            previewDispatch["Picture_TitleLineup"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitleLineup"); };
+            previewDispatch["Picture_TitledBlocks"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_TitledBlocks"); };
+            previewDispatch["Picture_VerticalAccentList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawChevronPreview(_g, _r, "Picture_VerticalAccentList"); };
+            previewDispatch["Picture_VerticalList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Picture_VerticalList"); };
+            previewDispatch["Office_CircleProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_CircleProcess"); };
+            previewDispatch["Office_ConvergingText"] = delegate(D2DGraphics _g, Rectangle _r) { DrawArrowsPreview(_g, _r, "Office_ConvergingText"); };
+            previewDispatch["Office_HexagonRadial"] = delegate(D2DGraphics _g, Rectangle _r) { DrawHexagonPreview(_g, _r, "Office_HexagonRadial"); };
+            previewDispatch["Office_InterconnectedBlockProcess"] = delegate(D2DGraphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_InterconnectedBlockProcess"); };
+            previewDispatch["Office_PictureFrame"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_PictureFrame"); };
+            previewDispatch["Office_RadialPictureList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_RadialPictureList"); };
+            previewDispatch["Office_TabList"] = delegate(D2DGraphics _g, Rectangle _r) { DrawTabPreview(_g, _r); };
+            previewDispatch["Office_ThemePictureAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_ThemePictureAccent"); };
+            previewDispatch["Office_ThemeAlternatingAccent"] = delegate(D2DGraphics _g, Rectangle _r) { DrawOfficeSpecificPreview(_g, _r, "Office_ThemeAlternatingAccent"); };
+            previewDispatch["Office_ThemePictureGrid"] = delegate(D2DGraphics _g, Rectangle _r) { DrawPicturePreview(_g, _r, "Office_ThemePictureGrid"); };
         }
 
         private List<SmartArtTemplate> filteredTemplates = new List<SmartArtTemplate>();
@@ -776,7 +776,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawCategoryIcon(Graphics g, int x, int y, string cat, bool isSelected)
+        private void DrawCategoryIcon(D2DGraphics g, int x, int y, string cat, bool isSelected)
         {
             Color strokeColor = isSelected ? Color.FromArgb(0, 90, 170) : Color.FromArgb(90, 90, 90);
             using (Pen pen = new Pen(strokeColor, 1.2f))
@@ -968,7 +968,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArchitecturalWireframe(Graphics g, Rectangle r, string typeId)
+        private void DrawArchitecturalWireframe(D2DGraphics g, Rectangle r, string typeId)
         {
             Color fillNeutral = Color.FromArgb(225, 223, 221); // #E1DFDD
             Color outNeutral = Color.FromArgb(96, 94, 92);     // #605E5C
@@ -1071,7 +1071,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawGearWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawGearWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // 3 interlocking gears
             DrawGearShape(g, r.X + 18, r.Y + 30, 13, 9, 8, fillBrush, outPen);
@@ -1079,7 +1079,7 @@ namespace ZenQOffice.UI
             DrawGearShape(g, r.X + 44, r.Y + 36, 9, 6, 6, fillBrush, outPen);
         }
 
-        private void DrawGearShape(Graphics g, float cx, float cy, float outerR, float innerR, int teeth, Brush fillBrush, Pen borderPen)
+        private void DrawGearShape(D2DGraphics g, float cx, float cy, float outerR, float innerR, int teeth, Brush fillBrush, Pen borderPen)
         {
             int totalPoints = teeth * 4;
             PointF[] pts = new PointF[totalPoints];
@@ -1100,7 +1100,7 @@ namespace ZenQOffice.UI
             g.DrawEllipse(borderPen, cx - holeR, cy - holeR, holeR * 2, holeR * 2);
         }
 
-        private void DrawHexagonWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawHexagonWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // 3 interlocking hexagons
             DrawHexagonShape(g, r.X + 16, r.Y + 20, 11, fillBrush, outPen);
@@ -1108,7 +1108,7 @@ namespace ZenQOffice.UI
             DrawHexagonShape(g, r.X + 46, r.Y + 19, 11, fillBrush, outPen);
         }
 
-        private void DrawHexagonShape(Graphics g, float cx, float cy, float radius, Brush fillBrush, Pen borderPen)
+        private void DrawHexagonShape(D2DGraphics g, float cx, float cy, float radius, Brush fillBrush, Pen borderPen)
         {
             PointF[] pts = new PointF[6];
             for (int i = 0; i < 6; i++)
@@ -1120,7 +1120,7 @@ namespace ZenQOffice.UI
             g.DrawPolygon(borderPen, pts);
         }
 
-        private void DrawFunnelWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawFunnelWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // Top rim
             g.FillEllipse(fillBrush, r.X + 6, r.Y + 4, r.Width - 12, 10);
@@ -1145,7 +1145,7 @@ namespace ZenQOffice.UI
             g.DrawEllipse(outPen, r.X + 32, r.Y + 3, 5, 5);
         }
 
-        private void DrawBalanceWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawBalanceWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + 12;
@@ -1182,7 +1182,7 @@ namespace ZenQOffice.UI
             g.DrawRectangle(outPen, r.Right - 19, cy + 14, 10, 6);
         }
 
-        private void DrawTargetWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawTargetWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int cx = r.X + r.Width / 2 - 4;
             int cy = r.Y + r.Height / 2;
@@ -1205,7 +1205,7 @@ namespace ZenQOffice.UI
             g.DrawRectangle(outPen, r.Right - 12, cy - 20, 10, 6);
         }
 
-        private void DrawVennWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawVennWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -1216,7 +1216,7 @@ namespace ZenQOffice.UI
             g.DrawEllipse(outPen, cx - 11, cy - 2, 22, 22);
         }
 
-        private void DrawEquationWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawEquationWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int bw = 13;
             int bh = 15;
@@ -1246,7 +1246,7 @@ namespace ZenQOffice.UI
             g.DrawRectangle(outPen, r.Right - bw - 2, by - 2, bw + 2, bh + 4);
         }
 
-        private void DrawTabWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen divPen)
+        private void DrawTabWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen divPen)
         {
             int count = 3;
             int th = (r.Height - 12) / count;
@@ -1264,7 +1264,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawBracketWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawBracketWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // Curly bracket on left
             int bx = r.X + 10;
@@ -1289,7 +1289,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawSnapshotWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawSnapshotWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // 2 overlapping Polaroid frames
             // Frame 1 (behind, tilted)
@@ -1309,7 +1309,7 @@ namespace ZenQOffice.UI
             g.DrawLine(outPen, r.X + 34, r.Y + 25, r.X + 44, r.Y + 33);
         }
 
-        private void DrawBubbleWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawBubbleWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             // 4 circular bubbles of varying sizes
             g.FillEllipse(fillBrush, r.X + 6, r.Y + 14, 18, 18);
@@ -1330,7 +1330,7 @@ namespace ZenQOffice.UI
             g.DrawLine(stemPen, r.X + 38, r.Y + 34, r.X + 31, r.Y + 36);
         }
 
-        private void DrawPyramidWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen)
+        private void DrawPyramidWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen)
         {
             if (typeId.Contains("Inverted"))
             {
@@ -1383,7 +1383,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawMatrixWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
+        private void DrawMatrixWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
         {
             int halfW = (r.Width - 10) / 2;
             int halfH = (r.Height - 10) / 2;
@@ -1428,7 +1428,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawTimelineWireframe(Graphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawTimelineWireframe(D2DGraphics g, Rectangle r, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int midY = r.Y + r.Height / 2;
             g.DrawLine(stemPen, r.X + 4, midY, r.Right - 4, midY);
@@ -1447,7 +1447,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawChevronWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen)
+        private void DrawChevronWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen)
         {
             if (typeId.Contains("Vertical"))
             {
@@ -1487,7 +1487,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawStepWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawStepWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int count = 3;
             int sw = (r.Width - 10) / count;
@@ -1514,7 +1514,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArrowsWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawArrowsWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             if (typeId.Contains("Opposing") || typeId.Contains("Ribbon"))
             {
@@ -1589,7 +1589,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawHierarchyWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen, Pen divPen)
+        private void DrawHierarchyWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen, Pen divPen)
         {
             if (typeId == "Hierarchy_Labeled")
             {
@@ -1734,7 +1734,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPictureWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen, Pen divPen)
+        private void DrawPictureWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen, Pen divPen)
         {
             if (typeId.Contains("Grid"))
             {
@@ -1792,7 +1792,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawCycleWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
+        private void DrawCycleWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen stemPen)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -1835,7 +1835,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawProcessWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
+        private void DrawProcessWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
         {
             if (typeId.Contains("Bending"))
             {
@@ -1877,7 +1877,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawListWireframe(Graphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
+        private void DrawListWireframe(D2DGraphics g, Rectangle r, string typeId, Brush fillBrush, Pen outPen, Pen divPen, Pen stemPen)
         {
             if (typeId.Contains("Trapezoid"))
             {
@@ -1973,10 +1973,10 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawOfficePreviewDiagram(Graphics g, Rectangle r, string typeId)
+        private void DrawOfficePreviewDiagram(D2DGraphics g, Rectangle r, string typeId)
         {
             if (previewDispatch == null) InitPreviewDispatch();
-            Action<Graphics, Rectangle> drawer;
+            Action<D2DGraphics, Rectangle> drawer;
             if (previewDispatch.TryGetValue(typeId, out drawer))
             {
                 drawer(g, r);
@@ -1992,7 +1992,7 @@ namespace ZenQOffice.UI
         // SPECIFIC OFFICE PREVIEW RENDERERS
         // =========================================================================
 
-        private void DrawGearPreview(Graphics g, Rectangle r)
+        private void DrawGearPreview(D2DGraphics g, Rectangle r)
         {
             // 3 interlocking mechanical gears in theme colors
             Color cBlueTop = Color.FromArgb(91, 155, 213);
@@ -2015,7 +2015,7 @@ namespace ZenQOffice.UI
             DrawGear(g, r.X + 164, r.Y + 112, 24, 16, 8, cGreenTop, cGreenBot, cGreenBorder);
         }
 
-        private void DrawFunnelPreview(Graphics g, Rectangle r)
+        private void DrawFunnelPreview(D2DGraphics g, Rectangle r)
         {
             // 3D-styled tapered funnel
             int cx = r.X + r.Width / 2;
@@ -2060,7 +2060,7 @@ namespace ZenQOffice.UI
             DrawSpecularSphere(g, cx, r.Bottom - 8, 8, Color.FromArgb(0, 176, 240));
         }
 
-        private void DrawSpecularSphere(Graphics g, float cx, float cy, float radius, Color baseColor)
+        private void DrawSpecularSphere(D2DGraphics g, float cx, float cy, float radius, Color baseColor)
         {
             RectangleF sRect = new RectangleF(cx - radius, cy - radius, radius * 2, radius * 2);
             using (GraphicsPath path = new GraphicsPath())
@@ -2080,7 +2080,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawBalancePreview(Graphics g, Rectangle r)
+        private void DrawBalancePreview(D2DGraphics g, Rectangle r)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + 24;
@@ -2149,7 +2149,7 @@ namespace ZenQOffice.UI
                 Color.FromArgb(237, 125, 49), Color.FromArgb(198, 89, 17), Color.FromArgb(162, 70, 11), 3, true);
         }
 
-        private void DrawTargetPreview(Graphics g, Rectangle r)
+        private void DrawTargetPreview(D2DGraphics g, Rectangle r)
         {
             int cx = r.X + r.Width / 2 - 12;
             int cy = r.Y + r.Height / 2;
@@ -2193,7 +2193,7 @@ namespace ZenQOffice.UI
             DrawGradientNode(g, new Rectangle(r.Right - 36, cy + 26, 32, 20), Color.FromArgb(255, 192, 0), Color.FromArgb(197, 144, 0), Color.FromArgb(150, 110, 0), 3, true);
         }
 
-        private void DrawVennPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawVennPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -2234,7 +2234,7 @@ namespace ZenQOffice.UI
             g.FillEllipse(Brushes.White, cx - 4, cy + 12, 8, 8);
         }
 
-        private void DrawEquationPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawEquationPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int bw = 48;
             int bh = 48;
@@ -2272,7 +2272,7 @@ namespace ZenQOffice.UI
                 Color.FromArgb(112, 173, 71), Color.FromArgb(83, 129, 53), Color.FromArgb(55, 86, 35), 6, true);
         }
 
-        private void DrawTabPreview(Graphics g, Rectangle r)
+        private void DrawTabPreview(D2DGraphics g, Rectangle r)
         {
             int count = 3;
             int th = 40;
@@ -2294,7 +2294,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawBracketPreview(Graphics g, Rectangle r)
+        private void DrawBracketPreview(D2DGraphics g, Rectangle r)
         {
             int bx = r.X + 24;
             int topY = r.Y + 16;
@@ -2327,7 +2327,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawSnapshotPreview(Graphics g, Rectangle r)
+        private void DrawSnapshotPreview(D2DGraphics g, Rectangle r)
         {
             // 3 Polaroid photo cards tilted slightly
             int pw = 68;
@@ -2343,7 +2343,7 @@ namespace ZenQOffice.UI
             DrawPolaroidCard(g, r.X + (r.Width - pw) / 2, r.Y + 22, pw, ph, 0f, Color.FromArgb(237, 125, 49));
         }
 
-        private void DrawPolaroidCard(Graphics g, float x, float y, float w, float h, float angle, Color accentColor)
+        private void DrawPolaroidCard(D2DGraphics g, float x, float y, float w, float h, float angle, Color accentColor)
         {
             GraphicsState state = g.Save();
             g.TranslateTransform(x + w / 2f, y + h / 2f);
@@ -2378,7 +2378,7 @@ namespace ZenQOffice.UI
             g.Restore(state);
         }
 
-        private void DrawBubblePreview(Graphics g, Rectangle r)
+        private void DrawBubblePreview(D2DGraphics g, Rectangle r)
         {
             // 4 circular bubbles of varying sizes with connections
             DrawPicturePlaceholder(g, new Rectangle(r.X + 16, r.Y + 40, 60, 60), true);
@@ -2394,7 +2394,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawHexagonPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawHexagonPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             // 4 interlocking alternating hexagons
             float rad = 32;
@@ -2413,7 +2413,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPyramidPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawPyramidPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Inverted"))
             {
@@ -2500,7 +2500,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawMatrixPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawMatrixPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int halfW = (r.Width - 32) / 2;
             int halfH = (r.Height - 32) / 2;
@@ -2560,7 +2560,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawTimelinePreview(Graphics g, Rectangle r, string typeId)
+        private void DrawTimelinePreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int midY = r.Y + r.Height / 2;
 
@@ -2603,7 +2603,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawChevronPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawChevronPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Vertical"))
             {
@@ -2654,7 +2654,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawStepPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawStepPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int count = 3;
             int sw = 56;
@@ -2686,7 +2686,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArrowsPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawArrowsPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Opposing") || typeId.Contains("Ribbon"))
             {
@@ -2750,7 +2750,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawHierarchyPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawHierarchyPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId == "Hierarchy_Labeled")
             {
@@ -2982,7 +2982,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPicturePreview(Graphics g, Rectangle r, string typeId)
+        private void DrawPicturePreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Grid"))
             {
@@ -3029,7 +3029,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawCyclePreview(Graphics g, Rectangle r, string typeId)
+        private void DrawCyclePreview(D2DGraphics g, Rectangle r, string typeId)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -3098,7 +3098,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawProcessPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawProcessPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Bending"))
             {
@@ -3151,12 +3151,12 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawRelationshipPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawRelationshipPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             // Obsolete, replaced by exact dispatch
         }
 
-        private void DrawOfficeSpecificPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawOfficeSpecificPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("CircleProcess"))
             {
@@ -3190,7 +3190,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawListPreview(Graphics g, Rectangle r, string typeId)
+        private void DrawListPreview(D2DGraphics g, Rectangle r, string typeId)
         {
             if (typeId.Contains("Trapezoid"))
             {
@@ -3240,7 +3240,7 @@ namespace ZenQOffice.UI
         }
 
 
-        private void DrawPreview_IncreasingCircles(Graphics g, Rectangle r)
+        private void DrawPreview_IncreasingCircles(D2DGraphics g, Rectangle r)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -3254,7 +3254,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_PlusMinus(Graphics g, Rectangle r)
+        private void DrawPreview_PlusMinus(D2DGraphics g, Rectangle r)
         {
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 20, r.Width / 2 - 25, 40), Color.FromArgb(91, 155, 213), Color.FromArgb(43, 91, 136), Color.Black, 2, false);
             DrawGradientNode(g, new Rectangle(r.X + r.Width / 2 + 5, r.Y + 20, r.Width / 2 - 25, 40), Color.FromArgb(237, 125, 49), Color.FromArgb(198, 89, 17), Color.Black, 2, false);
@@ -3266,7 +3266,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Reverse(Graphics g, Rectangle r)
+        private void DrawPreview_Reverse(D2DGraphics g, Rectangle r)
         {
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 30, 60, 40), Color.FromArgb(91, 155, 213), Color.FromArgb(43, 91, 136), Color.Black, 5, false);
             DrawGradientNode(g, new Rectangle(r.X + 120, r.Y + 30, 60, 40), Color.FromArgb(237, 125, 49), Color.FromArgb(198, 89, 17), Color.Black, 5, false);
@@ -3277,7 +3277,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Stacked(Graphics g, Rectangle r)
+        private void DrawPreview_Stacked(D2DGraphics g, Rectangle r)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -3290,7 +3290,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Lined(Graphics g, Rectangle r)
+        private void DrawPreview_Lined(D2DGraphics g, Rectangle r)
         {
             using (Pen p = new Pen(Color.Gray, 2))
             {
@@ -3306,7 +3306,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Grouped(Graphics g, Rectangle r)
+        private void DrawPreview_Grouped(D2DGraphics g, Rectangle r)
         {
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 20, 70, 70), Color.LightGray, Color.Gray, Color.DarkGray, 5, false);
             DrawGradientNode(g, new Rectangle(r.X + 110, r.Y + 20, 70, 70), Color.LightGray, Color.Gray, Color.DarkGray, 5, false);
@@ -3319,7 +3319,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_SquareAccent(Graphics g, Rectangle r)
+        private void DrawPreview_SquareAccent(D2DGraphics g, Rectangle r)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -3332,14 +3332,14 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_VaryingWidth(Graphics g, Rectangle r)
+        private void DrawPreview_VaryingWidth(D2DGraphics g, Rectangle r)
         {
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 20, 140, 20), Color.FromArgb(91, 155, 213), Color.FromArgb(43, 91, 136), Color.Black, 2, false);
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 50, 100, 20), Color.FromArgb(237, 125, 49), Color.FromArgb(198, 89, 17), Color.Black, 2, false);
             DrawGradientNode(g, new Rectangle(r.X + 20, r.Y + 80, 160, 20), Color.FromArgb(112, 173, 71), Color.FromArgb(83, 129, 53), Color.Black, 2, false);
         }
 
-        private void DrawPreview_CircleArrow(Graphics g, Rectangle r)
+        private void DrawPreview_CircleArrow(D2DGraphics g, Rectangle r)
         {
             int cx = r.X + r.Width / 2;
             int cy = r.Y + r.Height / 2;
@@ -3384,7 +3384,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Phased(Graphics g, Rectangle r)
+        private void DrawPreview_Phased(D2DGraphics g, Rectangle r)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -3397,7 +3397,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Pie(Graphics g, Rectangle r)
+        private void DrawPreview_Pie(D2DGraphics g, Rectangle r)
         {
             using (SolidBrush b1 = new SolidBrush(Color.FromArgb(91, 155, 213)))
             using (SolidBrush b2 = new SolidBrush(Color.FromArgb(237, 125, 49)))
@@ -3409,7 +3409,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_VerticalProcess(Graphics g, Rectangle r)
+        private void DrawPreview_VerticalProcess(D2DGraphics g, Rectangle r)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -3425,7 +3425,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_ContinuousArrow(Graphics g, Rectangle r)
+        private void DrawPreview_ContinuousArrow(D2DGraphics g, Rectangle r)
         {
             using (SolidBrush b = new SolidBrush(Color.FromArgb(91, 155, 213)))
             {
@@ -3446,7 +3446,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_SegmentedPyramid(Graphics g, Rectangle r)
+        private void DrawPreview_SegmentedPyramid(D2DGraphics g, Rectangle r)
         {
             using (SolidBrush b1 = new SolidBrush(Color.FromArgb(91, 155, 213)))
             using (SolidBrush b2 = new SolidBrush(Color.FromArgb(237, 125, 49)))
@@ -3459,7 +3459,7 @@ namespace ZenQOffice.UI
         }
 
         
-        private void DrawPreview_VerticalPictureStrips(Graphics g, Rectangle r)
+        private void DrawPreview_VerticalPictureStrips(D2DGraphics g, Rectangle r)
         {
             int colW = 48;
             int gap = 12;
@@ -3480,7 +3480,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPreview_Spiral(Graphics g, Rectangle r)
+        private void DrawPreview_Spiral(D2DGraphics g, Rectangle r)
         {
             for (int i = 0; i < 4; i++)
             {
@@ -3491,7 +3491,7 @@ namespace ZenQOffice.UI
         }
 
 
-        private void DrawPreview_AlternatingBlocks(Graphics g, Rectangle r)
+        private void DrawPreview_AlternatingBlocks(D2DGraphics g, Rectangle r)
         {
             int rowH = 38;
             int gap = 8;
@@ -3521,7 +3521,7 @@ namespace ZenQOffice.UI
         // VECTOR GRAPHICS HELPERS (C# 5 COMPATIBLE)
         // =========================================================================
 
-        private void DrawGradientNode(Graphics g, Rectangle r, Color cTop, Color cBot, Color cBorder, int radius, bool drawDash)
+        private void DrawGradientNode(D2DGraphics g, Rectangle r, Color cTop, Color cBot, Color cBorder, int radius, bool drawDash)
         {
             using (GraphicsPath path = GetRoundedPath(r, radius))
             {
@@ -3545,7 +3545,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawGear(Graphics g, float cx, float cy, float outerR, float innerR, int teeth, Color cTop, Color cBot, Color cBorder)
+        private void DrawGear(D2DGraphics g, float cx, float cy, float outerR, float innerR, int teeth, Color cTop, Color cBot, Color cBorder)
         {
             int totalPoints = teeth * 4;
             PointF[] pts = new PointF[totalPoints];
@@ -3581,7 +3581,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawHexagon(Graphics g, float cx, float cy, float radius, Color cTop, Color cBot, Color cBorder)
+        private void DrawHexagon(D2DGraphics g, float cx, float cy, float radius, Color cTop, Color cBot, Color cBorder)
         {
             PointF[] pts = new PointF[6];
             for (int i = 0; i < 6; i++)
@@ -3607,7 +3607,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawChevronShape(Graphics g, Rectangle r, Color cTop, Color cBot, Color cBorder, int notch)
+        private void DrawChevronShape(D2DGraphics g, Rectangle r, Color cTop, Color cBot, Color cBorder, int notch)
         {
             PointF[] pts = new PointF[] {
                 new PointF(r.X, r.Y),
@@ -3636,7 +3636,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPicturePlaceholder(Graphics g, Rectangle r, bool isCircle)
+        private void DrawPicturePlaceholder(D2DGraphics g, Rectangle r, bool isCircle)
         {
             // Drop shadow
             Rectangle shadowRect = new Rectangle(r.X + 2, r.Y + 2, r.Width, r.Height);
@@ -3690,7 +3690,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void FillRoundedRectangle(Graphics g, Color color, Rectangle r, int radius)
+        private void FillRoundedRectangle(D2DGraphics g, Color color, Rectangle r, int radius)
         {
             using (GraphicsPath path = GetRoundedPath(r, radius))
             using (SolidBrush b = new SolidBrush(color))
@@ -3711,7 +3711,20 @@ namespace ZenQOffice.UI
             return path;
         }
 
+        public void RenderDialog(D2DGraphics g, int width, int height)
+        {
+            RenderDialogD2D(g, width, height);
+        }
+
         public void RenderDialog(Graphics g, int width, int height)
+        {
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                RenderDialogD2D(d2d, width, height);
+            }
+        }
+
+        private void RenderDialogD2D(D2DGraphics g, int width, int height)
         {
             // Headless render method for testing / validation
             g.Clear(Color.FromArgb(246, 248, 250));

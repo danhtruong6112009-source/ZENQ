@@ -2011,10 +2011,27 @@ namespace ZenQOffice.UI
             }
         }
 
+        private RectangleF _currentClipBounds = RectangleF.Empty;
+
+        public RectangleF ClipBounds
+        {
+            get
+            {
+                if (_clipDepth > 0 && !_currentClipBounds.IsEmpty) return _currentClipBounds;
+                if (_renderTarget != null)
+                {
+                    var sz = _renderTarget.Size;
+                    return new RectangleF(0, 0, sz.Width, sz.Height);
+                }
+                return _gdiGraphics != null ? _gdiGraphics.ClipBounds : RectangleF.Empty;
+            }
+        }
+
         // --- Clipping Acceleration ---
         public void SetClip(Rectangle rect) => SetClip(new RectangleF(rect.X, rect.Y, rect.Width, rect.Height));
         public void SetClip(RectangleF rect)
         {
+            _currentClipBounds = rect;
             if (_renderTarget != null)
             {
                 int baseClip = (_d2dStateStack.Count > 0) ? _d2dStateStack[_d2dStateStack.Count - 1].Layer.ClipDepth : 0;

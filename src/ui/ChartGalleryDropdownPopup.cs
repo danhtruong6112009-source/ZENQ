@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -374,7 +374,8 @@ namespace ZenQOffice.UI
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
+            using (D2DGraphics g = new D2DGraphics(e.Graphics, this.Width, this.Height))
+            {
             g.SmoothingMode = SmoothingMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
@@ -460,9 +461,10 @@ namespace ZenQOffice.UI
             {
                 g.DrawString(moreChartsText, moreFont, moreBrush, moreChartsRect.Left + 28, moreChartsRect.Top + 4);
             }
+            }
         }
 
-        private void DrawMoreChartsFooterIcon(Graphics g, int x, int y)
+        private void DrawMoreChartsFooterIcon(D2DGraphics g, int x, int y)
         {
             using (SolidBrush b1 = new SolidBrush(Color.FromArgb(0, 120, 212))) g.FillRectangle(b1, x + 2, y + 8, 3, 8);
             using (SolidBrush b2 = new SolidBrush(Color.FromArgb(16, 124, 65))) g.FillRectangle(b2, x + 7, y + 3, 3, 13);
@@ -475,7 +477,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawTileVectorIcon(Graphics g, Rectangle r, string typeId)
+        private void DrawTileVectorIcon(D2DGraphics g, Rectangle r, string typeId)
         {
             int cx = r.X + 4;
             int cy = r.Y + 4;
@@ -803,7 +805,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawMini3DCuboid(Graphics g, int x, int y, int w, int h, int d, Color c)
+        private void DrawMini3DCuboid(D2DGraphics g, int x, int y, int w, int h, int d, Color c)
         {
             if (h <= 0) return;
             Color topC = ControlPaint.Light(c, 0.35f);
@@ -826,7 +828,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawMini3DHorzBar(Graphics g, int x, int y, int w, int h, int d, Color c)
+        private void DrawMini3DHorzBar(D2DGraphics g, int x, int y, int w, int h, int d, Color c)
         {
             if (w <= 0) return;
             Color topC = ControlPaint.Light(c, 0.35f);
