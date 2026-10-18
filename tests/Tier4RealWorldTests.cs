@@ -1093,5 +1093,93 @@ namespace GenOffice.Tests
                 }
             }
         }
+
+        // =========================================================================
+        // FEATURE 21: Slides PNG Export Full Opacity & Range Export
+        // =========================================================================
+        [Test, Tier(TestTier.Tier4_RealWorld), Feature(21, "Slide PNG Export Opacity & Range", Milestone.M2)]
+        [Description("Verify 100% opaque alpha on slide PNG exports (zero white specks) and custom slide range export")]
+        public void T4_F21_01_SlideExportOpaqueAlphaAndCustomRanges()
+        {
+            // 1. Verify PdfHandler.ParsePageRange for slide/page ranges
+            var parsed = PdfHandler.ParsePageRange("1-2, 4", 5);
+            Assert.AreEqual(3, parsed.Count, "Range '1-2, 4' must yield 3 slide indices");
+            Assert.AreEqual(0, parsed[0], "Slide 1 is index 0");
+            Assert.AreEqual(1, parsed[1], "Slide 2 is index 1");
+            Assert.AreEqual(3, parsed[2], "Slide 4 is index 3");
+
+            // 2. Setup SlidesView with 4 slides
+            SlidesView sv = new SlidesView();
+            sv.Presentation = new PresentationRoot();
+            for (int i = 0; i < 4; i++)
+            {
+                var slide = new SlideNode();
+                slide.BgColor = unchecked((int)0xFF101828); // Dark slide background
+                // Add a black rectangle shape
+                var sh = new ShapeNode
+                {
+                    Type = ShapeType.Rectangle,
+                    Transform = new Transform2D { X = 50, Y = 50, Width = 200, Height = 100 },
+                    FillColor = unchecked((int)0xFF000000), // Pure black
+                    StrokeColor = unchecked((int)0xFF000000)
+                };
+                slide.Shapes.Add(sh);
+                sv.Presentation.Slides.Add(slide);
+            }
+            sv.ActiveSlideIndex = 1; // Slide 2 active
+
+            // 3. Verify RenderSlideToBitmap sets 100% alpha (Alpha == 255) across all pixels
+            using (Bitmap rendered = sv.RenderSlideToBitmap(sv.Presentation.Slides[0], 200, 150))
+            {
+                Assert.IsNotNull(rendered, "Rendered slide bitmap must not be null");
+                Assert.AreEqual(200, rendered.Width);
+                Assert.AreEqual(150, rendered.Height);
+
+                // Sample pixels across corners, center, and shape area to verify Alpha is strictly 255
+                for (int y = 0; y < rendered.Height; y += 15)
+                {
+                    for (int x = 0; x < rendered.Width; x += 15)
+                    {
+                        Color px = rendered.GetPixel(x, y);
+                        Assert.AreEqual(255, (int)px.A, $"Pixel at ({x}, {y}) must have Alpha=255, got {px.A}");
+                    }
+                }
+            }
+
+            // 4. Test Single Slide Export to specific path
+            string tempDir = Path.Combine(Path.GetTempPath(), "ZenQ_Test_Export_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                string singlePath = Path.Combine(tempDir, "SlideCurrent.png");
+                bool okSingle = sv.ExportToImages(singlePath, allSlides: false, isJpeg: false, slideIndices: new int[] { 1 });
+                Assert.IsTrue(okSingle, "Export single slide must succeed");
+                Assert.IsTrue(File.Exists(singlePath), "SlideCurrent.png must exist directly");
+
+                // 5. Test Custom Range Export (Slides 1 and 3: indices 0 and 2)
+                string multiPath = Path.Combine(tempDir, "PresentationExport.png");
+                bool okMulti = sv.ExportToImages(multiPath, allSlides: false, isJpeg: false, slideIndices: new int[] { 0, 2 });
+                Assert.IsTrue(okMulti, "Export custom slide range must succeed");
+
+                string expectedSlide1 = Path.Combine(tempDir, "PresentationExport_Slide_1.png");
+                string expectedSlide2 = Path.Combine(tempDir, "PresentationExport_Slide_2.png");
+                string expectedSlide3 = Path.Combine(tempDir, "PresentationExport_Slide_3.png");
+
+                Assert.IsTrue(File.Exists(expectedSlide1), "PresentationExport_Slide_1.png must exist");
+                Assert.IsFalse(File.Exists(expectedSlide2), "PresentationExport_Slide_2.png must NOT exist");
+                Assert.IsTrue(File.Exists(expectedSlide3), "PresentationExport_Slide_3.png must exist");
+
+                // Verify Alpha channel of exported PNG files is 100% opaque
+                using (Bitmap pngCheck = new Bitmap(expectedSlide1))
+                {
+                    Color samplePx = pngCheck.GetPixel(50, 50);
+                    Assert.AreEqual(255, (int)samplePx.A, "Exported PNG pixel alpha must be 255");
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+        }
     }
 }

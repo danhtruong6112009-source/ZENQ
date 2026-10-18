@@ -227,7 +227,7 @@ namespace ZenQOffice.Core
         /// <summary>
         /// Xuất từng trang của tài liệu PDF thành danh sách hình ảnh (.png / .jpg)
         /// </summary>
-        public static List<string> ExportToImages(PdfDocument doc, string outputFolder, string format = "PNG", int dpi = 150)
+        public static List<string> ExportToImages(PdfDocument doc, string outputFolder, string format = "PNG", int dpi = 150, IEnumerable<int> pageIndices = null)
         {
             var result = new List<string>();
             if (doc == null || doc.Pages == null || string.IsNullOrEmpty(outputFolder)) return result;
@@ -238,8 +238,19 @@ namespace ZenQOffice.Core
                 string ext = format.ToLowerInvariant().Contains("jpg") || format.ToLowerInvariant().Contains("jpeg") ? "jpg" : "png";
                 ImageFormat imgFormat = ext == "jpg" ? ImageFormat.Jpeg : ImageFormat.Png;
 
-                for (int i = 0; i < doc.Pages.Count; i++)
+                List<int> targetIndices;
+                if (pageIndices != null)
                 {
+                    targetIndices = pageIndices.Where(i => i >= 0 && i < doc.Pages.Count).Distinct().ToList();
+                }
+                else
+                {
+                    targetIndices = Enumerable.Range(0, doc.Pages.Count).ToList();
+                }
+
+                for (int k = 0; k < targetIndices.Count; k++)
+                {
+                    int i = targetIndices[k];
                     using (Bitmap bmp = RenderPageBitmap(doc, i, dpi))
                     {
                         string outPath = Path.Combine(outputFolder, $"Trang_{i + 1:D2}.{ext}");

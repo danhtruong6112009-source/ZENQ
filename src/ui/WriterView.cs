@@ -7146,7 +7146,7 @@ namespace ZenQOffice.UI
             htmlSb.AppendLine("</table>");
         }
 
-        public bool ExportToImages(string filePath, RibbonBar ribbon, bool allPages = true, bool isJpeg = false)
+        public bool ExportToImages(string filePath, RibbonBar ribbon, bool allPages = true, bool isJpeg = false, IEnumerable<int> pageIndices = null)
         {
             try
             {
@@ -7159,10 +7159,31 @@ namespace ZenQOffice.UI
                 var imgFormat = isJpeg ? System.Drawing.Imaging.ImageFormat.Jpeg : System.Drawing.Imaging.ImageFormat.Png;
                 string ext = isJpeg ? ".jpg" : ".png";
 
-                if (!allPages)
+                List<int> targetIndices = new List<int>();
+                if (pageIndices != null)
+                {
+                    foreach (int p in pageIndices)
+                    {
+                        if (p >= 0 && p < pdfDoc.Pages.Count && !targetIndices.Contains(p))
+                            targetIndices.Add(p);
+                    }
+                }
+                else if (!allPages)
                 {
                     int targetPage = Math.Max(0, Math.Min(pdfDoc.Pages.Count - 1, CurrentActivePage - 1));
-                    using (Bitmap bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(pdfDoc, targetPage, 150f))
+                    targetIndices.Add(targetPage);
+                }
+                else
+                {
+                    for (int i = 0; i < pdfDoc.Pages.Count; i++)
+                        targetIndices.Add(i);
+                }
+
+                if (targetIndices.Count == 0) return false;
+
+                if (targetIndices.Count == 1)
+                {
+                    using (Bitmap bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(pdfDoc, targetIndices[0], 150f))
                     {
                         bmp.Save(filePath, imgFormat);
                     }
@@ -7171,8 +7192,9 @@ namespace ZenQOffice.UI
                 {
                     string folder = Path.GetDirectoryName(filePath);
                     string baseName = Path.GetFileNameWithoutExtension(filePath);
-                    for (int i = 0; i < pdfDoc.Pages.Count; i++)
+                    for (int k = 0; k < targetIndices.Count; k++)
                     {
+                        int i = targetIndices[k];
                         string outPath = Path.Combine(folder, $"{baseName}_Trang_{i + 1}{ext}");
                         using (Bitmap bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(pdfDoc, i, 150f))
                         {

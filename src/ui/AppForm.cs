@@ -6016,7 +6016,21 @@ namespace ZenQOffice.UI
                         }
                         else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
                         {
-                            ok = SlidesView.ExportToImages(sfd.FileName, allSlides: false, isJpeg: (ext == ".jpg" || ext == ".jpeg"));
+                            int totalSlides = SlidesView.Presentation != null ? SlidesView.Presentation.Slides.Count : 1;
+                            int curSlide = SlidesView.ActiveSlideIndex;
+                            using (var dlg = new ExportImageRangeDialog(isSlide: true, totalItems: totalSlides, currentItemIndex: curSlide))
+                            {
+                                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                                ok = SlidesView.ExportToImages(sfd.FileName, allSlides: dlg.IsAllSelected, isJpeg: (ext == ".jpg" || ext == ".jpeg"), slideIndices: dlg.SelectedIndices);
+                                if (ok)
+                                {
+                                    if (dlg.SelectedIndices.Count > 1)
+                                        MessageBox.Show(this, $"Đã lưu {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    else
+                                        MessageBox.Show(this, $"Đã lưu ảnh slide vào tệp '{sfd.FileName}' thành công!", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    return;
+                                }
+                            }
                         }
                         else if (ext == ".odp")
                         {
@@ -6163,10 +6177,21 @@ namespace ZenQOffice.UI
                         bool ok = false;
                         if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
                         {
-                            var dlgRes = MessageBox.Show(this, "Bạn muốn xuất TẤT CẢ các trang (mỗi trang thành 1 file ảnh) hay chỉ xuất trang hiện tại?\n\n• Chọn [Yes] để xuất TẤT CẢ trang\n• Chọn [No] để chỉ xuất TRANG HIỆN TẠI", "Tùy chọn xuất ảnh trang tài liệu", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                            if (dlgRes == DialogResult.Cancel) return;
-                            bool all = (dlgRes == DialogResult.Yes);
-                            ok = WriterView.ExportToImages(sfd.FileName, Ribbon, allPages: all, isJpeg: (ext == ".jpg" || ext == ".jpeg"));
+                            int totalPages = WriterView.TotalPageCount;
+                            int curPage = Math.Max(0, WriterView.CurrentActivePage - 1);
+                            using (var dlg = new ExportImageRangeDialog(isSlide: false, totalItems: totalPages, currentItemIndex: curPage))
+                            {
+                                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                                ok = WriterView.ExportToImages(sfd.FileName, Ribbon, allPages: dlg.IsAllSelected, isJpeg: (ext == ".jpg" || ext == ".jpeg"), pageIndices: dlg.SelectedIndices);
+                                if (ok)
+                                {
+                                    if (dlg.SelectedIndices.Count > 1)
+                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    else
+                                        MessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    return;
+                                }
+                            }
                         }
                         else if (ext == ".pdf")
                         {
@@ -6208,10 +6233,21 @@ namespace ZenQOffice.UI
                         }
                         else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
                         {
-                            var dlgRes = MessageBox.Show(this, "Bạn muốn xuất TẤT CẢ các slide (mỗi slide thành 1 file ảnh) hay chỉ xuất slide hiện tại?\n\n• Chọn [Yes] để xuất TẤT CẢ slide\n• Chọn [No] để chỉ xuất SLIDE HIỆN TẠI", "Tùy chọn xuất ảnh slide", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                            if (dlgRes == DialogResult.Cancel) return;
-                            bool all = (dlgRes == DialogResult.Yes);
-                            ok = SlidesView.ExportToImages(sfd.FileName, allSlides: all, isJpeg: (ext == ".jpg" || ext == ".jpeg"));
+                            int totalSlides = SlidesView.Presentation != null ? SlidesView.Presentation.Slides.Count : 1;
+                            int curSlide = SlidesView.ActiveSlideIndex;
+                            using (var dlg = new ExportImageRangeDialog(isSlide: true, totalItems: totalSlides, currentItemIndex: curSlide))
+                            {
+                                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                                ok = SlidesView.ExportToImages(sfd.FileName, allSlides: dlg.IsAllSelected, isJpeg: (ext == ".jpg" || ext == ".jpeg"), slideIndices: dlg.SelectedIndices);
+                                if (ok)
+                                {
+                                    if (dlg.SelectedIndices.Count > 1)
+                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    else
+                                        MessageBox.Show(this, $"Đã xuất slide vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    return;
+                                }
+                            }
                         }
                         else if (ext == ".odp")
                         {
@@ -6253,20 +6289,46 @@ namespace ZenQOffice.UI
                         }
                         else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
                         {
-                            var dlgRes = MessageBox.Show(this, "Bạn muốn xuất TẤT CẢ các trang (mỗi trang thành 1 file ảnh) hay chỉ xuất trang hiện tại?\n\n• Chọn [Yes] để xuất TẤT CẢ trang\n• Chọn [No] để chỉ xuất TRANG HIỆN TẠI", "Tùy chọn xuất ảnh PDF", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                            if (dlgRes == DialogResult.Cancel) return;
-                            if (dlgRes == DialogResult.Yes)
+                            int totalPages = PdfView.Document != null ? PdfView.Document.Pages.Count : 1;
+                            int curPage = Math.Max(0, PdfView.ActivePageIndex);
+                            using (var dlg = new ExportImageRangeDialog(isSlide: false, totalItems: totalPages, currentItemIndex: curPage))
                             {
-                                string folder = System.IO.Path.GetDirectoryName(sfd.FileName);
-                                var list = ZenQOffice.Core.PdfConverterEngine.ExportToImages(PdfView.Document, folder, (ext == ".jpg" || ext == ".jpeg") ? "JPG" : "PNG", 150);
-                                ok = list != null && list.Count > 0;
-                            }
-                            else
-                            {
-                                using (var bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(PdfView.Document, Math.Max(0, PdfView.ActivePageIndex), 150f))
+                                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                                bool isJpeg = (ext == ".jpg" || ext == ".jpeg");
+                                var imgFmt = isJpeg ? System.Drawing.Imaging.ImageFormat.Jpeg : System.Drawing.Imaging.ImageFormat.Png;
+
+                                if (dlg.SelectedIndices.Count == 1)
                                 {
-                                    bmp.Save(sfd.FileName, (ext == ".jpg" || ext == ".jpeg") ? System.Drawing.Imaging.ImageFormat.Jpeg : System.Drawing.Imaging.ImageFormat.Png);
+                                    int pIdx = dlg.SelectedIndices[0];
+                                    using (var bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(PdfView.Document, pIdx, 150f))
+                                    {
+                                        bmp.Save(sfd.FileName, imgFmt);
+                                        ok = true;
+                                    }
+                                }
+                                else
+                                {
+                                    string folder = System.IO.Path.GetDirectoryName(sfd.FileName);
+                                    string baseName = System.IO.Path.GetFileNameWithoutExtension(sfd.FileName);
+                                    string imgExt = isJpeg ? ".jpg" : ".png";
+                                    foreach (int pIdx in dlg.SelectedIndices)
+                                    {
+                                        string pPath = System.IO.Path.Combine(folder, $"{baseName}_Trang_{pIdx + 1}{imgExt}");
+                                        using (var bmp = ZenQOffice.Core.PdfConverterEngine.RenderPageBitmap(PdfView.Document, pIdx, 150f))
+                                        {
+                                            bmp.Save(pPath, imgFmt);
+                                        }
+                                    }
                                     ok = true;
+                                }
+
+                                if (ok)
+                                {
+                                    if (dlg.SelectedIndices.Count > 1)
+                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    else
+                                        MessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    return;
                                 }
                             }
                         }

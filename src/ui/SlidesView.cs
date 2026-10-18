@@ -1921,6 +1921,7 @@ namespace ZenQOffice.UI
             Bitmap bmp = new Bitmap(targetW, targetH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             using (Graphics g = Graphics.FromImage(bmp))
             {
+                g.Clear(Color.White);
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -1932,6 +1933,35 @@ namespace ZenQOffice.UI
                     DrawSlideFull(d2d, targetRect, slide, scale);
                 }
             }
+
+            // Ensure 100% full opacity (Alpha = 255) across all pixels. Direct2D DC RenderTarget interop
+            // or GDI blits can leave alpha=0 on black/dark pixels, which PNG encoders save as transparent white specks.
+            var bmpData = bmp.LockBits(
+                new Rectangle(0, 0, targetW, targetH),
+                System.Drawing.Imaging.ImageLockMode.ReadWrite,
+                System.Drawing.Imaging.PixelFormat.Format32bppArgb
+            );
+            try
+            {
+                unsafe
+                {
+                    byte* scan0 = (byte*)bmpData.Scan0;
+                    int stride = bmpData.Stride;
+                    for (int y = 0; y < targetH; y++)
+                    {
+                        uint* row = (uint*)(scan0 + y * stride);
+                        for (int x = 0; x < targetW; x++)
+                        {
+                            row[x] |= 0xFF000000;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                bmp.UnlockBits(bmpData);
+            }
+
             return bmp;
         }
 
@@ -1975,7 +2005,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        public bool ExportToImages(string targetPath, bool allSlides = true, bool isJpeg = false)
+        public bool ExportToImages(string targetPath, bool allSlides = true, bool isJpeg = false, IEnumerable<int> slideIndices = null)
         {
             if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0)
                 return false;
@@ -1988,10 +2018,29 @@ namespace ZenQOffice.UI
                 if (canvasH <= 0) canvasH = 1080;
 
                 var imgFormat = isJpeg ? System.Drawing.Imaging.ImageFormat.Jpeg : System.Drawing.Imaging.ImageFormat.Png;
+                string ext = isJpeg ? ".jpg" : ".png";
 
-                if (!allSlides)
+                List<int> targetIndices;
+                if (slideIndices != null)
                 {
-                    var slide = ActiveSlide ?? Presentation.Slides[0];
+                    targetIndices = slideIndices.Where(i => i >= 0 && i < Presentation.Slides.Count).Distinct().ToList();
+                }
+                else if (!allSlides)
+                {
+                    int activeIdx = Presentation.Slides.IndexOf(ActiveSlide);
+                    if (activeIdx < 0) activeIdx = 0;
+                    targetIndices = new List<int> { activeIdx };
+                }
+                else
+                {
+                    targetIndices = Enumerable.Range(0, Presentation.Slides.Count).ToList();
+                }
+
+                if (targetIndices.Count == 0) return false;
+
+                if (targetIndices.Count == 1)
+                {
+                    var slide = Presentation.Slides[targetIndices[0]];
                     using (Bitmap bmp = RenderSlideToBitmap(slide, canvasW, canvasH))
                     {
                         if (bmp != null) bmp.Save(targetPath, imgFormat);
@@ -2002,10 +2051,10 @@ namespace ZenQOffice.UI
                 {
                     string folder = System.IO.Path.GetDirectoryName(targetPath);
                     string baseName = System.IO.Path.GetFileNameWithoutExtension(targetPath);
-                    string ext = isJpeg ? ".jpg" : ".png";
 
-                    for (int i = 0; i < Presentation.Slides.Count; i++)
+                    for (int k = 0; k < targetIndices.Count; k++)
                     {
+                        int i = targetIndices[k];
                         var slide = Presentation.Slides[i];
                         string slidePath = System.IO.Path.Combine(folder, $"{baseName}_Slide_{i + 1}{ext}");
                         using (Bitmap bmp = RenderSlideToBitmap(slide, canvasW, canvasH))
