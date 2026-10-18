@@ -269,10 +269,43 @@ namespace ZenQOffice.UI
                 Padding = new Padding(4, 0, 4, 0)
             };
             _btnClose.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            _btnClose.Click += (s, e) => Close();
+            _btnClose.Click += (s, e) =>
+            {
+                if (_isDownloading)
+                {
+                    CancelDownload();
+                    return;
+                }
+                Close();
+            };
             pnlBottom.Controls.Add(_btnClose);
 
             Controls.Add(pnlBottom);
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_isDownloading)
+            {
+                CancelDownload();
+            }
+            base.OnFormClosing(e);
+        }
+
+        private void CancelDownload()
+        {
+            if (!_isDownloading) return;
+            _isDownloading = false;
+            UpdateManager.CancelActiveDownload();
+            _progressBar.Visible = false;
+            _lblProgress.Visible = false;
+            _lblStatus.Visible = true;
+            _lblStatus.Text = "ℹ️ Đã dừng tải bản cập nhật.";
+            _lblStatus.ForeColor = Color.FromArgb(100, 116, 139);
+            _btnUpdate.Enabled = true;
+            _btnCheckAgain.Enabled = true;
+            _btnClose.Text = "Đóng";
+            _btnClose.Enabled = true;
         }
 
         private void RunCheck()
@@ -289,13 +322,18 @@ namespace ZenQOffice.UI
 
             UpdateManager.CheckForUpdateAsync((info) =>
             {
-                if (IsDisposed) return;
-                Invoke((MethodInvoker)delegate
+                if (IsDisposed || !IsHandleCreated) return;
+                try
                 {
-                    _btnCheckAgain.Enabled = true;
-                    _releaseInfo = info;
-                    UpdateUIWithReleaseInfo(info);
-                });
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (IsDisposed) return;
+                        _btnCheckAgain.Enabled = true;
+                        _releaseInfo = info;
+                        UpdateUIWithReleaseInfo(info);
+                    });
+                }
+                catch { }
             });
         }
 
@@ -343,7 +381,8 @@ namespace ZenQOffice.UI
 
             _btnUpdate.Enabled = false;
             _btnCheckAgain.Enabled = false;
-            _btnClose.Enabled = false;
+            _btnClose.Enabled = true;
+            _btnClose.Text = "Hủy";
             _lblStatus.Visible = false;
             _progressBar.Visible = true;
             _progressBar.Value = 0;
@@ -353,40 +392,56 @@ namespace ZenQOffice.UI
             UpdateManager.DownloadAndApplyUpdate(_releaseInfo,
                 (percent, currentBytes, totalBytes) =>
                 {
-                    if (IsDisposed) return;
-                    Invoke((MethodInvoker)delegate
+                    if (IsDisposed || !IsHandleCreated) return;
+                    try
                     {
-                        _progressBar.Value = Math.Max(0, Math.Min(100, percent));
-                        double curMb = currentBytes / (1024.0 * 1024.0);
-                        double totMb = totalBytes / (1024.0 * 1024.0);
-                        _lblProgress.Text = string.Format("{0}% ({1:0.0} MB / {2:0.0} MB)", percent, curMb, totMb);
-                    });
+                        BeginInvoke((MethodInvoker)delegate
+                        {
+                            if (IsDisposed) return;
+                            _progressBar.Value = Math.Max(0, Math.Min(100, percent));
+                            double curMb = currentBytes / (1024.0 * 1024.0);
+                            double totMb = totalBytes / (1024.0 * 1024.0);
+                            _lblProgress.Text = string.Format("{0}% ({1:0.1} MB / {2:0.1} MB)", percent, curMb, totMb);
+                        });
+                    }
+                    catch { }
                 },
                 () =>
                 {
-                    if (IsDisposed) return;
-                    Invoke((MethodInvoker)delegate
+                    if (IsDisposed || !IsHandleCreated) return;
+                    try
                     {
-                        _lblProgress.Text = "🎉 Tải xong! Đang khởi chạy bản cập nhật...";
-                        _lblProgress.ForeColor = Color.FromArgb(16, 185, 129);
-                    });
+                        BeginInvoke((MethodInvoker)delegate
+                        {
+                            if (IsDisposed) return;
+                            _lblProgress.Text = "🎉 Tải xong! Đang cài đặt bản cập nhật...";
+                            _lblProgress.ForeColor = Color.FromArgb(16, 185, 129);
+                        });
+                    }
+                    catch { }
                 },
                 (errorMsg) =>
                 {
-                    if (IsDisposed) return;
-                    Invoke((MethodInvoker)delegate
+                    if (IsDisposed || !IsHandleCreated) return;
+                    try
                     {
-                        _isDownloading = false;
-                        _btnUpdate.Enabled = true;
-                        _btnCheckAgain.Enabled = true;
-                        _btnClose.Enabled = true;
-                        _progressBar.Visible = false;
-                        _lblProgress.Visible = false;
-                        _lblStatus.Visible = true;
-                        _lblStatus.Text = "❌ " + errorMsg;
-                        _lblStatus.ForeColor = Color.FromArgb(239, 68, 68);
-                        MessageBox.Show(errorMsg, "Lỗi cập nhật", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    });
+                        BeginInvoke((MethodInvoker)delegate
+                        {
+                            if (IsDisposed) return;
+                            _isDownloading = false;
+                            _btnUpdate.Enabled = true;
+                            _btnCheckAgain.Enabled = true;
+                            _btnClose.Enabled = true;
+                            _btnClose.Text = "Đóng";
+                            _progressBar.Visible = false;
+                            _lblProgress.Visible = false;
+                            _lblStatus.Visible = true;
+                            _lblStatus.Text = "❌ " + errorMsg;
+                            _lblStatus.ForeColor = Color.FromArgb(239, 68, 68);
+                            MessageBox.Show(this, errorMsg, "Lỗi cập nhật", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        });
+                    }
+                    catch { }
                 });
         }
     }

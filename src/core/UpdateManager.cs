@@ -108,6 +108,7 @@ namespace ZenQOffice.Core
                 request.Method = "GET";
                 request.UserAgent = "ZenQOffice-AutoUpdater";
                 request.Accept = "application/vnd.github.v3+json";
+                request.Proxy = null;
                 request.Timeout = 12000;
                 request.ReadWriteTimeout = 12000;
 
@@ -311,8 +312,36 @@ namespace ZenQOffice.Core
             return new Version(numbers[0], numbers[1], numbers[2], numbers[3]);
         }
 
+        private static readonly object _downloadLock = new object();
+        private static volatile bool _isCancelRequested = false;
+        private static HttpWebRequest _activeWebRequest = null;
+
         /// <summary>
-        /// Tải xuống bản cập nhật mới và khởi chạy tiến trình ghi đè tự động
+        /// Cho biết tiến trình tải cập nhật có đang hoạt động hay không
+        /// </summary>
+        public static bool IsDownloading { get; private set; }
+
+        /// <summary>
+        /// Yêu cầu dừng/hủy tải cập nhật ngay lập tức nếu người dùng đóng hoặc hủy
+        /// </summary>
+        public static void CancelActiveDownload()
+        {
+            lock (_downloadLock)
+            {
+                _isCancelRequested = true;
+                try
+                {
+                    if (_activeWebRequest != null)
+                    {
+                        _activeWebRequest.Abort();
+                    }
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Tải xuống bản cập nhật mới và khởi chạy tiến trình ghi đè tự động với tốc độ cao và hỗ trợ hủy an toàn
         /// </summary>
         public static void DownloadAndApplyUpdate(ReleaseInfo release, Action<int, long, long> progressCallback, Action onComplete, Action<string> onError)
         {
@@ -322,24 +351,63 @@ namespace ZenQOffice.Core
                 return;
             }
 
+            lock (_downloadLock)
+            {
+                if (IsDownloading)
+                {
+                    CancelActiveDownload();
+                    Thread.Sleep(150);
+                }
+                IsDownloading = true;
+                _isCancelRequested = false;
+                _activeWebRequest = null;
+            }
+
             ThreadPool.QueueUserWorkItem(delegate
             {
+                string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_Update");
+                string tempDownloadPath = null;
+                string targetDownloadPath = null;
+
                 try
                 {
-                    string tempDir = Path.Combine(Path.GetTempPath(), "GenOffice_Update");
                     if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
 
-                    string targetDownloadPath = Path.Combine(tempDir, release.DownloadFileName ?? "GenOffice_new.exe");
-                    if (File.Exists(targetDownloadPath))
-                    {
-                        try { File.Delete(targetDownloadPath); } catch { }
-                    }
+                    // Sử dụng tệp tạm thời với GUID duy nhất để không bao giờ bị xung đột hoặc khóa tệp nếu tắt mở lại
+                    string tempFileName = string.Format("ZenQSetup_{0}_{1}.tmp", Process.GetCurrentProcess().Id, Guid.NewGuid().ToString("N"));
+                    tempDownloadPath = Path.Combine(tempDir, tempFileName);
 
-                    // Download with progress tracking
+                    string finalFileName = release.DownloadFileName;
+                    if (string.IsNullOrEmpty(finalFileName)) finalFileName = "ZenQOffice-Setup.exe";
+                    targetDownloadPath = Path.Combine(tempDir, finalFileName);
+
+                    // Tối ưu hóa kết nối mạng để đạt băng thông tối đa
+                    ServicePointManager.DefaultConnectionLimit = 20;
+                    ServicePointManager.Expect100Continue = false;
+
                     HttpWebRequest req = (HttpWebRequest)WebRequest.Create(release.DownloadUrl);
-                    req.UserAgent = "ZenQOffice-AutoUpdater";
+                    req.Method = "GET";
+                    req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZenQOffice-AutoUpdater";
+                    req.Proxy = null; // Tắt tự động dò tìm proxy WPAD của Windows để tránh độ trễ ban đầu
+                    req.KeepAlive = true;
                     req.Timeout = 60000;
                     req.ReadWriteTimeout = 60000;
+                    req.AutomaticDecompression = DecompressionMethods.None;
+                    try
+                    {
+                        req.ServicePoint.ConnectionLimit = 20;
+                        req.ServicePoint.UseNagleAlgorithm = false;
+                    }
+                    catch { }
+
+                    lock (_downloadLock)
+                    {
+                        if (_isCancelRequested)
+                        {
+                            throw new OperationCanceledException();
+                        }
+                        _activeWebRequest = req;
+                    }
 
                     using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
                     {
@@ -347,32 +415,65 @@ namespace ZenQOffice.Core
                         if (totalBytes <= 0 && release.AssetSize > 0) totalBytes = release.AssetSize;
 
                         using (Stream sIn = resp.GetResponseStream())
-                        using (FileStream sOut = new FileStream(targetDownloadPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        using (FileStream sOut = new FileStream(tempDownloadPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                         {
-                            byte[] buffer = new byte[65536];
+                            // Tăng bộ đệm lên 256 KB giúp đẩy tốc độ tải lên cao nhất
+                            byte[] buffer = new byte[262144];
                             long bytesReadTotal = 0;
                             int bytesRead;
+                            long lastReportTick = 0;
+                            int lastReportPct = -1;
 
                             while ((bytesRead = sIn.Read(buffer, 0, buffer.Length)) > 0)
                             {
+                                if (_isCancelRequested)
+                                {
+                                    throw new OperationCanceledException("Người dùng đã hủy quá trình tải xuống.");
+                                }
+
                                 sOut.Write(buffer, 0, bytesRead);
                                 bytesReadTotal += bytesRead;
 
                                 if (progressCallback != null && totalBytes > 0)
                                 {
                                     int pct = (int)((bytesReadTotal * 100) / totalBytes);
-                                    progressCallback(pct, bytesReadTotal, totalBytes);
+                                    long now = Environment.TickCount;
+                                    // Tiết lưu báo cáo giao diện UI: chỉ gọi lại khi % thay đổi hoặc cách nhau ít nhất 100ms
+                                    // Tránh nghẽn thread tải do gọi Invoke UI quá dày đặc
+                                    if ((pct != lastReportPct && (now - lastReportTick >= 100)) || bytesReadTotal >= totalBytes)
+                                    {
+                                        lastReportPct = pct;
+                                        lastReportTick = now;
+                                        try { progressCallback(pct, bytesReadTotal, totalBytes); } catch { }
+                                    }
                                 }
                             }
                         }
                     }
+
+                    if (_isCancelRequested)
+                    {
+                        throw new OperationCanceledException("Người dùng đã hủy quá trình tải xuống.");
+                    }
+
+                    // Chuyển tệp tạm hoàn chỉnh vào đường dẫn bộ cài chính thức
+                    if (File.Exists(targetDownloadPath))
+                    {
+                        try { File.Delete(targetDownloadPath); }
+                        catch
+                        {
+                            targetDownloadPath = Path.Combine(tempDir, Path.GetFileNameWithoutExtension(finalFileName) + "_" + Environment.TickCount + Path.GetExtension(finalFileName));
+                        }
+                    }
+                    File.Move(tempDownloadPath, targetDownloadPath);
+                    tempDownloadPath = null; // Đã chuyển thành công
 
                     if (onComplete != null)
                     {
                         try { onComplete(); } catch { }
                     }
 
-                    // Build and execute apply_update.bat with intelligent installer handling
+                    // Xây dựng và thực thi apply_update.bat
                     string currentAppPath = Application.ExecutablePath;
                     string appDir = Path.GetDirectoryName(currentAppPath);
                     string updateScriptPath = Path.Combine(tempDir, "apply_update.bat");
@@ -401,7 +502,7 @@ namespace ZenQOffice.Core
                         }
                         else
                         {
-                            // Sử dụng /silent cho bộ cài custom GenOffice-Setup.exe
+                            // Sử dụng /silent cho bộ cài custom ZenQOffice-Setup.exe
                             bat.AppendLine(string.Format("start \"\" /wait \"{0}\" /silent", targetDownloadPath));
                         }
                         bat.AppendLine(string.Format("start \"\" \"{0}\"", currentAppPath));
@@ -439,11 +540,48 @@ namespace ZenQOffice.Core
                     // Exit current application to allow replacement
                     Application.Exit();
                 }
+                catch (OperationCanceledException)
+                {
+                    // Dọn dẹp tệp tạm khi người dùng hủy bỏ
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(tempDownloadPath) && File.Exists(tempDownloadPath))
+                            File.Delete(tempDownloadPath);
+                    }
+                    catch { }
+                }
+                catch (WebException webEx) when (_isCancelRequested || webEx.Status == WebExceptionStatus.RequestCanceled)
+                {
+                    // Dọn dẹp tệp tạm khi hủy request mạng
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(tempDownloadPath) && File.Exists(tempDownloadPath))
+                            File.Delete(tempDownloadPath);
+                    }
+                    catch { }
+                }
                 catch (Exception ex)
                 {
-                    if (onError != null)
+                    // Dọn dẹp tệp tạm khi gặp lỗi
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(tempDownloadPath) && File.Exists(tempDownloadPath))
+                            File.Delete(tempDownloadPath);
+                    }
+                    catch { }
+
+                    if (!_isCancelRequested && onError != null)
                     {
                         onError("Lỗi khi tải hoặc cài đặt bản cập nhật: " + ex.Message);
+                    }
+                }
+                finally
+                {
+                    lock (_downloadLock)
+                    {
+                        IsDownloading = false;
+                        _activeWebRequest = null;
+                        _isCancelRequested = false;
                     }
                 }
             });
