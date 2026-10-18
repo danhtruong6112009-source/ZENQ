@@ -1494,6 +1494,11 @@ namespace ZenQOffice.UI
                     using var layout = _dwriteFactory.CreateTextLayout(s, tf, w, h);
                     if (format != null)
                     {
+                        if ((format.FormatFlags & StringFormatFlags.NoWrap) != 0)
+                        {
+                            layout.WordWrapping = WordWrapping.NoWrap;
+                        }
+
                         if (format.Alignment == StringAlignment.Center) layout.TextAlignment = TextAlignment.Center;
                         else if (format.Alignment == StringAlignment.Far) layout.TextAlignment = TextAlignment.Trailing;
                         else layout.TextAlignment = TextAlignment.Leading;
@@ -1501,6 +1506,26 @@ namespace ZenQOffice.UI
                         if (format.LineAlignment == StringAlignment.Center) layout.ParagraphAlignment = ParagraphAlignment.Center;
                         else if (format.LineAlignment == StringAlignment.Far) layout.ParagraphAlignment = ParagraphAlignment.Far;
                         else layout.ParagraphAlignment = ParagraphAlignment.Near;
+
+                        if (format.Trimming == StringTrimming.EllipsisCharacter ||
+                            format.Trimming == StringTrimming.EllipsisWord ||
+                            format.Trimming == StringTrimming.EllipsisPath)
+                        {
+                            try
+                            {
+                                var trimming = new Trimming
+                                {
+                                    Granularity = (format.Trimming == StringTrimming.EllipsisWord)
+                                        ? TrimmingGranularity.Word
+                                        : TrimmingGranularity.Character,
+                                    Delimiter = 0,
+                                    DelimiterCount = 0
+                                };
+                                using var sign = _dwriteFactory.CreateEllipsisTrimmingSign(tf);
+                                layout.SetTrimming(trimming, sign);
+                            }
+                            catch { }
+                        }
                     }
                     _renderTarget.DrawTextLayout(new System.Numerics.Vector2(layoutRectangle.X, layoutRectangle.Y), layout, b);
                     return;

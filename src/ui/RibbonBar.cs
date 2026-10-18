@@ -3246,10 +3246,11 @@ namespace ZenQOffice.UI
                                 DrawVectorTabCloseCross(g, closeRect.X + 8, closeRect.Y + 8, 8, Color.FromArgb(148, 163, 184));
                             }
 
+                            string tabTitle = (DocTabs[i].Title ?? "").Replace("\r", " ").Replace("\n", " ");
                             Rectangle textRect = new Rectangle(tabRect.X + 30, 0, tabRect.Width - 54, tabHeight);
                             using (SolidBrush textBrush = new SolidBrush(isActive ? Color.FromArgb(15, 23, 42) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105))))
                             {
-                                g.DrawString(DocTabs[i].Title, isActive ? tabActiveFont : tabFont, textBrush, textRect, ellipsisFormat);
+                                g.DrawString(tabTitle, isActive ? tabActiveFont : tabFont, textBrush, textRect, ellipsisFormat);
                             }
                         }
 
@@ -3278,10 +3279,11 @@ namespace ZenQOffice.UI
                         }
 
                         DrawVectorTabDocIcon(g, floatRect.X + 10, (tabHeight - 16) / 2, 16, draggedTab.Mode, true);
+                        string draggedTitle = (draggedTab.Title ?? "").Replace("\r", " ").Replace("\n", " ");
                         Rectangle textRect = new Rectangle(floatRect.X + 30, 0, floatRect.Width - 36, tabHeight);
                         using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                         {
-                            g.DrawString(draggedTab.Title, tabActiveFont, textBrush, textRect, ellipsisFormat);
+                            g.DrawString(draggedTitle, tabActiveFont, textBrush, textRect, ellipsisFormat);
                         }
                     }
 
