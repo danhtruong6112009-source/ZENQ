@@ -842,8 +842,95 @@ namespace ZenQOffice.UI
             dlg.Show(this);
         }
 
-        public void RefreshAiChatProfileSelectors() {}
-        public void ReloadAiSidebarConfig() {}
+        private AiChatSidebarPanel _aiSidebar;
+        public AiChatSidebarPanel AiSidebar => _aiSidebar;
+
+        public void ToggleAiChatSidebar()
+        {
+            if (_aiSidebar == null)
+            {
+                _aiSidebar = new AiChatSidebarPanel(this);
+                _aiSidebar.Visible = false;
+                this.Controls.Add(_aiSidebar);
+                this.Controls.SetChildIndex(_aiSidebar, 0);
+            }
+
+            bool newState = !_aiSidebar.Visible;
+            _aiSidebar.Visible = newState;
+
+            DocTab curTab = (Ribbon != null && Ribbon.DocTabs != null && Ribbon.ActiveDocIndex >= 0 && Ribbon.ActiveDocIndex < Ribbon.DocTabs.Count) ? Ribbon.DocTabs[Ribbon.ActiveDocIndex] : null;
+            if (curTab != null)
+            {
+                curTab.IsAiChatOpen = newState;
+                if (newState)
+                {
+                    _aiSidebar.SwitchTab(curTab);
+                }
+            }
+
+            PositionAiSidebar();
+            Invalidate();
+        }
+
+        public void PositionAiSidebar()
+        {
+            if (_aiSidebar != null && _aiSidebar.Visible)
+            {
+                int sbW = 380;
+                int topY = RibbonBar.RibbonHeight;
+                int botH = 26; // Status bar
+                int sbH = Math.Max(100, ClientSize.Height - topY - botH);
+                _aiSidebar.Location = new Point(Math.Max(0, ClientSize.Width - sbW), topY);
+                _aiSidebar.Size = new Size(sbW, sbH);
+                _aiSidebar.BringToFront();
+            }
+        }
+
+        public int GetEffectiveDocWidth(int totalWidth)
+        {
+            if (_aiSidebar != null && _aiSidebar.Visible && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+            {
+                return Math.Max(300, totalWidth - _aiSidebar.Width);
+            }
+            return totalWidth;
+        }
+
+        public void OnTabSwitched(DocTab newTab)
+        {
+            if (_aiSidebar != null)
+            {
+                if (newTab != null && newTab.Mode != OfficeAppMode.Home)
+                {
+                    _aiSidebar.Visible = newTab.IsAiChatOpen;
+                    if (newTab.IsAiChatOpen)
+                    {
+                        _aiSidebar.SwitchTab(newTab);
+                    }
+                    PositionAiSidebar();
+                }
+                else
+                {
+                    _aiSidebar.Visible = false;
+                }
+            }
+            Invalidate();
+        }
+
+        public void RefreshAiChatProfileSelectors()
+        {
+            if (_aiSidebar != null)
+            {
+                _aiSidebar.ReloadProfilesAndModels();
+            }
+        }
+
+        public void ReloadAiSidebarConfig()
+        {
+            if (_aiSidebar != null)
+            {
+                _aiSidebar.ReloadProfilesAndModels();
+            }
+        }
 
         public AppForm()
         {
@@ -1488,25 +1575,26 @@ namespace ZenQOffice.UI
                             _aiConfigPanel.Visible = false;
                         }
 
+                        int effectiveDocWidth = GetEffectiveDocWidth(clientWidth);
                         if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                         {
-                            WriterView.Draw(g, clientWidth, clientHeight, Ribbon);
+                            WriterView.Draw(g, effectiveDocWidth, clientHeight, Ribbon);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
                         {
-                            CalcView.Draw(g, clientWidth, clientHeight);
+                            CalcView.Draw(g, effectiveDocWidth, clientHeight);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                         {
-                            SlidesView.Draw(g, clientWidth, clientHeight);
+                            SlidesView.Draw(g, effectiveDocWidth, clientHeight);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
                         {
-                            PdfView.Draw(g, clientWidth, clientHeight, Ribbon);
+                            PdfView.Draw(g, effectiveDocWidth, clientHeight, Ribbon);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
                         {
-                            PhotoView.Draw(g, clientWidth, clientHeight, Ribbon);
+                            PhotoView.Draw(g, effectiveDocWidth, clientHeight, Ribbon);
                         }
                     }
                 }
@@ -3151,25 +3239,37 @@ namespace ZenQOffice.UI
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
                 {
-                    if (e.Button == MouseButtons.Right)
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X <= docW)
                     {
-                        CalcView.HandleRightClick(e.X, e.Y, this, Ribbon);
-                        Invalidate();
-                        return;
-                    }
-                    bool handled = CalcView.HandleMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height, e.Button, this);
-                    if (!handled)
-                    {
-                        CalcView.HandleClick(e.X, e.Y, ClientSize.Height);
+                        if (e.Button == MouseButtons.Right)
+                        {
+                            CalcView.HandleRightClick(e.X, e.Y, this, Ribbon);
+                            Invalidate();
+                            return;
+                        }
+                        bool handled = CalcView.HandleMouseDown(e.X, e.Y, docW, ClientSize.Height, e.Button, this);
+                        if (!handled)
+                        {
+                            CalcView.HandleClick(e.X, e.Y, ClientSize.Height);
+                        }
                     }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                 {
-                    SlidesView.HandleMouseDown(e.Location, ClientSize.Width, ClientSize.Height, e.Button, this);
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X <= docW)
+                    {
+                        SlidesView.HandleMouseDown(e.Location, docW, ClientSize.Height, e.Button, this);
+                    }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
                 {
-                    PdfView.HandleMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height, e.Button, this);
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X <= docW)
+                    {
+                        PdfView.HandleMouseDown(e.X, e.Y, docW, ClientSize.Height, e.Button, this);
+                    }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
                 {
@@ -3426,23 +3526,31 @@ namespace ZenQOffice.UI
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
                 {
-                    CalcView.HandleMouseMove(e.X, e.Y, ClientSize.Width, ClientSize.Height, e.Button);
-                    if (e.Y > 155 && e.Y < ClientSize.Height - 25)
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X <= docW)
                     {
-                        Cursor newCur = CalcView.GetCursorForPosition(e.X, e.Y, ClientSize.Width, ClientSize.Height);
-                        Cursor = newCur;
-                        Cursor.Current = newCur;
+                        CalcView.HandleMouseMove(e.X, e.Y, docW, ClientSize.Height, e.Button);
+                        if (e.Y > 155 && e.Y < ClientSize.Height - 25)
+                        {
+                            Cursor newCur = CalcView.GetCursorForPosition(e.X, e.Y, docW, ClientSize.Height);
+                            Cursor = newCur;
+                            Cursor.Current = newCur;
+                        }
+                        Invalidate();
                     }
-                    Invalidate();
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                 {
-                    SlidesView.HandleMouseMove(e.Location, ClientSize.Width, ClientSize.Height);
-                    if (e.Y > 155 && e.Y < ClientSize.Height - 25)
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X <= docW)
                     {
-                        Cursor newCur = SlidesView.GetCursorForPosition(e.Location, ClientSize.Width, ClientSize.Height);
-                        Cursor = newCur;
-                        Cursor.Current = newCur;
+                        SlidesView.HandleMouseMove(e.Location, docW, ClientSize.Height);
+                        if (e.Y > 155 && e.Y < ClientSize.Height - 25)
+                        {
+                            Cursor newCur = SlidesView.GetCursorForPosition(e.Location, docW, ClientSize.Height);
+                            Cursor = newCur;
+                            Cursor.Current = newCur;
+                        }
                     }
                     if (e.Button != MouseButtons.None || SlidesView.ShowRuler || SlidesView.IsDrawingActive || SlidesView.IsPanningCanvas)
                     {
@@ -3583,17 +3691,20 @@ namespace ZenQOffice.UI
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
             {
-                CalcView.HandleMouseUp(e.X, e.Y, ClientSize.Width, ClientSize.Height, e.Button);
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
+                CalcView.HandleMouseUp(e.X, e.Y, docW, ClientSize.Height, e.Button);
                 Invalidate();
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
             {
-                SlidesView.HandleMouseUp(e.Location, ClientSize.Width, ClientSize.Height);
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
+                SlidesView.HandleMouseUp(e.Location, docW, ClientSize.Height);
                 Invalidate();
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
             {
-                PdfView.HandleMouseUp(e.X, e.Y, ClientSize.Width, ClientSize.Height, e.Button);
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
+                PdfView.HandleMouseUp(e.X, e.Y, docW, ClientSize.Height, e.Button);
                 Invalidate();
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
@@ -6510,6 +6621,7 @@ namespace ZenQOffice.UI
                 try { _appD2d.Resize(ClientSize.Width, ClientSize.Height); } catch { }
             }
             PositionAiConfigPanel();
+            PositionAiSidebar();
             Invalidate();
         }
 

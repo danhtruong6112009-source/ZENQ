@@ -142,12 +142,416 @@ namespace ZenQOffice.Core
     {
         private static readonly Regex ActionRegex = new Regex(@"\[(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION):([A-Za-z0-9_]+)\]([\s\S]*?)(?:\[/(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION)\]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        private static Dictionary<string, string> ParseXmlAttributes(string tagText)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(tagText)) return dict;
+            var matches = Regex.Matches(tagText, @"([a-zA-Z0-9_\-]+)\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))");
+            foreach (Match m in matches)
+            {
+                string key = m.Groups[1].Value;
+                string val = m.Groups[2].Success ? m.Groups[2].Value : (m.Groups[3].Success ? m.Groups[3].Value : m.Groups[4].Value);
+                dict[key] = val;
+            }
+            return dict;
+        }
+
+        private static void SetCellSmartValue(CellData cell, string val)
+        {
+            if (cell == null || val == null) return;
+            if (val.StartsWith("="))
+            {
+                cell.SetFormula(val);
+            }
+            else
+            {
+                double d;
+                if (double.TryParse(val, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
+                {
+                    cell.SetNumber(d);
+                }
+                else
+                {
+                    cell.SetString(val);
+                }
+            }
+        }
+
+        private static double GetDoubleFromStr(string s, double def)
+        {
+            if (string.IsNullOrEmpty(s)) return def;
+            double v;
+            if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out v)) return v;
+            return def;
+        }
+
+        public static bool ExecuteXmlActions(AppForm appForm, string rawAiResponse, AiActionResult result)
+        {
+            if (string.IsNullOrWhiteSpace(rawAiResponse) || appForm == null) return false;
+
+            // Kiểm tra sự xuất hiện của các thẻ XML hành động
+            bool hasXmlTag = Regex.IsMatch(rawAiResponse, @"<(zenq_action|action|zenq|highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|write|ghi|clear|xoa|create_slide|tao_slide|slide|insert_text|replace)\b", RegexOptions.IgnoreCase);
+            if (!hasXmlTag) return false;
+
+            List<string> summaries = new List<string>();
+            bool anyExecuted = false;
+
+            // 1. Xử lý Calc (Bảng tính)
+            if (appForm.CalcView != null)
+            {
+                var calc = appForm.CalcView;
+                var sheet = calc.CurrentSheet;
+
+                // 1.1 <create_sheet name="..." /> hoặc <tao_sheet ten="..." />
+                var sheetMatches = Regex.Matches(rawAiResponse, @"<(?:create_sheet|add_sheet|tao_sheet)\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match m in sheetMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string sName = "";
+                    if (attrs.ContainsKey("name")) sName = attrs["name"];
+                    else if (attrs.ContainsKey("ten")) sName = attrs["ten"];
+                    else if (attrs.ContainsKey("title")) sName = attrs["title"];
+
+                    if (!string.IsNullOrWhiteSpace(sName))
+                    {
+                        calc.SaveUndoState();
+                        if (calc.SheetNames == null || !calc.SheetNames.Contains(sName))
+                        {
+                            calc.AddSheet(sName);
+                        }
+                        int idx = calc.SheetNames != null ? calc.SheetNames.IndexOf(sName) : -1;
+                        if (idx >= 0) calc.ActiveSheetIndex = idx;
+                        sheet = calc.CurrentSheet;
+                        summaries.Add(string.Format("Đã tạo sheet mới '{0}'", sName));
+                        anyExecuted = true;
+                    }
+                }
+
+                // 1.2 <write sheet="..." cell="...">Nội dung</write> hoặc <ghi ...>...</ghi>
+                var writeMatches = Regex.Matches(rawAiResponse, @"<(?:write|ghi)\b([^>]*)>(.*?)</(?:write|ghi)>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                foreach (Match m in writeMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string targetSheet = attrs.ContainsKey("sheet") ? attrs["sheet"] : (attrs.ContainsKey("ten_sheet") ? attrs["ten_sheet"] : "");
+                    string startCellRef = attrs.ContainsKey("cell") ? attrs["cell"] : (attrs.ContainsKey("ref") ? attrs["ref"] : "A1");
+                    string content = m.Groups[2].Value.Trim();
+
+                    SparseMatrix targetMatrix = sheet;
+                    if (!string.IsNullOrEmpty(targetSheet))
+                    {
+                        int sIdx = calc.SheetNames != null ? calc.SheetNames.IndexOf(targetSheet) : -1;
+                        if (sIdx >= 0)
+                        {
+                            calc.ActiveSheetIndex = sIdx;
+                            targetMatrix = calc.CurrentSheet;
+                        }
+                        else
+                        {
+                            calc.AddSheet(targetSheet);
+                            calc.ActiveSheetIndex = calc.Sheets.Count - 1;
+                            targetMatrix = calc.CurrentSheet;
+                        }
+                    }
+
+                    if (targetMatrix != null && !string.IsNullOrEmpty(content))
+                    {
+                        calc.SaveUndoState();
+                        uint startR = 1, startC = 1;
+                        if (!SparseMatrix.TryParseCellReference(startCellRef, out startR, out startC))
+                        {
+                            startR = 1; startC = 1;
+                        }
+
+                        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        for (int li = 0; li < lines.Length; li++)
+                        {
+                            string line = lines[li].Trim();
+                            if (line.StartsWith("|") && line.EndsWith("|") && line.Length > 2)
+                            {
+                                if (Regex.IsMatch(line, @"^\|[\s\-:|]+\|$")) continue;
+                                var cols = line.Substring(1, line.Length - 2).Split('|');
+                                for (int ci = 0; ci < cols.Length; ci++)
+                                {
+                                    string cellVal = cols[ci].Trim();
+                                    SetCellSmartValue(targetMatrix.GetOrCreateCell(startR + (uint)li, startC + (uint)ci), cellVal);
+                                }
+                            }
+                            else if (line.Contains("\t") || line.Contains(","))
+                            {
+                                char sep = line.Contains("\t") ? '\t' : ',';
+                                var cols = line.Split(sep);
+                                for (int ci = 0; ci < cols.Length; ci++)
+                                {
+                                    SetCellSmartValue(targetMatrix.GetOrCreateCell(startR + (uint)li, startC + (uint)ci), cols[ci].Trim());
+                                }
+                            }
+                            else
+                            {
+                                SetCellSmartValue(targetMatrix.GetOrCreateCell(startR + (uint)li, startC), line);
+                            }
+                        }
+                        summaries.Add(string.Format("Đã ghi dữ liệu vào ô {0}", startCellRef));
+                        anyExecuted = true;
+                    }
+                }
+
+                // 1.3 <highlight range="A1:A10" color="vàng nhạt" /> hoặc <to_mau ... /> hoặc <format ... />
+                var hlMatches = Regex.Matches(rawAiResponse, @"<(?:highlight|to_mau|format)\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match m in hlMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string rangeStr = attrs.ContainsKey("range") ? attrs["range"] : (attrs.ContainsKey("cell") ? attrs["cell"] : (attrs.ContainsKey("vung") ? attrs["vung"] : ""));
+                    string colorStr = attrs.ContainsKey("color") ? attrs["color"] : (attrs.ContainsKey("mau") ? attrs["mau"] : (attrs.ContainsKey("fill") ? attrs["fill"] : (attrs.ContainsKey("bg") ? attrs["bg"] : "vàng nhạt")));
+
+                    uint r1 = 0, c1 = 0, r2 = 0, c2 = 0;
+                    bool hasR = TryParseRange(rangeStr, out r1, out c1, out r2, out c2);
+                    if (!hasR && SparseMatrix.TryParseCellReference(rangeStr, out r1, out c1))
+                    {
+                        r2 = r1; c2 = c1; hasR = true;
+                    }
+
+                    if (hasR && sheet != null)
+                    {
+                        calc.SaveUndoState();
+                        int bgColor = ParseColorExtended(colorStr, unchecked((int)0xFFFEF9C3));
+                        bool isBold = attrs.ContainsKey("bold") && (attrs["bold"] == "true" || attrs["bold"] == "1");
+
+                        uint minR = Math.Min(r1, r2), maxR = Math.Max(r1, r2);
+                        uint minC = Math.Min(c1, c2), maxC = Math.Max(c1, c2);
+
+                        for (uint r = minR; r <= maxR; r++)
+                        {
+                            for (uint c = minC; c <= maxC; c++)
+                            {
+                                var cell = sheet.GetOrCreateCell(r, c);
+                                if (cell.Format == null) cell.Format = new CellFormat();
+                                cell.Format.BgColor = bgColor;
+                                if (isBold) cell.Format.Bold = true;
+                            }
+                        }
+                        summaries.Add(string.Format("Đã tô màu {0} cho vùng {1}", colorStr, rangeStr));
+                        anyExecuted = true;
+                    }
+                }
+
+                // 1.4 <set cell="A11" formula="=SUM(A1:A10)" /> hoặc <cell ref="B2" value="..." />
+                var setMatches = Regex.Matches(rawAiResponse, @"<(?:set|cell|dien_o)\b([^>]*)(?:>(.*?)</(?:set|cell|dien_o)>|/?>)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                foreach (Match m in setMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string cellRef = attrs.ContainsKey("cell") ? attrs["cell"] : (attrs.ContainsKey("ref") ? attrs["ref"] : (attrs.ContainsKey("o") ? attrs["o"] : ""));
+                    string formula = attrs.ContainsKey("formula") ? attrs["formula"] : (attrs.ContainsKey("cong_thuc") ? attrs["cong_thuc"] : "");
+                    string val = attrs.ContainsKey("value") ? attrs["value"] : (attrs.ContainsKey("gia_tri") ? attrs["gia_tri"] : "");
+                    string inner = m.Groups[2].Success ? m.Groups[2].Value.Trim() : "";
+
+                    if (string.IsNullOrEmpty(formula) && string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(inner))
+                    {
+                        if (inner.StartsWith("=")) formula = inner;
+                        else val = inner;
+                    }
+
+                    uint r = 0, c = 0;
+                    if (SparseMatrix.TryParseCellReference(cellRef, out r, out c) && sheet != null)
+                    {
+                        calc.SaveUndoState();
+                        var cell = sheet.GetOrCreateCell(r, c);
+                        if (!string.IsNullOrEmpty(formula))
+                        {
+                            if (!formula.StartsWith("=")) formula = "=" + formula;
+                            cell.SetFormula(formula);
+                            summaries.Add(string.Format("Đã điền công thức {0} vào ô {1}", formula, cellRef));
+                            anyExecuted = true;
+                        }
+                        else if (!string.IsNullOrEmpty(val))
+                        {
+                            SetCellSmartValue(cell, val);
+                            summaries.Add(string.Format("Đã điền giá trị '{0}' vào ô {1}", val, cellRef));
+                            anyExecuted = true;
+                        }
+                    }
+                }
+
+                // 1.5 <clear range="A1:C10" /> hoặc <xoa ... />
+                var clearMatches = Regex.Matches(rawAiResponse, @"<(?:clear|xoa)\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match m in clearMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string rangeStr = attrs.ContainsKey("range") ? attrs["range"] : (attrs.ContainsKey("vung") ? attrs["vung"] : "");
+                    uint r1 = 0, c1 = 0, r2 = 0, c2 = 0;
+                    if (TryParseRange(rangeStr, out r1, out c1, out r2, out c2) && sheet != null)
+                    {
+                        calc.SaveUndoState();
+                        uint minR = Math.Min(r1, r2), maxR = Math.Max(r1, r2);
+                        uint minC = Math.Min(c1, c2), maxC = Math.Max(c1, c2);
+                        for (uint r = minR; r <= maxR; r++)
+                        {
+                            for (uint c = minC; c <= maxC; c++)
+                            {
+                                var cell = sheet.GetOrCreateCell(r, c);
+                                cell.Type = CellType.Empty;
+                                cell.RawValue = "";
+                                cell.FormulaStr = "";
+                                cell.NumericValue = 0;
+                                cell.EvaluatedStr = "";
+                                if (cell.Format != null) cell.Format.BgColor = unchecked((int)0xFFFFFFFF);
+                            }
+                        }
+                        summaries.Add(string.Format("Đã xóa dữ liệu vùng {0}", rangeStr));
+                        anyExecuted = true;
+                    }
+                }
+            }
+
+            // 2. Xử lý Slides (Tự do tạo slide bằng XML)
+            if (appForm.SlidesView != null)
+            {
+                var slides = appForm.SlidesView;
+                var pres = slides.Presentation;
+
+                var slideMatches = Regex.Matches(rawAiResponse, @"<(?:create_slide|tao_slide|slide)\b([^>]*)>(.*?)</(?:create_slide|tao_slide|slide)>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                foreach (Match sm in slideMatches)
+                {
+                    var sAttrs = ParseXmlAttributes(sm.Groups[1].Value);
+                    string title = sAttrs.ContainsKey("title") ? sAttrs["title"] : (sAttrs.ContainsKey("tieu_de") ? sAttrs["tieu_de"] : "Slide mới");
+                    string bgStr = sAttrs.ContainsKey("background") ? sAttrs["background"] : (sAttrs.ContainsKey("bg") ? sAttrs["bg"] : (sAttrs.ContainsKey("nen") ? sAttrs["nen"] : "#0B0F19"));
+
+                    slides.SaveUndoState();
+                    SlideNode newSlide = new SlideNode
+                    {
+                        Title = title,
+                        Shapes = new List<ShapeNode>(),
+                        Transition = TransitionType.Fade,
+                        BgFillType = BackgroundFillType.Solid,
+                        BgColor = ParseColorExtended(bgStr, unchecked((int)0xFF0B0F19))
+                    };
+
+                    string inner = sm.Groups[2].Value;
+                    // Parse các thẻ con: <shape ... /> hoặc <text ...>...</text>
+                    var childMatches = Regex.Matches(inner, @"<(shape|text|hinh|chu)\b([^>]*)(?:>(.*?)</\1>|/?>)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                    int elemCount = 0;
+                    foreach (Match cm in childMatches)
+                    {
+                        string tag = cm.Groups[1].Value.ToLowerInvariant();
+                        var cAttrs = ParseXmlAttributes(cm.Groups[2].Value);
+                        float x = (float)GetDoubleFromStr(cAttrs.ContainsKey("x") ? cAttrs["x"] : "100", 100);
+                        float y = (float)GetDoubleFromStr(cAttrs.ContainsKey("y") ? cAttrs["y"] : "150", 150);
+                        float w = (float)GetDoubleFromStr(cAttrs.ContainsKey("width") ? cAttrs["width"] : (cAttrs.ContainsKey("w") ? cAttrs["w"] : "400"), 400);
+                        float h = (float)GetDoubleFromStr(cAttrs.ContainsKey("height") ? cAttrs["height"] : (cAttrs.ContainsKey("h") ? cAttrs["h"] : "180"), 180);
+                        string text = cAttrs.ContainsKey("text") ? cAttrs["text"] : (cm.Groups[3].Success ? cm.Groups[3].Value.Trim() : "");
+
+                        if (tag == "text" || tag == "chu")
+                        {
+                            float fSize = (float)GetDoubleFromStr(cAttrs.ContainsKey("font_size") ? cAttrs["font_size"] : (cAttrs.ContainsKey("size") ? cAttrs["size"] : "20"), 20);
+                            bool isBold = cAttrs.ContainsKey("bold") && (cAttrs["bold"] == "true" || cAttrs["bold"] == "1");
+                            int txtColor = ParseColorExtended(cAttrs.ContainsKey("color") ? cAttrs["color"] : "#FFFFFF", unchecked((int)0xFFFFFFFF));
+                            var txtNode = CreateCleanTextBox(text, "Segoe UI", fSize, isBold, txtColor, TextAlignment.Left, x, y, w, h);
+                            newSlide.Shapes.Add(txtNode);
+                            elemCount++;
+                        }
+                        else
+                        {
+                            ShapeType shType = ShapeType.RoundedRectangle;
+                            string typeStr = cAttrs.ContainsKey("type") ? cAttrs["type"].ToLowerInvariant() : "";
+                            if (typeStr == "rectangle" || typeStr == "hinh_chu_nhat") shType = ShapeType.Rectangle;
+                            else if (typeStr == "circle" || typeStr == "ellipse" || typeStr == "hinh_tron") shType = ShapeType.Ellipse;
+
+                            int fillColor = ParseColorExtended(cAttrs.ContainsKey("fill") ? cAttrs["fill"] : (cAttrs.ContainsKey("color") ? cAttrs["color"] : "#1E293B"), unchecked((int)0xFF1E293B));
+                            int strokeColor = ParseColorExtended(cAttrs.ContainsKey("stroke") ? cAttrs["stroke"] : (cAttrs.ContainsKey("vien") ? cAttrs["vien"] : "#38BDF8"), unchecked((int)0xFF38BDF8));
+                            float strokeW = (float)GetDoubleFromStr(cAttrs.ContainsKey("stroke_width") ? cAttrs["stroke_width"] : "1.5", 1.5);
+
+                            ShapeNode shp = new ShapeNode
+                            {
+                                Type = shType,
+                                FillColor = fillColor,
+                                FillOpacity = 1.0f,
+                                StrokeColor = strokeColor,
+                                StrokeWidth = strokeW,
+                                Transform = new Transform2D(x, y, w, h),
+                                Text = text
+                            };
+                            newSlide.Shapes.Add(shp);
+                            elemCount++;
+                        }
+                    }
+
+                    if (pres != null)
+                    {
+                        pres.Slides.Add(newSlide);
+                        slides.ActiveSlideIndex = pres.Slides.Count - 1;
+                        summaries.Add(string.Format("Đã tạo slide '{0}' với {1} thành phần", title, elemCount));
+                        anyExecuted = true;
+                    }
+                }
+            }
+
+            // 3. Xử lý Writer (Chèn văn bản và thay thế từ)
+            if (appForm.WriterView != null)
+            {
+                var writer = appForm.WriterView;
+                var insertMatches = Regex.Matches(rawAiResponse, @"<insert_text\b[^>]*>(.*?)</insert_text>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                foreach (Match m in insertMatches)
+                {
+                    string txt = m.Groups[1].Value;
+                    if (!string.IsNullOrEmpty(txt))
+                    {
+                        writer.InsertTextFromAI(txt);
+                        summaries.Add("Đã chèn nội dung vào văn bản");
+                        anyExecuted = true;
+                    }
+                }
+
+                var replaceMatches = Regex.Matches(rawAiResponse, @"<replace\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match m in replaceMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    if (attrs.ContainsKey("find") && attrs.ContainsKey("replace"))
+                    {
+                        string f = attrs["find"];
+                        string r = attrs["replace"];
+                        int c = writer.ReplaceAll(f, r);
+                        summaries.Add(string.Format("Đã thay thế '{0}' thành '{1}' ({2} lần)", f, r, c));
+                        anyExecuted = true;
+                    }
+                }
+            }
+
+            if (anyExecuted)
+            {
+                result.HasAction = true;
+                result.ActionType = "XML_ACTION";
+                result.Success = true;
+                result.ExecutionSummary = "✅ " + string.Join("; ", summaries.ToArray());
+
+                // Làm sạch thẻ XML khỏi message trả lời để hiển thị cho người dùng
+                string clean = rawAiResponse;
+                clean = Regex.Replace(clean, @"</?(?:zenq_action|action|zenq)\b[^>]*>", "", RegexOptions.IgnoreCase);
+                clean = Regex.Replace(clean, @"<(?:highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|clear|xoa|replace)\b[^>]*\/?>", "", RegexOptions.IgnoreCase);
+                clean = Regex.Replace(clean, @"<(?:write|ghi|create_slide|tao_slide|slide|insert_text)\b[^>]*>[\s\S]*?<\/(?:write|ghi|create_slide|tao_slide|slide|insert_text)>", "", RegexOptions.IgnoreCase);
+                result.CleanUserMessage = clean.Trim();
+                if (string.IsNullOrEmpty(result.CleanUserMessage))
+                {
+                    result.CleanUserMessage = result.ExecutionSummary;
+                }
+
+                appForm.Invalidate();
+                return true;
+            }
+
+            return false;
+        }
+
         public static AiActionResult ProcessAndExecute(AppForm appForm, string rawAiResponse)
         {
             AiActionResult result = new AiActionResult();
             if (string.IsNullOrEmpty(rawAiResponse))
             {
                 result.CleanUserMessage = "";
+                return result;
+            }
+
+            // 0. Ưu tiên kiểm tra và thực thi các thẻ XML tự do theo yêu cầu người dùng
+            if (ExecuteXmlActions(appForm, rawAiResponse, result))
+            {
                 return result;
             }
 
@@ -2284,9 +2688,47 @@ namespace ZenQOffice.Core
             return VerticalTextAlignment.Top;
         }
 
-        private static int ParseColor(string hexOrName, int fallback)
+        public static int ParseColorExtended(string hexOrName, int fallback)
         {
             if (string.IsNullOrWhiteSpace(hexOrName)) return fallback;
+            string s = hexOrName.Trim().ToLowerInvariant();
+
+            // Map màu tiếng Việt và tiếng Anh phổ biến
+            if (s.Contains("vàng nhạt") || s.Contains("vang nhat") || s.Contains("light yellow") || s.Contains("lightyellow") || s.Contains("pale yellow") || s.Contains("cream"))
+                return unchecked((int)0xFFFEF9C3); // Vàng nhạt pastel chuẩn (#FEF9C3)
+            if (s.Contains("vàng chanh") || s.Contains("vang chanh") || s.Contains("lemon"))
+                return unchecked((int)0xFFFEF08A);
+            if (s.Contains("vàng") || s.Contains("vang") || s.Contains("yellow"))
+                return unchecked((int)0xFFFDE047);
+            if (s.Contains("xanh lá nhạt") || s.Contains("xanh la nhat") || s.Contains("light green") || s.Contains("lightgreen") || s.Contains("mint"))
+                return unchecked((int)0xFFDCFCE7); // Xanh lá nhạt pastel (#DCFCE7)
+            if (s.Contains("xanh lá") || s.Contains("xanh la") || s.Contains("green") || s.Contains("luc"))
+                return unchecked((int)0xFF22C55E);
+            if (s.Contains("xanh dương nhạt") || s.Contains("xanh bien nhat") || s.Contains("light blue") || s.Contains("lightblue") || s.Contains("sky"))
+                return unchecked((int)0xFFE0F2FE); // Xanh dương nhạt pastel (#E0F2FE)
+            if (s.Contains("xanh dương") || s.Contains("xanh bien") || s.Contains("blue"))
+                return unchecked((int)0xFF3B82F6);
+            if (s.Contains("đỏ nhạt") || s.Contains("do nhat") || s.Contains("hồng nhạt") || s.Contains("hong nhat") || s.Contains("light red") || s.Contains("pink"))
+                return unchecked((int)0xFFFEE2E2); // Đỏ/hồng nhạt pastel (#FEE2E2)
+            if (s.Contains("đỏ") || s.Contains("do") || s.Contains("red"))
+                return unchecked((int)0xFFEF4444);
+            if (s.Contains("cam nhạt") || s.Contains("cam nhat") || s.Contains("light orange") || s.Contains("peach"))
+                return unchecked((int)0xFFFFEDD5);
+            if (s.Contains("cam") || s.Contains("orange"))
+                return unchecked((int)0xFFF97316);
+            if (s.Contains("tím nhạt") || s.Contains("tim nhat") || s.Contains("light purple") || s.Contains("lavender"))
+                return unchecked((int)0xFFF3E8FF);
+            if (s.Contains("tím") || s.Contains("tim") || s.Contains("purple"))
+                return unchecked((int)0xFFA855F7);
+            if (s.Contains("xám nhạt") || s.Contains("xam nhat") || s.Contains("light gray") || s.Contains("light grey"))
+                return unchecked((int)0xFFF1F5F9);
+            if (s.Contains("xám") || s.Contains("xam") || s.Contains("gray") || s.Contains("grey"))
+                return unchecked((int)0xFF94A3B8);
+            if (s.Contains("trắng") || s.Contains("trang") || s.Contains("white"))
+                return unchecked((int)0xFFFFFFFF);
+            if (s.Contains("đen") || s.Contains("den") || s.Contains("black"))
+                return unchecked((int)0xFF000000);
+
             string c = hexOrName.Trim().TrimStart('#');
             if (c.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) c = c.Substring(2);
 
@@ -2307,6 +2749,11 @@ namespace ZenQOffice.Core
                 }
             }
             return fallback;
+        }
+
+        private static int ParseColor(string hexOrName, int fallback)
+        {
+            return ParseColorExtended(hexOrName, fallback);
         }
 
         private static Transform2D ParseBounds(object boundsObj, float canvasW, float canvasH, float defX, float defY, float defW, float defH)

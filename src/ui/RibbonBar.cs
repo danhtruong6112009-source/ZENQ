@@ -423,6 +423,7 @@ namespace ZenQOffice.UI
         public Rectangle RibbonToggleStyleBounds = Rectangle.Empty;
         public Rectangle RibbonUndoButtonBounds = Rectangle.Empty;
         public Rectangle RibbonRedoButtonBounds = Rectangle.Empty;
+        public Rectangle RibbonAiChatButtonBounds = Rectangle.Empty;
 
         // Tọa độ bounding box các nút Tab Thiết kế (Design)
         public Rectangle BtnThemesBounds = Rectangle.Empty;
@@ -1468,6 +1469,12 @@ namespace ZenQOffice.UI
                 else
                 {
                     LoadTabState(ActiveDocIndex, slidesView, writerView, calcView, pdfView, photoView);
+                }
+
+                AppForm appForm = app ?? (Parent as AppForm) ?? HostAppForm;
+                if (appForm != null)
+                {
+                    appForm.OnTabSwitched(DocTabs[index]);
                 }
             }
         }
@@ -3036,6 +3043,63 @@ namespace ZenQOffice.UI
             FluentIconRenderer.DrawGlyph(g, glyph, r, iconColor, 13f);
         }
 
+        private void DrawQuickAiButton(Graphics g, Rectangle r, bool isHover, bool isActive)
+        {
+            if (isActive)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(new RectangleF(r.X, r.Y, r.Width, r.Height), 5f))
+                using (LinearGradientBrush bg = new LinearGradientBrush(r, Color.FromArgb(238, 242, 255), Color.FromArgb(224, 231, 255), 135f))
+                using (Pen borderPen = new Pen(Color.FromArgb(129, 140, 248), 1.2f))
+                {
+                    g.FillPath(bg, p);
+                    g.DrawPath(borderPen, p);
+                }
+            }
+            else if (isHover)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(new RectangleF(r.X, r.Y, r.Width, r.Height), 5f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(245, 243, 255)))
+                using (Pen borderPen = new Pen(Color.FromArgb(196, 181, 253), 1.0f))
+                {
+                    g.FillPath(b, p);
+                    g.DrawPath(borderPen, p);
+                }
+            }
+
+            // Vẽ biểu tượng ngôi sao 4 cánh AI lấp lánh (Gemini / ZenQ AI)
+            float cx = r.X + r.Width / 2f;
+            float cy = r.Y + r.Height / 2f;
+            float armLen = 7.5f;
+            float armW = 2.4f;
+
+            Color starColor = isActive ? Color.FromArgb(79, 70, 229) : (isHover ? Color.FromArgb(124, 58, 237) : Color.FromArgb(100, 116, 139));
+            using (GraphicsPath starPath = new GraphicsPath())
+            {
+                PointF[] pts = new PointF[]
+                {
+                    new PointF(cx, cy - armLen),
+                    new PointF(cx + armW, cy - armW),
+                    new PointF(cx + armLen, cy),
+                    new PointF(cx + armW, cy + armW),
+                    new PointF(cx, cy + armLen),
+                    new PointF(cx - armW, cy + armW),
+                    new PointF(cx - armLen, cy),
+                    new PointF(cx - armW, cy - armW)
+                };
+                starPath.AddPolygon(pts);
+                using (SolidBrush sb = new SolidBrush(starColor))
+                {
+                    g.FillPath(sb, starPath);
+                }
+            }
+
+            // Nhỏ thêm một chấm sao nhỏ góc trên phải
+            using (SolidBrush dotB = new SolidBrush(isHover || isActive ? Color.FromArgb(236, 72, 153) : Color.FromArgb(148, 163, 184)))
+            {
+                g.FillEllipse(dotB, cx + 4.2f, cy - 6.8f, 2.4f, 2.4f);
+            }
+        }
+
         private void DrawVectorTabDocIcon(Graphics g, float x, float y, float size, OfficeAppMode mode, bool isActive)
         {
             if (mode == OfficeAppMode.Home)
@@ -3768,19 +3832,25 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Top-Right Quick Undo & Redo Arrow Buttons inside Island
+                // Top-Right Quick AI, Undo & Redo Arrow Buttons inside Island
                 int qBtnW = 26;
                 int qBtnH = 22;
                 int redoX = islandRect.Right - qBtnW - 8;
                 int undoX = redoX - qBtnW - 4;
+                int aiX = undoX - qBtnW - 4;
                 int qBtnY = 41;
                 RibbonUndoButtonBounds = new Rectangle(undoX, qBtnY, qBtnW, qBtnH);
                 RibbonRedoButtonBounds = new Rectangle(redoX, qBtnY, qBtnW, qBtnH);
+                RibbonAiChatButtonBounds = new Rectangle(aiX, qBtnY, qBtnW, qBtnH);
                 RibbonToggleStyleBounds = Rectangle.Empty;
 
                 bool isHoverUndo = IsHovering(RibbonUndoButtonBounds);
                 bool isHoverRedo = IsHovering(RibbonRedoButtonBounds);
+                bool isHoverAi = IsHovering(RibbonAiChatButtonBounds);
 
+                DocTab curTab = (DocTabs != null && ActiveDocIndex >= 0 && ActiveDocIndex < DocTabs.Count) ? DocTabs[ActiveDocIndex] : null;
+                bool isAiOpen = (curTab != null && curTab.IsAiChatOpen);
+                DrawQuickAiButton(g, RibbonAiChatButtonBounds, isHoverAi, isAiOpen);
                 DrawQuickActionButton(g, RibbonUndoButtonBounds, '\uE7A7', isHoverUndo);
                 DrawQuickActionButton(g, RibbonRedoButtonBounds, '\uE7A6', isHoverRedo);
             }
@@ -3872,19 +3942,25 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Top-Right Quick Undo & Redo Arrow Buttons on Classic Tab Strip
+                // Top-Right Quick AI, Undo & Redo Arrow Buttons on Classic Tab Strip
                 int qBtnW = 26;
                 int qBtnH = 22;
                 int redoX = width - qBtnW - 14;
                 int undoX = redoX - qBtnW - 4;
+                int aiX = undoX - qBtnW - 4;
                 int qBtnY = 39;
                 RibbonUndoButtonBounds = new Rectangle(undoX, qBtnY, qBtnW, qBtnH);
                 RibbonRedoButtonBounds = new Rectangle(redoX, qBtnY, qBtnW, qBtnH);
+                RibbonAiChatButtonBounds = new Rectangle(aiX, qBtnY, qBtnW, qBtnH);
                 RibbonToggleStyleBounds = Rectangle.Empty;
 
                 bool isHoverUndo = IsHovering(RibbonUndoButtonBounds);
                 bool isHoverRedo = IsHovering(RibbonRedoButtonBounds);
+                bool isHoverAi = IsHovering(RibbonAiChatButtonBounds);
 
+                DocTab curTab = (DocTabs != null && ActiveDocIndex >= 0 && ActiveDocIndex < DocTabs.Count) ? DocTabs[ActiveDocIndex] : null;
+                bool isAiOpen = (curTab != null && curTab.IsAiChatOpen);
+                DrawQuickAiButton(g, RibbonAiChatButtonBounds, isHoverAi, isAiOpen);
                 DrawQuickActionButton(g, RibbonUndoButtonBounds, '\uE7A7', isHoverUndo);
                 DrawQuickActionButton(g, RibbonRedoButtonBounds, '\uE7A6', isHoverRedo);
 
@@ -18727,7 +18803,18 @@ namespace ZenQOffice.UI
             }
             else if (y > rTop && y <= 66 && CurrentMode != OfficeAppMode.Home)
             {
-                // 1. Kiểm tra click nút Hoàn tác (Undo) và Làm lại (Redo)
+                // 1. Kiểm tra click nút Trợ lý AI (✦), Hoàn tác (Undo) và Làm lại (Redo)
+                if (!RibbonAiChatButtonBounds.IsEmpty && RibbonAiChatButtonBounds.Contains(x, y))
+                {
+                    AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;
+                    if (app != null)
+                    {
+                        app.ToggleAiChatSidebar();
+                        if (parentForm != null) parentForm.Invalidate();
+                        if (Parent != null) Parent.Invalidate();
+                    }
+                    return true;
+                }
                 if (!RibbonUndoButtonBounds.IsEmpty && RibbonUndoButtonBounds.Contains(x, y))
                 {
                     AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;

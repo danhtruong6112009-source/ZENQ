@@ -605,13 +605,9 @@ namespace ZenQOffice.UI
                 }
                 _currentSessionId = tab.AiChatSessionId;
 
-                if (tab.AiChatHistory == null || tab.AiChatHistory.Count == 0)
+                if (tab.AiChatHistory == null)
                 {
-                    var persistent = AiChatHistoryManager.LoadHistory();
-                    if (persistent != null && persistent.Count > 0)
-                    {
-                        tab.AiChatHistory = new List<AiChatMessage>(persistent);
-                    }
+                    tab.AiChatHistory = new List<AiChatMessage>();
                 }
             }
 
@@ -640,8 +636,8 @@ namespace ZenQOffice.UI
             }
             else
             {
-                // Hiện tin nhắn chào random khi mở tab mới (chưa có lịch sử)
-                AddWelcomeGreeting();
+                // Hiện giao diện chào mừng phong cách Google Gemini / GPT khi mở tab mới
+                AddGeminiWelcomeView();
             }
 
             // Kiểm tra xem tab này có tiến trình AI đang chạy ngầm hay không
@@ -682,13 +678,27 @@ namespace ZenQOffice.UI
         }
 
         /// <summary>
-        /// Hiện 1 tin nhắn chào mừng random (khác nhau mỗi lần).
+        /// Hiện giao diện chào mừng phong cách Google Gemini / GPT:
+        /// - Hiệu ứng ánh sáng Radiant Aura Glow huyền ảo
+        /// - Biểu tượng ngôi sao 4 cánh Google Gemini lấp lánh đa sắc
+        /// - Câu chào ngẫu nhiên truyền cảm hứng ("Chúng ta nên bắt đầu từ đâu nhỉ?", "Bắt đầu làm việc thôi!",...)
+        /// - 4 gợi ý câu hỏi mẫu thông minh (Chips)
         /// </summary>
-        private void AddWelcomeGreeting()
+        private void AddGeminiWelcomeView()
         {
-            Random rng = new Random();
-            string greeting = _greetings[rng.Next(_greetings.Length)];
-            AddAiBubble(greeting);
+            int feedW = pnlChatFeed.ClientSize.Width - 46;
+            if (feedW <= 100) feedW = 320;
+            OfficeAppMode curMode = _appForm != null && _appForm.Ribbon != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
+            GeminiWelcomeControl welcome = new GeminiWelcomeControl(feedW, curMode, (prompt) =>
+            {
+                txtInput.Text = prompt;
+                txtInput.ForeColor = Color.FromArgb(15, 23, 42);
+                _isPlaceholderActive = false;
+                pnlInputPill.Invalidate();
+                SendMessageFromInput();
+            });
+            pnlChatFeed.AddVirtualControl(welcome);
+            ScrollToBottomForce();
         }
 
         public void StartNewChatSession()
@@ -725,7 +735,7 @@ namespace ZenQOffice.UI
             _streamingAiBubble = null;
             _streamingAiLabel = null;
             HideThinkingBubble();
-            AddWelcomeGreeting();
+            AddGeminiWelcomeView();
             pnlChatFeed.ResumeLayout(true);
             pnlChatFeed.PerformLayout();
             ScrollToBottomForce();
@@ -980,7 +990,7 @@ namespace ZenQOffice.UI
 
             _streamingAiBubble.Size = new Size(bubbleW, bubbleH);
             _streamingAiLabel.Bounds = new Rectangle(padX, padY, bubbleW - padX * 2, bubbleH - padY * 2);
-            _streamingAiLabel.Text = displayText;
+            _streamingAiLabel.Text = displayText + " ▌";
 
             if (_streamingAiRow.Height != bubbleH)
             {
@@ -1215,7 +1225,7 @@ namespace ZenQOffice.UI
 
             object _streamLock = new object();
             string _pendingStreamChunk = "";
-            System.Windows.Forms.Timer streamUiTimer = new System.Windows.Forms.Timer { Interval = 45 };
+            System.Windows.Forms.Timer streamUiTimer = new System.Windows.Forms.Timer { Interval = 30 };
             streamUiTimer.Tick += (s, e) =>
             {
                 string chunkToUpdate = "";
@@ -1909,6 +1919,37 @@ namespace ZenQOffice.UI
                 sb.AppendLine("   - TUYỆT ĐỐI KHÔNG HỎI LẠI! Dữ liệu đã có đủ 100%.");
             }
 
+            // 0. Multi-Turn Context Memory: Nhớ các tin nhắn trước của phiên chat tab hiện tại (ít nhất 1 tin nhắn trước)
+            if (_currentTab != null && _currentTab.AiChatHistory != null && _currentTab.AiChatHistory.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("<previous_conversation_context>");
+                sb.AppendLine("Lịch sử trao đổi gần nhất trong phiên làm việc của tab này:");
+                int hCount = _currentTab.AiChatHistory.Count;
+                int startH = Math.Max(0, hCount - 4); // Lấy đến 4 tin nhắn gần nhất
+                for (int hi = startH; hi < hCount; hi++)
+                {
+                    var hMsg = _currentTab.AiChatHistory[hi];
+                    string roleStr = (hMsg.Role == "user") ? "Người dùng" : "Trợ lý AI";
+                    sb.AppendLine(string.Format("{0}: {1}", roleStr, hMsg.Content));
+                }
+                sb.AppendLine("</previous_conversation_context>");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("[HƯỚNG DẪN THỰC THI THAO TÁC BẰNG XML TỰ DO (XML ACTION ENGINE)]:");
+            sb.AppendLine("Bạn có toàn quyền sáng tạo và thực hiện bất kỳ thao tác nào bằng cách tự do xuất các thẻ XML trực tiếp:");
+            sb.AppendLine("- Bảng tính (Calc):");
+            sb.AppendLine("  + Tô màu ô/vùng: <highlight range=\"A1:A10\" color=\"vàng nhạt\" /> (hoặc color=\"#FEF08A\", color=\"xanh lá nhạt\", bold=\"true\",...)");
+            sb.AppendLine("  + Điền công thức hoặc giá trị: <set cell=\"A11\" formula=\"=SUM(A1:A10)\" /> (Tự do dùng các hàm tối ưu: SUM, AVERAGE, COUNT, MAX, MIN, IF, VLOOKUP,...)");
+            sb.AppendLine("  + Tạo Sheet: <create_sheet name=\"Tóm tắt\" />");
+            sb.AppendLine("  + Ghi dữ liệu vào Sheet: <write sheet=\"Tóm tắt\" cell=\"A1\">Nội dung tóm tắt...</write>");
+            sb.AppendLine("  + Xóa vùng ô: <clear range=\"A1:C10\" />");
+            sb.AppendLine("- Trình chiếu (Slides):");
+            sb.AppendLine("  + Tạo slide tự do: <create_slide title=\"Tiêu đề\" background=\"#0F172A\"><shape type=\"rectangle\" x=\"100\" y=\"150\" width=\"400\" height=\"200\" fill=\"#1E293B\" /><text x=\"120\" y=\"170\" font_size=\"24\" color=\"#38BDF8\">Nội dung</text></create_slide>");
+            sb.AppendLine("- Soạn thảo (Writer): <insert_text>Nội dung...</insert_text>, <replace find=\"từ cũ\" replace=\"từ mới\" />");
+            sb.AppendLine("Hệ thống sẽ tự động bóc tách và thực thi chính xác!");
+
             sb.AppendLine();
             sb.AppendLine("<user_question>");
             sb.AppendLine(userQuery);
@@ -1919,6 +1960,283 @@ namespace ZenQOffice.UI
             return sb.ToString().Trim();
         }
         #endregion
+    }
+
+    /// <summary>
+    /// Giao diện mở đầu đoạn chat phong cách Google Gemini / GPT:
+    /// - Quầng sáng Radiant Aura Glow huyền ảo
+    /// - Biểu tượng ngôi sao 4 cánh Google Gemini lấp lánh đa sắc
+    /// - Câu chào ngẫu nhiên truyền cảm hứng ("Chúng ta nên bắt đầu từ đâu nhỉ?", "Bắt đầu làm việc thôi!", "Xin chào!...")
+    /// - 4 gợi ý câu hỏi thông minh (Suggestion Chips) thích ứng theo tài liệu hiện tại (Calc, Slides, Writer)
+    /// </summary>
+    public class GeminiWelcomeControl : Control
+    {
+        private Action<string> _onSelectPrompt;
+        private OfficeAppMode _mode;
+        private string _greetingText;
+        private List<string> _chips = new List<string>();
+        private List<Rectangle> _chipRects = new List<Rectangle>();
+        private int _hoveredChipIndex = -1;
+        private System.Windows.Forms.Timer _pulseTimer;
+        private float _pulsePhase = 0f;
+
+        private static readonly string[] _geminiHeadings = new string[]
+        {
+            "Chúng ta nên bắt đầu từ đâu nhỉ?",
+            "Bắt đầu làm việc thôi!",
+            "Xin chào! Bạn cứ hỏi tôi bất cứ điều gì...",
+            "Hôm nay bạn cần tôi hỗ trợ gì nào?",
+            "Cùng tạo nên những điều tuyệt vời nhé!"
+        };
+
+        public GeminiWelcomeControl(int width, OfficeAppMode mode, Action<string> onSelectPrompt)
+        {
+            _mode = mode;
+            _onSelectPrompt = onSelectPrompt;
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            this.BackColor = Color.FromArgb(248, 250, 252);
+            this.Font = new Font("Segoe UI", 9.5f);
+
+            Random rng = new Random();
+            _greetingText = _geminiHeadings[rng.Next(_geminiHeadings.Length)];
+
+            InitChipsForMode(mode);
+
+            int totalH = CalculateLayout(width);
+            this.Size = new Size(width, totalH);
+
+            _pulseTimer = new System.Windows.Forms.Timer { Interval = 60 };
+            _pulseTimer.Tick += (s, e) =>
+            {
+                _pulsePhase += 0.08f;
+                if (_pulsePhase > (float)Math.PI * 2) _pulsePhase -= (float)Math.PI * 2;
+                Invalidate();
+            };
+            _pulseTimer.Start();
+        }
+
+        private void InitChipsForMode(OfficeAppMode mode)
+        {
+            _chips.Clear();
+            if (mode == OfficeAppMode.Calc)
+            {
+                _chips.Add("📊 Tính tổng cột dữ liệu (=SUM)");
+                _chips.Add("🎨 Tô màu highlight A1:A10 vàng nhạt");
+                _chips.Add("📋 Tạo sheet mới và ghi bản tóm tắt");
+                _chips.Add("💡 Tối ưu hóa bảng tính và công thức");
+            }
+            else if (mode == OfficeAppMode.Slides)
+            {
+                _chips.Add("🎨 Tạo slide trình chiếu theo mô tả");
+                _chips.Add("✨ Đổi màu nền gradient sang trọng");
+                _chips.Add("💡 Viết dàn ý và nội dung thuyết trình");
+                _chips.Add("📋 Thêm các thẻ phân tích số liệu");
+            }
+            else
+            {
+                _chips.Add("📝 Tóm tắt nội dung tài liệu này");
+                _chips.Add("✨ Sửa lỗi chính tả & câu từ tự động");
+                _chips.Add("💡 Viết tiếp đoạn văn theo ý tưởng");
+                _chips.Add("📋 Lập dàn ý bài viết chi tiết");
+            }
+        }
+
+        private int CalculateLayout(int width)
+        {
+            _chipRects.Clear();
+            int topH = 150;
+            int padX = 14;
+            int chipW = width - padX * 2;
+            int chipH = 34;
+            int gapY = 8;
+            int curY = topH;
+
+            for (int i = 0; i < _chips.Count; i++)
+            {
+                _chipRects.Add(new Rectangle(padX, curY, chipW, chipH));
+                curY += chipH + gapY;
+            }
+
+            return curY + 16;
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            CalculateLayout(this.ClientSize.Width);
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            using (SolidBrush bgB = new SolidBrush(this.BackColor))
+            {
+                g.FillRectangle(bgB, this.ClientRectangle);
+            }
+
+            int w = this.ClientSize.Width;
+            float cx = w / 2f;
+            float cy = 52f;
+
+            // 1. Quầng sáng Radiant Aura Glow huyền ảo (breathing light)
+            float pulseScale = 1.0f + 0.08f * (float)Math.Sin(_pulsePhase);
+            float glowR = 75f * pulseScale;
+            RectangleF glowRect = new RectangleF(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+
+            using (GraphicsPath gp = new GraphicsPath())
+            {
+                gp.AddEllipse(glowRect);
+                using (PathGradientBrush pgb = new PathGradientBrush(gp))
+                {
+                    pgb.CenterColor = Color.FromArgb(70, 224, 231, 255);
+                    pgb.SurroundColors = new Color[] { Color.FromArgb(0, 248, 250, 252) };
+                    g.FillPath(pgb, gp);
+                }
+            }
+
+            // 2. Biểu tượng ngôi sao 4 cánh Google Gemini lấp lánh (đa sắc màu)
+            float starLen = 17f;
+            float starW = 4.8f;
+            PointF[] starPts = new PointF[]
+            {
+                new PointF(cx, cy - starLen),
+                new PointF(cx + starW, cy - starW),
+                new PointF(cx + starLen, cy),
+                new PointF(cx + starW, cy + starW),
+                new PointF(cx, cy + starLen),
+                new PointF(cx - starW, cy + starW),
+                new PointF(cx - starLen, cy),
+                new PointF(cx - starW, cy - starW)
+            };
+            using (GraphicsPath starPath = new GraphicsPath())
+            {
+                starPath.AddPolygon(starPts);
+                using (LinearGradientBrush sBrush = new LinearGradientBrush(new RectangleF(cx - starLen, cy - starLen, starLen * 2, starLen * 2),
+                    Color.FromArgb(59, 130, 246), Color.FromArgb(236, 72, 153), 45f))
+                {
+                    g.FillPath(sBrush, starPath);
+                }
+            }
+
+            // Chấm sao phụ lấp lánh
+            using (SolidBrush dotB = new SolidBrush(Color.FromArgb(245, 158, 11)))
+            {
+                g.FillEllipse(dotB, cx + 11f, cy - 14f, 4.5f, 4.5f);
+            }
+
+            // 3. Câu mở đầu ngẫu nhiên
+            using (Font titleF = new Font("Segoe UI", 12.5f, FontStyle.Bold))
+            using (SolidBrush txtB = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                RectangleF titleR = new RectangleF(10, 84, w - 20, 52);
+                g.DrawString(_greetingText, titleF, txtB, titleR, sf);
+            }
+
+            // 4. Các Suggestion Chips
+            using (Font chipF = new Font("Segoe UI", 9.2f, FontStyle.Regular))
+            using (StringFormat csf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            {
+                for (int i = 0; i < _chips.Count; i++)
+                {
+                    Rectangle cr = _chipRects[i];
+                    bool isHover = (i == _hoveredChipIndex);
+
+                    using (GraphicsPath cp = CreateRoundRectPath(cr, 8))
+                    using (SolidBrush chipBg = new SolidBrush(isHover ? Color.FromArgb(245, 243, 255) : Color.White))
+                    using (Pen chipPen = new Pen(isHover ? Color.FromArgb(167, 139, 250) : Color.FromArgb(226, 232, 240), isHover ? 1.4f : 1.0f))
+                    {
+                        g.FillPath(chipBg, cp);
+                        g.DrawPath(chipPen, cp);
+                    }
+
+                    Rectangle textR = new Rectangle(cr.X + 12, cr.Y, cr.Width - 24, cr.Height);
+                    Color textColor = isHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(51, 65, 85);
+                    using (SolidBrush tb = new SolidBrush(textColor))
+                    {
+                        g.DrawString(_chips[i], chipF, tb, textR, csf);
+                    }
+                }
+            }
+        }
+
+        private GraphicsPath CreateRoundRectPath(Rectangle r, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            float d = radius * 2f;
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int prev = _hoveredChipIndex;
+            _hoveredChipIndex = -1;
+            for (int i = 0; i < _chipRects.Count; i++)
+            {
+                if (_chipRects[i].Contains(e.Location))
+                {
+                    _hoveredChipIndex = i;
+                    break;
+                }
+            }
+            if (_hoveredChipIndex != prev)
+            {
+                this.Cursor = (_hoveredChipIndex >= 0) ? Cursors.Hand : Cursors.Default;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (_hoveredChipIndex != -1)
+            {
+                _hoveredChipIndex = -1;
+                this.Cursor = Cursors.Default;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            for (int i = 0; i < _chipRects.Count; i++)
+            {
+                if (_chipRects[i].Contains(e.Location))
+                {
+                    string prompt = _chips[i];
+                    int spaceIdx = prompt.IndexOf(' ');
+                    if (spaceIdx > 0 && spaceIdx < 4) prompt = prompt.Substring(spaceIdx + 1).Trim();
+                    if (_onSelectPrompt != null)
+                    {
+                        _onSelectPrompt(prompt);
+                    }
+                    break;
+                }
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _pulseTimer != null)
+            {
+                _pulseTimer.Stop();
+                _pulseTimer.Dispose();
+                _pulseTimer = null;
+            }
+            base.Dispose(disposing);
+        }
     }
 
     /// <summary>
@@ -2157,7 +2475,7 @@ namespace ZenQOffice.UI
             _bubbleH = Math.Max(32, txtSize.Height + padY * 2);
 
             int btnH = 22;
-            int replyBtnW = 76;
+            int replyBtnW = 88;
             int copyBtnW = 78;
             int btnY = _bubbleH + 6;
 
@@ -2190,7 +2508,7 @@ namespace ZenQOffice.UI
             Rectangle txtR = new Rectangle(bX + 14, 2 + 8, _bubbleW - 28, _bubbleH - 16);
             TextRenderer.DrawText(g, _text, this.Font, txtR, Color.White, TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
 
-            // 2. NÃºt "â†© Há»i láº¡i" (Edit & Resend)
+            // 2. Nút "✏️ Chỉnh sửa" (Edit & Resend)
             if (_isReplyHover)
             {
                 using (GraphicsPath p = RoundRect(_replyBtnRect, 5f))
@@ -2199,11 +2517,11 @@ namespace ZenQOffice.UI
                     g.FillPath(sb, p);
                 }
             }
-            AiVectorGlassRenderer.DrawVectorReply(g, _replyBtnRect.X + 4, _replyBtnRect.Y + 3, 14, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184));
+            DrawVectorPencil(g, _replyBtnRect.X + 6, _replyBtnRect.Y + 4, 13, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184));
             using (Font bf = new Font("Segoe UI", 8.2f))
             {
-                Rectangle textR = new Rectangle(_replyBtnRect.X + 20, _replyBtnRect.Y, _replyBtnRect.Width - 20, _replyBtnRect.Height);
-                TextRenderer.DrawText(g, "Hỏi lại", bf, textR, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                Rectangle textR = new Rectangle(_replyBtnRect.X + 22, _replyBtnRect.Y, _replyBtnRect.Width - 22, _replyBtnRect.Height);
+                TextRenderer.DrawText(g, "Chỉnh sửa", bf, textR, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             }
 
             // 3. Nút "📋 Sao chép"
@@ -2299,6 +2617,27 @@ namespace ZenQOffice.UI
             gp.AddArc(r.X, r.Height + r.Y - radius, radius, radius, 90, 90);
             gp.CloseFigure();
             return gp;
+        }
+
+        private static void DrawVectorPencil(Graphics g, float x, float y, float size, Color color)
+        {
+            using (Pen p = new Pen(color, 1.4f))
+            using (SolidBrush b = new SolidBrush(color))
+            {
+                p.StartCap = LineCap.Round;
+                p.EndCap = LineCap.Round;
+                // Thân bút chì nghiêng 45 độ
+                g.DrawLine(p, x + 3.0f, y + size - 3.0f, x + size - 3.0f, y + 3.0f);
+                g.DrawLine(p, x + 4.5f, y + size - 1.5f, x + size - 1.5f, y + 4.5f);
+                // Ngòi bút chì
+                PointF[] tip = new PointF[]
+                {
+                    new PointF(x + 1.0f, y + size - 1.0f),
+                    new PointF(x + 5.0f, y + size - 1.5f),
+                    new PointF(x + 1.5f, y + size - 5.0f)
+                };
+                g.FillPolygon(b, tip);
+            }
         }
 
         protected override void Dispose(bool disposing)
