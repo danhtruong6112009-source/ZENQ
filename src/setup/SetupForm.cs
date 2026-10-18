@@ -637,6 +637,20 @@ namespace ZenQOffice.Setup
             {
                 try
                 {
+                    // Terminate any running ZenQOffice / GenOffice instances to unlock binaries
+                    try
+                    {
+                        foreach (var p in Process.GetProcessesByName("ZenQOffice"))
+                        {
+                            try { p.Kill(); p.WaitForExit(1500); } catch { }
+                        }
+                        foreach (var p in Process.GetProcessesByName("GenOffice"))
+                        {
+                            try { p.Kill(); p.WaitForExit(1500); } catch { }
+                        }
+                    }
+                    catch { }
+
                     if (!Directory.Exists(chosenPath)) Directory.CreateDirectory(chosenPath);
 
                     SetStatus("Chuẩn bị môi trường cài đặt...", 0.15f);
@@ -661,11 +675,25 @@ namespace ZenQOffice.Setup
 
                                 if (!string.IsNullOrEmpty(entry.Name))
                                 {
-                                    entry.ExtractToFile(destPath, true);
+                                    int retries = 3;
+                                    while (retries > 0)
+                                    {
+                                        try
+                                        {
+                                            entry.ExtractToFile(destPath, true);
+                                            break;
+                                        }
+                                        catch (IOException)
+                                        {
+                                            retries--;
+                                            if (retries == 0) throw;
+                                            Thread.Sleep(200);
+                                        }
+                                    }
                                 }
                                 float stepProg = 0.35f + ((float)(i + 1) / totalEntries) * 0.35f;
                                 SetStatus(string.Format("Đang cài đặt: {0}...", entry.Name), stepProg);
-                                Thread.Sleep(25);
+                                Thread.Sleep(20);
                             }
                         }
                     }

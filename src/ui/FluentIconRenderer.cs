@@ -26,6 +26,8 @@ namespace ZenQOffice.UI
         private static readonly ConcurrentDictionary<string, Bitmap> _bitmapCache =
             new ConcurrentDictionary<string, Bitmap>(StringComparer.Ordinal);
 
+        private static readonly object _glyphRasterSync = new object();
+
         private static string DetectBestIconFontFamily()
         {
             try
@@ -65,10 +67,12 @@ namespace ZenQOffice.UI
 
             return _bitmapCache.GetOrAdd(key, _ =>
             {
-                // 1. Kết xuất vector ở độ phân giải 4x (Super-Sampling 4x)
-                int scale = 4;
-                int hiW = Math.Max(32, width * scale);
-                int hiH = Math.Max(32, height * scale);
+                lock (_glyphRasterSync)
+                {
+                    // 1. Kết xuất vector ở độ phân giải 4x (Super-Sampling 4x)
+                    int scale = 4;
+                    int hiW = Math.Max(32, width * scale);
+                    int hiH = Math.Max(32, height * scale);
 
                 using (Bitmap hiBmp = new Bitmap(hiW, hiH, PixelFormat.Format32bppArgb))
                 {
@@ -175,6 +179,7 @@ namespace ZenQOffice.UI
                         gTarget.DrawImage(hiBmp, new Rectangle(0, 0, width, height));
                     }
                     return targetBmp;
+                    }
                 }
             });
         }
@@ -186,21 +191,31 @@ namespace ZenQOffice.UI
         {
             if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
 
-            int w = (int)Math.Max(1, Math.Round(bounds.Width));
-            int h = (int)Math.Max(1, Math.Round(bounds.Height));
-
-            Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
-            if (bmp != null)
+            try
             {
-                var prevInterp = g.InterpolationMode;
-                var prevSmooth = g.SmoothingMode;
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                g.SmoothingMode = SmoothingMode.HighQuality;
+                int w = (int)Math.Max(1, Math.Round(bounds.Width));
+                int h = (int)Math.Max(1, Math.Round(bounds.Height));
 
-                g.DrawImage(bmp, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
+                if (bmp != null)
+                {
+                    lock (bmp)
+                    {
+                        var prevInterp = g.InterpolationMode;
+                        var prevSmooth = g.SmoothingMode;
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.SmoothingMode = SmoothingMode.HighQuality;
 
-                g.InterpolationMode = prevInterp;
-                g.SmoothingMode = prevSmooth;
+                        g.DrawImage(bmp, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+
+                        g.InterpolationMode = prevInterp;
+                        g.SmoothingMode = prevSmooth;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawGlyph error: " + ex.Message);
             }
         }
 
@@ -220,12 +235,23 @@ namespace ZenQOffice.UI
         public static void DrawGlyphD2D(D2DGraphics g, char glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
             if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
-            int w = (int)Math.Max(1, Math.Round(bounds.Width));
-            int h = (int)Math.Max(1, Math.Round(bounds.Height));
-            Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
-            if (bmp != null)
+
+            try
             {
-                g.DrawImage(bmp, bounds);
+                int w = (int)Math.Max(1, Math.Round(bounds.Width));
+                int h = (int)Math.Max(1, Math.Round(bounds.Height));
+                Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
+                if (bmp != null)
+                {
+                    lock (bmp)
+                    {
+                        g.DrawImage(bmp, bounds);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawGlyphD2D error: " + ex.Message);
             }
         }
 

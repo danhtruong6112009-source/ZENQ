@@ -55,7 +55,7 @@ echo ===================================================
 echo [3/3] Compiling ZenQOffice-Setup.exe...
 echo ===================================================
 taskkill /f /im ZenQOffice-Setup.exe >nul 2>&1
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /optimize /main:ZenQOffice.Setup.Program /win32icon:ZenQOffice.ico /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.CSharp.dll /resource:payload.zip,payload.zip /resource:ZenQOffice.ico,app.ico /out:ZenQOffice-Setup.exe src\setup\*.cs src\AssemblyInfo.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /optimize /main:ZenQOffice.Setup.Program /win32icon:ZenQOffice.ico /win32manifest:src\setup\app.manifest /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:Microsoft.CSharp.dll /resource:payload.zip,payload.zip /resource:ZenQOffice.ico,app.ico /out:ZenQOffice-Setup.exe src\setup\*.cs src\AssemblyInfo.cs
 
 if %ERRORLEVEL% EQU 0 (
     if exist payload.zip del payload.zip

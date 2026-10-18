@@ -1121,90 +1121,60 @@ namespace ZenQOffice.UI
 
             if (image is Bitmap bmp)
             {
-                try
+                lock (bmp)
                 {
-                    bool is32Rgb = (bmp.PixelFormat == System.Drawing.Imaging.PixelFormat.Format32bppRgb);
-                    if (is32Rgb)
-                    {
-                        using (var clone = new Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
-                        {
-                            var srcData = bmp.LockBits(
-                                new Rectangle(0, 0, bmp.Width, bmp.Height),
-                                System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                                System.Drawing.Imaging.PixelFormat.Format32bppRgb
-                            );
-                            var dstData = clone.LockBits(
-                                new Rectangle(0, 0, clone.Width, clone.Height),
-                                System.Drawing.Imaging.ImageLockMode.WriteOnly,
-                                System.Drawing.Imaging.PixelFormat.Format32bppPArgb
-                            );
-                            try
-                            {
-                                unsafe
-                                {
-                                    int w = bmp.Width;
-                                    int h = bmp.Height;
-                                    for (int y = 0; y < h; y++)
-                                    {
-                                        uint* pSrc = (uint*)IntPtr.Add(srcData.Scan0, y * srcData.Stride);
-                                        uint* pDst = (uint*)IntPtr.Add(dstData.Scan0, y * dstData.Stride);
-                                        for (int x = 0; x < w; x++)
-                                        {
-                                            pDst[x] = pSrc[x] | 0xFF000000;
-                                        }
-                                    }
-                                }
-                                var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
-                                createdBmp = _renderTarget.CreateBitmap(
-                                    new Vortice.Mathematics.SizeI(clone.Width, clone.Height),
-                                    dstData.Scan0,
-                                    (uint)dstData.Stride,
-                                    props
-                                );
-                            }
-                            finally
-                            {
-                                bmp.UnlockBits(srcData);
-                                clone.UnlockBits(dstData);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        var data = bmp.LockBits(
-                            new Rectangle(0, 0, bmp.Width, bmp.Height),
-                            System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                            System.Drawing.Imaging.PixelFormat.Format32bppPArgb
-                        );
-                        try
-                        {
-                            var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
-                            createdBmp = _renderTarget.CreateBitmap(
-                                new Vortice.Mathematics.SizeI(bmp.Width, bmp.Height),
-                                data.Scan0,
-                                (uint)data.Stride,
-                                props
-                            );
-                        }
-                        finally
-                        {
-                            bmp.UnlockBits(data);
-                        }
-                    }
-                }
-                catch
-                {
-                    // Fallback: Convert indexed / non-standard bitmap to 32bppPArgb
                     try
                     {
-                        using (var clone = new Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                        bool is32Rgb = (bmp.PixelFormat == System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+                        if (is32Rgb)
                         {
-                            using (var cg = Graphics.FromImage(clone))
+                            using (var clone = new Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
                             {
-                                cg.DrawImage(bmp, 0, 0, bmp.Width, bmp.Height);
+                                var srcData = bmp.LockBits(
+                                    new Rectangle(0, 0, bmp.Width, bmp.Height),
+                                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                                    System.Drawing.Imaging.PixelFormat.Format32bppRgb
+                                );
+                                var dstData = clone.LockBits(
+                                    new Rectangle(0, 0, clone.Width, clone.Height),
+                                    System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb
+                                );
+                                try
+                                {
+                                    unsafe
+                                    {
+                                        int w = bmp.Width;
+                                        int h = bmp.Height;
+                                        for (int y = 0; y < h; y++)
+                                        {
+                                            uint* pSrc = (uint*)IntPtr.Add(srcData.Scan0, y * srcData.Stride);
+                                            uint* pDst = (uint*)IntPtr.Add(dstData.Scan0, y * dstData.Stride);
+                                            for (int x = 0; x < w; x++)
+                                            {
+                                                pDst[x] = pSrc[x] | 0xFF000000;
+                                            }
+                                        }
+                                    }
+                                    var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
+                                    createdBmp = _renderTarget.CreateBitmap(
+                                        new Vortice.Mathematics.SizeI(clone.Width, clone.Height),
+                                        dstData.Scan0,
+                                        (uint)dstData.Stride,
+                                        props
+                                    );
+                                }
+                                finally
+                                {
+                                    bmp.UnlockBits(srcData);
+                                    clone.UnlockBits(dstData);
+                                }
                             }
-                            var data = clone.LockBits(
-                                new Rectangle(0, 0, clone.Width, clone.Height),
+                        }
+                        else
+                        {
+                            var data = bmp.LockBits(
+                                new Rectangle(0, 0, bmp.Width, bmp.Height),
                                 System.Drawing.Imaging.ImageLockMode.ReadOnly,
                                 System.Drawing.Imaging.PixelFormat.Format32bppPArgb
                             );
@@ -1212,7 +1182,7 @@ namespace ZenQOffice.UI
                             {
                                 var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
                                 createdBmp = _renderTarget.CreateBitmap(
-                                    new Vortice.Mathematics.SizeI(clone.Width, clone.Height),
+                                    new Vortice.Mathematics.SizeI(bmp.Width, bmp.Height),
                                     data.Scan0,
                                     (uint)data.Stride,
                                     props
@@ -1220,11 +1190,44 @@ namespace ZenQOffice.UI
                             }
                             finally
                             {
-                                clone.UnlockBits(data);
+                                bmp.UnlockBits(data);
                             }
                         }
                     }
-                    catch { }
+                    catch
+                    {
+                        // Fallback: Convert indexed / non-standard bitmap to 32bppPArgb
+                        try
+                        {
+                            using (var clone = new Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                            {
+                                using (var cg = Graphics.FromImage(clone))
+                                {
+                                    cg.DrawImage(bmp, 0, 0, bmp.Width, bmp.Height);
+                                }
+                                var data = clone.LockBits(
+                                    new Rectangle(0, 0, clone.Width, clone.Height),
+                                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb
+                                );
+                                try
+                                {
+                                    var props = new BitmapProperties(new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied));
+                                    createdBmp = _renderTarget.CreateBitmap(
+                                        new Vortice.Mathematics.SizeI(clone.Width, clone.Height),
+                                        data.Scan0,
+                                        (uint)data.Stride,
+                                        props
+                                    );
+                                }
+                                finally
+                                {
+                                    clone.UnlockBits(data);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
             }
             else
@@ -1632,7 +1635,10 @@ namespace ZenQOffice.UI
                 }
                 catch { }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, x, y);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, x, y); } catch { }
+            }
         }
 
         public void DrawImage(Image image, float x, float y, float width, float height, float opacity = -1.0f)
@@ -1652,7 +1658,10 @@ namespace ZenQOffice.UI
                 }
                 catch { }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, x, y, width, height);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, x, y, width, height); } catch { }
+            }
         }
 
         public void DrawImage(Image image, Rectangle rect, float opacity = -1.0f) => DrawImage(image, (float)rect.X, (float)rect.Y, (float)rect.Width, (float)rect.Height, opacity);
@@ -1680,7 +1689,10 @@ namespace ZenQOffice.UI
                 }
                 catch { }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit); } catch { }
+            }
         }
 
         public void DrawImage(Image image, Rectangle destRect, float srcX, float srcY, float srcWidth, float srcHeight, GraphicsUnit srcUnit, float opacity = -1.0f)
@@ -1709,7 +1721,10 @@ namespace ZenQOffice.UI
                 }
                 catch { }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, destRect, srcRect, srcUnit);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, destRect, srcRect, srcUnit); } catch { }
+            }
         }
 
         public void DrawImage(Image image, PointF[] destPoints, RectangleF srcRect, GraphicsUnit srcUnit, System.Drawing.Imaging.ImageAttributes imageAttr, float opacity = -1.0f)
@@ -1752,7 +1767,10 @@ namespace ZenQOffice.UI
                 {
                 }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, destPoints, srcRect, srcUnit, imageAttr);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, destPoints, srcRect, srcUnit, imageAttr); } catch { }
+            }
         }
 
         public void DrawImage(Image image, Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight, GraphicsUnit srcUnit, System.Drawing.Imaging.ImageAttributes imageAttr, float opacity = -1.0f)
@@ -1778,7 +1796,10 @@ namespace ZenQOffice.UI
                 }
                 catch { }
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawImage(image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.DrawImage(image, destRect, srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr); } catch { }
+            }
         }
 
         public void DrawImage(Image image, Rectangle destRect, float srcX, float srcY, float srcWidth, float srcHeight, GraphicsUnit srcUnit, System.Drawing.Imaging.ImageAttributes imageAttr, float opacity = -1.0f)

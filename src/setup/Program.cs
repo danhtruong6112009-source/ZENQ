@@ -57,6 +57,20 @@ namespace ZenQOffice.Setup
                         string targetDir = ShortcutHelper.DefaultInstallPath;
                         if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
 
+                        // Terminate any running ZenQOffice / GenOffice instances to unlock binaries
+                        try
+                        {
+                            foreach (var p in System.Diagnostics.Process.GetProcessesByName("ZenQOffice"))
+                            {
+                                try { p.Kill(); p.WaitForExit(1500); } catch { }
+                            }
+                            foreach (var p in System.Diagnostics.Process.GetProcessesByName("GenOffice"))
+                            {
+                                try { p.Kill(); p.WaitForExit(1500); } catch { }
+                            }
+                        }
+                        catch { }
+
                         // Extract payload.zip in silent mode
                         System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
                         using (Stream payloadStream = asm.GetManifestResourceStream("payload.zip"))

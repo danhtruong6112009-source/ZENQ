@@ -2801,7 +2801,9 @@ namespace ZenQOffice.UI
 
         private void DrawWindowCaptionButtons(Graphics g, int width, int ribbonTop, float dpiScale, bool isIsland, OfficeAppMode mode)
         {
-            int btnW = (int)Math.Round(46f * dpiScale);
+            try
+            {
+                int btnW = (int)Math.Round(46f * dpiScale);
             int utilBtnW = (int)Math.Round(38f * dpiScale);
             int btnH = ribbonTop;
 
@@ -2913,62 +2915,109 @@ namespace ZenQOffice.UI
                 Rectangle closeIconRect = new Rectangle(CaptionCloseBounds.X + (btnW - closeSz) / 2, (btnH - closeSz) / 2, closeSz, closeSz);
                 FluentIconRenderer.DrawGlyph(g, '\uE8BB', closeIconRect, isHoverClose ? Color.White : normalIconColor, 10.5f * dpiScale);
             }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawWindowCaptionButtons error: " + ex.Message);
+            }
         }
 
         private void DrawVectorTouchModeCaptionIcon(Graphics g, Rectangle r, bool isActive, bool isHover, float dpiScale)
         {
-            Color c = isActive ? Color.FromArgb(37, 99, 235) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
-            int iconSz = (int)Math.Round(16f * dpiScale);
-            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
-            FluentIconRenderer.DrawGlyph(g, '\uE815', iconRect, c, 14f * dpiScale);
+            try
+            {
+                Color c = isActive ? Color.FromArgb(37, 99, 235) : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+                int iconSz = (int)Math.Round(16f * dpiScale);
+                Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+                FluentIconRenderer.DrawGlyph(g, '\uE815', iconRect, c, 14f * dpiScale);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorTouchModeCaptionIcon error: " + ex.Message);
+            }
         }
 
         private void DrawVectorPeripheralCaptionIcon(Graphics g, Rectangle r, bool isHover, float dpiScale)
         {
-            Color c = AppSettings.Instance.CalcBarcodeScannerMode
-                ? Color.FromArgb(5, 150, 105)
-                : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
-            int iconSz = (int)Math.Round(16f * dpiScale);
-            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
-            FluentIconRenderer.DrawGlyph(g, '\uE772', iconRect, c, 14f * dpiScale);
+            try
+            {
+                Color c = AppSettings.Instance.CalcBarcodeScannerMode
+                    ? Color.FromArgb(5, 150, 105)
+                    : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+                int iconSz = (int)Math.Round(16f * dpiScale);
+                Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+                FluentIconRenderer.DrawGlyph(g, '\uE772', iconRect, c, 14f * dpiScale);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorPeripheralCaptionIcon error: " + ex.Message);
+            }
         }
 
         private void DrawVectorMobileConnectCaptionIcon(Graphics g, Rectangle r, bool isHover, bool isConnected, float dpiScale)
         {
-            Color c = isConnected
-                ? Color.FromArgb(5, 150, 105)
-                : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
-            int iconSz = (int)Math.Round(16f * dpiScale);
-            Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
-            FluentIconRenderer.DrawGlyph(g, '\uE8EA', iconRect, c, 14f * dpiScale);
-
-            if (isConnected)
+            try
             {
-                int dotSz = (int)Math.Round(6f * dpiScale);
-                Rectangle dotRect = new Rectangle(r.Right - dotSz - 4, r.Bottom - dotSz - 4, dotSz, dotSz);
-                using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(16, 185, 129)))
+                Color c = isConnected
+                    ? Color.FromArgb(5, 150, 105)
+                    : (isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105));
+                int iconSz = (int)Math.Round(16f * dpiScale);
+                Rectangle iconRect = new Rectangle(r.X + (r.Width - iconSz) / 2, r.Y + (r.Height - iconSz) / 2, iconSz, iconSz);
+                FluentIconRenderer.DrawGlyph(g, '\uE8EA', iconRect, c, 14f * dpiScale);
+
+                if (isConnected)
                 {
-                    g.FillEllipse(dotBrush, dotRect);
+                    int dotSz = (int)Math.Round(6f * dpiScale);
+                    Rectangle dotRect = new Rectangle(r.Right - dotSz - 4, r.Bottom - dotSz - 4, dotSz, dotSz);
+                    using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(16, 185, 129)))
+                    {
+                        g.FillEllipse(dotBrush, dotRect);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorMobileConnectCaptionIcon error: " + ex.Message);
             }
         }
 
         private void DrawVectorQuickSave(Graphics g, Rectangle r, bool isHover)
         {
-            Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            FluentIconRenderer.DrawGlyph(g, '\uE74E', r, c, 13f);
+            try
+            {
+                Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
+                FluentIconRenderer.DrawGlyph(g, '\uE74E', r, c, 13f);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorQuickSave error: " + ex.Message);
+            }
         }
 
         private void DrawVectorQuickUndo(Graphics g, Rectangle r, bool isHover)
         {
-            Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            FluentIconRenderer.DrawGlyph(g, '\uE7A7', r, c, 13f);
+            try
+            {
+                Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
+                FluentIconRenderer.DrawGlyph(g, '\uE7A7', r, c, 13f);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorQuickUndo error: " + ex.Message);
+            }
         }
 
         private void DrawVectorQuickRedo(Graphics g, Rectangle r, bool isHover)
         {
-            Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
-            FluentIconRenderer.DrawGlyph(g, '\uE7A6', r, c, 13f);
+            try
+            {
+                Color c = isHover ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105);
+                FluentIconRenderer.DrawGlyph(g, '\uE7A6', r, c, 13f);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawVectorQuickRedo error: " + ex.Message);
+            }
         }
 
         private void DrawQuickActionButton(Graphics g, Rectangle r, char glyph, bool isHover)
@@ -3055,14 +3104,13 @@ namespace ZenQOffice.UI
 
             try
             {
-                g.SmoothingMode = SmoothingMode.HighQuality;
-                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-                g.PixelOffsetMode = PixelOffsetMode.Default;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("DrawTopDocTabBar state error: " + ex.Message);
-            }
+                try
+                {
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                    g.PixelOffsetMode = PixelOffsetMode.Default;
+                }
+                catch { }
 
             float dpiScale = (g.DpiY > 0) ? (g.DpiY / 96.0f) : 1.0f;
             CurrentDpiScale = dpiScale;
@@ -3355,6 +3403,11 @@ namespace ZenQOffice.UI
             }
 
             DrawWindowCaptionButtons(g, width, ribbonTop, dpiScale, isIsland, CurrentMode);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawTopDocTabBar error: " + ex.Message);
+            }
         }
 
         public void DrawTopDocTabBar(System.Drawing.Graphics g, int width)
