@@ -16503,6 +16503,18 @@ namespace ZenQOffice.UI
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
                 curX += 8;
 
+                // ==================== Group 3b: Hình ảnh (Stock 4K Images - 100% Tách biệt) ====================
+                int gImagesStart = curX;
+                Rectangle imgBox = new Rectangle(curX, 68, 64, 62);
+                DrawInteractiveButton(g, imgBox, false, 4);
+                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Picture, new Rectangle(imgBox.X, 70, imgBox.Width, 26), 26, neutralIcon, pptAccent);
+                g.DrawString("Hình ảnh ▾", btnFont, darkBrush, new RectangleF(imgBox.X - 2, 100, imgBox.Width + 4, 24), sfCenter);
+                curX += 68;
+
+                g.DrawString("Hình ảnh", labelFont, Brushes.Gray, new RectangleF(gImagesStart, 137, curX - gImagesStart, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
                 // ==================== Group 4: Font chữ (Internal Fonts & Typography) ====================
                 int gFontStart = curX;
                 Rectangle fontBox = new Rectangle(curX, 68, 64, 62);
@@ -23401,16 +23413,24 @@ namespace ZenQOffice.UI
                 return true;
             }
 
-            // Group 4: Font chữ (X: 246..434)
+            // Group 3b: Hình ảnh (X: 246..314)
+            if (x >= 246 && x <= 314 && y >= 68 && y <= 130)
+            {
+                slidesView.OpenImagesDrawer();
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+
+            // Group 4: Font chữ (X: 322..510)
             // Nút lớn: Font chữ ▾ (Mở Drawer Quản lý font chữ)
-            if (x >= 246 && x <= 313 && y >= 68 && y <= 130)
+            if (x >= 322 && x <= 389 && y >= 68 && y <= 130)
             {
                 slidesView.ToggleElementsDrawer(2);
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
             // Nút trên: 📥 Nhập font...
-            if (x >= 306 && x <= 425 && y >= 68 && y <= 98)
+            if (x >= 390 && x <= 506 && y >= 68 && y <= 98)
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
@@ -23440,7 +23460,7 @@ namespace ZenQOffice.UI
                 return true;
             }
             // Nút dưới: 🔤 Font nội bộ ▾ (Danh sách phông chữ nội bộ)
-            if (x >= 314 && x <= 433 && y >= 99 && y <= 130)
+            if (x >= 390 && x <= 509 && y >= 99 && y <= 130)
             {
                 ContextMenuStrip fontMenu = new ContextMenuStrip();
                 var customFonts = SlideFontManager.GetCustomFontNames();
@@ -23505,22 +23525,22 @@ namespace ZenQOffice.UI
                 return true;
             }
 
-            // Group 4: Thương hiệu / Bảng màu (X: 434..506)
-            if (x >= 442 && x <= 514 && y >= 68 && y <= 130)
+            // Group 5: Thương hiệu / Bảng màu (X: 518..590)
+            if (x >= 518 && x <= 590 && y >= 68 && y <= 130)
             {
                 slidesView.ToggleElementsDrawer(3);
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
 
-            // Group 5: Phần bổ trợ (X: 514..662)
-            if (x >= 522 && x <= 589 && y >= 68 && y <= 130)
+            // Group 6: Phần bổ trợ (X: 598..746)
+            if (x >= 598 && x <= 665 && y >= 68 && y <= 130)
             {
                 slidesView.ToggleElementsDrawer(7);
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
-            if (x >= 590 && x <= 670 && y >= 68 && y <= 130)
+            if (x >= 666 && x <= 746 && y >= 68 && y <= 130)
             {
                 using (CreateQrCodeDialogForm dlg = new CreateQrCodeDialogForm())
                 {
@@ -25257,56 +25277,67 @@ namespace ZenQOffice.UI
                 // ==================== Group 3: Hình ảnh (Images) (X: 148..284) ====================
                 else if (x >= 148 && x <= 204 && y >= 68 && y <= 124) // Hình ảnh ▾
                 {
-                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    ContextMenuStrip picMenu = new ContextMenuStrip();
+                    picMenu.Items.Add("🖼️ Kho ảnh trực tuyến 4K theo chủ đề...", null, (s, e) =>
                     {
-                        ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|Tất cả tệp (*.*)|*.*";
-                        if (ofd.ShowDialog(parentForm) == DialogResult.OK && slidesView.ActiveSlide != null)
+                        slidesView.OpenImagesDrawer();
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    picMenu.Items.Add("💻 Thiết bị này (Chèn từ máy tính)...", null, (s, e) =>
+                    {
+                        using (OpenFileDialog ofd = new OpenFileDialog())
                         {
-                            try
+                            ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|Tất cả tệp (*.*)|*.*";
+                            if (ofd.ShowDialog(parentForm) == DialogResult.OK && slidesView.ActiveSlide != null)
                             {
-                                Image loadedImg = Image.FromFile(ofd.FileName);
-                                float origW = Math.Max(1f, (float)loadedImg.Width);
-                                float origH = Math.Max(1f, (float)loadedImg.Height);
-                                float canvasW = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasWidth : 1920f;
-                                float canvasH = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasHeight : 1080f;
-
-                                float maxW = canvasW * 0.70f;
-                                float maxH = canvasH * 0.70f;
-                                float scaleFactor = Math.Min(maxW / origW, maxH / origH);
-                                if (scaleFactor > 1.0f && origW > 120f && origH > 120f) scaleFactor = 1.0f;
-
-                                float fitW = (float)Math.Round(origW * scaleFactor);
-                                float fitH = (float)Math.Round(origH * scaleFactor);
-                                float posX = (canvasW - fitW) / 2f;
-                                float posY = (canvasH - fitH) / 2f;
-
-                                ShapeNode imgShape = new ShapeNode
+                                try
                                 {
-                                    Name = "Hình ảnh " + (slidesView.ActiveSlide.Shapes.Count + 1),
-                                    Type = ShapeType.Image,
-                                    ImagePath = ofd.FileName,
-                                    CachedImage = loadedImg,
-                                    Transform = new Transform2D(posX, posY, fitW, fitH),
-                                    OriginalWidth = origW,
-                                    OriginalHeight = origH,
-                                    Text = "",
-                                    FillColor = 0x00FFFFFF,
-                                    StrokeWidth = 0f
-                                };
-                                slidesView.SaveUndoState();
-                                slidesView.ActiveSlide.AddShape(imgShape);
-                                slidesView.SelectedShapeIndex = slidesView.ActiveSlide.Shapes.Count - 1;
-                                slidesView.SelectedShapeIndices.Clear();
-                                slidesView.SelectedShapeIndices.Add(slidesView.SelectedShapeIndex);
-                                if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show("Không thể tải hình ảnh: " + ex.Message, "Lỗi Chèn Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    Image loadedImg = Image.FromFile(ofd.FileName);
+                                    float origW = Math.Max(1f, (float)loadedImg.Width);
+                                    float origH = Math.Max(1f, (float)loadedImg.Height);
+                                    float canvasW = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasWidth : 1920f;
+                                    float canvasH = (slidesView.Presentation != null) ? slidesView.Presentation.CanvasHeight : 1080f;
+
+                                    float maxW = canvasW * 0.70f;
+                                    float maxH = canvasH * 0.70f;
+                                    float scaleFactor = Math.Min(maxW / origW, maxH / origH);
+                                    if (scaleFactor > 1.0f && origW > 120f && origH > 120f) scaleFactor = 1.0f;
+
+                                    float fitW = (float)Math.Round(origW * scaleFactor);
+                                    float fitH = (float)Math.Round(origH * scaleFactor);
+                                    float posX = (canvasW - fitW) / 2f;
+                                    float posY = (canvasH - fitH) / 2f;
+
+                                    ShapeNode imgShape = new ShapeNode
+                                    {
+                                        Name = "Hình ảnh " + (slidesView.ActiveSlide.Shapes.Count + 1),
+                                        Type = ShapeType.Image,
+                                        ImagePath = ofd.FileName,
+                                        CachedImage = loadedImg,
+                                        Transform = new Transform2D(posX, posY, fitW, fitH),
+                                        OriginalWidth = origW,
+                                        OriginalHeight = origH,
+                                        Text = "",
+                                        FillColor = 0x00FFFFFF,
+                                        StrokeWidth = 0f
+                                    };
+                                    slidesView.SaveUndoState();
+                                    slidesView.ActiveSlide.AddShape(imgShape);
+                                    slidesView.SelectedShapeIndex = slidesView.ActiveSlide.Shapes.Count - 1;
+                                    slidesView.SelectedShapeIndices.Clear();
+                                    slidesView.SelectedShapeIndices.Add(slidesView.SelectedShapeIndex);
+                                    if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show("Không thể tải hình ảnh: " + ex.Message, "Lỗi Chèn Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                }
+                                if (parentForm != null) parentForm.Invalidate();
                             }
                         }
-                    }
-                    if (parentForm != null) parentForm.Invalidate();
+                    });
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(148, 126)) : new Point(148, 126);
+                    picMenu.Show(pt);
                     return true;
                 }
                 else if (x >= 208 && x <= 284 && y >= 68 && y <= 94) // Ảnh chụp màn hình ▾ (Chụp cắt màn hình trực tiếp - Screen Snip)

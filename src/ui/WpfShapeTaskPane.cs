@@ -26,11 +26,12 @@ namespace ZenQOffice.UI
     public enum ShapePaneMode
     {
         ShapesOnly,
-        GraphicsOnly
+        GraphicsOnly,
+        ImagesOnly
     }
 
     /// <summary>
-    /// Bảng điều khiển tác vụ Thư viện Hình dạng hoặc Đồ họa (WPF Shape Task Pane).
+    /// Bảng điều khiển tác vụ Thư viện Hình dạng, Đồ họa hoặc Hình ảnh Stock 4K (WPF Shape Task Pane).
     /// Toàn bộ đồ họa và icon được kết xuất bằng công nghệ WPF Vector Sub-pixel Anti-Aliasing mượt mà,
     /// loại bỏ hoàn toàn hiện tượng răng cưa và méo hình của GDI+.
     /// </summary>
@@ -56,6 +57,7 @@ namespace ZenQOffice.UI
         public Rectangle BtnCloseBounds = Rectangle.Empty;
         public Rectangle BtnTabShapesBounds = Rectangle.Empty;
         public Rectangle BtnTabGraphicsBounds = Rectangle.Empty;
+        public Rectangle BtnTabImagesBounds = Rectangle.Empty;
         public Rectangle SearchBoxBounds = Rectangle.Empty;
         public Rectangle ScrollbarTrackBounds = Rectangle.Empty;
         public Rectangle ScrollbarThumbBounds = Rectangle.Empty;
@@ -94,6 +96,29 @@ namespace ZenQOffice.UI
 
             int scale = 2; // SSAA 2x Super-Sampling for ultra-sharp, anti-aliased curves
             int pixelSize = size * scale;
+
+            if (item.IsPhoto || item.Category.StartsWith("Online_Image_"))
+            {
+                lock (_thumbLock) { _loadingThumbs.Add(cacheKey); }
+                System.Threading.ThreadPool.QueueUserWorkItem(_ => 
+                {
+                    try 
+                    {
+                        Bitmap photoBmp = ZenQOffice.Core.OnlineImagesManager.GetCachedOrDownloadImage(item.Id, item.ImageUrl, pixelSize);
+                        if (photoBmp != null) 
+                        {
+                            lock (_thumbLock) { _thumbCache[cacheKey] = photoBmp; }
+                            ZenQOffice.Core.OnlineImagesManager.TriggerImageDownloaded();
+                        }
+                    } 
+                    catch { }
+                    finally
+                    {
+                        lock (_thumbLock) { _loadingThumbs.Remove(cacheKey); }
+                    }
+                });
+                return null;
+            }
 
             if (item.IsOnlineImage) 
             {
@@ -457,7 +482,8 @@ namespace ZenQOffice.UI
                 }
 
                 // Tiêu đề
-                string titleText = (Mode == ShapePaneMode.GraphicsOnly) ? "Đồ họa" : "Hình dạng";
+                string titleText = (Mode == ShapePaneMode.ImagesOnly) ? "Hình ảnh" :
+                                   (Mode == ShapePaneMode.GraphicsOnly) ? "Đồ họa" : "Hình dạng";
                 if (!string.IsNullOrEmpty(ExpandedCategoryKey))
                 {
                     foreach (var c in WpfShapeLibrary.Categories)
@@ -486,16 +512,19 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // 2b. Tab switcher: [ 🔷 Hình dạng ]  [ 🎨 Đồ họa ]
+            // 2b. Tab switcher: [ 🔷 Hình dạng ]  [ 🎨 Đồ họa ]  [ 🖼️ Hình ảnh ]
             int tabsH = 34;
-            int tabW = (w - 28) / 2;
+            int tabGap = 4;
+            int tabW = (w - 24 - tabGap * 2) / 3;
             BtnTabShapesBounds = new Rectangle(x + 12, y + headerH + 6, tabW, 28);
-            BtnTabGraphicsBounds = new Rectangle(x + 12 + tabW + 4, y + headerH + 6, tabW, 28);
+            BtnTabGraphicsBounds = new Rectangle(x + 12 + tabW + tabGap, y + headerH + 6, tabW, 28);
+            BtnTabImagesBounds = new Rectangle(x + 12 + (tabW + tabGap) * 2, y + headerH + 6, tabW, 28);
 
             bool isShapes = (Mode == ShapePaneMode.ShapesOnly);
             bool isGraphics = (Mode == ShapePaneMode.GraphicsOnly);
+            bool isImages = (Mode == ShapePaneMode.ImagesOnly);
 
-            using (Font tabFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font tabFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (StringFormat sfTab = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
                 // Tab Hình dạng
@@ -545,6 +574,30 @@ namespace ZenQOffice.UI
                         }
                     }
                 }
+
+                // Tab Hình ảnh
+                using (GraphicsPath pImages = CreateRoundedRectPath(BtnTabImagesBounds, 4))
+                {
+                    if (isImages)
+                    {
+                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
+                        {
+                            g.FillPath(actBg, pImages);
+                            g.DrawString("🖼️ Hình ảnh", tabFont, Brushes.White, BtnTabImagesBounds, sfTab);
+                        }
+                    }
+                    else
+                    {
+                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                        {
+                            g.FillPath(inactBg, pImages);
+                            g.DrawPath(inactBorder, pImages);
+                            g.DrawString("🖼️ Hình ảnh", tabFont, inactTxt, BtnTabImagesBounds, sfTab);
+                        }
+                    }
+                }
             }
 
             // 3. Search Bar: Ô tìm kiếm hiện đại
@@ -574,7 +627,8 @@ namespace ZenQOffice.UI
 
                 if (string.IsNullOrEmpty(SearchText))
                 {
-                    string defaultPlaceholder = (Mode == ShapePaneMode.GraphicsOnly) ? "Tìm kiếm trong kho đồ họa & biểu tượng..." : "Tìm kiếm trong hơn 500+ hình dạng...";
+                    string defaultPlaceholder = (Mode == ShapePaneMode.ImagesOnly) ? "Tìm kiếm trong kho ảnh Stock 4K..." :
+                                                 (Mode == ShapePaneMode.GraphicsOnly) ? "Tìm kiếm trong kho đồ họa & biểu tượng..." : "Tìm kiếm trong hơn 500+ hình dạng...";
                     g.DrawString(defaultPlaceholder, sFont, sText, SearchBoxBounds.X + 28, SearchBoxBounds.Y + 6);
                 }
             }
@@ -595,11 +649,15 @@ namespace ZenQOffice.UI
                 var searchResults = WpfShapeLibrary.SearchPresets(SearchText);
                 if (Mode == ShapePaneMode.ShapesOnly)
                 {
-                    searchResults = searchResults.FindAll(item => !item.Category.StartsWith("Online_"));
+                    searchResults = searchResults.FindAll(item => !item.Category.StartsWith("Online_") && !item.IsPhoto);
                 }
                 else if (Mode == ShapePaneMode.GraphicsOnly)
                 {
-                    searchResults = searchResults.FindAll(item => item.Category.StartsWith("Online_") || item.IsOnlineImage);
+                    searchResults = searchResults.FindAll(item => (item.Category.StartsWith("Online_") || item.IsOnlineImage) && !item.IsPhoto && !item.Category.StartsWith("Online_Image_"));
+                }
+                else if (Mode == ShapePaneMode.ImagesOnly)
+                {
+                    searchResults = searchResults.FindAll(item => item.IsPhoto || item.Category.StartsWith("Online_Image_"));
                 }
                 currentY = RenderShapeGrid(g, x + 12, currentY, w - 24, searchResults, $"Kết quả tìm kiếm ({searchResults.Count})");
             }
@@ -622,22 +680,31 @@ namespace ZenQOffice.UI
                 int renderedCount = 0;
                 foreach (var cat in WpfShapeLibrary.Categories)
                 {
-                    bool isOnlineCat = cat.Key.StartsWith("Online_");
-                    if (Mode == ShapePaneMode.ShapesOnly && isOnlineCat) continue;
-                    if (Mode == ShapePaneMode.GraphicsOnly && !isOnlineCat) continue;
+                    bool isPhotoCat = cat.IsPhotoCategory || cat.Key.StartsWith("Online_Image_");
+                    bool isOnlineGraphicCat = cat.Key.StartsWith("Online_") && !isPhotoCat;
+                    bool isStandardShapeCat = !cat.Key.StartsWith("Online_") && !isPhotoCat;
+
+                    if (Mode == ShapePaneMode.ShapesOnly && !isStandardShapeCat) continue;
+                    if (Mode == ShapePaneMode.GraphicsOnly && !isOnlineGraphicCat) continue;
+                    if (Mode == ShapePaneMode.ImagesOnly && !isPhotoCat) continue;
 
                     renderedCount++;
                     currentY = RenderCategoryRow(g, x + 12, currentY, w - 24, cat);
                     currentY += 12; // Khoảng cách giữa các danh mục
                 }
 
-                if (renderedCount == 0 && Mode == ShapePaneMode.GraphicsOnly)
+                if (renderedCount == 0)
                 {
                     using (SolidBrush emptyB = new SolidBrush(Color.FromArgb(100, 116, 139)))
                     using (Font emptyF = new Font("Segoe UI", 9.5f, FontStyle.Regular))
                     using (StringFormat sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
-                        g.DrawString("Đang đồng bộ dữ liệu đồ họa trực tuyến từ Vercel...\nVui lòng kiểm tra kết nối mạng.", emptyF, emptyB, new RectangleF(x + 12, currentY + 40, w - 24, 60), sfC);
+                        string emptyMsg = (Mode == ShapePaneMode.ImagesOnly)
+                            ? "Đang đồng bộ kho hình ảnh Stock 4K...\nVui lòng kiểm tra kết nối mạng."
+                            : (Mode == ShapePaneMode.GraphicsOnly)
+                            ? "Đang đồng bộ dữ liệu đồ họa trực tuyến từ Vercel...\nVui lòng kiểm tra kết nối mạng."
+                            : "Không có danh mục nào.";
+                        g.DrawString(emptyMsg, emptyF, emptyB, new RectangleF(x + 12, currentY + 40, w - 24, 60), sfC);
                     }
                     currentY += 120;
                 }
@@ -714,9 +781,10 @@ namespace ZenQOffice.UI
             }
 
             int itemY = ry + 26;
-            int cardSize = 44;
+            int cardW = (Mode == ShapePaneMode.ImagesOnly) ? 68 : 44;
+            int cardH = (Mode == ShapePaneMode.ImagesOnly) ? 50 : 44;
             int cardSpacing = 6;
-            int cols = Math.Max(1, (rw + cardSpacing) / (cardSize + cardSpacing));
+            int cols = Math.Max(1, (rw + cardSpacing) / (cardW + cardSpacing));
             int displayCount = Math.Min(cols, cat.Items.Count);
 
             RectangleF clip = g.ClipBounds;
@@ -724,8 +792,8 @@ namespace ZenQOffice.UI
             for (int i = 0; i < displayCount; i++)
             {
                 ShapePresetItem item = cat.Items[i];
-                int cx = rx + i * (cardSize + cardSpacing);
-                Rectangle cardRect = new Rectangle(cx, itemY, cardSize, cardSize);
+                int cx = rx + i * (cardW + cardSpacing);
+                Rectangle cardRect = new Rectangle(cx, itemY, cardW, cardH);
 
                 if (cardRect.Bottom < clip.Top || cardRect.Top > clip.Bottom) continue;
 
@@ -733,7 +801,7 @@ namespace ZenQOffice.UI
                 DrawShapeCard(g, cardRect, item);
             }
 
-            return itemY + cardSize;
+            return itemY + cardH;
         }
 
         private int RenderShapeGrid(Graphics g, int rx, int ry, int rw, List<ShapePresetItem> items, string headerTitle)
@@ -753,24 +821,25 @@ namespace ZenQOffice.UI
                 using (Font emptyFont = new Font("Segoe UI", 9f, FontStyle.Italic))
                 using (SolidBrush emptyBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawString("Không tìm thấy mẫu hình dạng phù hợp.", emptyFont, emptyBrush, rx, ry + 10);
+                    g.DrawString("Không tìm thấy mẫu phù hợp.", emptyFont, emptyBrush, rx, ry + 10);
                 }
                 return ry + 40;
             }
 
-            int cardSize = 46;
+            int cardW = (Mode == ShapePaneMode.ImagesOnly) ? 80 : 46;
+            int cardH = (Mode == ShapePaneMode.ImagesOnly) ? 58 : 46;
             int cardSpacing = 6;
-            int cols = Math.Max(1, (rw + cardSpacing) / (cardSize + cardSpacing));
+            int cols = Math.Max(1, (rw + cardSpacing) / (cardW + cardSpacing));
             int totalRows = (items.Count + cols - 1) / cols;
             
             RectangleF clip = g.ClipBounds;
 
             // Mathematical culling
             int startRow = 0;
-            if (ry < clip.Top) startRow = Math.Max(0, (int)((clip.Top - ry) / (cardSize + cardSpacing)));
+            if (ry < clip.Top) startRow = Math.Max(0, (int)((clip.Top - ry) / (cardH + cardSpacing)));
             int endRow = totalRows - 1;
-            if (ry + totalRows * (cardSize + cardSpacing) > clip.Bottom)
-                endRow = Math.Min(totalRows - 1, (int)((clip.Bottom - ry) / (cardSize + cardSpacing)) + 1);
+            if (ry + totalRows * (cardH + cardSpacing) > clip.Bottom)
+                endRow = Math.Min(totalRows - 1, (int)((clip.Bottom - ry) / (cardH + cardSpacing)) + 1);
 
             int startIndex = startRow * cols;
             int endIndex = Math.Min(items.Count - 1, (endRow + 1) * cols - 1);
@@ -780,10 +849,10 @@ namespace ZenQOffice.UI
                 ShapePresetItem item = items[i];
                 int c = i % cols;
                 int r = i / cols;
-                int cx = rx + c * (cardSize + cardSpacing);
-                int cy = ry + r * (cardSize + cardSpacing);
+                int cx = rx + c * (cardW + cardSpacing);
+                int cy = ry + r * (cardH + cardSpacing);
 
-                Rectangle cardRect = new Rectangle(cx, cy, cardSize, cardSize);
+                Rectangle cardRect = new Rectangle(cx, cy, cardW, cardH);
                 
                 if (cardRect.Bottom < clip.Top || cardRect.Top > clip.Bottom) continue;
 
@@ -791,7 +860,7 @@ namespace ZenQOffice.UI
                 DrawShapeCard(g, cardRect, item);
             }
 
-            return ry + totalRows * (cardSize + cardSpacing);
+            return ry + totalRows * (cardH + cardSpacing);
         }
 
         private void DrawShapeCard(Graphics g, Rectangle rect, ShapePresetItem item)
@@ -910,6 +979,20 @@ namespace ZenQOffice.UI
                 if (Mode != ShapePaneMode.GraphicsOnly)
                 {
                     Mode = ShapePaneMode.GraphicsOnly;
+                    ExpandedCategoryKey = null;
+                    SearchText = "";
+                    ScrollY = 0;
+                    SmoothScrollY = 0f;
+                    TargetScrollY = 0f;
+                    action = "SwitchMode";
+                    return true;
+                }
+            }
+            if (BtnTabImagesBounds.Contains(pt))
+            {
+                if (Mode != ShapePaneMode.ImagesOnly)
+                {
+                    Mode = ShapePaneMode.ImagesOnly;
                     ExpandedCategoryKey = null;
                     SearchText = "";
                     ScrollY = 0;

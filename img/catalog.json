@@ -1,0 +1,414 @@
+{
+  "version": "1.0",
+  "total": 48,
+  "categories": [
+    {
+      "name": "Bầu trời & Khí quyển",
+      "folder": "bau-troi",
+      "items": [
+        {
+          "id": "sky_blue_clouds",
+          "name": "Bầu trời xanh mây trắng",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bau-troi/bau-troi-xanh-may-trang-4k.jpg",
+          "local_path": "img/bau-troi/bau-troi-xanh-may-trang-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "sky_sunset_glow",
+          "name": "Hoàng hôn rực rỡ chân trời",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bau-troi/hoang-hon-ruc-ro-4k.jpg",
+          "local_path": "img/bau-troi/hoang-hon-ruc-ro-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "sky_aurora_lights",
+          "name": "Cực quang đêm huyền ảo",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bau-troi/cuc-quang-huyen-ao-4k.jpg",
+          "local_path": "img/bau-troi/cuc-quang-huyen-ao-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "sky_milky_way",
+          "name": "Dải ngân hà ban đêm",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bau-troi/dai-ngan-ha-ban-dem-4k.jpg",
+          "local_path": "img/bau-troi/dai-ngan-ha-ban-dem-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Mặt đất & Núi rừng",
+      "folder": "mat-dat",
+      "items": [
+        {
+          "id": "earth_green_hills",
+          "name": "Đồi cỏ xanh bao la",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/mat-dat/doi-co-xanh-4k.jpg",
+          "local_path": "img/mat-dat/doi-co-xanh-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "earth_grand_canyon",
+          "name": "Hẻm núi đá hùng vĩ",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/mat-dat/hem-nui-hung-vi-4k.jpg",
+          "local_path": "img/mat-dat/hem-nui-hung-vi-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "earth_snow_peaks",
+          "name": "Đỉnh núi tuyết phủ ngút ngàn",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/mat-dat/nui-tuyet-phu-4k.jpg",
+          "local_path": "img/mat-dat/nui-tuyet-phu-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "earth_agriculture",
+          "name": "Cánh đồng đất đai trù phú",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/mat-dat/canh-dong-tru-phu-4k.jpg",
+          "local_path": "img/mat-dat/canh-dong-tru-phu-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Bãi biển & Đại dương",
+      "folder": "bai-bien",
+      "items": [
+        {
+          "id": "beach_white_sand",
+          "name": "Bãi biển nhiệt đới cát trắng",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bai-bien/bai-bien-cat-trang-4k.jpg",
+          "local_path": "img/bai-bien/bai-bien-cat-trang-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "beach_ocean_waves",
+          "name": "Sóng biển xanh biếc dạt dào",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bai-bien/song-bien-dai-duong-4k.jpg",
+          "local_path": "img/bai-bien/song-bien-dai-duong-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "beach_sunset",
+          "name": "Hoàng hôn phản chiếu mặt biển",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bai-bien/hoang-hon-bo-bien-4k.jpg",
+          "local_path": "img/bai-bien/hoang-hon-bo-bien-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "beach_coral_aerial",
+          "name": "Đảo san hô nhìn từ trên cao",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bai-bien/dao-san-ho-tren-cao-4k.jpg",
+          "local_path": "img/bai-bien/dao-san-ho-tren-cao-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Con người & Đời sống",
+      "folder": "con-nguoi",
+      "items": [
+        {
+          "id": "people_portrait",
+          "name": "Chân dung nụ cười rạng rỡ",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/con-nguoi/chan-dung-nu-cuoi-4k.jpg",
+          "local_path": "img/con-nguoi/chan-dung-nu-cuoi-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "people_office_work",
+          "name": "Chuyên gia làm việc văn phòng",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/con-nguoi/chuyen-gia-van-phong-4k.jpg",
+          "local_path": "img/con-nguoi/chuyen-gia-van-phong-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "people_teamwork",
+          "name": "Hợp tác nhóm sáng tạo",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/con-nguoi/hop-tac-nhom-sang-tao-4k.jpg",
+          "local_path": "img/con-nguoi/hop-tac-nhom-sang-tao-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "people_active_sports",
+          "name": "Lối sống năng động thể thao",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/con-nguoi/the-thao-nang-dong-4k.jpg",
+          "local_path": "img/con-nguoi/the-thao-nang-dong-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Gia đình & Tổ ấm",
+      "folder": "gia-dinh",
+      "items": [
+        {
+          "id": "family_picnic",
+          "name": "Gia đình dã ngoại ngoài trời",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/gia-dinh/gia-dinh-da-ngoai-4k.jpg",
+          "local_path": "img/gia-dinh/gia-dinh-da-ngoai-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "family_play_kids",
+          "name": "Cha mẹ vui đùa cùng con cái",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/gia-dinh/vui-dua-cung-con-4k.jpg",
+          "local_path": "img/gia-dinh/vui-dua-cung-con-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "family_cozy_home",
+          "name": "Sum vầy ấm cúng tại nhà",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/gia-dinh/sum-vay-to-am-4k.jpg",
+          "local_path": "img/gia-dinh/sum-vay-to-am-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "family_generations",
+          "name": "Ông bà và con cháu gắn kết",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/gia-dinh/the-he-gan-ket-4k.jpg",
+          "local_path": "img/gia-dinh/the-he-gan-ket-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Xã hội & Đô thị",
+      "folder": "xa-hoi",
+      "items": [
+        {
+          "id": "society_cityscape",
+          "name": "Đô thị hiện đại & kiến trúc",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/xa-hoi/do-thi-hien-dai-4k.jpg",
+          "local_path": "img/xa-hoi/do-thi-hien-dai-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "society_volunteers",
+          "name": "Cộng đồng tình nguyện viên",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/xa-hoi/tinh-nguyen-cong-dong-4k.jpg",
+          "local_path": "img/xa-hoi/tinh-nguyen-cong-dong-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "society_public_space",
+          "name": "Quảng trường công cộng sôi động",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/xa-hoi/quang-truong-cong-cong-4k.jpg",
+          "local_path": "img/xa-hoi/quang-truong-cong-cong-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "society_connection",
+          "name": "Gắn kết & hợp tác xã hội",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/xa-hoi/hop-tac-xa-hoi-4k.jpg",
+          "local_path": "img/xa-hoi/hop-tac-xa-hoi-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Bảo hiểm & An sinh",
+      "folder": "bao-hiem",
+      "items": [
+        {
+          "id": "insurance_shield",
+          "name": "Bảo bọc & an tâm tương lai",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bao-hiem/bao-boc-an-sinh-4k.jpg",
+          "local_path": "img/bao-hiem/bao-boc-an-sinh-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "insurance_contract",
+          "name": "Ký kết giải pháp bảo hiểm",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bao-hiem/ky-ket-bao-hiem-4k.jpg",
+          "local_path": "img/bao-hiem/ky-ket-bao-hiem-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "insurance_health",
+          "name": "Bảo hiểm sức khỏe & y tế",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bao-hiem/bao-hiem-suc-khoe-4k.jpg",
+          "local_path": "img/bao-hiem/bao-hiem-suc-khoe-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "insurance_finance",
+          "name": "Tích lũy tài chính bền vững",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/bao-hiem/tich-luy-tai-chinh-4k.jpg",
+          "local_path": "img/bao-hiem/tich-luy-tai-chinh-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Vệ sinh & Chăm sóc",
+      "folder": "ve-sinh",
+      "items": [
+        {
+          "id": "hygiene_washing_hands",
+          "name": "Rửa tay sạch khuẩn bảo vệ sức khỏe",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/ve-sinh/rua-tay-sach-khuan-4k.jpg",
+          "local_path": "img/ve-sinh/rua-tay-sach-khuan-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "hygiene_disinfection",
+          "name": "Khử khuẩn môi trường sống",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/ve-sinh/khu-khuan-moi-truong-4k.jpg",
+          "local_path": "img/ve-sinh/khu-khuan-moi-truong-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "hygiene_clean_space",
+          "name": "Không gian sống sạch sẽ trong lành",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/ve-sinh/khong-gian-sach-se-4k.jpg",
+          "local_path": "img/ve-sinh/khong-gian-sach-se-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "hygiene_medical_clean",
+          "name": "Tiêu chuẩn vệ sinh y tế",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/ve-sinh/ve-sinh-y-te-4k.jpg",
+          "local_path": "img/ve-sinh/ve-sinh-y-te-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Môi trường & Sinh thái",
+      "folder": "moi-truong",
+      "items": [
+        {
+          "id": "env_green_sprout",
+          "name": "Mầm xanh tái sinh sự sống",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/moi-truong/mam-xanh-tai-sinh-4k.jpg",
+          "local_path": "img/moi-truong/mam-xanh-tai-sinh-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "env_rainforest",
+          "name": "Rừng nguyên sinh bạt ngàn",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/moi-truong/rung-nguyen-sinh-4k.jpg",
+          "local_path": "img/moi-truong/rung-nguyen-sinh-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "env_clean_energy",
+          "name": "Năng lượng gió tái tạo sạch",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/moi-truong/nang-luong-sach-4k.jpg",
+          "local_path": "img/moi-truong/nang-luong-sach-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "env_planet_earth",
+          "name": "Chung tay bảo vệ hành tinh xanh",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/moi-truong/bao-ve-hanh-tinh-4k.jpg",
+          "local_path": "img/moi-truong/bao-ve-hanh-tinh-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Giáo dục & Tri thức",
+      "folder": "giao-duc",
+      "items": [
+        {
+          "id": "edu_library_books",
+          "name": "Kho tàng sách & tri thức",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/giao-duc/thu-vien-tri-thuc-4k.jpg",
+          "local_path": "img/giao-duc/thu-vien-tri-thuc-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "edu_students_learning",
+          "name": "Sinh viên học tập giảng đường",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/giao-duc/sinh-vien-hoc-tap-4k.jpg",
+          "local_path": "img/giao-duc/sinh-vien-hoc-tap-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "edu_digital_classroom",
+          "name": "Lớp học thời đại số",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/giao-duc/lop-hoc-thoi-dai-so-4k.jpg",
+          "local_path": "img/giao-duc/lop-hoc-thoi-dai-so-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "edu_graduation",
+          "name": "Tốt nghiệp & tương lai rộng mở",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/giao-duc/tot-nghiep-thanh-cong-4k.jpg",
+          "local_path": "img/giao-duc/tot-nghiep-thanh-cong-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Công nghệ & Tương lai",
+      "folder": "cong-nghe",
+      "items": [
+        {
+          "id": "tech_ai_chip",
+          "name": "Vi xử lý bán dẫn & Trí tuệ nhân tạo",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/cong-nghe/vi-xu-ly-ai-4k.jpg",
+          "local_path": "img/cong-nghe/vi-xu-ly-ai-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "tech_cloud_network",
+          "name": "Điện toán đám mây & Mạng toàn cầu",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/cong-nghe/dien-toan-dam-may-4k.jpg",
+          "local_path": "img/cong-nghe/dien-toan-dam-may-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "tech_software_coding",
+          "name": "Lập trình phần mềm & Phát triển số",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/cong-nghe/lap-trinh-phan-mem-4k.jpg",
+          "local_path": "img/cong-nghe/lap-trinh-phan-mem-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "tech_robotics_ai",
+          "name": "Robot thông minh & Tương lai",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/cong-nghe/robot-thong-minh-4k.jpg",
+          "local_path": "img/cong-nghe/robot-thong-minh-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    },
+    {
+      "name": "Ẩm thực & Đồ uống",
+      "folder": "am-thuc",
+      "items": [
+        {
+          "id": "food_gourmet_dish",
+          "name": "Món ăn cao cấp hấp dẫn",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/am-thuc/mon-an-cao-cap-4k.jpg",
+          "local_path": "img/am-thuc/mon-an-cao-cap-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "food_coffee_morning",
+          "name": "Tách cà phê thơm nồng buổi sáng",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/am-thuc/ca-phe-buoi-sang-4k.jpg",
+          "local_path": "img/am-thuc/ca-phe-buoi-sang-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "food_tropical_fruits",
+          "name": "Hoa quả nhiệt đới tươi ngon",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/am-thuc/hoa-qua-nhiet-doi-4k.jpg",
+          "local_path": "img/am-thuc/hoa-qua-nhiet-doi-4k.jpg",
+          "type": "jpg"
+        },
+        {
+          "id": "food_asian_bowl",
+          "name": "Ẩm thực Á Đông tinh tế",
+          "url": "https://raw.githubusercontent.com/danhtruong6112009-source/ZENQ/master/img/am-thuc/am-thuc-a-dong-4k.jpg",
+          "local_path": "img/am-thuc/am-thuc-a-dong-4k.jpg",
+          "type": "jpg"
+        }
+      ]
+    }
+  ]
+}

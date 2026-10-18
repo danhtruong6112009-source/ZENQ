@@ -527,6 +527,12 @@ namespace ZenQOffice.UI
             ZenQOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
                 if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
             };
+            ZenQOffice.Core.OnlineImagesManager.OnCatalogUpdated += (cat) => {
+                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
+            };
+            ZenQOffice.Core.OnlineImagesManager.OnImageDownloaded += () => {
+                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
+            };
 
             IsRemovingBackground = false;
             BgRemovalTool = "Keep";
@@ -5661,6 +5667,37 @@ namespace ZenQOffice.UI
             if (InvalidateCallback != null) InvalidateCallback();
         }
 
+        public void OpenImagesDrawer()
+        {
+            if (ShapeTaskPane == null) ShapeTaskPane = new WpfShapeTaskPane();
+            bool isAlreadyOpen = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && ShapeTaskPane.Mode == ShapePaneMode.ImagesOnly && !IsElementsDrawerCollapsed;
+            if (isAlreadyOpen)
+            {
+                IsElementsDrawerOpen = false;
+                if (_elementsDrawerBmp != null)
+                {
+                    try { D2DGraphics.InvalidateBitmapCache(_elementsDrawerBmp); } catch { }
+                    try { _elementsDrawerBmp.Dispose(); } catch { }
+                    _elementsDrawerBmp = null;
+                }
+            }
+            else
+            {
+                ShapeTaskPane.Mode = ShapePaneMode.ImagesOnly;
+                ShapeTaskPane.ExpandedCategoryKey = null;
+                ShapeTaskPane.SearchText = "";
+                ShapeTaskPane.ScrollY = 0;
+                ShapeTaskPane.SmoothScrollY = 0f;
+                ShapeTaskPane.TargetScrollY = 0f;
+                if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                IsElementsDrawerOpen = true;
+                ElementsDrawerSelectedTab = 1;
+                IsElementsDrawerCollapsed = false;
+            }
+            ZoomToFit();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
         public void ToggleElementsDrawer(int targetTab = -1)
         {
             if (targetTab >= 0)
@@ -6801,6 +6838,56 @@ namespace ZenQOffice.UI
             if (preset == null) return;
 
             SaveUndoState();
+            if (preset.IsPhoto || preset.Category.StartsWith("Online_Image_"))
+            {
+                string localPath = ZenQOffice.Core.OnlineImagesManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
+                Bitmap bmp = ZenQOffice.Core.OnlineImagesManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl, 1920);
+
+                float imgW = 480f;
+                float imgH = 320f;
+                if (bmp != null && bmp.Height > 0)
+                {
+                    float aspect = (float)bmp.Width / bmp.Height;
+                    if (aspect > 1f)
+                    {
+                        imgH = imgW / aspect;
+                    }
+                    else
+                    {
+                        imgW = imgH * aspect;
+                    }
+                }
+
+                float imgCx = (Presentation.CanvasWidth - imgW) / 2f;
+                float imgCy = (Presentation.CanvasHeight - imgH) / 2f;
+
+                ShapeNode imgShape = new ShapeNode
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = !string.IsNullOrEmpty(preset.Name) ? preset.Name : "Hình ảnh Stock 4K",
+                    Type = ShapeType.Image,
+                    IsSvg = false,
+                    IsGraphic = false, // standard Image triggers "Định dạng Hình ảnh" (Picture Format)
+                    ImagePath = localPath,
+                    CachedImage = bmp,
+                    OriginalWidth = (bmp != null) ? bmp.Width : imgW,
+                    OriginalHeight = (bmp != null) ? bmp.Height : imgH,
+                    Transform = new Transform2D(imgCx, imgCy, imgW, imgH),
+                    FillColor = 0x00FFFFFF,
+                    StrokeColor = 0x00FFFFFF,
+                    StrokeWidth = 0f,
+                    CornerRadius = 0f,
+                    Text = ""
+                };
+                ActiveSlide.AddShape(imgShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+                if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
             if (preset.IsOnlineImage)
             {
                 string localPath = ZenQOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);

@@ -20,6 +20,7 @@ namespace ZenQOffice.UI
         public Func<double, double, System.Windows.Media.Geometry> WpfGeometryGenerator { get; set; }
 
         public bool IsOnlineImage { get; set; }
+        public bool IsPhoto { get; set; }
         public string ImageUrl { get; set; }
 
         public GraphicsPath CreatePath(float w, float h)
@@ -50,6 +51,7 @@ namespace ZenQOffice.UI
     {
         public string Key { get; set; }
         public string Title { get; set; }
+        public bool IsPhotoCategory { get; set; }
         public List<ShapePresetItem> Items { get; set; } = new List<ShapePresetItem>();
     }
 
@@ -110,6 +112,7 @@ namespace ZenQOffice.UI
         private static void PopulateAllCategories()
         {
             PopulateOnlineGraphics();
+            PopulateOnlineImages();
             PopulateLinesAndArrows();
             PopulateBasicShapes();
             PopulatePolygonsAndGeometry();
@@ -357,6 +360,67 @@ namespace ZenQOffice.UI
                             Category = cat.Key,
                             CategoryName = cat.Title,
                             IsOnlineImage = true,
+                            ImageUrl = item.url
+                        };
+                        cat.Items.Add(pItem);
+                        _lookup[item.id] = pItem;
+                    }
+                }
+            }
+        }
+
+        private static void PopulateOnlineImages()
+        {
+            try
+            {
+                ZenQOffice.Core.OnlineImagesManager.OnCatalogUpdated += (catResp) =>
+                {
+                    if (catResp != null) AddOnlineImageCategories(catResp);
+                };
+
+                var catalog = ZenQOffice.Core.OnlineImagesManager.GetCatalogCached();
+                if (catalog != null)
+                {
+                    AddOnlineImageCategories(catalog);
+                }
+                ZenQOffice.Core.OnlineImagesManager.RefreshCatalogAsync();
+            }
+            catch { }
+        }
+
+        public static void AddOnlineImageCategories(ZenQOffice.Core.OnlineImagesResponse catalog)
+        {
+            if (catalog == null || catalog.categories == null) return;
+            lock (_categories)
+            {
+                _categories.RemoveAll(x => x.Key.StartsWith("Online_Image_"));
+
+                List<string> keysToRemove = new List<string>();
+                foreach (var kvp in _lookup)
+                {
+                    if (kvp.Value.IsPhoto || kvp.Value.Category.StartsWith("Online_Image_"))
+                        keysToRemove.Add(kvp.Key);
+                }
+                foreach (var k in keysToRemove) _lookup.Remove(k);
+
+                foreach (var c in catalog.categories)
+                {
+                    if (c.items == null || c.items.Count == 0) continue;
+
+                    string key = "Online_Image_" + (c.name ?? "Unnamed");
+                    var cat = new ShapeCategoryGroup { Key = key, Title = c.name ?? "Unnamed", IsPhotoCategory = true };
+                    _categories.Add(cat);
+
+                    foreach (var item in c.items)
+                    {
+                        ShapePresetItem pItem = new ShapePresetItem
+                        {
+                            Id = item.id,
+                            Name = item.name,
+                            Category = cat.Key,
+                            CategoryName = cat.Title,
+                            IsOnlineImage = true,
+                            IsPhoto = true,
                             ImageUrl = item.url
                         };
                         cat.Items.Add(pItem);

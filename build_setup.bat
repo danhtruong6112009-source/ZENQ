@@ -40,6 +40,10 @@ if exist data\graphics.json (
     if not exist temp_dist\data mkdir temp_dist\data >nul 2>&1
     copy /y data\graphics.json temp_dist\data\ >nul
 )
+if exist data\images.json (
+    if not exist temp_dist\data mkdir temp_dist\data >nul 2>&1
+    copy /y data\images.json temp_dist\data\ >nul
+)
 if exist icon (
     if not exist temp_dist\icon mkdir temp_dist\icon >nul 2>&1
     copy /y icon\* temp_dist\icon\ >nul
