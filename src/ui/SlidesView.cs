@@ -5547,7 +5547,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter) ? 0 : 210;
+                leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.ReadingView) ? 0 : 210;
                 bottomThumbH = 0;
 
                 canvasX = (isIsland && leftSidebarW > 0) ? (leftSidebarW + 10) : leftSidebarW;
@@ -7374,7 +7374,8 @@ namespace ZenQOffice.UI
             g.PixelOffsetMode = PixelOffsetMode.Half;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-            using (SolidBrush stageBg = new SolidBrush(Color.FromArgb(240, 240, 240)))
+            Color stageBgColor = (ViewMode == ImpressViewMode.ReadingView) ? Color.FromArgb(32, 32, 32) : Color.FromArgb(240, 240, 240);
+            using (SolidBrush stageBg = new SolidBrush(stageBgColor))
             {
                 g.FillRectangle(stageBg, x, y, w, h);
             }
@@ -7427,16 +7428,20 @@ namespace ZenQOffice.UI
                     g.FillRectangle(Brushes.White, slideRect);
                 }
 
-                // Render Gridlines (Đường lưới)
-                DrawGridlines(g, slideRect, scale);
+                if (ViewMode != ImpressViewMode.ReadingView)
+                {
+                    // Render Gridlines (Đường lưới)
+                    DrawGridlines(g, slideRect, scale);
 
-                // Render Guides (Đường dẫn hướng tâm)
-                DrawGuides(g, slideRect);
+                    // Render Guides (Đường dẫn hướng tâm)
+                    DrawGuides(g, slideRect);
+                }
 
                 g.Restore(slideClipState);
 
                 // Border around slide canvas (chuẩn PowerPoint canvas edge)
-                using (Pen borderPen = new Pen(Color.FromArgb(215, 215, 215), 1.0f))
+                Color borderCol = (ViewMode == ImpressViewMode.ReadingView) ? Color.FromArgb(60, 60, 60) : Color.FromArgb(215, 215, 215);
+                using (Pen borderPen = new Pen(borderCol, 1.0f))
                 {
                     g.DrawRectangle(borderPen, slideRect);
                 }
@@ -7457,7 +7462,7 @@ namespace ZenQOffice.UI
                         ShapeNode shape = slide.Shapes[i];
                         if (shape == null || !shape.IsVisible || (shape.Name != null && shape.Name.StartsWith("__morph_ghost__"))) continue;
 
-                        bool isSel = (i == SelectedShapeIndex) || (SelectedShapeIndices != null && SelectedShapeIndices.Contains(i));
+                        bool isSel = (ViewMode != ImpressViewMode.ReadingView) && ((i == SelectedShapeIndex) || (SelectedShapeIndices != null && SelectedShapeIndices.Contains(i)));
 
                         bool isVis;
                         float offX, offY, scX, scY, rDelta, opMul;
@@ -7475,12 +7480,18 @@ namespace ZenQOffice.UI
                         }
                     }
 
-                    // Render Motion Paths Trajectory & Ghost Silhouettes in Design Mode
-                    try { DrawMotionPathsOverlay(g, slideX, slideY, scale, slide); } catch { }
+                    if (ViewMode != ImpressViewMode.ReadingView)
+                    {
+                        // Render Motion Paths Trajectory & Ghost Silhouettes in Design Mode
+                        try { DrawMotionPathsOverlay(g, slideX, slideY, scale, slide); } catch { }
+                    }
                 }
 
-                // Render Table Insert Live Preview (Ghost Overlay)
-                try { DrawTableInsertPreviewOverlay(g, slideX, slideY, scale); } catch { }
+                if (ViewMode != ImpressViewMode.ReadingView)
+                {
+                    // Render Table Insert Live Preview (Ghost Overlay)
+                    try { DrawTableInsertPreviewOverlay(g, slideX, slideY, scale); } catch { }
+                }
 
                 if (shapesClipState != null)
                 {
@@ -7488,37 +7499,40 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // Render Pending Drawing Overlay
-            if (IsDrawingActive || (IsDrawingShapeMode && IsScribbleMode))
+            if (ViewMode != ImpressViewMode.ReadingView)
             {
-                DrawPendingShapeOverlay(g, slideX, slideY, scale);
-            }
-
-            // Render Edit Shape Points Overlay (PowerPoint Edit Points)
-            if (IsEditingShapePoints && EditingPointsShape != null)
-            {
-                DrawEditShapePointsOverlay(g, slideX, slideY, scale);
-            }
-
-            // Render Smart Snap Guides & Equidistant Spacing Indicators
-            DrawSmartGuidesAndSpacingIndicators(g, slideX, slideY, scale);
-
-            // Render Rubberband / Marquee Selection Box (Quét khối chọn đối tượng)
-            if (IsRubberbandSelecting)
-            {
-                int rx = Math.Min(RubberbandStartPoint.X, RubberbandCurrentPoint.X);
-                int ry = Math.Min(RubberbandStartPoint.Y, RubberbandCurrentPoint.Y);
-                int rw = Math.Abs(RubberbandStartPoint.X - RubberbandCurrentPoint.X);
-                int rh = Math.Abs(RubberbandStartPoint.Y - RubberbandCurrentPoint.Y);
-
-                if (rw > 1 && rh > 1)
+                // Render Pending Drawing Overlay
+                if (IsDrawingActive || (IsDrawingShapeMode && IsScribbleMode))
                 {
-                    Rectangle boxRect = new Rectangle(rx, ry, rw, rh);
-                    using (SolidBrush boxBrush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
-                    using (Pen boxPen = new Pen(Color.FromArgb(200, 0, 120, 215), 1.0f))
+                    DrawPendingShapeOverlay(g, slideX, slideY, scale);
+                }
+
+                // Render Edit Shape Points Overlay (PowerPoint Edit Points)
+                if (IsEditingShapePoints && EditingPointsShape != null)
+                {
+                    DrawEditShapePointsOverlay(g, slideX, slideY, scale);
+                }
+
+                // Render Smart Snap Guides & Equidistant Spacing Indicators
+                DrawSmartGuidesAndSpacingIndicators(g, slideX, slideY, scale);
+
+                // Render Rubberband / Marquee Selection Box (Quét khối chọn đối tượng)
+                if (IsRubberbandSelecting)
+                {
+                    int rx = Math.Min(RubberbandStartPoint.X, RubberbandCurrentPoint.X);
+                    int ry = Math.Min(RubberbandStartPoint.Y, RubberbandCurrentPoint.Y);
+                    int rw = Math.Abs(RubberbandStartPoint.X - RubberbandCurrentPoint.X);
+                    int rh = Math.Abs(RubberbandStartPoint.Y - RubberbandCurrentPoint.Y);
+
+                    if (rw > 1 && rh > 1)
                     {
-                        g.FillRectangle(boxBrush, boxRect);
-                        g.DrawRectangle(boxPen, boxRect);
+                        Rectangle boxRect = new Rectangle(rx, ry, rw, rh);
+                        using (SolidBrush boxBrush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
+                        using (Pen boxPen = new Pen(Color.FromArgb(200, 0, 120, 215), 1.0f))
+                        {
+                            g.FillRectangle(boxBrush, boxRect);
+                            g.DrawRectangle(boxPen, boxRect);
+                        }
                     }
                 }
             }
@@ -7527,7 +7541,7 @@ namespace ZenQOffice.UI
             int stageH = Math.Max(80, h - notesPaneH);
 
             // Render Rulers
-            if (ShowRuler)
+            if (ShowRuler && ViewMode != ImpressViewMode.ReadingView)
             {
                 DrawSlideRulers(g, x, y, w, stageH, slideX, slideY, slideW, slideH, scale);
             }
@@ -7536,8 +7550,8 @@ namespace ZenQOffice.UI
             int minScrollX, maxScrollX, minScrollY, maxScrollY;
             GetScrollLimits(w, h, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
 
-            bool hasVScroll = (minScrollY < maxScrollY);
-            bool hasHScroll = (minScrollX < maxScrollX);
+            bool hasVScroll = (ViewMode != ImpressViewMode.ReadingView) && (minScrollY < maxScrollY);
+            bool hasHScroll = (ViewMode != ImpressViewMode.ReadingView) && (minScrollX < maxScrollX);
             int sbH = 14;
             int sbW = 14;
 
@@ -25265,32 +25279,41 @@ namespace ZenQOffice.UI
                     SlideNode s = Presentation.Slides[i];
 
                     g.FillRectangle(Brushes.White, cardRect);
+
+                    EnsureSlideThumbnail(s);
+                    if (s.ThumbnailCache != null)
+                    {
+                        g.DrawImage(s.ThumbnailCache, cardRect);
+                    }
+                    else
+                    {
+                        float miniScale = (float)cardW / Presentation.CanvasWidth;
+                        GraphicsState state = g.Save();
+                        g.SetClip(cardRect);
+
+                        DrawSlideBackground(g, cardRect, s);
+
+                        foreach (ShapeNode shape in s.Shapes)
+                        {
+                            int mx = cx + (int)(shape.Transform.X * miniScale);
+                            int my = cy + (int)(shape.Transform.Y * miniScale);
+                            int mw = Math.Max(2, (int)(shape.Transform.Width * miniScale));
+                            int mh = Math.Max(2, (int)(shape.Transform.Height * miniScale));
+
+                            Color fillCol = Color.FromArgb(shape.FillColor | unchecked((int)0xFF000000));
+                            using (SolidBrush miniBrush = new SolidBrush(fillCol))
+                            {
+                                g.FillRectangle(miniBrush, mx, my, mw, mh);
+                            }
+                        }
+                        g.Restore(state);
+                    }
+
                     Color borderCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.LightGray;
                     using (Pen bPen = new Pen(borderCol, (i == ActiveSlideIndex) ? 2.5f : 1.0f))
                     {
                         g.DrawRectangle(bPen, cardRect);
                     }
-
-                    float miniScale = (float)cardW / Presentation.CanvasWidth;
-                    GraphicsState state = g.Save();
-                    g.SetClip(cardRect);
-
-                    DrawSlideBackground(g, cardRect, s);
-
-                    foreach (ShapeNode shape in s.Shapes)
-                    {
-                        int mx = cx + (int)(shape.Transform.X * miniScale);
-                        int my = cy + (int)(shape.Transform.Y * miniScale);
-                        int mw = Math.Max(2, (int)(shape.Transform.Width * miniScale));
-                        int mh = Math.Max(2, (int)(shape.Transform.Height * miniScale));
-
-                        Color fillCol = Color.FromArgb(shape.FillColor | unchecked((int)0xFF000000));
-                        using (SolidBrush miniBrush = new SolidBrush(fillCol))
-                        {
-                            g.FillRectangle(miniBrush, mx, my, mw, mh);
-                        }
-                    }
-                    g.Restore(state);
 
                     g.DrawString("Slide " + (i + 1) + ": " + s.Title, titleFont, (i == ActiveSlideIndex) ? Brushes.DarkOrange : Brushes.Black, cx, cy + cardH + 6);
                 }
@@ -26817,7 +26840,32 @@ namespace ZenQOffice.UI
             }
 
             // 3. Center Slide Viewport Interaction
-            if (ViewMode == ImpressViewMode.Normal || ViewMode == ImpressViewMode.ReadingView)
+            if (ViewMode == ImpressViewMode.ReadingView)
+            {
+                if (buttons == MouseButtons.Left)
+                {
+                    if (Presentation != null && ActiveSlideIndex < Presentation.Slides.Count - 1)
+                    {
+                        ActiveSlideIndex++;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                else if (buttons == MouseButtons.Right)
+                {
+                    if (ActiveSlideIndex > 0)
+                    {
+                        ActiveSlideIndex--;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                return;
+            }
+
+            if (ViewMode == ImpressViewMode.Normal)
             {
                 int notesPaneH = GetEffectiveNotesPaneHeight();
                 int stageH = Math.Max(80, contentH - notesPaneH);
@@ -27802,9 +27850,10 @@ namespace ZenQOffice.UI
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
-            if (ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.Outline)
+            if (ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.Outline || ViewMode == ImpressViewMode.ReadingView)
             {
                 ViewMode = ImpressViewMode.Normal;
+                ZoomToFit();
                 if (parentControl != null) parentControl.Invalidate();
                 return;
             }
@@ -30719,6 +30768,78 @@ namespace ZenQOffice.UI
                     {
                         ActiveSlide.SpeakerNotes = notes.Remove(SpeakerNotesCaretIndex, 1);
                         EnsureSpeakerNotesCaretVisible();
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                    return;
+                }
+                return;
+            }
+
+            if (ViewMode == ImpressViewMode.ReadingView)
+            {
+                if (key == Keys.Escape)
+                {
+                    ViewMode = ImpressViewMode.Normal;
+                    ZoomToFit();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Right || key == Keys.Down || key == Keys.Space || key == Keys.PageDown || key == Keys.Enter || key == Keys.Return)
+                {
+                    if (Presentation != null && ActiveSlideIndex < Presentation.Slides.Count - 1)
+                    {
+                        ActiveSlideIndex++;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                    return;
+                }
+                if (key == Keys.Left || key == Keys.Up || key == Keys.PageUp || key == Keys.Back)
+                {
+                    if (ActiveSlideIndex > 0)
+                    {
+                        ActiveSlideIndex--;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                    return;
+                }
+                if (key == Keys.Home)
+                {
+                    ActiveSlideIndex = 0;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.End && Presentation != null && Presentation.Slides.Count > 0)
+                {
+                    ActiveSlideIndex = Presentation.Slides.Count - 1;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                return;
+            }
+
+            if (ViewMode == ImpressViewMode.SlideSorter)
+            {
+                if (key == Keys.Escape || key == Keys.Enter)
+                {
+                    ViewMode = ImpressViewMode.Normal;
+                    ZoomToFit();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.Right || key == Keys.Down)
+                {
+                    if (Presentation != null && ActiveSlideIndex < Presentation.Slides.Count - 1)
+                    {
+                        ActiveSlideIndex++;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                    }
+                    return;
+                }
+                if (key == Keys.Left || key == Keys.Up)
+                {
+                    if (ActiveSlideIndex > 0)
+                    {
+                        ActiveSlideIndex--;
                         if (InvalidateCallback != null) InvalidateCallback();
                     }
                     return;

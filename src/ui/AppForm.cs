@@ -1767,7 +1767,7 @@ namespace ZenQOffice.UI
                 int currentZoom = (int)Math.Round(activeZoom * 100);
 
                 // -1. Touch Mode / Peripheral Quick Toggle Pill on Status Bar
-                int touchBtnX = (Ribbon.CurrentMode == OfficeAppMode.Slides) ? (width - 420) : (width - 344);
+                int touchBtnX = (Ribbon.CurrentMode == OfficeAppMode.Slides) ? (width - 442) : (width - 344);
                 _statusTouchToggleBounds = new Rectangle(touchBtnX, height - 23, 90, 20);
                 bool touchOn = AppSettings.Instance.TouchModeEnabled;
                 if (touchOn)
@@ -1790,7 +1790,7 @@ namespace ZenQOffice.UI
                 // 0. Speaker Notes Toggle Button ("Ghi chú") for Slides Mode (PowerPoint-style)
                 if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
                 {
-                    Rectangle notesBtnRect = new Rectangle(width - 322, height - 23, 68, 20);
+                    Rectangle notesBtnRect = new Rectangle(width - 344, height - 23, 68, 20);
                     if (SlidesView.IsNotesPaneOpen)
                     {
                         using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
@@ -1803,21 +1803,49 @@ namespace ZenQOffice.UI
                     g.DrawString("Ghi chú", sFont, Brushes.White, notesBtnRect.X + 19, notesBtnRect.Y + 2);
                 }
 
-                // 1. View Mode Icons (Read Mode, Print Layout, Web Layout)
-                int modeX = width - 246;
-                string[] modeGlyphs = new string[] { "\uE736", "\uE8A5", "\uE774" };
-                for (int m = 0; m < 3; m++)
+                // 1. View Mode & Slide Show Icons
+                if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
                 {
-                    Rectangle mRect = new Rectangle(modeX + m * 24, height - 23, 22, 20);
-                    if (ActiveViewMode == m)
+                    // 4 Buttons in Slides mode: Normal, Slide Sorter, Reading View, Slide Show
+                    int modeX = width - 270;
+                    for (int m = 0; m < 4; m++)
                     {
-                        using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                        Rectangle mRect = new Rectangle(modeX + m * 24, height - 23, 22, 20);
+                        bool isActive = false;
+                        if (m == 0 && SlidesView.ViewMode == ImpressViewMode.Normal) isActive = true;
+                        else if (m == 1 && SlidesView.ViewMode == ImpressViewMode.SlideSorter) isActive = true;
+                        else if (m == 2 && SlidesView.ViewMode == ImpressViewMode.ReadingView) isActive = true;
+                        else if (m == 3 && SlidesView.IsPresenting) isActive = true;
+
+                        if (isActive)
                         {
-                            g.FillRectangle(activeBg, mRect);
+                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                            {
+                                g.FillRectangle(activeBg, mRect);
+                            }
+                            g.DrawRectangle(Pens.White, mRect);
                         }
-                        g.DrawRectangle(Pens.White, mRect);
+                        DrawSlideStatusBarButton(g, m, mRect);
                     }
-                    FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, Color.White, 9f);
+                }
+                else
+                {
+                    // View Mode Icons for Writer (Read Mode, Print Layout, Web Layout)
+                    int modeX = width - 246;
+                    string[] modeGlyphs = new string[] { "\uE736", "\uE8A5", "\uE774" };
+                    for (int m = 0; m < 3; m++)
+                    {
+                        Rectangle mRect = new Rectangle(modeX + m * 24, height - 23, 22, 20);
+                        if (ActiveViewMode == m)
+                        {
+                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                            {
+                                g.FillRectangle(activeBg, mRect);
+                            }
+                            g.DrawRectangle(Pens.White, mRect);
+                        }
+                        FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, Color.White, 9f);
+                    }
                 }
 
                 // 2. Zoom Minus [-] Button
@@ -1900,6 +1928,47 @@ namespace ZenQOffice.UI
             if (NewTabRadialLauncher.IsOpen)
             {
                 NewTabRadialLauncher.Draw(g, ClientSize.Width, ClientSize.Height);
+            }
+        }
+
+        private void DrawSlideStatusBarButton(D2DGraphics g, int mode, Rectangle mRect)
+        {
+            int x = mRect.X + (mRect.Width - 14) / 2;
+            int y = mRect.Y + (mRect.Height - 11) / 2;
+            using (Pen pen = new Pen(Color.White, 1.2f))
+            using (SolidBrush brush = new SolidBrush(Color.White))
+            {
+                switch (mode)
+                {
+                    case 0: // Normal View (Bình thường: Cột thumbnail bên trái & canvas chính)
+                        g.DrawRectangle(pen, x, y, 14, 11);
+                        g.DrawLine(pen, x + 4, y, x + 4, y + 11);
+                        g.FillRectangle(brush, x + 1.5f, y + 2.5f, 1.5f, 2.0f);
+                        g.FillRectangle(brush, x + 1.5f, y + 6.0f, 1.5f, 2.0f);
+                        g.FillRectangle(brush, x + 6.5f, y + 2.5f, 5.5f, 6.0f);
+                        break;
+                    case 1: // Slide Sorter (Bộ sắp xếp slide: Lưới 4 ô chuẩn PowerPoint)
+                        g.DrawRectangle(pen, x, y, 6, 4.5f);
+                        g.DrawRectangle(pen, x + 7.5f, y, 6, 4.5f);
+                        g.DrawRectangle(pen, x, y + 6.5f, 6, 4.5f);
+                        g.DrawRectangle(pen, x + 7.5f, y + 6.5f, 6, 4.5f);
+                        break;
+                    case 2: // Reading View (Chế độ xem Đọc: Quyển sách mở)
+                        FluentIconRenderer.DrawGlyph(g, "\uE736", mRect, Color.White, 9f);
+                        break;
+                    case 3: // Slide Show (Trình chiếu: Màn chiếu ba chân với nút Play)
+                        g.DrawLine(pen, x, y, x + 14, y);
+                        g.DrawRectangle(pen, x + 1, y + 1, 12, 7);
+                        g.FillPolygon(brush, new PointF[] {
+                            new PointF(x + 5.5f, y + 2.8f),
+                            new PointF(x + 9.5f, y + 4.5f),
+                            new PointF(x + 5.5f, y + 6.2f)
+                        });
+                        g.DrawLine(pen, x + 7, y + 8, x + 7, y + 10);
+                        g.DrawLine(pen, x + 4, y + 12, x + 7, y + 10);
+                        g.DrawLine(pen, x + 10, y + 12, x + 7, y + 10);
+                        break;
+                }
             }
         }
 
@@ -2530,7 +2599,7 @@ namespace ZenQOffice.UI
                     }
 
                     // Speaker Notes Toggle Button ("📝 Ghi chú") in Slides Mode
-                    if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && e.X >= w - 322 && e.X <= w - 254)
+                    if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && e.X >= w - 344 && e.X <= w - 276)
                     {
                         SlidesView.IsNotesPaneOpen = !SlidesView.IsNotesPaneOpen;
                         if (!SlidesView.IsNotesPaneOpen)
@@ -2541,22 +2610,66 @@ namespace ZenQOffice.UI
                         return;
                     }
 
-                    // View Mode Icons (Read Mode 0, Print Layout 1, Web Layout 2)
-                    int modeX = w - 246;
-                    for (int m = 0; m < 3; m++)
+                    // In Slides Mode: 4 View Mode / Presentation Buttons (Normal, Slide Sorter, Reading View, Slide Show)
+                    if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
                     {
-                        if (e.X >= modeX + m * 24 && e.X <= modeX + m * 24 + 22)
+                        int modeX = w - 270;
+                        for (int m = 0; m < 4; m++)
                         {
-                            ActiveViewMode = m;
-                            WriterView.ViewMode = m;
-                            if (m == 0)
+                            if (e.X >= modeX + m * 24 && e.X <= modeX + m * 24 + 22)
                             {
-                                WriterView.ScrollY = 0;
-                                WriterView.TargetScrollY = 0;
-                                WriterView.ReadModePageIndex = Math.Max(0, Math.Min(WriterView.TotalPageCount - 1, WriterView.CurrentActivePage - 1));
+                                if (m == 0)
+                                {
+                                    SlidesView.ViewMode = ImpressViewMode.Normal;
+                                    SlidesView.SelectedShapeIndex = -1;
+                                    if (SlidesView.SelectedShapeIndices != null) SlidesView.SelectedShapeIndices.Clear();
+                                    SlidesView.ZoomToFit();
+                                }
+                                else if (m == 1)
+                                {
+                                    SlidesView.ViewMode = ImpressViewMode.SlideSorter;
+                                    SlidesView.SelectedShapeIndex = -1;
+                                    if (SlidesView.SelectedShapeIndices != null) SlidesView.SelectedShapeIndices.Clear();
+                                }
+                                else if (m == 2)
+                                {
+                                    SlidesView.ViewMode = ImpressViewMode.ReadingView;
+                                    SlidesView.SelectedShapeIndex = -1;
+                                    if (SlidesView.SelectedShapeIndices != null) SlidesView.SelectedShapeIndices.Clear();
+                                    SlidesView.CanvasScrollX = 0;
+                                    SlidesView.CanvasScrollY = 0;
+                                    SlidesView.TargetCanvasScrollX = 0f;
+                                    SlidesView.TargetCanvasScrollY = 0f;
+                                    SlidesView.ZoomLevel = 1.0f;
+                                }
+                                else if (m == 3)
+                                {
+                                    StartSlideShow(false);
+                                }
+                                Invalidate();
+                                return;
                             }
-                            Invalidate();
-                            return;
+                        }
+                    }
+                    else
+                    {
+                        // View Mode Icons for Writer (Read Mode 0, Print Layout 1, Web Layout 2)
+                        int modeX = w - 246;
+                        for (int m = 0; m < 3; m++)
+                        {
+                            if (e.X >= modeX + m * 24 && e.X <= modeX + m * 24 + 22)
+                            {
+                                ActiveViewMode = m;
+                                WriterView.ViewMode = m;
+                                if (m == 0)
+                                {
+                                    WriterView.ScrollY = 0;
+                                    WriterView.TargetScrollY = 0;
+                                    WriterView.ReadModePageIndex = Math.Max(0, Math.Min(WriterView.TotalPageCount - 1, WriterView.CurrentActivePage - 1));
+                                }
+                                Invalidate();
+                                return;
+                            }
                         }
                     }
 
@@ -3193,6 +3306,32 @@ namespace ZenQOffice.UI
                     {
                         Cursor = Cursors.Hand;
                         Cursor.Current = Cursors.Hand;
+                    }
+                }
+
+                if (e.Y >= ClientSize.Height - 25 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                {
+                    int w = ClientSize.Width;
+                    if (!_statusTouchToggleBounds.IsEmpty && _statusTouchToggleBounds.Contains(e.Location))
+                    {
+                        Cursor = Cursors.Hand;
+                        Cursor.Current = Cursors.Hand;
+                    }
+                    else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
+                    {
+                        if ((e.X >= w - 344 && e.X <= w - 276) || (e.X >= w - 270 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 35))
+                        {
+                            Cursor = Cursors.Hand;
+                            Cursor.Current = Cursors.Hand;
+                        }
+                    }
+                    else
+                    {
+                        if ((e.X >= w - 246 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 35))
+                        {
+                            Cursor = Cursors.Hand;
+                            Cursor.Current = Cursors.Hand;
+                        }
                     }
                 }
             }
@@ -4079,6 +4218,70 @@ namespace ZenQOffice.UI
                         }
                         e.Handled = true;
                         return;
+                    }
+                }
+
+                if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
+                {
+                    if (SlidesView.ViewMode == ImpressViewMode.ReadingView)
+                    {
+                        if (e.KeyCode == Keys.Escape)
+                        {
+                            SlidesView.ViewMode = ImpressViewMode.Normal;
+                            SlidesView.ZoomToFit();
+                            Invalidate();
+                            return;
+                        }
+                        if (e.KeyCode == Keys.Right || e.KeyCode == Keys.Down || e.KeyCode == Keys.PageDown || e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+                        {
+                            if (SlidesView.Presentation != null && SlidesView.ActiveSlideIndex < SlidesView.Presentation.Slides.Count - 1)
+                            {
+                                SlidesView.ActiveSlideIndex++;
+                                Invalidate();
+                            }
+                            e.Handled = true;
+                            return;
+                        }
+                        if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Up || e.KeyCode == Keys.PageUp || e.KeyCode == Keys.Back)
+                        {
+                            if (SlidesView.ActiveSlideIndex > 0)
+                            {
+                                SlidesView.ActiveSlideIndex--;
+                                Invalidate();
+                            }
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+                    else if (SlidesView.ViewMode == ImpressViewMode.SlideSorter)
+                    {
+                        if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.Enter)
+                        {
+                            SlidesView.ViewMode = ImpressViewMode.Normal;
+                            SlidesView.ZoomToFit();
+                            Invalidate();
+                            return;
+                        }
+                        if (e.KeyCode == Keys.Right || e.KeyCode == Keys.Down)
+                        {
+                            if (SlidesView.Presentation != null && SlidesView.ActiveSlideIndex < SlidesView.Presentation.Slides.Count - 1)
+                            {
+                                SlidesView.ActiveSlideIndex++;
+                                Invalidate();
+                            }
+                            e.Handled = true;
+                            return;
+                        }
+                        if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Up)
+                        {
+                            if (SlidesView.ActiveSlideIndex > 0)
+                            {
+                                SlidesView.ActiveSlideIndex--;
+                                Invalidate();
+                            }
+                            e.Handled = true;
+                            return;
+                        }
                     }
                 }
 

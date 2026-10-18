@@ -16254,13 +16254,21 @@ namespace ZenQOffice.UI
             using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             {
                 int x = 12;
-                string[] viewModes = new string[] { "Soạn thảo", "Dàn bài", "Lưới Slide", "Ghi chú", "Slide Master" };
+                string[] viewModes = new string[] { "Soạn thảo", "Dàn bài", "Lưới Slide", "Ghi chú", "Chế độ Đọc", "Slide Master" };
+                ImpressViewMode[] mappedModes = new ImpressViewMode[] {
+                    ImpressViewMode.Normal,
+                    ImpressViewMode.Outline,
+                    ImpressViewMode.SlideSorter,
+                    ImpressViewMode.Notes,
+                    ImpressViewMode.ReadingView,
+                    ImpressViewMode.SlideMaster
+                };
 
                 int gStart = x;
                 for (int i = 0; i < viewModes.Length; i++)
                 {
                     Rectangle vBox = new Rectangle(x, 68, 76, 62);
-                    bool isSel = (slidesView != null && (int)slidesView.ViewMode == i);
+                    bool isSel = (slidesView != null && slidesView.ViewMode == mappedModes[i]);
                     DrawInteractiveButton(g, vBox, isSel, 4);
                     if (isSel)
                     {
@@ -16290,7 +16298,11 @@ namespace ZenQOffice.UI
                     {
                         WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.NotesPane, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
                     }
-                    else if (i == 4) // Slide Master
+                    else if (i == 4) // Chế độ Đọc (Reading View)
+                    {
+                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ReadingView, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
+                    }
+                    else if (i == 5) // Slide Master
                     {
                         WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideMaster, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
                     }
@@ -26127,9 +26139,31 @@ namespace ZenQOffice.UI
             else if (curTab == "Hiển thị" || (ActiveRibbonTab == 6 && string.IsNullOrEmpty(curTab))) // Hiển thị (View)
             {
                 int vIdx = (x - 12) / 82;
-                if (vIdx >= 0 && vIdx <= 4)
+                ImpressViewMode[] mappedModes = new ImpressViewMode[] {
+                    ImpressViewMode.Normal,
+                    ImpressViewMode.Outline,
+                    ImpressViewMode.SlideSorter,
+                    ImpressViewMode.Notes,
+                    ImpressViewMode.ReadingView,
+                    ImpressViewMode.SlideMaster
+                };
+                if (vIdx >= 0 && vIdx < mappedModes.Length)
                 {
-                    slidesView.ViewMode = (ImpressViewMode)vIdx;
+                    slidesView.ViewMode = mappedModes[vIdx];
+                    if (slidesView.ViewMode == ImpressViewMode.ReadingView)
+                    {
+                        slidesView.SelectedShapeIndex = -1;
+                        if (slidesView.SelectedShapeIndices != null) slidesView.SelectedShapeIndices.Clear();
+                        slidesView.CanvasScrollX = 0;
+                        slidesView.CanvasScrollY = 0;
+                        slidesView.TargetCanvasScrollX = 0f;
+                        slidesView.TargetCanvasScrollY = 0f;
+                        slidesView.ZoomLevel = 1.0f;
+                    }
+                    else if (slidesView.ViewMode == ImpressViewMode.Normal)
+                    {
+                        slidesView.ZoomToFit();
+                    }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
