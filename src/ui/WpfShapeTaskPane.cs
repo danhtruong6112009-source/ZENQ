@@ -898,9 +898,9 @@ namespace ZenQOffice.UI
                 var prevSmooth = g.SmoothingMode;
                 var prevPixel = g.PixelOffsetMode;
 
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 g.SmoothingMode = SmoothingMode.HighQuality;
-                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
 
                 Rectangle dstRect = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
                 

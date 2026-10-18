@@ -35,16 +35,34 @@ namespace ZenQOffice.Core
     {
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         private static readonly string _cacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZenQOffice", "Cache", "Images");
+        private static readonly string _thumbDir = Path.Combine(_cacheDir, "Thumbs");
         private static readonly string _catalogCacheFile = Path.Combine(_cacheDir, "catalog.json");
         private static OnlineImagesResponse _catalog;
         private static readonly HashSet<string> _downloadingImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private static System.Threading.Timer _throttleTimer;
+        private static readonly object _throttleLock = new object();
 
         public static event Action<OnlineImagesResponse> OnCatalogUpdated;
         public static event Action OnImageDownloaded;
 
         public static void TriggerImageDownloaded()
         {
-            OnImageDownloaded?.Invoke();
+            lock (_throttleLock)
+            {
+                if (_throttleTimer == null)
+                {
+                    _throttleTimer = new System.Threading.Timer(_ =>
+                    {
+                        lock (_throttleLock)
+                        {
+                            try { _throttleTimer?.Dispose(); } catch { }
+                            _throttleTimer = null;
+                        }
+                        try { OnImageDownloaded?.Invoke(); } catch { }
+                    }, null, 120, System.Threading.Timeout.Infinite);
+                }
+            }
         }
 
         public static string GetCachedImagePath(string id, string url)
@@ -200,37 +218,84 @@ namespace ZenQOffice.Core
             try
             {
                 string localPath = GetCachedImagePath(id, url);
-
-                // 1. Kiểm tra cache đã tải trước đó
-                if (File.Exists(localPath))
-                {
-                    try
-                    {
-                        using (var fs = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        {
-                            return new Bitmap(fs);
-                        }
-                    }
-                    catch { }
-                }
-
-                // 2. Kiểm tra tệp nguồn cục bộ trong thư mục img/ của dự án (Zero network latency)
                 string localSource = FindLocalSourceFile(url);
-                if (!string.IsNullOrEmpty(localSource) && File.Exists(localSource))
+                string existingSource = File.Exists(localPath) ? localPath : (File.Exists(localSource) ? localSource : null);
+
+                // TRƯỜNG HỢP 1: Yêu cầu hình thu nhỏ (Thumbnail cho Task Pane, targetSize <= 300)
+                if (targetSize <= 300)
+                {
+                    if (!Directory.Exists(_thumbDir)) Directory.CreateDirectory(_thumbDir);
+                    string thumbPath = Path.Combine(_thumbDir, string.Format("{0}_{1}.jpg", id, targetSize));
+
+                    // 1a. Kiểm tra tệp thumbnail đã tạo sẵn trong cache
+                    if (File.Exists(thumbPath))
+                    {
+                        try
+                        {
+                            using (var fs = new FileStream(thumbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            {
+                                return new Bitmap(fs);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // 1b. Nếu có tệp nguồn cục bộ, tạo ngay thumbnail nhỏ nhẹ và lưu lại
+                    if (!string.IsNullOrEmpty(existingSource))
+                    {
+                        try
+                        {
+                            Bitmap thumb = GenerateAndSaveThumbnail(existingSource, thumbPath, targetSize);
+                            if (thumb != null) return thumb;
+                        }
+                        catch { }
+                    }
+
+                    // 1c. Chưa có cả nguồn lẫn thumb -> Tải nguồn từ mạng ngầm rồi sinh thumbnail
+                    lock (_downloadingImages)
+                    {
+                        if (_downloadingImages.Contains(id)) return null;
+                        _downloadingImages.Add(id);
+                    }
+
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
+                            byte[] data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+                            if (data != null && data.Length > 0)
+                            {
+                                File.WriteAllBytes(localPath, data);
+                                try
+                                {
+                                    GenerateAndSaveThumbnail(localPath, thumbPath, targetSize);
+                                }
+                                catch { }
+                                TriggerImageDownloaded();
+                            }
+                        }
+                        catch { }
+                        finally
+                        {
+                            lock (_downloadingImages) { _downloadingImages.Remove(id); }
+                        }
+                    });
+
+                    return null;
+                }
+
+                // TRƯỜNG HỢP 2: Yêu cầu ảnh kích thước lớn (chèn vào Slide)
+                if (!string.IsNullOrEmpty(existingSource))
                 {
                     try
                     {
-                        if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
-                        File.Copy(localSource, localPath, true);
-                        using (var fs = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        {
-                            return new Bitmap(fs);
-                        }
+                        return LoadScaledImage(existingSource, targetSize);
                     }
                     catch { }
                 }
 
-                // 3. Nếu chưa có, kích hoạt tải ngầm từ GitHub raw
+                // Nếu chưa có tệp ảnh gốc, kích hoạt tải ngầm
                 lock (_downloadingImages)
                 {
                     if (_downloadingImages.Contains(id)) return null;
@@ -242,12 +307,11 @@ namespace ZenQOffice.Core
                     try
                     {
                         if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
-
                         byte[] data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
                         if (data != null && data.Length > 0)
                         {
                             File.WriteAllBytes(localPath, data);
-                            OnImageDownloaded?.Invoke();
+                            TriggerImageDownloaded();
                         }
                     }
                     catch { }
@@ -258,6 +322,84 @@ namespace ZenQOffice.Core
                 });
 
                 return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Bitmap GenerateAndSaveThumbnail(string sourcePath, string thumbPath, int targetSize)
+        {
+            try
+            {
+                using (var fs = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var orig = Image.FromStream(fs, false, false))
+                {
+                    int w = orig.Width;
+                    int h = orig.Height;
+                    if (w <= 0 || h <= 0) return null;
+
+                    float scale = Math.Min((float)targetSize / w, (float)targetSize / h);
+                    int tw = Math.Max(1, (int)(w * scale));
+                    int th = Math.Max(1, (int)(h * scale));
+
+                    Bitmap thumb = new Bitmap(tw, th, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                    using (Graphics g = Graphics.FromImage(thumb))
+                    {
+                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.None;
+                        g.DrawImage(orig, 0, 0, tw, th);
+                    }
+
+                    try
+                    {
+                        if (!Directory.Exists(Path.GetDirectoryName(thumbPath)))
+                            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath));
+                        thumb.Save(thumbPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                    }
+                    catch { }
+
+                    return thumb;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Bitmap LoadScaledImage(string filePath, int maxDimension)
+        {
+            try
+            {
+                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var orig = Image.FromStream(fs, false, false))
+                {
+                    int w = orig.Width;
+                    int h = orig.Height;
+                    if (w <= 0 || h <= 0) return null;
+
+                    float scale = Math.Min((float)maxDimension / w, (float)maxDimension / h);
+                    if (scale >= 1.0f)
+                    {
+                        return new Bitmap(orig);
+                    }
+
+                    int tw = Math.Max(1, (int)(w * scale));
+                    int th = Math.Max(1, (int)(h * scale));
+
+                    Bitmap scaled = new Bitmap(tw, th, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                    using (Graphics g = Graphics.FromImage(scaled))
+                    {
+                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                        g.DrawImage(orig, 0, 0, tw, th);
+                    }
+                    return scaled;
+                }
             }
             catch
             {

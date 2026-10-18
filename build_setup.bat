@@ -48,6 +48,10 @@ if exist icon (
     if not exist temp_dist\icon mkdir temp_dist\icon >nul 2>&1
     copy /y icon\* temp_dist\icon\ >nul
 )
+if exist img (
+    if not exist temp_dist\img mkdir temp_dist\img >nul 2>&1
+    xcopy /s /e /y img\* temp_dist\img\ >nul
+)
 
 powershell -Command "Compress-Archive -Path 'temp_dist\*' -DestinationPath 'payload.zip' -Force"
 rmdir /s /q temp_dist
