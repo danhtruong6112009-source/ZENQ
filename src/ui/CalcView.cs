@@ -116,6 +116,7 @@ namespace ZenQOffice.UI
         }
         public List<ExcelTableInfo> Tables { get; set; }
         public Color TabColor { get; set; }
+        public float ZoomFactor { get; set; } = 1.0f;
 
         public CalcSheetState()
         {
@@ -125,6 +126,7 @@ namespace ZenQOffice.UI
             SelEndCol = 1;
             ScrollRow = 1;
             ScrollCol = 1;
+            ZoomFactor = 1.0f;
             CustomColWidths = new Dictionary<uint, int>();
             CustomRowHeights = new Dictionary<uint, int>();
             Shapes = new List<DocShapeObject>();
@@ -241,7 +243,12 @@ namespace ZenQOffice.UI
 
         // View Mode & Zoom
         public int ViewMode { get; set; } // 0: Normal, 1: Page Layout, 2: Page Break Preview
-        public float ZoomFactor { get; set; } // 1.0f = 100%
+        private float _zoomFactor = 1.0f;
+        public float ZoomFactor
+        {
+            get { return _zoomFactor > 0 ? _zoomFactor : 1.0f; }
+            set { _zoomFactor = Math.Max(0.10f, Math.Min(5.0f, value)); }
+        }
         public bool ShowGridlines { get; set; }
         public bool ShowHeadings { get; set; }
         public bool ShowFormulaBar { get; set; }
@@ -868,6 +875,7 @@ namespace ZenQOffice.UI
                 st.CustomRowHeights = CustomRowHeights != null ? new Dictionary<uint, int>(CustomRowHeights) : new Dictionary<uint, int>();
                 st.Shapes = Shapes != null ? new List<DocShapeObject>(Shapes) : new List<DocShapeObject>();
                 st.Tables = Tables != null ? new List<ExcelTableInfo>(Tables) : new List<ExcelTableInfo>();
+                st.ZoomFactor = ZoomFactor;
             }
         }
 
@@ -890,6 +898,7 @@ namespace ZenQOffice.UI
                 SelEndCol = Math.Max(1, st.SelEndCol);
                 ScrollRow = Math.Max(1, st.ScrollRow);
                 ScrollCol = Math.Max(1, st.ScrollCol);
+                ZoomFactor = st.ZoomFactor > 0 ? st.ZoomFactor : 1.0f;
                 CustomColWidths = st.CustomColWidths != null ? new Dictionary<uint, int>(st.CustomColWidths) : new Dictionary<uint, int>();
                 CustomRowHeights = st.CustomRowHeights != null ? new Dictionary<uint, int>(st.CustomRowHeights) : new Dictionary<uint, int>();
                 Shapes = st.Shapes != null ? new List<DocShapeObject>(st.Shapes) : new List<DocShapeObject>();
@@ -955,6 +964,7 @@ namespace ZenQOffice.UI
                     cloneState.SelectedCol = origSt.SelectedCol;
                     cloneState.SelEndRow = origSt.SelEndRow;
                     cloneState.SelEndCol = origSt.SelEndCol;
+                    cloneState.ZoomFactor = origSt.ZoomFactor;
                     cloneState.CustomColWidths = new Dictionary<uint, int>(origSt.CustomColWidths);
                     cloneState.CustomRowHeights = new Dictionary<uint, int>(origSt.CustomRowHeights);
                 }
@@ -1297,16 +1307,28 @@ namespace ZenQOffice.UI
             FormulaEngine.EvaluateSheet(sheet);
         }
 
+        public int GetRawColWidth(uint col)
+        {
+            if (CustomColWidths != null && CustomColWidths.ContainsKey(col)) return CustomColWidths[col];
+            return DefaultColWidth;
+        }
+
         public int GetColWidth(uint col)
         {
-            if (CustomColWidths.ContainsKey(col)) return CustomColWidths[col];
-            return DefaultColWidth;
+            float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+            return Math.Max(1, (int)Math.Round(GetRawColWidth(col) * z));
+        }
+
+        public int GetRawRowHeight(uint row)
+        {
+            if (CustomRowHeights != null && CustomRowHeights.ContainsKey(row)) return CustomRowHeights[row];
+            return AppSettings.Instance.TouchModeEnabled ? (DefaultRowHeight + 6) : DefaultRowHeight;
         }
 
         public int GetRowHeight(uint row)
         {
-            if (CustomRowHeights.ContainsKey(row)) return CustomRowHeights[row];
-            return AppSettings.Instance.TouchModeEnabled ? (DefaultRowHeight + 6) : DefaultRowHeight;
+            float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+            return Math.Max(1, (int)Math.Round(GetRawRowHeight(row) * z));
         }
 
         public int GetColX(uint col)
@@ -2774,7 +2796,7 @@ namespace ZenQOffice.UI
                         IsResizingCol = true;
                         ResizingColIndex = cIdx;
                         ResizeStartMouse = new Point(x, y);
-                        ResizeStartSize = cW;
+                        ResizeStartSize = GetRawColWidth(cIdx);
                         return true;
                     }
                     curX += cW;
@@ -2796,7 +2818,7 @@ namespace ZenQOffice.UI
                         IsResizingRow = true;
                         ResizingRowIndex = rIdx;
                         ResizeStartMouse = new Point(x, y);
-                        ResizeStartSize = rH;
+                        ResizeStartSize = GetRawRowHeight(rIdx);
                         return true;
                     }
                     curY += rH;
@@ -3244,7 +3266,9 @@ namespace ZenQOffice.UI
             // Handle Column Resize Dragging
             if (IsResizingCol)
             {
-                int newWidth = Math.Max(25, ResizeStartSize + (x - ResizeStartMouse.X));
+                float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+                int delta = (int)Math.Round((x - ResizeStartMouse.X) / z);
+                int newWidth = Math.Max(20, ResizeStartSize + delta);
                 CustomColWidths[ResizingColIndex] = newWidth;
                 return;
             }
@@ -3252,7 +3276,9 @@ namespace ZenQOffice.UI
             // Handle Row Resize Dragging
             if (IsResizingRow)
             {
-                int newHeight = Math.Max(16, ResizeStartSize + (y - ResizeStartMouse.Y));
+                float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+                int delta = (int)Math.Round((y - ResizeStartMouse.Y) / z);
+                int newHeight = Math.Max(12, ResizeStartSize + delta);
                 CustomRowHeights[ResizingRowIndex] = newHeight;
                 return;
             }
@@ -5006,12 +5032,13 @@ namespace ZenQOffice.UI
             }
             else
             {
-                bool isTallRow = cellRect.Height >= 30;
+                float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+                bool isTallRow = cellRect.Height >= (int)Math.Round(30 * z);
                 bool hasNewlines = dispText.Contains("\r") || dispText.Contains("\n");
                 bool isExplicitWrap = cell.Format != null && cell.Format.WrapText;
                 bool wrapText = isExplicitWrap || isTallRow || hasNewlines;
 
-                int indentPx = (cell.Format != null && cell.Format.Indent > 0) ? cell.Format.Indent * 10 : 0;
+                int indentPx = (cell.Format != null && cell.Format.Indent > 0) ? (int)Math.Round(cell.Format.Indent * 10 * z) : 0;
                 string textToDraw = dispText;
                 if (!wrapText && (textToDraw.Contains("\r") || textToDraw.Contains("\n")))
                 {
@@ -5025,11 +5052,14 @@ namespace ZenQOffice.UI
 
                 StringFormat sf = GetCachedStringFormat(hAlign, vAlign, wrapText);
 
+                int padX = Math.Max(2, (int)Math.Round(4 * z));
+                int padY = wrapText ? Math.Max(1, (int)Math.Round(2 * z)) : 0;
+
                 Rectangle textBounds = new Rectangle(
-                    cellRect.Left + 4 + indentPx,
-                    cellRect.Top + (wrapText ? 2 : 0),
-                    Math.Max(0, cellRect.Width - 8 - indentPx),
-                    wrapText ? Math.Max(0, cellRect.Height - 4) : cellRect.Height
+                    cellRect.Left + padX + indentPx,
+                    cellRect.Top + padY,
+                    Math.Max(0, cellRect.Width - (padX * 2) - indentPx),
+                    wrapText ? Math.Max(0, cellRect.Height - (padY * 2)) : cellRect.Height
                 );
 
                 g.PushClip(textClipRect);
@@ -8024,9 +8054,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             DocShapeObject newSh = new DocShapeObject(shapeType, startX + 20, startY + 20, 160, 100);
@@ -8047,9 +8077,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             Image img = null;
@@ -8080,9 +8110,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             int saW = 480;
@@ -8317,9 +8347,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             DocShapeObject newSh = new DocShapeObject
@@ -8375,10 +8405,11 @@ namespace ZenQOffice.UI
             int scrollPixelY = 0;
             for (uint r = 1; r < ScrollRow; r++) scrollPixelY += GetRowHeight(r);
 
-            int screenX = headerW + (int)((shape.PageX - scrollPixelX) * ZoomFactor);
-            int screenY = startY + headerH + (int)((shape.PageY - scrollPixelY) * ZoomFactor);
-            int screenW = (int)((shape.BaseWidth + shape.WidthDelta) * ZoomFactor);
-            int screenH = (int)((shape.BaseHeight + shape.HeightDelta) * ZoomFactor);
+            float z = ZoomFactor > 0 ? ZoomFactor : 1.0f;
+            int screenX = headerW + (int)Math.Round(shape.PageX * z) - scrollPixelX;
+            int screenY = startY + headerH + (int)Math.Round(shape.PageY * z) - scrollPixelY;
+            int screenW = (int)Math.Round((shape.BaseWidth + shape.WidthDelta) * z);
+            int screenH = (int)Math.Round((shape.BaseHeight + shape.HeightDelta) * z);
 
             return new Rectangle(screenX, screenY, Math.Max(10, screenW), Math.Max(10, screenH));
         }
@@ -8604,9 +8635,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             if (Shapes == null) Shapes = new List<DocShapeObject>();
@@ -8655,9 +8686,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             if (Shapes == null) Shapes = new List<DocShapeObject>();
@@ -8692,9 +8723,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             string colName = SparseMatrix.ColIndexToName(SelectedCol > 0 ? SelectedCol : 1);
@@ -8728,9 +8759,9 @@ namespace ZenQOffice.UI
             if (SelectedRow > 0 && SelectedCol > 0)
             {
                 startX = 0;
-                for (uint c = 1; c < SelectedCol; c++) startX += GetColWidth(c);
+                for (uint c = 1; c < SelectedCol; c++) startX += GetRawColWidth(c);
                 startY = 0;
-                for (uint r = 1; r < SelectedRow; r++) startY += GetRowHeight(r);
+                for (uint r = 1; r < SelectedRow; r++) startY += GetRawRowHeight(r);
             }
 
             DocShapeObject tl = new DocShapeObject

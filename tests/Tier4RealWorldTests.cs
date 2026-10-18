@@ -988,5 +988,110 @@ namespace GenOffice.Tests
             cv.ScrollRow = 25000;
             Assert.AreEqual(25000u, cv.ScrollRow, "ScrollRow should seamlessly support large row offsets");
         }
+
+        // =========================================================================
+        // FEATURE 32 (Extended): Calc Excel-Like Proportional Zoom Grid Scaling
+        // =========================================================================
+        [Test, Tier(TestTier.Tier4_RealWorld), Feature(32, "Calc Viewport & Scrolled Merged Cell Rendering", Milestone.M4)]
+        [Description("Scenario 36: Calc Excel-like Zoom scaling: grid cells, column widths, row heights and text scale proportionally")]
+        public void T4_F32_05_CalcExcelLikeZoomScalingScenario()
+        {
+            CalcView cv = new CalcView();
+            cv.ShowFormulaBar = false;
+
+            // Step 1: Default dimensions at 100% (ZoomFactor = 1.0f)
+            Assert.AreEqual(1.0f, cv.ZoomFactor, 0.001f, "Default ZoomFactor must be 1.0f (100%)");
+            Assert.AreEqual(80, cv.GetRawColWidth(1), "Raw default column width must be 80");
+            Assert.AreEqual(24, cv.GetRawRowHeight(1), "Raw default row height must be 24");
+            Assert.AreEqual(80, cv.GetColWidth(1), "100% column width must be 80");
+            Assert.AreEqual(24, cv.GetRowHeight(1), "100% row height must be 24");
+
+            // Step 2: Custom column width and row height
+            cv.CustomColWidths[2] = 120;
+            cv.CustomRowHeights[3] = 40;
+            Assert.AreEqual(120, cv.GetRawColWidth(2));
+            Assert.AreEqual(40, cv.GetRawRowHeight(3));
+            Assert.AreEqual(120, cv.GetColWidth(2));
+            Assert.AreEqual(40, cv.GetRowHeight(3));
+
+            // Step 3: Zoom In to 150% (ZoomFactor = 1.5f)
+            cv.ZoomFactor = 1.5f;
+            Assert.AreEqual(1.5f, cv.ZoomFactor, 0.001f);
+            // Default col 1: 80 * 1.5 = 120
+            Assert.AreEqual(120, cv.GetColWidth(1), "Col 1 scaled to 150% should be 120");
+            // Default row 1: 24 * 1.5 = 36
+            Assert.AreEqual(36, cv.GetRowHeight(1), "Row 1 scaled to 150% should be 36");
+            // Custom col 2: 120 * 1.5 = 180
+            Assert.AreEqual(180, cv.GetColWidth(2), "Custom col 2 scaled to 150% should be 180");
+            // Custom row 3: 40 * 1.5 = 60
+            Assert.AreEqual(60, cv.GetRowHeight(3), "Custom row 3 scaled to 150% should be 60");
+            // Raw values remain unaffected by zoom (critical for PDF and file export)
+            Assert.AreEqual(80, cv.GetRawColWidth(1));
+            Assert.AreEqual(24, cv.GetRawRowHeight(1));
+            Assert.AreEqual(120, cv.GetRawColWidth(2));
+            Assert.AreEqual(40, cv.GetRawRowHeight(3));
+
+            // Step 4: Zoom Out to 50% (ZoomFactor = 0.5f)
+            cv.ZoomFactor = 0.5f;
+            Assert.AreEqual(0.5f, cv.ZoomFactor, 0.001f);
+            // Default col 1: 80 * 0.5 = 40
+            Assert.AreEqual(40, cv.GetColWidth(1), "Col 1 scaled to 50% should be 40");
+            // Default row 1: 24 * 0.5 = 12
+            Assert.AreEqual(12, cv.GetRowHeight(1), "Row 1 scaled to 50% should be 12");
+            // Custom col 2: 120 * 0.5 = 60
+            Assert.AreEqual(60, cv.GetColWidth(2), "Custom col 2 scaled to 50% should be 60");
+            // Custom row 3: 40 * 0.5 = 20
+            Assert.AreEqual(20, cv.GetRowHeight(3), "Custom row 3 scaled to 50% should be 20");
+
+            // Step 5: Clamping bounds verification
+            cv.ZoomFactor = 10.0f;
+            Assert.AreEqual(5.0f, cv.ZoomFactor, 0.001f, "ZoomFactor capped at 5.0 (500%)");
+            cv.ZoomFactor = 0.01f;
+            Assert.AreEqual(0.10f, cv.ZoomFactor, 0.001f, "ZoomFactor floored at 0.10 (10%)");
+
+            // Step 6: CalcSheetState preserves ZoomFactor across sheets
+            cv.ZoomFactor = 1.25f;
+            cv.SaveCurrentSheetState();
+            Assert.AreEqual(1.25f, cv.SheetStates[cv.ActiveSheetIndex].ZoomFactor, 0.001f, "CalcSheetState must persist ZoomFactor");
+
+            // Add new sheet and verify switching sheets preserves per-sheet ZoomFactor
+            cv.AddSheet("Sheet4");
+            cv.SwitchToSheet(cv.Sheets.Count - 1);
+            cv.ZoomFactor = 1.75f;
+            cv.SaveCurrentSheetState();
+
+            cv.SwitchToSheet(0);
+            Assert.AreEqual(1.25f, cv.ZoomFactor, 0.001f, "SwitchToSheet must restore Sheet 0 ZoomFactor (125%)");
+
+            cv.SwitchToSheet(cv.Sheets.Count - 1);
+            Assert.AreEqual(1.75f, cv.ZoomFactor, 0.001f, "SwitchToSheet must restore Sheet 4 ZoomFactor (175%)");
+
+            // Step 7: Visual rendering at 150% and 75% without exceptions
+            cv.ZoomFactor = 1.5f;
+            cv.CurrentSheet.SetCellString(1, 1, "Doanh Thu 2026");
+            cv.CurrentSheet.SetCellNumber(2, 1, 985000000);
+            using (Bitmap bmp = new Bitmap(800, 600))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                cv.Draw(g, 800, 600);
+                string artifactDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gemini", "antigravity", "brain", "56da7ca9-ea1d-4316-b95c-50b3bafbe999");
+                if (Directory.Exists(artifactDir))
+                {
+                    bmp.Save(Path.Combine(artifactDir, "calc_zoom_150_percent.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+
+            cv.ZoomFactor = 0.75f;
+            using (Bitmap bmp2 = new Bitmap(800, 600))
+            using (Graphics g2 = Graphics.FromImage(bmp2))
+            {
+                cv.Draw(g2, 800, 600);
+                string artifactDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gemini", "antigravity", "brain", "56da7ca9-ea1d-4316-b95c-50b3bafbe999");
+                if (Directory.Exists(artifactDir))
+                {
+                    bmp2.Save(Path.Combine(artifactDir, "calc_zoom_75_percent.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+        }
     }
 }

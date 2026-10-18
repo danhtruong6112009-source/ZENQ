@@ -1270,7 +1270,7 @@ namespace ZenQOffice.Format
                                             string bl = !string.IsNullOrEmpty(cell.Format.DiagonalBottomLeftText) ? cell.Format.DiagonalBottomLeftText : "";
                                             if (!string.IsNullOrEmpty(tr) && !string.IsNullOrEmpty(bl))
                                             {
-                                                int colW = calcView.GetColWidth(c);
+                                                int colW = calcView.GetRawColWidth(c);
                                                 int spaces = Math.Max(12, colW / 10);
                                                 exportText = new string(' ', spaces) + tr + "\n" + bl;
                                             }

@@ -12829,6 +12829,32 @@ namespace ZenQOffice.UI
                 curX += 80;
 
                 g.DrawString("Cửa sổ", labelFont, Brushes.Gray, curX - 55, 137);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // Zoom: 100%, Zoom In (+), Zoom Out (-)
+                float curZoom = calcView != null ? calcView.ZoomFactor : 1.0f;
+                Rectangle z100Btn = new Rectangle(curX, 68, 56, 54);
+                DrawInteractiveButton(g, z100Btn, Math.Abs(curZoom - 1.0f) < 0.05f, 4);
+                using (Pen pZ = new Pen(Color.FromArgb(16, 124, 65), 1.5f))
+                using (Font zFont = new Font("Segoe UI", 6.8f, FontStyle.Bold))
+                {
+                    g.DrawEllipse(pZ, curX + 17, 72, 20, 20);
+                    g.DrawString("100", zFont, Brushes.Black, curX + 18, 76);
+                    g.DrawString("100%", labelFont, Brushes.Black, curX + 14, 100);
+                }
+                curX += 60;
+
+                Rectangle zInBtn = new Rectangle(curX, 68, 80, 26);
+                DrawInteractiveButton(g, zInBtn, false, 3);
+                g.DrawString("🔍+ Phóng to", btnFont, Brushes.Black, curX + 4, 72);
+
+                Rectangle zOutBtn = new Rectangle(curX, 96, 80, 26);
+                DrawInteractiveButton(g, zOutBtn, false, 3);
+                g.DrawString("🔍- Thu nhỏ", btnFont, Brushes.Black, curX + 4, 100);
+                curX += 84;
+
+                g.DrawString("Thu phóng", labelFont, Brushes.Gray, curX - 85, 137);
             }
         }
 
@@ -23046,6 +23072,27 @@ namespace ZenQOffice.UI
                 else if (x >= 224 && x <= 300 && y >= 68 && y <= 124)
                 {
                     calcView.IsFreezeTopRow = !calcView.IsFreezeTopRow;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                // Zoom 100% (X: 312..368, Y: 68..124)
+                else if (x >= 312 && x <= 368 && y >= 68 && y <= 124)
+                {
+                    calcView.ZoomFactor = 1.0f;
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                // Zoom In (+) (X: 372..452, Y: 68..94)
+                else if (x >= 372 && x <= 452 && y >= 68 && y <= 94)
+                {
+                    calcView.ZoomFactor = Math.Min(4.0f, calcView.ZoomFactor + 0.15f);
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                // Zoom Out (-) (X: 372..452, Y: 96..124)
+                else if (x >= 372 && x <= 452 && y >= 96 && y <= 124)
+                {
+                    calcView.ZoomFactor = Math.Max(0.2f, calcView.ZoomFactor - 0.15f);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }

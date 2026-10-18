@@ -231,12 +231,12 @@ namespace ZenQOffice.Format
 
         private static double RenderRow(XGraphics gfx, CalcView calcView, SparseMatrix sheet, uint rowIdx, ColBand colBand, double startX, double curY, bool showGridlines)
         {
-            double rowH = calcView.GetRowHeight(rowIdx) * 0.75;
+            double rowH = calcView.GetRawRowHeight(rowIdx) * 0.75;
             double curX = startX;
 
             for (uint c = colBand.StartCol; c <= colBand.EndCol; c++)
             {
-                double colW = calcView.GetColWidth(c) * 0.75;
+                double colW = calcView.GetRawColWidth(c) * 0.75;
                 CellData cell = sheet.GetCell(rowIdx, c);
 
                 // Skip merged children
@@ -255,12 +255,12 @@ namespace ZenQOffice.Format
                     for (uint mc = 0; mc < cell.Format.MergeColSpan; mc++)
                     {
                         uint targetC = c + mc;
-                        if (targetC <= colBand.EndCol) renderW += calcView.GetColWidth(targetC) * 0.75;
+                        if (targetC <= colBand.EndCol) renderW += calcView.GetRawColWidth(targetC) * 0.75;
                     }
                     renderH = 0.0;
                     for (uint mr = 0; mr < cell.Format.MergeRowSpan; mr++)
                     {
-                        renderH += calcView.GetRowHeight(rowIdx + mr) * 0.75;
+                        renderH += calcView.GetRawRowHeight(rowIdx + mr) * 0.75;
                     }
                 }
 
@@ -404,18 +404,18 @@ namespace ZenQOffice.Format
             if (calcView.Shapes == null || calcView.Shapes.Count == 0) return;
 
             int bandPxLeft = 0;
-            for (uint c = 1; c < colBand.StartCol; c++) bandPxLeft += calcView.GetColWidth(c);
+            for (uint c = 1; c < colBand.StartCol; c++) bandPxLeft += calcView.GetRawColWidth(c);
             int bandPxWidth = 0;
-            for (uint c = colBand.StartCol; c <= colBand.EndCol; c++) bandPxWidth += calcView.GetColWidth(c);
+            for (uint c = colBand.StartCol; c <= colBand.EndCol; c++) bandPxWidth += calcView.GetRawColWidth(c);
             int bandPxRight = bandPxLeft + bandPxWidth;
 
             int bandPxTop = 0;
-            for (uint r = 1; r < rowBand.StartRow; r++) bandPxTop += calcView.GetRowHeight(r);
+            for (uint r = 1; r < rowBand.StartRow; r++) bandPxTop += calcView.GetRawRowHeight(r);
             int bandPxHeight = 0;
-            for (uint r = rowBand.StartRow; r <= rowBand.EndRow; r++) bandPxHeight += calcView.GetRowHeight(r);
+            for (uint r = rowBand.StartRow; r <= rowBand.EndRow; r++) bandPxHeight += calcView.GetRawRowHeight(r);
             int bandPxBottom = bandPxTop + bandPxHeight;
 
-            double extraTopOffset = (!rowBand.IsFirstBand && repeatHeaderRow && repeatHeaderRowIdx >= 1) ? calcView.GetRowHeight(repeatHeaderRowIdx) * 0.75 : 0.0;
+            double extraTopOffset = (!rowBand.IsFirstBand && repeatHeaderRow && repeatHeaderRowIdx >= 1) ? calcView.GetRawRowHeight(repeatHeaderRowIdx) * 0.75 : 0.0;
 
             foreach (DocShapeObject sh in calcView.Shapes)
             {
@@ -648,7 +648,7 @@ namespace ZenQOffice.Format
                     int curX = 0;
                     for (uint c = 1; c <= 256; c++)
                     {
-                        curX += calcView.GetColWidth(c);
+                        curX += calcView.GetRawColWidth(c);
                         if (curX >= rightPx)
                         {
                             if (c > maxC) maxC = c;
@@ -659,7 +659,7 @@ namespace ZenQOffice.Format
                     int curY = 0;
                     for (uint r = 1; r <= 1000; r++)
                     {
-                        curY += calcView.GetRowHeight(r);
+                        curY += calcView.GetRawRowHeight(r);
                         if (curY >= bottomPx)
                         {
                             if (r > maxR) maxR = r;
@@ -700,12 +700,12 @@ namespace ZenQOffice.Format
                 double currentW = 0.0;
                 while (c <= maxC)
                 {
-                    double colW = calcView.GetColWidth(c) * 0.75;
+                    double colW = calcView.GetRawColWidth(c) * 0.75;
                     if (currentW > 0.0 && currentW + colW > usableWidth) break;
                     currentW += colW;
                     c++;
                 }
-                if (c == startC) { currentW += calcView.GetColWidth(c) * 0.75; c++; }
+                if (c == startC) { currentW += calcView.GetRawColWidth(c) * 0.75; c++; }
                 ColBand cb = new ColBand();
                 cb.StartCol = startC;
                 cb.EndCol = c - 1;
@@ -719,7 +719,7 @@ namespace ZenQOffice.Format
         {
             List<RowBand> bands = new List<RowBand>();
             uint r = minR;
-            double headerH = (repeatHeaderRow && repeatHeaderRowIdx >= minR && repeatHeaderRowIdx <= maxR) ? calcView.GetRowHeight(repeatHeaderRowIdx) * 0.75 : 0.0;
+            double headerH = (repeatHeaderRow && repeatHeaderRowIdx >= minR && repeatHeaderRowIdx <= maxR) ? calcView.GetRawRowHeight(repeatHeaderRowIdx) * 0.75 : 0.0;
 
             bool isFirst = true;
             while (r <= maxR)
@@ -730,12 +730,12 @@ namespace ZenQOffice.Format
 
                 while (r <= maxR)
                 {
-                    double rowH = calcView.GetRowHeight(r) * 0.75;
+                    double rowH = calcView.GetRawRowHeight(r) * 0.75;
                     if (currentH > 0.0 && currentH + rowH > limitH) break;
                     currentH += rowH;
                     r++;
                 }
-                if (r == startR) { currentH += calcView.GetRowHeight(r) * 0.75; r++; }
+                if (r == startR) { currentH += calcView.GetRawRowHeight(r) * 0.75; r++; }
                 RowBand rb = new RowBand();
                 rb.StartRow = startR;
                 rb.EndRow = r - 1;
