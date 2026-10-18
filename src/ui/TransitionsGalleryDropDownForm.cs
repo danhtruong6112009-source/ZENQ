@@ -249,6 +249,12 @@ namespace ZenQOffice.UI
         private static readonly Color BorderColor = Color.FromArgb(30, 64, 175);    // #1E40AF
         private static readonly Color WhiteColor = Color.White;
 
+        public static void DrawIcon(D2DGraphics g, Rectangle r, TransitionType type, bool isSelected)
+        {
+            if (g == null) return;
+            g.DrawGdi(nativeG => DrawIcon(nativeG, r, type, isSelected));
+        }
+
         public static void DrawIcon(Graphics g, Rectangle r, TransitionType type, bool isSelected)
         {
             int x = r.X;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Graphics = ZenQOffice.UI.D2DGraphics;
 
 namespace ZenQOffice.UI
 {
@@ -173,6 +174,15 @@ namespace ZenQOffice.UI
                 }
             }
             return false;
+        }
+
+        public void Draw(System.Drawing.Graphics g)
+        {
+            if (g == null || !IsVisible || Suggestions == null || Suggestions.Count == 0) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, Bounds.Right, Bounds.Bottom))
+            {
+                Draw(d2d);
+            }
         }
 
         public void Draw(Graphics g)

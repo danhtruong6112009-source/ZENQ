@@ -123,6 +123,8 @@ namespace ZenQOffice.UI
         private float _dpiX = 96.0f;
         private float _dpiY = 96.0f;
 
+        public bool IsDirectXActive => _renderTarget != null;
+
         private static ID2D1DCRenderTarget CreateDCRenderTargetInternal()
         {
             // 1. Try Hardware D3D11 Acceleration
@@ -171,14 +173,19 @@ namespace ZenQOffice.UI
         }
 
         public D2DGraphics(Graphics g, int viewportWidth = 0, int viewportHeight = 0)
-            : this(g, false, viewportWidth, viewportHeight)
+            : this(g, false, viewportWidth, viewportHeight, false)
         {
         }
 
         public D2DGraphics(Graphics g, bool pureGdi, int viewportWidth, int viewportHeight)
+            : this(g, pureGdi, viewportWidth, viewportHeight, false)
+        {
+        }
+
+        public D2DGraphics(Graphics g, bool pureGdi, int viewportWidth, int viewportHeight, bool ownsGraphics)
         {
             _gdiGraphics = g;
-            _ownsGraphics = false;
+            _ownsGraphics = ownsGraphics;
             _ownsGdiHdc = false;
             _renderTarget = null;
             if (g != null)
@@ -348,6 +355,18 @@ namespace ZenQOffice.UI
             }
         }
 
+        public static D2DGraphics FromHwnd(IntPtr hwnd)
+        {
+            return new D2DGraphics(hwnd, 1, 1);
+        }
+
+        public static D2DGraphics FromImage(System.Drawing.Image image)
+        {
+            if (image == null) return null;
+            var g = Graphics.FromImage(image);
+            return new D2DGraphics(g, pureGdi: false, viewportWidth: image.Width, viewportHeight: image.Height, ownsGraphics: true);
+        }
+
         public void Resize(int width, int height)
         {
             if (_hwndRenderTarget != null && width > 0 && height > 0)
@@ -473,6 +492,13 @@ namespace ZenQOffice.UI
                 try { _gdiGraphics.ReleaseHdc(_gdiHdc); } catch { }
                 _gdiHdc = IntPtr.Zero;
                 _ownsGdiHdc = false;
+            }
+
+            if (_ownsGraphics && _gdiGraphics != null)
+            {
+                try { _gdiGraphics.Dispose(); } catch { }
+                _gdiGraphics = null;
+                _ownsGraphics = false;
             }
 
             if (_hwndRenderTarget != null)
@@ -1740,6 +1766,34 @@ namespace ZenQOffice.UI
                 }
             }
             if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.FillPath(brush, path);
+        }
+
+        public void FillRegion(Brush brush, Region region)
+        {
+            if (brush == null || region == null) return;
+            if (_renderTarget != null)
+            {
+                try
+                {
+                    using (var mx = new Matrix())
+                    {
+                        RectangleF[] rects = region.GetRegionScans(mx);
+                        if (rects != null && rects.Length > 0)
+                        {
+                            foreach (var rf in rects)
+                            {
+                                FillRectangle(brush, rf);
+                            }
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("D2D FillRegion error: " + ex.Message);
+                }
+            }
+            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.FillRegion(brush, region);
         }
         public float DpiX => _dpiX;
         public float DpiY => _dpiY;

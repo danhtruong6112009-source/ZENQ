@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using ZenQOffice;
 using ZenQOffice.Core;
 using ZenQOffice.Format;
+using Graphics = ZenQOffice.UI.D2DGraphics;
 
 namespace ZenQOffice.UI
 {
@@ -3334,6 +3335,24 @@ namespace ZenQOffice.UI
             }
 
             DrawWindowCaptionButtons(g, width, ribbonTop, dpiScale, isIsland, CurrentMode);
+        }
+
+        public void DrawTopDocTabBar(System.Drawing.Graphics g, int width)
+        {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, width, RibbonTopHeight > 0 ? RibbonTopHeight : 36))
+            {
+                DrawTopDocTabBar(d2d, width);
+            }
+        }
+
+        public void Draw(System.Drawing.Graphics g, int width, int height, WriterView writerView = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
+        {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height, writerView, slidesView, calcView, pdfView, photoView);
+            }
         }
 
         public void Draw(Graphics g, int width, int height, WriterView writerView = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
@@ -15151,6 +15170,15 @@ namespace ZenQOffice.UI
 
                 g.DrawString("Phương tiện", labelFont, Brushes.Gray, new RectangleF(g8Start, 137, curX - g8Start, 14), sfCenter);
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+            }
+        }
+
+        public static void DrawThemeMiniCardPreview(System.Drawing.Graphics g, Rectangle r, PresentationTheme theme, bool isSelected, bool isHovered)
+        {
+            if (g == null || theme == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, r.Width, r.Height))
+            {
+                DrawThemeMiniCardPreview(d2d, r, theme, isSelected, isHovered);
             }
         }
 

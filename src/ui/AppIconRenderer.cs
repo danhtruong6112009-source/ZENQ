@@ -181,6 +181,25 @@ namespace ZenQOffice.UI
             return DrawAppIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height), mode);
         }
 
+        public static bool DrawAppIcon(D2DGraphics g, float x, float y, float size, OfficeAppMode mode)
+        {
+            if (g == null) return false;
+            int s = (int)Math.Round(size);
+            if (s < 16) s = 16;
+            Bitmap bmp = GetScaledBitmap(mode, s);
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, x, y, size, size);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool DrawAppIcon(D2DGraphics g, RectangleF rect, OfficeAppMode mode)
+        {
+            return DrawAppIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height), mode);
+        }
+
         private static Image _rawBanner = null;
         private static Bitmap _cachedBanner = null;
         private static int _cachedBannerW = 0;
@@ -322,6 +341,22 @@ namespace ZenQOffice.UI
 
         public static bool DrawBanner(Graphics g, RectangleF rect)
         {
+            int w = (int)Math.Round(rect.Width);
+            int h = (int)Math.Round(rect.Height);
+            if (w <= 0 || h <= 0) return false;
+
+            Bitmap bmp = GetScaledBanner(w, h);
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, rect.X, rect.Y, rect.Width, rect.Height);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool DrawBanner(D2DGraphics g, RectangleF rect)
+        {
+            if (g == null) return false;
             int w = (int)Math.Round(rect.Width);
             int h = (int)Math.Round(rect.Height);
             if (w <= 0 || h <= 0) return false;

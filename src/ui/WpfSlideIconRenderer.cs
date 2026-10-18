@@ -268,6 +268,53 @@ namespace ZenQOffice.UI
             DrawIcon(g, kind, x, y, iconWidth, iconHeight, primaryColor, accentColor);
         }
 
+        public static void DrawIcon(
+            D2DGraphics g,
+            SlideIconKind kind,
+            int x,
+            int y,
+            int width,
+            int height,
+            GdiColor? primaryColor = null,
+            GdiColor? accentColor = null)
+        {
+            if (g == null) return;
+            GdiBitmap bmp = GetIconBitmap(kind, width, height, primaryColor, accentColor);
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, x, y, width, height);
+            }
+        }
+
+        public static void DrawIconCentered(
+            D2DGraphics g,
+            SlideIconKind kind,
+            GdiRectangle containerRect,
+            int iconSize,
+            GdiColor? primaryColor = null,
+            GdiColor? accentColor = null)
+        {
+            if (g == null) return;
+            int x = containerRect.X + (containerRect.Width - iconSize) / 2;
+            int y = containerRect.Y + (containerRect.Height - iconSize) / 2;
+            DrawIcon(g, kind, x, y, iconSize, iconSize, primaryColor, accentColor);
+        }
+
+        public static void DrawIconCentered(
+            D2DGraphics g,
+            SlideIconKind kind,
+            GdiRectangle containerRect,
+            int iconWidth,
+            int iconHeight,
+            GdiColor? primaryColor = null,
+            GdiColor? accentColor = null)
+        {
+            if (g == null) return;
+            int x = containerRect.X + (containerRect.Width - iconWidth) / 2;
+            int y = containerRect.Y + (containerRect.Height - iconHeight) / 2;
+            DrawIcon(g, kind, x, y, iconWidth, iconHeight, primaryColor, accentColor);
+        }
+
         #region Core WPF Vector Rendering Pipeline
         private static GdiBitmap RenderWpfVectorToGdiBitmap(
             SlideIconKind kind,

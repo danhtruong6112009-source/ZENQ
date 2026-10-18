@@ -254,6 +254,41 @@ namespace ZenQOffice.UI
             g.PixelOffsetMode = prevPixel;
         }
 
+        public static void DrawLogo(D2DGraphics g, float x, float y, float size, bool drawBackdrop = false, bool highDetail = false)
+        {
+            if (g == null) return;
+            int targetSize = (int)Math.Round(size);
+            if (targetSize < 16) targetSize = 16;
+            Bitmap roundedBmp = GetRoundedLogo(targetSize, 0.22f);
+            if (roundedBmp != null)
+            {
+                g.DrawImage(roundedBmp, x, y, size, size);
+            }
+        }
+
+        public static void DrawLogoWithBrand(D2DGraphics g, float x, float y, float logoSize, Font brandFont, Font subFont, Color textColor, Color subColor)
+        {
+            if (g == null) return;
+            DrawLogo(g, x, y, logoSize, true, logoSize >= 48);
+            float textX = x + logoSize + (logoSize >= 48 ? 14 : 8);
+            float textY = y + (logoSize >= 48 ? 2 : 1);
+            if (brandFont != null)
+            {
+                using (SolidBrush tb = new SolidBrush(textColor))
+                {
+                    g.DrawString("ZENQ OFFICE", brandFont, tb, textX, textY);
+                }
+            }
+            if (subFont != null && logoSize >= 36)
+            {
+                float subY = textY + (brandFont != null ? brandFont.Height : 20) + 1;
+                using (SolidBrush sb = new SolidBrush(subColor))
+                {
+                    g.DrawString("Writer • Calc • Slides • PDF (Bộ ứng dụng văn phòng)", subFont, sb, textX, subY);
+                }
+            }
+        }
+
         /// <summary>
         /// Vẽ cụm Thương hiệu: Logo bo góc + Tên ứng dụng + Tagline
         /// </summary>
@@ -335,7 +370,17 @@ namespace ZenQOffice.UI
             ZenQOfficeLogoRenderer.DrawLogo(g, x, y, size, drawBackdrop, highDetail);
         }
 
+        public static void DrawLogo(D2DGraphics g, float x, float y, float size, bool drawBackdrop = false, bool highDetail = false)
+        {
+            ZenQOfficeLogoRenderer.DrawLogo(g, x, y, size, drawBackdrop, highDetail);
+        }
+
         public static void DrawLogoWithBrand(Graphics g, float x, float y, float logoSize, Font brandFont, Font subFont, Color textColor, Color subColor)
+        {
+            ZenQOfficeLogoRenderer.DrawLogoWithBrand(g, x, y, logoSize, brandFont, subFont, textColor, subColor);
+        }
+
+        public static void DrawLogoWithBrand(D2DGraphics g, float x, float y, float logoSize, Font brandFont, Font subFont, Color textColor, Color subColor)
         {
             ZenQOfficeLogoRenderer.DrawLogoWithBrand(g, x, y, logoSize, brandFont, subFont, textColor, subColor);
         }

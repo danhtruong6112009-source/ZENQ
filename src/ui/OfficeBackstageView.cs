@@ -6,6 +6,7 @@ using System.Drawing.Text;
 using System.IO;
 using System.Windows.Forms;
 using ZenQOffice.Core;
+using Graphics = ZenQOffice.UI.D2DGraphics;
 
 namespace ZenQOffice.UI
 {
@@ -275,6 +276,15 @@ namespace ZenQOffice.UI
         // ==========================================
         // VẼ GIAO DIỆN BACKSTAGE 2D & VECTOR ICONS
         // ==========================================
+        public void Draw(System.Drawing.Graphics g, int width, int height)
+        {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height);
+            }
+        }
+
         public void Draw(Graphics g, int width, int height)
         {
             _lastWidth = width;

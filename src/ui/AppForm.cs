@@ -22,6 +22,7 @@ namespace ZenQOffice.UI
         public OfficeBackstageView BackstageView { get; set; }
         private AiConfigPanel _aiConfigPanel;
         public AiConfigPanel AiConfigPanel { get { return _aiConfigPanel; } }
+        private D2DGraphics _appD2d;
 
         public void OpenBackstageView(int defaultTab = 0, OfficeAppMode? overrideMode = null)
         {
@@ -1403,201 +1404,186 @@ namespace ZenQOffice.UI
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            if (SlidesView != null && SlidesView.IsPresenting)
-            {
-                // Prevent white background erasing during slide show to eliminate flickering
-                return;
-            }
-            base.OnPaintBackground(e);
+            // Fully handled by Direct2D pipeline - suppress GDI background erase to eliminate flickering
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
-            Graphics g = e.Graphics;
+            if (e.Graphics == null) return;
+            int w = Math.Max(1, ClientSize.Width);
+            int h = Math.Max(1, ClientSize.Height);
+
+            using (D2DGraphics d2d = new D2DGraphics(e.Graphics, w, h))
+            {
+                RenderFrame(d2d, w, h);
+            }
+        }
+
+        private void RenderFrame(D2DGraphics g, int clientWidth, int clientHeight)
+        {
             if (g == null) return;
 
             try
             {
-
-            if (SlidesView != null && SlidesView.IsPresenting)
-            {
-                using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
+                if (SlidesView != null && SlidesView.IsPresenting)
                 {
-                    SlidesView.DrawFullscreenPresenter(d2d, ClientSize.Width, ClientSize.Height, true);
+                    SlidesView.DrawFullscreenPresenter(g, clientWidth, clientHeight, true);
+                    return;
                 }
-                return;
-            }
 
-            if (BackstageView != null && BackstageView.IsOpen)
-            {
-                bool isStandalone = (Ribbon != null && Ribbon.StandaloneMode);
-                if (!isStandalone && Ribbon != null)
+                if (BackstageView != null && BackstageView.IsOpen)
                 {
-                    // Giữ lại thanh tab ứng dụng phía trên (Trang chính | doc 1 | doc 2 | +)
-                    Ribbon.DrawTopDocTabBar(g, ClientSize.Width);
+                    bool isStandalone = (Ribbon != null && Ribbon.StandaloneMode);
+                    if (!isStandalone && Ribbon != null)
+                    {
+                        // Giữ lại thanh tab ứng dụng phía trên (Trang chính | doc 1 | doc 2 | +)
+                        Ribbon.DrawTopDocTabBar(g, clientWidth);
 
-                    int bsTopOffset = (Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
-                    var gState = g.Save();
-                    g.IntersectClip(new Rectangle(0, bsTopOffset, ClientSize.Width, Math.Max(1, ClientSize.Height - bsTopOffset)));
-                    g.TranslateTransform(0, bsTopOffset);
-                    BackstageView.Draw(g, ClientSize.Width, Math.Max(1, ClientSize.Height - bsTopOffset));
-                    g.Restore(gState);
+                        int bsTopOffset = (Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
+                        var gState = g.Save();
+                        g.IntersectClip(new Rectangle(0, bsTopOffset, clientWidth, Math.Max(1, clientHeight - bsTopOffset)));
+                        g.TranslateTransform(0, bsTopOffset);
+                        BackstageView.Draw(g, clientWidth, Math.Max(1, clientHeight - bsTopOffset));
+                        g.Restore(gState);
+                    }
+                    else
+                    {
+                        // Chế độ mở ứng dụng đơn từ shortcut ngoài desktop: che toàn màn hình
+                        BackstageView.Draw(g, clientWidth, clientHeight);
+                    }
+                    return;
+                }
+
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+                // Ensure top title bar area (0..36px) is solidly prefilled
+                bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                Color titleBarColor = (isIsland && Ribbon != null)
+                    ? ((Ribbon.CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
+                       ((Ribbon.CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
+                       Color.FromArgb(238, 238, 238)))
+                    : Color.FromArgb(248, 250, 252);
+                int topFillH = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
+                using (SolidBrush titleBg = new SolidBrush(titleBarColor))
+                {
+                    g.FillRectangle(titleBg, 0, 0, clientWidth, topFillH);
+                }
+
+                if (Ribbon != null)
+                {
+                    Ribbon.IsParentMaximized = (this.WindowState == FormWindowState.Maximized);
+                }
+
+                // 1. Draw Active Viewport (Home / Writer / Calc / Slides / Pdf)
+                try
+                {
+                    if (Ribbon.CurrentMode == OfficeAppMode.Home)
+                    {
+                        HomeView.Draw(g, clientWidth, clientHeight);
+                    }
+                    else
+                    {
+                        if (_aiConfigPanel != null && _aiConfigPanel.Visible)
+                        {
+                            _aiConfigPanel.Visible = false;
+                        }
+
+                        if (Ribbon.CurrentMode == OfficeAppMode.Writer)
+                        {
+                            WriterView.Draw(g, clientWidth, clientHeight, Ribbon);
+                        }
+                        else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
+                        {
+                            CalcView.Draw(g, clientWidth, clientHeight);
+                        }
+                        else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
+                        {
+                            SlidesView.Draw(g, clientWidth, clientHeight);
+                        }
+                        else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
+                        {
+                            PdfView.Draw(g, clientWidth, clientHeight, Ribbon);
+                        }
+                        else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
+                        {
+                            PhotoView.Draw(g, clientWidth, clientHeight, Ribbon);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("AppForm Viewport Draw error: " + ex.Message);
+                }
+
+                // 2. Draw Ribbon Bar
+                try
+                {
+                    if (Ribbon != null)
+                    {
+                        Ribbon.Draw(g, clientWidth, clientHeight, WriterView, SlidesView, CalcView, PdfView, PhotoView);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("AppForm Ribbon Draw error: " + ex.Message);
+                }
+
+                // 3. Draw Status Bar (Ẩn hoàn toàn khi ở Trang chủ Home)
+                if (Ribbon.CurrentMode != OfficeAppMode.Home)
+                {
+                    DrawStatusBar(g, clientWidth, clientHeight);
+                }
+
+                // 3B. Draw Floating Touch Quick Action Bar (khi bật Chế độ Cảm ứng)
+                if (!SlidesView.IsPresenting && Ribbon.CurrentMode != OfficeAppMode.Home && AppSettings.Instance.TouchModeEnabled)
+                {
+                    DrawFloatingTouchActionBar(g, clientWidth, clientHeight);
                 }
                 else
                 {
-                    // Chế độ mở ứng dụng đơn từ shortcut ngoài desktop: che toàn màn hình
-                    BackstageView.Draw(g, ClientSize.Width, ClientSize.Height);
+                    _touchBarBounds = Rectangle.Empty;
                 }
-                return;
-            }
 
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-            // Ensure top title bar area (0..36px) is solidly prefilled
-            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-            Color titleBarColor = (isIsland && Ribbon != null)
-                ? ((Ribbon.CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
-                   ((Ribbon.CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
-                   Color.FromArgb(238, 238, 238)))
-                : Color.FromArgb(248, 250, 252);
-            int topFillH = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
-            using (SolidBrush titleBg = new SolidBrush(titleBarColor))
-            {
-                g.FillRectangle(titleBg, 0, 0, ClientSize.Width, topFillH);
-            }
-
-            if (Ribbon != null)
-            {
-                Ribbon.IsParentMaximized = (this.WindowState == FormWindowState.Maximized);
-            }
-
-            // 1. Draw Active Viewport (Home / Writer / Calc / Slides / Pdf)
-            try
-            {
-                if (Ribbon.CurrentMode == OfficeAppMode.Home)
+                // 3B2. Draw Right-Side Inking Palette
+                if (!SlidesView.IsPresenting && Ribbon.CurrentMode != OfficeAppMode.Home)
                 {
-                    HomeView.Draw(g, ClientSize.Width, ClientSize.Height);
+                    DrawFloatingInkingPalette(g, clientWidth, clientHeight);
                 }
                 else
                 {
-                    if (_aiConfigPanel != null && _aiConfigPanel.Visible)
-                    {
-                        _aiConfigPanel.Visible = false;
-                    }
+                    _inkPaletteBounds = Rectangle.Empty;
+                }
 
-                    if (Ribbon.CurrentMode == OfficeAppMode.Writer)
+                // 3C. Draw Smart Peripheral Plug-and-Play Toast Notification Banner
+                DrawPeripheralToastBanner(g, clientWidth, clientHeight);
+
+                // 4. Draw IDE-Style Word Suggestions Popup (Topmost Floating Overlay)
+                if (WordSuggestions != null && WordSuggestions.IsVisible)
+                {
+                    int newX = WordSuggestions.Bounds.X;
+                    int newY = WordSuggestions.Bounds.Y;
+                    if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null && WriterView.CurrentCaretScreenX > 0)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
-                        {
-                            WriterView.Draw(d2d, ClientSize.Width, ClientSize.Height, Ribbon);
-                        }
+                        newX = WriterView.CurrentCaretScreenX;
+                        newY = WriterView.CurrentCaretScreenY + WriterView.CurrentCaretScreenH + 2;
                     }
-                    else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
+                    else if (Ribbon.CurrentMode == OfficeAppMode.Calc && CalcView != null && CalcView.CurrentCaretScreenX > 0)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
-                        {
-                            CalcView.Draw(d2d, ClientSize.Width, ClientSize.Height);
-                        }
+                        newX = CalcView.CurrentCaretScreenX;
+                        newY = CalcView.CurrentCaretScreenY;
                     }
-                    else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
+                    else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && SlidesView.CurrentCaretScreenX > 0)
                     {
-                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
-                        {
-                            SlidesView.Draw(d2d, ClientSize.Width, ClientSize.Height);
-                        }
+                        newX = SlidesView.CurrentCaretScreenX;
+                        newY = SlidesView.CurrentCaretScreenY;
                     }
-                    else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
-                    {
-                        PdfView.Draw(g, ClientSize.Width, ClientSize.Height, Ribbon);
-                    }
-                    else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
-                    {
-                        using (D2DGraphics d2d = new D2DGraphics(g, ClientSize.Width, ClientSize.Height))
-                        {
-                            PhotoView.Draw(d2d, ClientSize.Width, ClientSize.Height, Ribbon);
-                        }
-                    }
+                    WordSuggestions.Reposition(newX, newY, clientWidth, clientHeight);
+                    WordSuggestions.Draw(g);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("AppForm Viewport Draw error: " + ex.Message);
-            }
-
-            // 2. Draw Ribbon Bar (skip repainting if clip rectangle is only the slide canvas!)
-            try
-            {
-                int ribbonH = (Ribbon != null) ? (Ribbon.RibbonTopHeight + RibbonBar.RibbonHeight) : 155;
-                if (e.ClipRectangle.Top < ribbonH && Ribbon != null)
-                {
-                    Ribbon.Draw(g, ClientSize.Width, ClientSize.Height, WriterView, SlidesView, CalcView, PdfView, PhotoView);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("AppForm Ribbon Draw error: " + ex.Message);
-            }
-
-            // 3. Draw Status Bar (Ẩn hoàn toàn khi ở Trang chủ Home)
-            if (Ribbon.CurrentMode != OfficeAppMode.Home)
-            {
-                if (e.ClipRectangle.Bottom > ClientSize.Height - 30)
-                {
-                    DrawStatusBar(g, ClientSize.Width, ClientSize.Height);
-                }
-            }
-
-            // 3B. Draw Floating Touch Quick Action Bar (khi bật Chế độ Cảm ứng)
-            if (!SlidesView.IsPresenting && Ribbon.CurrentMode != OfficeAppMode.Home && AppSettings.Instance.TouchModeEnabled)
-            {
-                DrawFloatingTouchActionBar(g, ClientSize.Width, ClientSize.Height);
-            }
-            else
-            {
-                _touchBarBounds = Rectangle.Empty;
-            }
-
-            // 3B2. Draw Right-Side Inking Palette (Bảng màu tròn dọc, cỡ bút, tự nắn thẳng khi chọn Bút/Dạ quang)
-            if (!SlidesView.IsPresenting && Ribbon.CurrentMode != OfficeAppMode.Home)
-            {
-                DrawFloatingInkingPalette(g, ClientSize.Width, ClientSize.Height);
-            }
-            else
-            {
-                _inkPaletteBounds = Rectangle.Empty;
-            }
-
-            // 3C. Draw Smart Peripheral Plug-and-Play Toast Notification Banner
-            DrawPeripheralToastBanner(g, ClientSize.Width, ClientSize.Height);
-
-            // 4. Draw IDE-Style Word Suggestions Popup (Topmost Floating Overlay)
-            if (WordSuggestions != null && WordSuggestions.IsVisible)
-            {
-                int newX = WordSuggestions.Bounds.X;
-                int newY = WordSuggestions.Bounds.Y;
-                if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null && WriterView.CurrentCaretScreenX > 0)
-                {
-                    newX = WriterView.CurrentCaretScreenX;
-                    newY = WriterView.CurrentCaretScreenY + WriterView.CurrentCaretScreenH + 2;
-                }
-                else if (Ribbon.CurrentMode == OfficeAppMode.Calc && CalcView != null && CalcView.CurrentCaretScreenX > 0)
-                {
-                    newX = CalcView.CurrentCaretScreenX;
-                    newY = CalcView.CurrentCaretScreenY;
-                }
-                else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && SlidesView.CurrentCaretScreenX > 0)
-                {
-                    newX = SlidesView.CurrentCaretScreenX;
-                    newY = SlidesView.CurrentCaretScreenY;
-                }
-                WordSuggestions.Reposition(newX, newY, ClientSize.Width, ClientSize.Height);
-                WordSuggestions.Draw(g);
-            }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("AppForm.OnPaint error: " + ex);
+                System.Diagnostics.Debug.WriteLine("AppForm.RenderFrame error: " + ex);
             }
         }
 
@@ -1690,7 +1676,7 @@ namespace ZenQOffice.UI
             Invalidate();
         }
 
-        private void DrawStatusBar(Graphics g, int width, int height)
+        private void DrawStatusBar(D2DGraphics g, int width, int height)
         {
             if (Ribbon.CurrentMode == OfficeAppMode.Home) return;
             int barH = 26;
@@ -6234,8 +6220,22 @@ namespace ZenQOffice.UI
             {
                 Ribbon.IsParentMaximized = (this.WindowState == FormWindowState.Maximized);
             }
+            if (_appD2d != null && ClientSize.Width > 0 && ClientSize.Height > 0)
+            {
+                try { _appD2d.Resize(ClientSize.Width, ClientSize.Height); } catch { }
+            }
             PositionAiConfigPanel();
             Invalidate();
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            if (_appD2d != null)
+            {
+                try { _appD2d.Dispose(); } catch { }
+                _appD2d = null;
+            }
+            base.OnHandleDestroyed(e);
         }
 
         protected override void OnLocationChanged(EventArgs e)
@@ -7232,7 +7232,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawFloatingTouchActionBar(Graphics g, int width, int height)
+        private void DrawFloatingTouchActionBar(D2DGraphics g, int width, int height)
         {
             string[] glyphs = new string[]
             {
@@ -7381,7 +7381,7 @@ namespace ZenQOffice.UI
             return true;
         }
 
-        private void DrawFloatingInkingPalette(Graphics g, int width, int height)
+        private void DrawFloatingInkingPalette(D2DGraphics g, int width, int height)
         {
             bool isPenActive = (Ribbon.ActiveDrawTool == 1 || Ribbon.ActiveDrawTool == 2 || Ribbon.ActiveDrawTool == 3 || (Ribbon.ActiveDrawTool == 7 && !Ribbon.CustomPenIsHighlighter));
             bool isHighlighterActive = (Ribbon.ActiveDrawTool == 4 || Ribbon.ActiveDrawTool == 5 || (Ribbon.ActiveDrawTool == 7 && Ribbon.CustomPenIsHighlighter));
@@ -7697,7 +7697,7 @@ namespace ZenQOffice.UI
             return true;
         }
 
-        private void DrawPeripheralToastBanner(Graphics g, int width, int height)
+        private void DrawPeripheralToastBanner(D2DGraphics g, int width, int height)
         {
             if (string.IsNullOrEmpty(_peripheralToastTitle) || DateTime.UtcNow > _peripheralToastExpiry)
             {

@@ -10,6 +10,7 @@ using System.Threading;
 using System.Windows.Forms;
 using ZenQOffice.Core;
 using ZenQOffice.Format;
+using Graphics = ZenQOffice.UI.D2DGraphics;
 
 namespace ZenQOffice.UI
 {
@@ -460,6 +461,15 @@ namespace ZenQOffice.UI
         #endregion
 
         #region Main Render Pipeline
+        public void Draw(System.Drawing.Graphics g, int width, int height, RibbonBar ribbon, int topOffset = 155, int statusH = 26)
+        {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            {
+                Draw(d2d, width, height, ribbon, topOffset, statusH);
+            }
+        }
+
         public void Draw(Graphics g, int width, int height, RibbonBar ribbon, int topOffset = 155, int statusH = 26)
         {
             _lastViewWidth = width;

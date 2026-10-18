@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using ZenQOffice.UI;
+using Graphics = ZenQOffice.UI.D2DGraphics;
 
 namespace ZenQOffice
 {
@@ -253,6 +254,15 @@ namespace ZenQOffice
         /// <summary>
         /// Draws modern Microsoft 365 / Apple style Popover Dropdown Card anchored cleanly under the '+' button.
         /// </summary>
+        public static void Draw(System.Drawing.Graphics g, int clientWidth, int clientHeight)
+        {
+            if (g == null) return;
+            using (D2DGraphics d2d = new D2DGraphics(g, clientWidth, clientHeight))
+            {
+                Draw(d2d, clientWidth, clientHeight);
+            }
+        }
+
         public static void Draw(Graphics g, int clientWidth, int clientHeight)
         {
             if (WpfNewTabLauncherWindow.IsCurrentlyOpen) return;

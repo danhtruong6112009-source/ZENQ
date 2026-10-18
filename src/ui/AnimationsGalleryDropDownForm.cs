@@ -338,6 +338,12 @@ namespace ZenQOffice.UI
             curY += 160;
         }
 
+        public static void DrawAnimationVector(D2DGraphics g, float cx, float cy, AnimationType type, string category)
+        {
+            if (g == null) return;
+            g.DrawGdi(nativeG => DrawAnimationVector(nativeG, cx, cy, type, category));
+        }
+
         public static void DrawAnimationVector(Graphics g, float cx, float cy, AnimationType type, string category)
         {
             switch (category)
@@ -879,6 +885,31 @@ namespace ZenQOffice.UI
                     using (SolidBrush gb = new SolidBrush(green)) g.FillEllipse(gb, cx - 3, cy - 14, 6, 6);
                     using (SolidBrush rb = new SolidBrush(red)) g.FillEllipse(rb, cx - 3, cy + 9, 6, 6);
                     break;
+            }
+        }
+
+        public static void DrawStarVector(D2DGraphics g, float cx, float cy, float rOuter, float rInner, Color col, bool isFilled = true)
+        {
+            if (g == null) return;
+            PointF[] pts = new PointF[10];
+            double step = Math.PI / 5.0;
+            double angle = -Math.PI / 2.0;
+            for (int i = 0; i < 10; i++)
+            {
+                float r = (i % 2 == 0) ? rOuter : rInner;
+                pts[i] = new PointF(cx + (float)(r * Math.Cos(angle)), cy + (float)(r * Math.Sin(angle)));
+                angle += step;
+            }
+            if (isFilled)
+            {
+                using (SolidBrush b = new SolidBrush(col))
+                {
+                    g.FillPolygon(b, pts);
+                }
+            }
+            using (Pen p = new Pen(col, 1.2f))
+            {
+                g.DrawPolygon(p, pts);
             }
         }
 
