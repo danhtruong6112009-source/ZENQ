@@ -17287,30 +17287,16 @@ namespace ZenQOffice.UI
                 g.DrawLine(stemPen, topCenter.X, topCenter.Y, rotHandle.X, rotHandle.Y);
             }
 
-            // 4. Draw Circular Rotation Arrow Icon (Mũi tên xoay vòng chuẩn PowerPoint 365)
-            RectangleF rotCircle = new RectangleF(rotHandle.X - 9f, rotHandle.Y - 9f, 18f, 18f);
+            // 4. Draw Circular Rotation Arrow Knob (Windows 11 Fluent Rotate Icon)
+            RectangleF rotCircle = new RectangleF(rotHandle.X - 10f, rotHandle.Y - 10f, 20f, 20f);
             using (SolidBrush whiteBg = new SolidBrush(Color.White))
-            using (Pen borderPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
-            using (Pen arrowPen = new Pen(Color.FromArgb(30, 41, 59), 1.6f))
-            using (SolidBrush arrowBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
             {
                 g.FillEllipse(whiteBg, rotCircle);
                 g.DrawEllipse(borderPen, rotCircle);
 
-                // Circular arc for rotation arrow
-                RectangleF arcRect = new RectangleF(rotHandle.X - 5.5f, rotHandle.Y - 5.5f, 11f, 11f);
-                g.DrawArc(arrowPen, arcRect, -30, 240);
-
-                // Arrow head at the top-right end
-                float headX = rotHandle.X + 3.5f;
-                float headY = rotHandle.Y - 5.5f;
-                PointF[] arrowHead = new PointF[]
-                {
-                    new PointF(headX - 1f, headY - 3.5f),
-                    new PointF(headX + 3.5f, headY + 0.5f),
-                    new PointF(headX - 3.5f, headY + 2f)
-                };
-                g.FillPolygon(arrowBrush, arrowHead);
+                RectangleF iconRect = new RectangleF(rotHandle.X - 6.5f, rotHandle.Y - 6.5f, 13f, 13f);
+                FluentIconRenderer.DrawGlyph(g, '\uE7AD', iconRect, Color.FromArgb(30, 41, 59), 11f);
             }
 
             // 5. Draw Corner Rounding Handle at Top-Right (Icon bo góc bên phải góc trên của hình vuông/chữ nhật)
@@ -27435,6 +27421,10 @@ namespace ZenQOffice.UI
                                 CropInitialTop = shape.CropTop;
                                 CropInitialRight = shape.CropRight;
                                 CropInitialBottom = shape.CropBottom;
+                                CropInitialShapeX = shape.Transform.X;
+                                CropInitialShapeY = shape.Transform.Y;
+                                CropInitialShapeW = shape.Transform.Width;
+                                CropInitialShapeH = shape.Transform.Height;
                                 return;
                             }
                         }
@@ -29071,7 +29061,7 @@ namespace ZenQOffice.UI
                 float startW = DragStartTransform.Width;
                 float startH = DragStartTransform.Height;
                 float ratio = startW / Math.Max(1.0f, startH);
-                bool isGraphic = shape.Type == ShapeType.Image || shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.Video;
+                bool isGraphic = shape.Type == ShapeType.Image || shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.Video || shape.IsGraphic || shape.IsSvg;
                 bool isCornerHandle = (DragResizeHandleIndex == 0 || DragResizeHandleIndex == 2 || DragResizeHandleIndex == 4 || DragResizeHandleIndex == 6);
                 bool keepAspect = (Control.ModifierKeys & Keys.Shift) != 0 || (isGraphic && isCornerHandle);
 
@@ -29080,6 +29070,58 @@ namespace ZenQOffice.UI
                 float sinR = (float)Math.Sin(rotRad);
                 float localDx = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * cosR - dy * sinR) : dx;
                 float localDy = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * sinR + dy * cosR) : dy;
+
+                bool isSvgOrGraphic = shape.IsGraphic || shape.IsSvg || (!string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) || (shape.Type == ShapeType.Image && shape.CachedImage != null);
+                if (isSvgOrGraphic && !isCornerHandle)
+                {
+                    float initW = Math.Max(10f, CropInitialShapeW > 0 ? CropInitialShapeW : startW);
+                    float initH = Math.Max(10f, CropInitialShapeH > 0 ? CropInitialShapeH : startH);
+                    float initVisWFrac = Math.Max(0.05f, 1.0f - CropInitialLeft - CropInitialRight);
+                    float initVisHFrac = Math.Max(0.05f, 1.0f - CropInitialTop - CropInitialBottom);
+                    float cropRotPosRad = (float)(shape.Transform.Rotation * Math.PI / 180.0);
+                    float cropCosP = (float)Math.Cos(cropRotPosRad);
+                    float cropSinP = (float)Math.Sin(cropRotPosRad);
+
+                    if (DragResizeHandleIndex == 7) // Left edge
+                    {
+                        float fracDelta = (localDx / initW) * initVisWFrac;
+                        shape.CropLeft = Math.Max(0f, Math.Min(0.95f - CropInitialRight, CropInitialLeft + fracDelta));
+                        float activeVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
+                        float w = Math.Max(10f, initW * (activeVisWFrac / initVisWFrac));
+                        float deltaCropW = (shape.CropLeft - CropInitialLeft) * (initW / initVisWFrac);
+                        shape.Transform.Width = w;
+                        shape.Transform.X = CropInitialShapeX + deltaCropW * cropCosP;
+                        shape.Transform.Y = CropInitialShapeY + deltaCropW * cropSinP;
+                    }
+                    else if (DragResizeHandleIndex == 3) // Right edge
+                    {
+                        float fracDelta = (-localDx / initW) * initVisWFrac;
+                        shape.CropRight = Math.Max(0f, Math.Min(0.95f - CropInitialLeft, CropInitialRight + fracDelta));
+                        float activeVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
+                        shape.Transform.Width = Math.Max(10f, initW * (activeVisWFrac / initVisWFrac));
+                    }
+                    else if (DragResizeHandleIndex == 1) // Top edge
+                    {
+                        float fracDelta = (localDy / initH) * initVisHFrac;
+                        shape.CropTop = Math.Max(0f, Math.Min(0.95f - CropInitialBottom, CropInitialTop + fracDelta));
+                        float activeVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
+                        float h = Math.Max(10f, initH * (activeVisHFrac / initVisHFrac));
+                        float deltaCropH = (shape.CropTop - CropInitialTop) * (initH / initVisHFrac);
+                        shape.Transform.Height = h;
+                        shape.Transform.X = CropInitialShapeX - deltaCropH * cropSinP;
+                        shape.Transform.Y = CropInitialShapeY + deltaCropH * cropCosP;
+                    }
+                    else if (DragResizeHandleIndex == 5) // Bottom edge
+                    {
+                        float fracDelta = (-localDy / initH) * initVisHFrac;
+                        shape.CropBottom = Math.Max(0f, Math.Min(0.95f - CropInitialTop, CropInitialBottom + fracDelta));
+                        float activeVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
+                        shape.Transform.Height = Math.Max(10f, initH * (activeVisHFrac / initVisHFrac));
+                    }
+
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
 
                 float ax = 0.5f, ay = 0.5f;
                 switch (DragResizeHandleIndex)

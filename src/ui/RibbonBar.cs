@@ -3441,10 +3441,12 @@ namespace ZenQOffice.UI
                 else if (slidesView != null && slidesView.SelectedShape != null)
                 {
                     var shape = slidesView.SelectedShape;
-                    if (shape.IsSvg || shape.IsGraphic)
+                    bool isSvgGraphic = shape.IsSvg || shape.IsGraphic || (!string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase));
+                    if (isSvgGraphic)
                     {
+                        shape.IsSvg = true;
+                        shape.IsGraphic = true;
                         pTabs.Add("Định dạng Đồ họa");
-                        pTabs.Add("Định dạng Hình dạng");
                     }
                     else if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
                     {
@@ -23950,21 +23952,44 @@ namespace ZenQOffice.UI
             if (x >= 94 && x <= 188 && y >= 68 && y <= 122)
             {
                 slidesView.SaveUndoState();
-                shape.IsGraphic = false;
-                shape.IsSvg = false;
-                if (shape.Type == ShapeType.Image) shape.Type = ShapeType.Rectangle;
-                MessageBox.Show(parentForm, "Đã chuyển đổi đồ họa sang hình khối vector độc lập có thể tùy biến đường viền và tô màu toàn diện!", "Chuyển Đổi Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string xml = shape.SvgContent;
+                if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                {
+                    xml = System.IO.File.ReadAllText(shape.ImagePath);
+                    shape.OriginalSvgContent = xml;
+                    shape.SvgContent = xml;
+                }
+                var newShapes = SvgRasterizer.ConvertSvgToShapes(xml, shape.Transform.X, shape.Transform.Y, shape.Transform.Width, shape.Transform.Height);
+                if (newShapes != null && newShapes.Count > 0)
+                {
+                    int idx = slidesView.ActiveSlide.Shapes.IndexOf(shape);
+                    if (idx >= 0)
+                    {
+                        slidesView.ActiveSlide.Shapes.RemoveAt(idx);
+                        slidesView.ActiveSlide.Shapes.InsertRange(idx, newShapes);
+                        slidesView.SelectedShapeIndex = idx;
+                        slidesView.ActiveSlide.IsThumbnailDirty = true;
+                        MessageBox.Show(parentForm, $"Đã rã đồ họa thành {newShapes.Count} hình khối vector độc lập thành công!", "Rã Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                else
+                {
+                    shape.IsGraphic = false;
+                    shape.IsSvg = false;
+                    if (shape.Type == ShapeType.Image) shape.Type = ShapeType.Rectangle;
+                    MessageBox.Show(parentForm, "Đã chuyển đổi đồ họa sang hình khối vector độc lập!", "Chuyển Đổi Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
 
             // Group 2: Kiểu Đồ họa
             Color[] styleColors = new Color[] {
-                Color.FromArgb(37, 99, 235),
-                Color.FromArgb(220, 38, 38),
-                Color.FromArgb(16, 185, 129),
-                Color.FromArgb(245, 158, 11),
-                Color.FromArgb(107, 114, 128)
+                Color.FromArgb(37, 99, 235),  // Kiểu 1: Blue
+                Color.FromArgb(220, 38, 38),  // Kiểu 2: Red
+                Color.FromArgb(16, 185, 129), // Kiểu 3: Green
+                Color.FromArgb(245, 158, 11), // Kiểu 4: Amber
+                Color.FromArgb(71, 85, 105)   // Kiểu 5: Slate
             };
             for (int i = 0; i < styleColors.Length; i++)
             {
@@ -23972,44 +23997,303 @@ namespace ZenQOffice.UI
                 if (x >= bx && x <= bx + 32 && y >= 68 && y <= 122)
                 {
                     slidesView.SaveUndoState();
-                    shape.FillColor = styleColors[i].ToArgb();
-                    shape.StrokeColor = Color.White.ToArgb();
-                    shape.StrokeWidth = 1.5f;
+                    Color chosen = styleColors[i];
+                    shape.FillColor = chosen.ToArgb();
+
+                    string xml = shape.SvgContent;
+                    if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                    {
+                        xml = System.IO.File.ReadAllText(shape.ImagePath);
+                        shape.OriginalSvgContent = xml;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(xml))
+                    {
+                        shape.SvgContent = SvgRasterizer.RecolorSvgWithThemeColor(xml, chosen);
+                        Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
+                        if (sharpBmp != null)
+                        {
+                            shape.CachedImage = sharpBmp;
+                            shape.InvalidateDisplayCache();
+                        }
+                    }
+                    else if (shape.CachedImage != null)
+                    {
+                        Bitmap recolored = SvgRasterizer.ApplySolidColorRecolor((Bitmap)shape.CachedImage, chosen);
+                        if (recolored != null)
+                        {
+                            shape.CachedImage = recolored;
+                            shape.InvalidateDisplayCache();
+                        }
+                    }
+
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
             }
 
-            if (x >= 380 && x <= 500 && y >= 68 && y <= 92)
+            if (x >= 380 && x <= 500 && y >= 68 && y <= 92) // Tô màu Đồ họa ▾
             {
-                using (ColorDialog cd = new ColorDialog())
+                ContextMenuStrip fillMenu = new ContextMenuStrip();
+                fillMenu.RenderMode = ToolStripRenderMode.System;
+
+                // 1. Chọn màu tô chủ đề
+                fillMenu.Items.Add("🎨 Màu Chủ đề (Theme Color)...", null, (s, e) =>
                 {
-                    cd.Color = Color.FromArgb(shape.FillColor);
-                    if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                    using (ColorDialog cd = new ColorDialog())
                     {
-                        slidesView.SaveUndoState();
-                        shape.FillColor = cd.Color.ToArgb();
-                        if (parentForm != null) parentForm.Invalidate();
+                        cd.Color = Color.FromArgb(shape.FillColor != 0 ? shape.FillColor : Color.FromArgb(37, 99, 235).ToArgb());
+                        if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                        {
+                            slidesView.SaveUndoState();
+                            Color chosen = cd.Color;
+                            shape.FillColor = chosen.ToArgb();
+
+                            string xml = shape.SvgContent;
+                            if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                            {
+                                xml = System.IO.File.ReadAllText(shape.ImagePath);
+                                shape.OriginalSvgContent = xml;
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(xml))
+                            {
+                                shape.SvgContent = SvgRasterizer.RecolorSvgWithThemeColor(xml, chosen);
+                                Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
+                                if (sharpBmp != null)
+                                {
+                                    shape.CachedImage = sharpBmp;
+                                    shape.InvalidateDisplayCache();
+                                }
+                            }
+                            else if (shape.CachedImage != null)
+                            {
+                                Bitmap recolored = SvgRasterizer.ApplySolidColorRecolor((Bitmap)shape.CachedImage, chosen);
+                                if (recolored != null)
+                                {
+                                    shape.CachedImage = recolored;
+                                    shape.InvalidateDisplayCache();
+                                }
+                            }
+
+                            if (parentForm != null) parentForm.Invalidate();
+                        }
+                    }
+                });
+
+                // 2. Nhận diện các màu trong đồ họa (SVG Color Palette)
+                string curXml = shape.SvgContent;
+                if (string.IsNullOrWhiteSpace(curXml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                {
+                    curXml = System.IO.File.ReadAllText(shape.ImagePath);
+                    shape.OriginalSvgContent = curXml;
+                    shape.SvgContent = curXml;
+                }
+                var detectedColors = SvgRasterizer.ExtractColorsFromSvg(curXml ?? "");
+
+                ToolStripMenuItem paletteItem = new ToolStripMenuItem($"🔍 Bảng màu phát hiện ({detectedColors.Count} màu)...");
+                if (detectedColors.Count > 0)
+                {
+                    int maxColors = Math.Min(16, detectedColors.Count);
+                    for (int ci = 0; ci < maxColors; ci++)
+                    {
+                        Color capturedColor = detectedColors[ci];
+                        Bitmap colorIcon = new Bitmap(16, 16);
+                        using (Graphics gI = Graphics.FromImage(colorIcon))
+                        {
+                            using (SolidBrush b = new SolidBrush(capturedColor)) gI.FillRectangle(b, 1, 1, 14, 14);
+                            using (Pen p = new Pen(Color.FromArgb(160, 174, 192), 1f)) gI.DrawRectangle(p, 1, 1, 13, 13);
+                        }
+                        ToolStripMenuItem cItem = new ToolStripMenuItem($"Màu #{capturedColor.R:X2}{capturedColor.G:X2}{capturedColor.B:X2}", colorIcon, (s, e) =>
+                        {
+                            using (ColorDialog cd = new ColorDialog())
+                            {
+                                cd.Color = capturedColor;
+                                if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                                {
+                                    slidesView.SaveUndoState();
+                                    Color newC = cd.Color;
+                                    string sourceXml = shape.SvgContent ?? curXml;
+                                    shape.SvgContent = SvgRasterizer.ReplaceColorInSvg(sourceXml, capturedColor, newC);
+                                    Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
+                                    if (sharpBmp != null)
+                                    {
+                                        shape.CachedImage = sharpBmp;
+                                        shape.InvalidateDisplayCache();
+                                    }
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            }
+                        });
+                        paletteItem.DropDownItems.Add(cItem);
                     }
                 }
-                return true;
-            }
-            if (x >= 380 && x <= 500 && y >= 94 && y <= 118)
-            {
-                using (ColorDialog cd = new ColorDialog())
+                else
                 {
-                    cd.Color = Color.FromArgb(shape.StrokeColor);
-                    if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                    paletteItem.DropDownItems.Add(new ToolStripMenuItem("Không phát hiện mã màu XML (Hình bitmap)") { Enabled = false });
+                }
+                fillMenu.Items.Add(paletteItem);
+
+                // 3. Trộn màu Gradient (Gradient Blend)
+                ToolStripMenuItem gradItem = new ToolStripMenuItem("🌊 Trộn màu Gradient (Gradient Blend)");
+                var gradPresets = new[]
+                {
+                    new { Name = "🌅 Hoàng hôn ấm áp (Sunset)", C1 = Color.FromArgb(255, 241, 118), C2 = Color.FromArgb(240, 98, 146) },
+                    new { Name = "🌊 Đại dương Xanh (Ocean)", C1 = Color.FromArgb(56, 189, 248), C2 = Color.FromArgb(2, 132, 199) },
+                    new { Name = "🍃 Rừng Nhiệt đới (Emerald)", C1 = Color.FromArgb(52, 211, 153), C2 = Color.FromArgb(5, 150, 105) },
+                    new { Name = "👑 Hoàng gia Tím (Purple)", C1 = Color.FromArgb(192, 132, 252), C2 = Color.FromArgb(126, 34, 206) },
+                    new { Name = "⚡ Cyber Neon", C1 = Color.FromArgb(0, 240, 255), C2 = Color.FromArgb(224, 64, 251) },
+                    new { Name = "✨ Vàng Champagne (Golden)", C1 = Color.FromArgb(253, 230, 138), C2 = Color.FromArgb(245, 158, 11) },
+                    new { Name = "🌌 Đêm Huyền bí (Midnight)", C1 = Color.FromArgb(49, 46, 129), C2 = Color.FromArgb(67, 56, 202) },
+                    new { Name = "❄️ Băng tuyết Bạc hà (Mint)", C1 = Color.FromArgb(153, 246, 228), C2 = Color.FromArgb(20, 184, 166) }
+                };
+
+                foreach (var gp in gradPresets)
+                {
+                    var capturedGp = gp;
+                    gradItem.DropDownItems.Add(capturedGp.Name, null, (s, e) =>
                     {
                         slidesView.SaveUndoState();
-                        shape.StrokeColor = cd.Color.ToArgb();
-                        if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2f;
+                        Bitmap baseBmp = (Bitmap)shape.CachedImage;
+                        if (baseBmp == null && !string.IsNullOrEmpty(shape.ImagePath))
+                        {
+                            baseBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent ?? shape.ImagePath, 1600, 1600);
+                        }
+                        if (baseBmp != null)
+                        {
+                            Bitmap blended = SvgRasterizer.ApplyGradientBlendToBitmap(baseBmp, capturedGp.C1, capturedGp.C2, 90f);
+                            if (blended != null)
+                            {
+                                shape.CachedImage = blended;
+                                shape.HasGradientFill = true;
+                                shape.FillColor = capturedGp.C1.ToArgb();
+                                shape.GradientColor2 = capturedGp.C2.ToArgb();
+                                shape.GradientAngle = 90f;
+                                shape.InvalidateDisplayCache();
+                            }
+                        }
                         if (parentForm != null) parentForm.Invalidate();
-                    }
+                    });
                 }
+
+                gradItem.DropDownItems.Add(new ToolStripSeparator());
+                gradItem.DropDownItems.Add("🎨 Tùy chọn 2 màu Gradient...", null, (s, e) =>
+                {
+                    Color c1 = Color.FromArgb(37, 99, 235);
+                    Color c2 = Color.FromArgb(245, 158, 11);
+                    using (ColorDialog cd1 = new ColorDialog { Color = c1 })
+                    {
+                        if (cd1.ShowDialog(parentForm) == DialogResult.OK)
+                        {
+                            c1 = cd1.Color;
+                            using (ColorDialog cd2 = new ColorDialog { Color = c2 })
+                            {
+                                if (cd2.ShowDialog(parentForm) == DialogResult.OK)
+                                {
+                                    c2 = cd2.Color;
+                                    slidesView.SaveUndoState();
+                                    Bitmap baseBmp = (Bitmap)shape.CachedImage;
+                                    if (baseBmp != null)
+                                    {
+                                        Bitmap blended = SvgRasterizer.ApplyGradientBlendToBitmap(baseBmp, c1, c2, 90f);
+                                        if (blended != null)
+                                        {
+                                            shape.CachedImage = blended;
+                                            shape.HasGradientFill = true;
+                                            shape.FillColor = c1.ToArgb();
+                                            shape.GradientColor2 = c2.ToArgb();
+                                            shape.GradientAngle = 90f;
+                                            shape.InvalidateDisplayCache();
+                                        }
+                                    }
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }
+                            }
+                        }
+                    }
+                });
+
+                fillMenu.Items.Add(gradItem);
+
+                // 4. Khôi phục màu gốc
+                fillMenu.Items.Add(new ToolStripSeparator());
+                fillMenu.Items.Add("🔄 Đặt lại màu gốc của Đồ họa", null, (s, e) =>
+                {
+                    slidesView.SaveUndoState();
+                    string orig = shape.OriginalSvgContent;
+                    if (string.IsNullOrWhiteSpace(orig) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                    {
+                        orig = System.IO.File.ReadAllText(shape.ImagePath);
+                    }
+                    if (!string.IsNullOrWhiteSpace(orig))
+                    {
+                        shape.SvgContent = orig;
+                        shape.CachedImage = SvgRasterizer.RenderSvgToBitmap(orig, 1600, 1600);
+                    }
+                    else if (!string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                    {
+                        shape.CachedImage = Image.FromFile(shape.ImagePath);
+                    }
+                    shape.HasGradientFill = false;
+                    shape.InvalidateDisplayCache();
+                    if (parentForm != null) parentForm.Invalidate();
+                });
+
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(380, 94)) : new Point(380, 94);
+                fillMenu.Show(pt);
                 return true;
             }
-            if (x >= 380 && x <= 500 && y >= 120 && y <= 144)
+
+            if (x >= 380 && x <= 500 && y >= 94 && y <= 118) // Viền Đồ họa ▾
+            {
+                ContextMenuStrip outlineMenu = new ContextMenuStrip();
+                outlineMenu.RenderMode = ToolStripRenderMode.System;
+
+                outlineMenu.Items.Add("🎨 Màu viền (Outline Color)...", null, (s, e) =>
+                {
+                    using (ColorDialog cd = new ColorDialog())
+                    {
+                        cd.Color = Color.FromArgb(shape.StrokeColor != 0 ? shape.StrokeColor : Color.FromArgb(37, 99, 235).ToArgb());
+                        if (cd.ShowDialog(parentForm) == DialogResult.OK)
+                        {
+                            slidesView.SaveUndoState();
+                            shape.StrokeColor = cd.Color.ToArgb();
+                            if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2.0f;
+                            if (parentForm != null) parentForm.Invalidate();
+                        }
+                    }
+                });
+
+                ToolStripMenuItem widthItem = new ToolStripMenuItem("📏 Độ dày viền");
+                float[] widths = new float[] { 1f, 1.5f, 2f, 3f, 4.5f, 6f };
+                foreach (float w in widths)
+                {
+                    float cw = w;
+                    widthItem.DropDownItems.Add($"{cw} pt", null, (s, e) =>
+                    {
+                        slidesView.SaveUndoState();
+                        shape.StrokeWidth = cw;
+                        if (shape.StrokeColor == 0) shape.StrokeColor = Color.FromArgb(37, 99, 235).ToArgb();
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                }
+                outlineMenu.Items.Add(widthItem);
+
+                outlineMenu.Items.Add(new ToolStripSeparator());
+                outlineMenu.Items.Add("🚫 Không viền", null, (s, e) =>
+                {
+                    slidesView.SaveUndoState();
+                    shape.StrokeWidth = 0f;
+                    shape.StrokeColor = Color.Transparent.ToArgb();
+                    if (parentForm != null) parentForm.Invalidate();
+                });
+
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(380, 120)) : new Point(380, 120);
+                outlineMenu.Show(pt);
+                return true;
+            }
+
+            if (x >= 380 && x <= 500 && y >= 120 && y <= 144) // Hiệu ứng ▾
             {
                 ShowShapeEffectsMenu(slidesView, shape, parentForm, new Point(380, 144));
                 return true;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
@@ -299,6 +300,426 @@ namespace ZenQOffice.Core
                 return null;
             }
         }
+
+        #region SVG Color Extraction, Palette Swapping & Recoloring
+
+        public static List<Color> ExtractColorsFromSvg(string svgXmlOrPath)
+        {
+            var result = new List<Color>();
+            if (string.IsNullOrWhiteSpace(svgXmlOrPath)) return result;
+
+            string xml = svgXmlOrPath.Trim();
+            if (!xml.StartsWith("<") && File.Exists(xml))
+            {
+                try { xml = File.ReadAllText(xml); } catch { return result; }
+            }
+
+            var colorSet = new HashSet<int>();
+
+            // Find all hex colors: #RRGGBB or #RGB or #RRGGBBAA
+            var hexRegex = new Regex(@"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b");
+            foreach (Match m in hexRegex.Matches(xml))
+            {
+                try
+                {
+                    var wpfC = ParseColor(m.Value, 1.0);
+                    if (wpfC.A > 0)
+                    {
+                        Color c = Color.FromArgb(wpfC.A, wpfC.R, wpfC.G, wpfC.B);
+                        if (colorSet.Add(c.ToArgb()))
+                        {
+                            result.Add(c);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Find all rgb(...) or rgba(...)
+            var rgbRegex = new Regex(@"rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9\.]+))?\s*\)", RegexOptions.IgnoreCase);
+            foreach (Match m in rgbRegex.Matches(xml))
+            {
+                try
+                {
+                    int r = Math.Max(0, Math.Min(255, int.Parse(m.Groups[1].Value)));
+                    int g = Math.Max(0, Math.Min(255, int.Parse(m.Groups[2].Value)));
+                    int b = Math.Max(0, Math.Min(255, int.Parse(m.Groups[3].Value)));
+                    int a = 255;
+                    if (m.Groups[4].Success)
+                    {
+                        float fa = float.Parse(m.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture);
+                        a = Math.Max(0, Math.Min(255, (int)Math.Round(fa * 255f)));
+                    }
+                    if (a > 10)
+                    {
+                        Color c = Color.FromArgb(a, r, g, b);
+                        if (colorSet.Add(c.ToArgb()))
+                        {
+                            result.Add(c);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return result;
+        }
+
+        public static string ReplaceColorInSvg(string svgXml, Color oldColor, Color newColor)
+        {
+            if (string.IsNullOrWhiteSpace(svgXml)) return svgXml;
+
+            string newHex = $"#{newColor.R:X2}{newColor.G:X2}{newColor.B:X2}";
+            string oldHex6 = $"{oldColor.R:X2}{oldColor.G:X2}{oldColor.B:X2}";
+
+            // Replace #RRGGBB
+            string pattern = @"#" + oldHex6 + @"\b";
+            string updated = Regex.Replace(svgXml, pattern, newHex, RegexOptions.IgnoreCase);
+
+            // Replace #RGB if applicable
+            if ((oldColor.R >> 4) == (oldColor.R & 0xF) &&
+                (oldColor.G >> 4) == (oldColor.G & 0xF) &&
+                (oldColor.B >> 4) == (oldColor.B & 0xF))
+            {
+                string oldHex3 = $"{(oldColor.R & 0xF):X}{(oldColor.G & 0xF):X}{(oldColor.B & 0xF):X}";
+                updated = Regex.Replace(updated, @"#" + oldHex3 + @"\b", newHex, RegexOptions.IgnoreCase);
+            }
+
+            // Replace rgb(r, g, b)
+            string rgbPattern = $@"\brgb\s*\(\s*{oldColor.R}\s*,\s*{oldColor.G}\s*,\s*{oldColor.B}\s*\)";
+            updated = Regex.Replace(updated, rgbPattern, newHex, RegexOptions.IgnoreCase);
+
+            return updated;
+        }
+
+        public static string RecolorSvgWithThemeColor(string svgXml, Color themeColor)
+        {
+            var colors = ExtractColorsFromSvg(svgXml);
+            if (colors == null || colors.Count == 0) return svgXml;
+
+            Color primaryAccent = Color.Empty;
+            float maxScore = -1f;
+
+            foreach (var c in colors)
+            {
+                float max = Math.Max(c.R, Math.Max(c.G, c.B)) / 255f;
+                float min = Math.Min(c.R, Math.Min(c.G, c.B)) / 255f;
+                float delta = max - min;
+                float sat = (max == 0) ? 0 : delta / max;
+                float lum = (max + min) / 2f;
+
+                if (lum > 0.1f && lum < 0.92f && sat > 0.15f)
+                {
+                    float score = sat * 2f + (0.5f - Math.Abs(lum - 0.5f));
+                    if (score > maxScore)
+                    {
+                        maxScore = score;
+                        primaryAccent = c;
+                    }
+                }
+            }
+
+            if (!primaryAccent.IsEmpty)
+            {
+                return ReplaceColorInSvg(svgXml, primaryAccent, themeColor);
+            }
+            else
+            {
+                foreach (var c in colors)
+                {
+                    if (c.R < 240 || c.G < 240 || c.B < 240)
+                    {
+                        return ReplaceColorInSvg(svgXml, c, themeColor);
+                    }
+                }
+            }
+
+            return svgXml;
+        }
+
+        public static Bitmap ApplyGradientBlendToBitmap(Bitmap srcBmp, Color color1, Color color2, float angle)
+        {
+            if (srcBmp == null) return null;
+
+            int w = srcBmp.Width;
+            int h = srcBmp.Height;
+            Bitmap result = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
+
+            float rad = (float)(angle * Math.PI / 180.0);
+            float cos = (float)Math.Cos(rad);
+            float sin = (float)Math.Sin(rad);
+
+            float minProj = float.MaxValue;
+            float maxProj = float.MinValue;
+            PointF[] corners = new PointF[] {
+                new PointF(0, 0),
+                new PointF(w, 0),
+                new PointF(0, h),
+                new PointF(w, h)
+            };
+            foreach (var pt in corners)
+            {
+                float proj = pt.X * cos + pt.Y * sin;
+                if (proj < minProj) minProj = proj;
+                if (proj > maxProj) maxProj = proj;
+            }
+            float projRange = Math.Max(1f, maxProj - minProj);
+
+            BitmapData srcData = srcBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+            BitmapData dstData = result.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+
+            try
+            {
+                int stride = srcData.Stride;
+                byte[] srcBytes = new byte[stride * h];
+                byte[] dstBytes = new byte[stride * h];
+                Marshal.Copy(srcData.Scan0, srcBytes, 0, srcBytes.Length);
+
+                for (int y = 0; y < h; y++)
+                {
+                    int rowOff = y * stride;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int px = rowOff + x * 4;
+                        byte b = srcBytes[px];
+                        byte g = srcBytes[px + 1];
+                        byte r = srcBytes[px + 2];
+                        byte a = srcBytes[px + 3];
+
+                        if (a <= 5)
+                        {
+                            dstBytes[px] = 0;
+                            dstBytes[px + 1] = 0;
+                            dstBytes[px + 2] = 0;
+                            dstBytes[px + 3] = 0;
+                            continue;
+                        }
+
+                        float proj = x * cos + y * sin;
+                        float t = Math.Max(0f, Math.Min(1f, (proj - minProj) / projRange));
+
+                        float gR = color1.R + (color2.R - color1.R) * t;
+                        float gG = color1.G + (color2.G - color1.G) * t;
+                        float gB = color1.B + (color2.B - color1.B) * t;
+
+                        float unA = a / 255f;
+                        float lum = (0.299f * (r / unA) + 0.587f * (g / unA) + 0.114f * (b / unA)) / 255f;
+                        float factor = 0.35f + 0.65f * lum;
+
+                        byte outR = (byte)Math.Max(0, Math.Min(255, (int)(gR * factor * unA)));
+                        byte outG = (byte)Math.Max(0, Math.Min(255, (int)(gG * factor * unA)));
+                        byte outB = (byte)Math.Max(0, Math.Min(255, (int)(gB * factor * unA)));
+
+                        dstBytes[px] = outB;
+                        dstBytes[px + 1] = outG;
+                        dstBytes[px + 2] = outR;
+                        dstBytes[px + 3] = a;
+                    }
+                }
+
+                Marshal.Copy(dstBytes, 0, dstData.Scan0, dstBytes.Length);
+            }
+            finally
+            {
+                srcBmp.UnlockBits(srcData);
+                result.UnlockBits(dstData);
+            }
+
+            return result;
+        }
+
+        public static Bitmap ApplySolidColorRecolor(Bitmap srcBmp, Color targetColor)
+        {
+            if (srcBmp == null) return null;
+
+            int w = srcBmp.Width;
+            int h = srcBmp.Height;
+            Bitmap result = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
+
+            BitmapData srcData = srcBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+            BitmapData dstData = result.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+
+            try
+            {
+                int stride = srcData.Stride;
+                byte[] srcBytes = new byte[stride * h];
+                byte[] dstBytes = new byte[stride * h];
+                Marshal.Copy(srcData.Scan0, srcBytes, 0, srcBytes.Length);
+
+                for (int y = 0; y < h; y++)
+                {
+                    int rowOff = y * stride;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int px = rowOff + x * 4;
+                        byte b = srcBytes[px];
+                        byte g = srcBytes[px + 1];
+                        byte r = srcBytes[px + 2];
+                        byte a = srcBytes[px + 3];
+
+                        if (a <= 5)
+                        {
+                            dstBytes[px] = 0;
+                            dstBytes[px + 1] = 0;
+                            dstBytes[px + 2] = 0;
+                            dstBytes[px + 3] = 0;
+                            continue;
+                        }
+
+                        float unA = a / 255f;
+                        float lum = (0.299f * (r / unA) + 0.587f * (g / unA) + 0.114f * (b / unA)) / 255f;
+                        float factor = 0.25f + 0.75f * lum;
+
+                        byte outR = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.R * factor * unA)));
+                        byte outG = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.G * factor * unA)));
+                        byte outB = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.B * factor * unA)));
+
+                        dstBytes[px] = outB;
+                        dstBytes[px + 1] = outG;
+                        dstBytes[px + 2] = outR;
+                        dstBytes[px + 3] = a;
+                    }
+                }
+
+                Marshal.Copy(dstBytes, 0, dstData.Scan0, dstBytes.Length);
+            }
+            finally
+            {
+                srcBmp.UnlockBits(srcData);
+                result.UnlockBits(dstData);
+            }
+
+            return result;
+        }
+
+        public static List<ShapeNode> ConvertSvgToShapes(string svgXmlOrPath, float targetX, float targetY, float targetW, float targetH)
+        {
+            var shapes = new List<ShapeNode>();
+            if (string.IsNullOrWhiteSpace(svgXmlOrPath)) return shapes;
+
+            string xml = svgXmlOrPath.Trim();
+            if (!xml.StartsWith("<") && File.Exists(xml))
+            {
+                try { xml = File.ReadAllText(xml); } catch { return shapes; }
+            }
+
+            try
+            {
+                XDocument doc = XDocument.Parse(xml);
+                XElement root = doc.Root;
+                if (root == null) return shapes;
+
+                double vbX = 0, vbY = 0, vbW = 100, vbH = 100;
+                string viewBoxAttr = root.Attribute("viewBox")?.Value;
+                if (!string.IsNullOrWhiteSpace(viewBoxAttr))
+                {
+                    var parts = viewBoxAttr.Split(new[] { ' ', ',', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 4)
+                    {
+                        double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out vbX);
+                        double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out vbY);
+                        double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out vbW);
+                        double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out vbH);
+                    }
+                }
+                if (vbW <= 0) vbW = 100;
+                if (vbH <= 0) vbH = 100;
+
+                float scaleX = (float)(targetW / vbW);
+                float scaleY = (float)(targetH / vbH);
+
+                var pathElements = root.Descendants().Where(e => e.Name.LocalName.Equals("path", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                foreach (var pe in pathElements)
+                {
+                    string d = pe.Attribute("d")?.Value;
+                    if (string.IsNullOrWhiteSpace(d)) continue;
+
+                    string fillStr = pe.Attribute("fill")?.Value ?? "";
+                    string strokeStr = pe.Attribute("stroke")?.Value ?? "";
+                    string strokeWStr = pe.Attribute("stroke-width")?.Value ?? "";
+
+                    Color fillColor = Color.FromArgb(37, 99, 235);
+                    Color strokeColor = Color.Transparent;
+                    float strokeW = 0f;
+
+                    if (!string.IsNullOrWhiteSpace(fillStr) && !fillStr.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var wc = ParseColor(fillStr, 1.0);
+                        fillColor = Color.FromArgb(wc.A, wc.R, wc.G, wc.B);
+                    }
+                    if (!string.IsNullOrWhiteSpace(strokeStr) && !strokeStr.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var wc = ParseColor(strokeStr, 1.0);
+                        strokeColor = Color.FromArgb(wc.A, wc.R, wc.G, wc.B);
+                        float.TryParse(strokeWStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out strokeW);
+                    }
+
+                    try
+                    {
+                        var wpfGeom = WpfGeometry.Parse(d);
+                        var pathGeom = WpfPathGeometry.CreateFromGeometry(wpfGeom);
+                        var flat = pathGeom.GetFlattenedPathGeometry(0.25, System.Windows.Media.ToleranceType.Absolute);
+
+                        GraphicsPath gp = new GraphicsPath();
+                        foreach (System.Windows.Media.PathFigure fig in flat.Figures)
+                        {
+                            PointF start = new PointF((float)(fig.StartPoint.X - vbX) * scaleX, (float)(fig.StartPoint.Y - vbY) * scaleY);
+                            PointF prev = start;
+                            foreach (System.Windows.Media.PathSegment seg in fig.Segments)
+                            {
+                                if (seg is System.Windows.Media.PolyLineSegment pls)
+                                {
+                                    foreach (var pt in pls.Points)
+                                    {
+                                        PointF next = new PointF((float)(pt.X - vbX) * scaleX, (float)(pt.Y - vbY) * scaleY);
+                                        gp.AddLine(prev, next);
+                                        prev = next;
+                                    }
+                                }
+                                else if (seg is System.Windows.Media.LineSegment ls)
+                                {
+                                    PointF next = new PointF((float)(ls.Point.X - vbX) * scaleX, (float)(ls.Point.Y - vbY) * scaleY);
+                                    gp.AddLine(prev, next);
+                                    prev = next;
+                                }
+                            }
+                            if (fig.IsClosed)
+                            {
+                                gp.CloseFigure();
+                            }
+                        }
+
+                        if (gp.PointCount > 2)
+                        {
+                            RectangleF bounds = gp.GetBounds();
+                            ShapeNode node = new ShapeNode
+                            {
+                                Type = ShapeType.CustomPath,
+                                Name = "Vector " + (shapes.Count + 1),
+                                CustomPath = gp,
+                                PathWidth = bounds.Width,
+                                PathHeight = bounds.Height,
+                                FillColor = fillColor.ToArgb(),
+                                StrokeColor = strokeColor.ToArgb(),
+                                StrokeWidth = strokeW * scaleX,
+                                Transform = new Transform2D(targetX, targetY, targetW, targetH, 0)
+                            };
+                            shapes.Add(node);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ConvertSvgToShapes error: " + ex.Message);
+            }
+
+            return shapes;
+        }
+
+        #endregion
 
         private static void RenderElementRecursive(
             WpfDrawingContext dc,

@@ -638,6 +638,8 @@ namespace ZenQOffice.Core
         public float OriginalHeight { get; set; }
         public bool IsSvg { get; set; }
         public bool IsGraphic { get; set; }
+        public string SvgContent { get; set; }
+        public string OriginalSvgContent { get; set; }
 
         // Table Properties
         public int TableColumns { get; set; }
@@ -1070,6 +1072,10 @@ namespace ZenQOffice.Core
                 AltText = AltText,
                 OriginalWidth = OriginalWidth,
                 OriginalHeight = OriginalHeight,
+                IsSvg = IsSvg,
+                IsGraphic = IsGraphic,
+                SvgContent = SvgContent,
+                OriginalSvgContent = OriginalSvgContent,
                 VideoPath = VideoPath,
                 VideoFadeInDuration = VideoFadeInDuration,
                 VideoFadeOutDuration = VideoFadeOutDuration,
