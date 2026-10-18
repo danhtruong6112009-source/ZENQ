@@ -1535,8 +1535,32 @@ namespace ZenQOffice.UI
         }
 
         public void DrawString(string s, Font font, Brush brush, RectangleF layoutRectangle) => DrawString(s, font, brush, layoutRectangle, null);
-        public void DrawString(string s, Font font, Brush brush, float x, float y, StringFormat format) => DrawString(s, font, brush, new RectangleF(x, y, 10000, 10000), format);
-        public void DrawString(string s, Font font, Brush brush, PointF point, StringFormat format) => DrawString(s, font, brush, new RectangleF(point.X, point.Y, 10000, 10000), format);
+        public void DrawString(string s, Font font, Brush brush, Rectangle layoutRectangle) => DrawString(s, font, brush, (RectangleF)layoutRectangle, null);
+        public void DrawString(string s, Font font, Brush brush, Rectangle layoutRectangle, StringFormat format) => DrawString(s, font, brush, (RectangleF)layoutRectangle, format);
+
+        public void DrawString(string s, Font font, Brush brush, float x, float y, StringFormat format)
+        {
+            if (string.IsNullOrEmpty(s)) return;
+            if (format != null)
+            {
+                SizeF sz = MeasureString(s, font);
+                float layoutX = x;
+                float layoutY = y;
+                if (format.Alignment == StringAlignment.Center) layoutX = x - sz.Width / 2.0f;
+                else if (format.Alignment == StringAlignment.Far) layoutX = x - sz.Width;
+
+                if (format.LineAlignment == StringAlignment.Center) layoutY = y - sz.Height / 2.0f;
+                else if (format.LineAlignment == StringAlignment.Far) layoutY = y - sz.Height;
+
+                DrawString(s, font, brush, new RectangleF(layoutX, layoutY, Math.Max(1.0f, sz.Width + 2.0f), Math.Max(1.0f, sz.Height + 2.0f)), null);
+            }
+            else
+            {
+                DrawString(s, font, brush, new RectangleF(x, y, 10000.0f, 10000.0f), null);
+            }
+        }
+
+        public void DrawString(string s, Font font, Brush brush, PointF point, StringFormat format) => DrawString(s, font, brush, point.X, point.Y, format);
 
         public SizeF MeasureString(string text, Font font)
         {

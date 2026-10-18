@@ -2225,8 +2225,29 @@ namespace GenOffice.Tests
                 Assert.IsFalse(bannerPixel.R == 240 && bannerPixel.G == 240 && bannerPixel.B == 240,
                     "HomeView banner at Y=100 must NOT be covered by gray wsBg");
 
+                // Verify Photo icon alpha transparency
+                Image photoImg = AppIconRenderer.GetRawImage(OfficeAppMode.Photo);
+                Assert.IsNotNull(photoImg, "Photo raw image must exist");
+                using (Bitmap photoBmp = new Bitmap(photoImg))
+                {
+                    Color cornerColor = photoBmp.GetPixel(0, 0);
+                    Assert.AreEqual(0, (int)cornerColor.A, "Photo icon corner (0,0) must have Alpha = 0 (transparent)");
+                }
+
+                // Verify creation cards exist
+                RectangleF card4 = hv.GetCardBounds(4, w, h);
+                Assert.IsTrue(card4.Width > 50, "Creation card 4 (Đồ họa & Ảnh) must have width > 50");
+
+                string artifactDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gemini", "antigravity", "brain", "56da7ca9-ea1d-4316-b95c-50b3bafbe999");
+                if (Directory.Exists(artifactDir))
+                {
+                    bmp.Save(Path.Combine(artifactDir, "homeview_creation_cards_verified.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
                 string outPath = Path.Combine(outDir, "verify_home_fixed_island.png");
-                bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+                if (Directory.Exists(outDir))
+                {
+                    bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
             }
         }
 

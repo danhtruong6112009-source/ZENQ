@@ -1610,16 +1610,18 @@ namespace ZenQOffice.UI
             using (Font nameFont = new Font("Segoe UI", 8.8f, FontStyle.Bold))
             using (SolidBrush nameB = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center };
-                g.DrawString(name, nameFont, nameB, rect.X + rect.Width / 2f, rect.Y + 53f, csf);
+                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                RectangleF nameRect = new RectangleF(rect.X + 2f, rect.Y + 51f, rect.Width - 4f, 17f);
+                g.DrawString(name, nameFont, nameB, nameRect, csf);
             }
 
             // Subtitle centered
             using (Font subFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
             using (SolidBrush subB = new SolidBrush(Color.FromArgb(148, 163, 184)))
             {
-                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center };
-                g.DrawString(subtitle, subFont, subB, rect.X + rect.Width / 2f, rect.Y + 68f, csf);
+                StringFormat csf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                RectangleF subRect = new RectangleF(rect.X + 2f, rect.Y + 67f, rect.Width - 4f, 14f);
+                g.DrawString(subtitle, subFont, subB, subRect, csf);
             }
         }
 
