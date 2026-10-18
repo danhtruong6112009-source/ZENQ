@@ -735,6 +735,8 @@ namespace ZenQOffice.Setup
                     string exePath = Path.Combine(chosenPath, "ZenQOffice.exe");
                     string icoPath = Path.Combine(chosenPath, "ZenQOffice.ico");
 
+                    ShortcutHelper.CleanObsoleteShortcuts();
+
                     if (createDesktop)
                     {
                         string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);

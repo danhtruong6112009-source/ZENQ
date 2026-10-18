@@ -513,7 +513,7 @@ namespace ZenQOffice.UI
 
             try
             {
-                DesktopShortcutManager.DeleteShortcut("GenOffice");
+                DesktopShortcutManager.CleanObsoleteShortcuts();
             }
             catch { }
         }

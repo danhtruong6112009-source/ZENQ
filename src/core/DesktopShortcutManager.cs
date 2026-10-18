@@ -194,11 +194,39 @@ namespace ZenQOffice.Core
             }
         }
 
+        public static void CleanObsoleteShortcuts()
+        {
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
+
+                // If ZENQ OFFICE does not exist yet but ZenQOffice exists, create ZENQ OFFICE before deleting old
+                string mainHub = Path.Combine(desktop, "ZENQ OFFICE.lnk");
+                string oldHub = Path.Combine(desktop, "ZenQOffice.lnk");
+                if (!File.Exists(mainHub) && File.Exists(oldHub))
+                {
+                    CreateMainHubShortcut();
+                }
+
+                string[] obsolete = { "ZenQOffice.lnk", "ZenQ Office Suite.lnk", "GenOffice.lnk", "GenOffice Suite.lnk", "GenOffice Writer.lnk", "GenOffice Calc.lnk", "GenOffice Slides.lnk", "GenOffice PDF.lnk" };
+                foreach (var name in obsolete)
+                {
+                    string dp = Path.Combine(desktop, name);
+                    if (File.Exists(dp)) { try { File.Delete(dp); } catch { } }
+
+                    string sp = Path.Combine(startMenu, name);
+                    if (File.Exists(sp)) { try { File.Delete(sp); } catch { } }
+                }
+            }
+            catch { }
+        }
+
         public static void CreateMainHubShortcut()
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string ico = Path.Combine(baseDir, "ZenQOffice.ico");
-            CreateShortcut("ZenQ Office", "", File.Exists(ico) ? "ZenQOffice.ico" : "ZenQOffice.ico", "ZenQ Office - Bộ ứng dụng văn phòng tích hợp đa năng");
+            CreateShortcut("ZENQ OFFICE", "", File.Exists(ico) ? "ZenQOffice.ico" : "ZenQOffice.ico", "ZENQ OFFICE");
         }
 
         public static void CreateAllShortcuts()
