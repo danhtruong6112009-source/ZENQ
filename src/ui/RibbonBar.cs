@@ -421,6 +421,8 @@ namespace ZenQOffice.UI
         public Rectangle RibbonIslandBounds = Rectangle.Empty;
         public Rectangle RibbonFileBtnBounds = Rectangle.Empty;
         public Rectangle RibbonToggleStyleBounds = Rectangle.Empty;
+        public Rectangle RibbonUndoButtonBounds = Rectangle.Empty;
+        public Rectangle RibbonRedoButtonBounds = Rectangle.Empty;
 
         // Tọa độ bounding box các nút Tab Thiết kế (Design)
         public Rectangle BtnThemesBounds = Rectangle.Empty;
@@ -2969,6 +2971,22 @@ namespace ZenQOffice.UI
             FluentIconRenderer.DrawGlyph(g, '\uE7A6', r, c, 13f);
         }
 
+        private void DrawQuickActionButton(Graphics g, Rectangle r, char glyph, bool isHover)
+        {
+            if (isHover)
+            {
+                using (GraphicsPath p = CreateRoundedRectanglePath(new RectangleF(r.X, r.Y, r.Width, r.Height), 4f))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(238, 242, 255)))
+                using (Pen borderPen = new Pen(Color.FromArgb(199, 210, 254), 1.0f))
+                {
+                    g.FillPath(b, p);
+                    g.DrawPath(borderPen, p);
+                }
+            }
+            Color iconColor = isHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(71, 85, 105);
+            FluentIconRenderer.DrawGlyph(g, glyph, r, iconColor, 13f);
+        }
+
         private void DrawVectorTabDocIcon(Graphics g, float x, float y, float size, OfficeAppMode mode, bool isActive)
         {
             if (mode == OfficeAppMode.Home)
@@ -3695,39 +3713,21 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Top-Right Toggle Style Button inside Island: [Dạng Đảo]
-                int toggleW = 100;
-                Rectangle toggleRect = new Rectangle(islandRect.Right - toggleW - 8, 42, toggleW, 21);
-                RibbonToggleStyleBounds = toggleRect;
-                bool isHoverToggle = IsHovering(toggleRect);
-                using (GraphicsPath tp = CreateRoundedRectanglePath(new RectangleF(toggleRect.X, toggleRect.Y, toggleRect.Width, toggleRect.Height), 10f))
-                using (SolidBrush tb = new SolidBrush(isHoverToggle ? Color.FromArgb(238, 242, 255) : Color.FromArgb(248, 250, 252)))
-                using (Pen tPen = new Pen(isHoverToggle ? Color.FromArgb(129, 140, 248) : Color.FromArgb(203, 213, 225), 1.0f))
-                {
-                    g.FillPath(tb, tp);
-                    g.DrawPath(tPen, tp);
+                // Top-Right Quick Undo & Redo Arrow Buttons inside Island
+                int qBtnW = 26;
+                int qBtnH = 22;
+                int redoX = islandRect.Right - qBtnW - 8;
+                int undoX = redoX - qBtnW - 4;
+                int qBtnY = 41;
+                RibbonUndoButtonBounds = new Rectangle(undoX, qBtnY, qBtnW, qBtnH);
+                RibbonRedoButtonBounds = new Rectangle(redoX, qBtnY, qBtnW, qBtnH);
+                RibbonToggleStyleBounds = Rectangle.Empty;
 
-                    // Mini Island Vector Icon
-                    float icX = toggleRect.X + 8;
-                    float icY = toggleRect.Y + 5;
-                    Color icColor = isHoverToggle ? Color.FromArgb(67, 56, 202) : Color.FromArgb(71, 85, 105);
-                    using (Pen icPen = new Pen(icColor, 1.2f))
-                    using (SolidBrush icBlue = new SolidBrush(Color.FromArgb(13, 110, 253)))
-                    {
-                        g.DrawRectangle(icPen, icX, icY, 13, 10);
-                        g.FillRectangle(icBlue, icX + 2, icY + 2, 4, 3);
-                        g.DrawLine(icPen, icX + 7, icY + 3, icX + 11, icY + 3);
-                        g.DrawLine(icPen, icX + 2, icY + 7, icX + 11, icY + 7);
-                    }
+                bool isHoverUndo = IsHovering(RibbonUndoButtonBounds);
+                bool isHoverRedo = IsHovering(RibbonRedoButtonBounds);
 
-                    Rectangle textRect = new Rectangle(toggleRect.X + 24, toggleRect.Y, toggleRect.Width - 26, toggleRect.Height);
-                    using (Font tFont = new Font("Segoe UI", 8.4f, FontStyle.Bold))
-                    using (SolidBrush tTxtB = new SolidBrush(icColor))
-                    {
-                        StringFormat lsf = new StringFormat { LineAlignment = StringAlignment.Center };
-                        g.DrawString("Dạng Đảo", tFont, tTxtB, textRect, lsf);
-                    }
-                }
+                DrawQuickActionButton(g, RibbonUndoButtonBounds, '\uE7A7', isHoverUndo);
+                DrawQuickActionButton(g, RibbonRedoButtonBounds, '\uE7A6', isHoverRedo);
             }
             else
             {
@@ -3817,36 +3817,21 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Top-Right Toggle Style Button on Classic Tab Strip: [Tiêu chuẩn]
-                int toggleW = 104;
-                Rectangle toggleRect = new Rectangle(width - toggleW - 14, 39, toggleW, 22);
-                RibbonToggleStyleBounds = toggleRect;
-                bool isHoverToggle = IsHovering(toggleRect);
-                using (GraphicsPath tp = CreateRoundedRectanglePath(new RectangleF(toggleRect.X, toggleRect.Y, toggleRect.Width, toggleRect.Height), 11f))
-                using (SolidBrush tb = new SolidBrush(isHoverToggle ? Color.FromArgb(238, 242, 255) : Color.White))
-                using (Pen tPen = new Pen(isHoverToggle ? Color.FromArgb(129, 140, 248) : Color.FromArgb(203, 213, 225), 1.0f))
-                {
-                    g.FillPath(tb, tp);
-                    g.DrawPath(tPen, tp);
+                // Top-Right Quick Undo & Redo Arrow Buttons on Classic Tab Strip
+                int qBtnW = 26;
+                int qBtnH = 22;
+                int redoX = width - qBtnW - 14;
+                int undoX = redoX - qBtnW - 4;
+                int qBtnY = 39;
+                RibbonUndoButtonBounds = new Rectangle(undoX, qBtnY, qBtnW, qBtnH);
+                RibbonRedoButtonBounds = new Rectangle(redoX, qBtnY, qBtnW, qBtnH);
+                RibbonToggleStyleBounds = Rectangle.Empty;
 
-                    // Mini Standard Vector Icon
-                    float icX = toggleRect.X + 8;
-                    float icY = toggleRect.Y + 5;
-                    Color icColor = isHoverToggle ? Color.FromArgb(67, 56, 202) : Color.FromArgb(71, 85, 105);
-                    using (Pen icPen = new Pen(icColor, 1.2f))
-                    {
-                        g.DrawRectangle(icPen, icX, icY, 13, 11);
-                        g.DrawLine(icPen, icX, icY + 4, icX + 13, icY + 4);
-                    }
+                bool isHoverUndo = IsHovering(RibbonUndoButtonBounds);
+                bool isHoverRedo = IsHovering(RibbonRedoButtonBounds);
 
-                    Rectangle textRect = new Rectangle(toggleRect.X + 24, toggleRect.Y, toggleRect.Width - 26, toggleRect.Height);
-                    using (Font tFont = new Font("Segoe UI", 8.4f, FontStyle.Regular))
-                    using (SolidBrush tTxtB = new SolidBrush(icColor))
-                    {
-                        StringFormat lsf = new StringFormat { LineAlignment = StringAlignment.Center };
-                        g.DrawString("Tiêu chuẩn", tFont, tTxtB, textRect, lsf);
-                    }
-                }
+                DrawQuickActionButton(g, RibbonUndoButtonBounds, '\uE7A7', isHoverUndo);
+                DrawQuickActionButton(g, RibbonRedoButtonBounds, '\uE7A6', isHoverRedo);
 
                 // Standard Action Toolbar Body
                 g.FillRectangle(Brushes.White, 0, 64, width, 91);
@@ -13632,35 +13617,34 @@ namespace ZenQOffice.UI
 
         private void DrawSlideLayoutVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideLayout, new Rectangle(x, y, w, h), Math.Min(w, 16), Math.Min(h, 14), col);
+            FluentIconRenderer.DrawGlyph(g, '\uF158', new Rectangle(x, y, w, h), col, 13f);
         }
 
         private void DrawResetVector(Graphics g, int cx, int cy, int r, Color col)
         {
-            int sz = Math.Max(12, r * 2 + 2);
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ResetSlide, new Rectangle(cx - sz / 2, cy - sz / 2, sz, sz), sz, sz, col);
+            FluentIconRenderer.DrawGlyph(g, '\uE777', new Rectangle(cx - 7, cy - 7, 14, 14), col, 12f);
         }
 
         private void DrawDuplicateVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.DuplicateSlide, new Rectangle(x, y, w, h), Math.Min(w, 16), Math.Min(h, 14), col);
+            FluentIconRenderer.DrawGlyph(g, '\uE8C8', new Rectangle(x, y, w, h), col, 13f);
         }
 
         private void DrawAlignVector(Graphics g, int x, int y, int w, int h, int align, Color col)
         {
-            SlideIconKind kind = (align == 1) ? SlideIconKind.AlignCenter : ((align == 2) ? SlideIconKind.AlignRight : ((align == 3) ? SlideIconKind.AlignJustify : SlideIconKind.AlignLeft));
-            WpfSlideIconRenderer.DrawIconCentered(g, kind, new Rectangle(x, y, w, h), Math.Min(w, 16), Math.Min(h, 14), col);
+            char glyph = (align == 1) ? '\uE8E3' : ((align == 2) ? '\uE8E2' : ((align == 3) ? '\uF51E' : '\uE8E4'));
+            FluentIconRenderer.DrawGlyph(g, glyph, new Rectangle(x, y, w, h), col, 13f);
         }
 
         private void DrawBulletsVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Bullets, x, y, 16, 14, col);
+            FluentIconRenderer.DrawGlyph(g, '\uE8FD', new Rectangle(x, y, 16, 14), col, 13f);
             DrawDropdownChevron(g, x + 18, y + 6, Color.FromArgb(100, 116, 139));
         }
 
         private void DrawNumberingVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Numbering, x, y, 16, 14, col);
+            FluentIconRenderer.DrawGlyph(g, '\uE8FE', new Rectangle(x, y, 16, 14), col, 13f);
             DrawDropdownChevron(g, x + 18, y + 6, Color.FromArgb(100, 116, 139));
         }
 
@@ -13693,8 +13677,8 @@ namespace ZenQOffice.UI
                 }
                 else if (type == ShapeType.Line)
                 {
-                    // Slanted diagonal line like PowerPoint Image 1
-                    g.DrawLine(p, x + 2, y + 2, x + w - 3, y + h - 3);
+                    // Forward slash / matching standard PowerPoint icon
+                    g.DrawLine(p, x + 2, y + h - 3, x + w - 3, y + 2);
                 }
                 else if (type == ShapeType.Arrow)
                 {
@@ -18638,15 +18622,27 @@ namespace ZenQOffice.UI
             }
             else if (y > rTop && y <= 66 && CurrentMode != OfficeAppMode.Home)
             {
-                // 1. Kiểm tra click nút chuyển đổi kiểu Ribbon [🏝️ Dạng Đảo] / [🗂️ Tiêu chuẩn]
-                if (!RibbonToggleStyleBounds.IsEmpty && RibbonToggleStyleBounds.Contains(x, y))
+                // 1. Kiểm tra click nút Hoàn tác (Undo) và Làm lại (Redo)
+                if (!RibbonUndoButtonBounds.IsEmpty && RibbonUndoButtonBounds.Contains(x, y))
                 {
-                    AppSettings.Instance.RibbonStyle = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island)
-                        ? RibbonStyle.Standard
-                        : RibbonStyle.Island;
-                    AppSettings.Instance.Save();
-                    if (parentForm != null) parentForm.Invalidate();
-                    if (Parent != null) Parent.Invalidate();
+                    AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;
+                    if (app != null)
+                    {
+                        app.PerformQuickUndo();
+                        if (parentForm != null) parentForm.Invalidate();
+                        if (Parent != null) Parent.Invalidate();
+                    }
+                    return true;
+                }
+                if (!RibbonRedoButtonBounds.IsEmpty && RibbonRedoButtonBounds.Contains(x, y))
+                {
+                    AppForm app = (parentForm as AppForm) ?? (Parent as AppForm) ?? HostAppForm;
+                    if (app != null)
+                    {
+                        app.PerformQuickRedo();
+                        if (parentForm != null) parentForm.Invalidate();
+                        if (Parent != null) Parent.Invalidate();
+                    }
                     return true;
                 }
 
@@ -24185,18 +24181,29 @@ namespace ZenQOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                // Bố cục Layout
+                // Bố cục Layout (Mở SlideLayoutGalleryDropDownForm với thumbnail đầy đủ)
                 else if (x >= 280 && x <= 372 && y >= 68 && y <= 88)
                 {
-                    slidesView.SetLayout(SlideLayoutType.TwoContent);
-                    if (parentForm != null) parentForm.Invalidate();
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(280, 88)) : new Point(280, 88);
+                    SlideLayoutType curL = (slidesView.ActiveSlide != null) ? slidesView.ActiveSlide.Layout : SlideLayoutType.TitleAndContent;
+                    SlideLayoutGalleryDropDownForm dlg = new SlideLayoutGalleryDropDownForm(pt, curL, (chosenLayout) =>
+                    {
+                        slidesView.SetLayout(chosenLayout);
+                        if (parentForm != null) parentForm.Invalidate();
+                        if (Parent != null) Parent.Invalidate();
+                    });
+                    dlg.Show(parentForm);
                     return true;
                 }
                 // Đặt lại Reset
                 else if (x >= 280 && x <= 372 && y >= 89 && y <= 109)
                 {
-                    slidesView.SetLayout(SlideLayoutType.TitleAndContent);
-                    if (parentForm != null) parentForm.Invalidate();
+                    if (slidesView.ActiveSlide != null)
+                    {
+                        slidesView.ApplySlideLayoutTemplate(slidesView.ActiveSlide, slidesView.ActiveSlide.Layout);
+                        if (parentForm != null) parentForm.Invalidate();
+                        if (Parent != null) Parent.Invalidate();
+                    }
                     return true;
                 }
                 // Nhân bản Duplicate

@@ -725,74 +725,7 @@ namespace ZenQOffice.UI
         {
             SlideNode slide = ActiveSlide;
             if (slide == null) return;
-            slide.Layout = layout;
-            slide.Shapes.Clear();
-
-            ShapeNode titleShape = new ShapeNode
-            {
-                Type = ShapeType.TextBox,
-                Transform = new Transform2D(100f, 60f, 1720f, 120f),
-                Text = "Nhấp để thêm tiêu đề...",
-                FontName = "Segoe UI",
-                FontSize = 36.0f,
-                Bold = true,
-                TextColor = 0x111111,
-                FillColor = 0x00FFFFFF,
-                StrokeWidth = 0f,
-                PlaceholderType = "Title",
-                IsPlaceholder = true
-            };
-            slide.AddShape(titleShape);
-
-            if (layout == SlideLayoutType.TitleAndContent)
-            {
-                ShapeNode contentShape = new ShapeNode
-                {
-                    Type = ShapeType.TextBox,
-                    Transform = new Transform2D(100f, 220f, 1720f, 760f),
-                    Text = "• Nhấp để thêm nội dung văn bản hoặc danh sách...",
-                    FontName = "Segoe UI",
-                    FontSize = 22.0f,
-                    TextColor = 0x555555,
-                    FillColor = 0x00FFFFFF,
-                    StrokeWidth = 0f,
-                    PlaceholderType = "Body",
-                    IsPlaceholder = true
-                };
-                slide.AddShape(contentShape);
-            }
-            else if (layout == SlideLayoutType.TwoContent)
-            {
-                ShapeNode col1 = new ShapeNode
-                {
-                    Type = ShapeType.TextBox,
-                    Transform = new Transform2D(100f, 220f, 830f, 760f),
-                    Text = "• Cột nội dung bên trái...",
-                    FontName = "Segoe UI",
-                    FontSize = 20.0f,
-                    TextColor = 0x555555,
-                    FillColor = 0x00FFFFFF,
-                    StrokeWidth = 0f,
-                    PlaceholderType = "Body",
-                    IsPlaceholder = true
-                };
-                ShapeNode col2 = new ShapeNode
-                {
-                    Type = ShapeType.TextBox,
-                    Transform = new Transform2D(970f, 220f, 850f, 760f),
-                    Text = "• Cột nội dung bên phải...",
-                    FontName = "Segoe UI",
-                    FontSize = 20.0f,
-                    TextColor = 0x555555,
-                    FillColor = 0x00FFFFFF,
-                    StrokeWidth = 0f,
-                    PlaceholderType = "Body",
-                    IsPlaceholder = true
-                };
-                slide.AddShape(col1);
-                slide.AddShape(col2);
-            }
-            SelectedShapeIndex = -1;
+            ApplySlideLayoutTemplate(slide, layout);
         }
 
         public void ApplyTheme(string themeName)
@@ -18829,13 +18762,70 @@ namespace ZenQOffice.UI
 
         public void ApplySlideLayoutTemplate(SlideNode slide, SlideLayoutType layout)
         {
-            if (slide == null) return;
+            if (slide == null || Presentation == null) return;
+            SaveUndoState();
             slide.Layout = layout;
+
+            float cw = Presentation.CanvasWidth > 0 ? Presentation.CanvasWidth : 1920f;
+            float ch = Presentation.CanvasHeight > 0 ? Presentation.CanvasHeight : 1080f;
+
+            // 1. Phân loại và bảo toàn 100% hình khối/hình ảnh/nội dung tùy biến do người dùng tạo
+            List<ShapeNode> userCustomShapes = new List<ShapeNode>();
+            ShapeNode existingTitle = null;
+            ShapeNode existingSubtitle = null;
+            List<ShapeNode> existingBodies = new List<ShapeNode>();
+
+            foreach (var sh in slide.Shapes)
+            {
+                if (sh == null) continue;
+
+                // Nếu là Hình ảnh, Bảng biểu, Biểu đồ hoặc hình do người dùng tự vẽ (không phải khung mẫu giữ chỗ) -> Giữ nguyên 100%
+                if (sh.Type == ShapeType.Image || sh.CachedImage != null || !string.IsNullOrEmpty(sh.ImagePath) ||
+                    sh.Type == ShapeType.Table || sh.Type == ShapeType.Chart || !sh.IsPlaceholder)
+                {
+                    userCustomShapes.Add(sh);
+                }
+                else
+                {
+                    // Là khung mẫu giữ chỗ (Placeholder)
+                    if (sh.PlaceholderType == "Title" || sh.Name == "Tiêu đề Chính" || sh.Name == "Tiêu đề")
+                    {
+                        if (existingTitle == null) existingTitle = sh;
+                        else userCustomShapes.Add(sh);
+                    }
+                    else if (sh.PlaceholderType == "Subtitle" || sh.Name == "Tiêu đề Phụ")
+                    {
+                        if (existingSubtitle == null) existingSubtitle = sh;
+                        else existingBodies.Add(sh);
+                    }
+                    else
+                    {
+                        existingBodies.Add(sh);
+                    }
+                }
+            }
+
+            // Lấy lại văn bản người dùng đã nhập (nếu có)
+            string savedTitleText = (existingTitle != null && !string.IsNullOrWhiteSpace(existingTitle.Text) &&
+                                     !existingTitle.Text.Equals("Nhấp để thêm tiêu đề...", StringComparison.OrdinalIgnoreCase) &&
+                                     !existingTitle.Text.Equals("BẤM ĐỂ THÊM TIÊU ĐỀ", StringComparison.OrdinalIgnoreCase) &&
+                                     !existingTitle.Text.Equals("Tiêu đề trang chiếu", StringComparison.OrdinalIgnoreCase))
+                                    ? existingTitle.Text : null;
+
+            string savedSubText = (existingSubtitle != null && !string.IsNullOrWhiteSpace(existingSubtitle.Text) &&
+                                   !existingSubtitle.Text.Equals("Bấm để thêm tiêu đề phụ", StringComparison.OrdinalIgnoreCase) &&
+                                   !existingSubtitle.Text.Equals("Nhấp để thêm tiêu đề phụ...", StringComparison.OrdinalIgnoreCase))
+                                  ? existingSubtitle.Text : null;
+
             slide.Shapes.Clear();
 
-            float cw = Presentation.CanvasWidth;
-            float ch = Presentation.CanvasHeight;
+            // Đưa toàn bộ hình ảnh và các shape tùy biến của người dùng trở lại slide
+            foreach (var customSh in userCustomShapes)
+            {
+                slide.Shapes.Add(customSh);
+            }
 
+            // 2. Thiết lập các khung giữ chỗ (Placeholders) chuẩn Microsoft PowerPoint theo bố cục được chọn
             switch (layout)
             {
                 case SlideLayoutType.TitleSlide:
@@ -18843,28 +18833,34 @@ namespace ZenQOffice.UI
                     {
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề Chính",
-                        Transform = new Transform2D(cw * 0.1f, ch * 0.28f, cw * 0.8f, 100f),
-                        Text = "BẤM ĐỂ THÊM TIÊU ĐỀ",
-                        FontSize = 36f,
+                        Transform = new Transform2D(cw * 0.1f, ch * 0.28f, cw * 0.8f, 110f),
+                        Text = savedTitleText ?? "BẤM ĐỂ THÊM TIÊU ĐỀ",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
+                        FontSize = 38f,
                         Bold = true,
                         Alignment = TextAlignment.Center,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề Phụ",
-                        Transform = new Transform2D(cw * 0.15f, ch * 0.52f, cw * 0.7f, 60f),
-                        Text = "Bấm để thêm tiêu đề phụ",
+                        Transform = new Transform2D(cw * 0.15f, ch * 0.52f, cw * 0.7f, 65f),
+                        Text = savedSubText ?? "Bấm để thêm tiêu đề phụ",
+                        FontName = existingSubtitle?.FontName ?? "Segoe UI",
                         FontSize = 20f,
                         Alignment = TextAlignment.Center,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x64748B,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Subtitle",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -18874,27 +18870,33 @@ namespace ZenQOffice.UI
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề",
                         Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
-                        Text = "Tiêu đề trang chiếu",
+                        Text = savedTitleText ?? "Tiêu đề trang chiếu",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 30f,
                         Bold = true,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
+                    string bodyText1 = (existingBodies.Count > 0 && !string.IsNullOrWhiteSpace(existingBodies[0].Text)) ? existingBodies[0].Text : "• Nhập nội dung chính tại đây\n• Nhấn Enter để thêm mục mới\n• Có thể chèn hình ảnh, biểu đồ hoặc bảng biểu";
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Nội dung",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.88f, ch * 0.62f),
-                        Text = "• Nhập nội dung chính tại đây\n• Nhấn Enter để thêm mục mới\n• Có thể chèn hình ảnh, biểu đồ hoặc bảng biểu",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.24f, cw * 0.88f, ch * 0.65f),
+                        Text = bodyText1,
                         FontSize = 18f,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Top,
                         TextColor = 0x334155,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -18904,14 +18906,17 @@ namespace ZenQOffice.UI
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề Mục",
                         Transform = new Transform2D(cw * 0.08f, ch * 0.38f, cw * 0.84f, 90f),
-                        Text = "TIÊU ĐỀ PHẦN MỤC",
+                        Text = savedTitleText ?? "TIÊU ĐỀ PHẦN MỤC",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 34f,
                         Bold = true,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -18921,40 +18926,49 @@ namespace ZenQOffice.UI
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề",
                         Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
-                        Text = "Tiêu đề trang chiếu",
+                        Text = savedTitleText ?? "Tiêu đề trang chiếu",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 30f,
                         Bold = true,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
+                    string col1Text = (existingBodies.Count > 0 && !string.IsNullOrWhiteSpace(existingBodies[0].Text)) ? existingBodies[0].Text : "• Nội dung cột bên trái\n• Chi tiết mục 1";
+                    string col2Text = (existingBodies.Count > 1 && !string.IsNullOrWhiteSpace(existingBodies[1].Text)) ? existingBodies[1].Text : "• Nội dung cột bên phải\n• Chi tiết mục 2";
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Cột 1",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.42f, ch * 0.62f),
-                        Text = "• Nội dung cột bên trái\n• Chi tiết mục 1",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.24f, cw * 0.42f, ch * 0.65f),
+                        Text = col1Text,
                         FontSize = 18f,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Top,
                         TextColor = 0x334155,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Cột 2",
-                        Transform = new Transform2D(cw * 0.52f, ch * 0.26f, cw * 0.42f, ch * 0.62f),
-                        Text = "• Nội dung cột bên phải\n• Chi tiết mục 2",
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.24f, cw * 0.42f, ch * 0.65f),
+                        Text = col2Text,
                         FontSize = 18f,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Top,
                         TextColor = 0x334155,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -18964,60 +18978,71 @@ namespace ZenQOffice.UI
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề",
                         Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
-                        Text = "So sánh hai phương án",
+                        Text = savedTitleText ?? "So sánh hai phương án",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 30f,
                         Bold = true,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề A",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.24f, cw * 0.42f, 40f),
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.22f, cw * 0.42f, 40f),
                         Text = "Phương án A",
                         FontSize = 20f,
                         Bold = true,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Subtitle",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Nội dung A",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.35f, cw * 0.42f, ch * 0.55f),
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.32f, cw * 0.42f, ch * 0.58f),
                         Text = "• Ưu điểm phương án A\n• Chi phí và thời gian",
                         FontSize = 16f,
                         TextColor = 0x334155,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề B",
-                        Transform = new Transform2D(cw * 0.52f, ch * 0.24f, cw * 0.42f, 40f),
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.22f, cw * 0.42f, 40f),
                         Text = "Phương án B",
                         FontSize = 20f,
                         Bold = true,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Subtitle",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Nội dung B",
-                        Transform = new Transform2D(cw * 0.52f, ch * 0.35f, cw * 0.42f, ch * 0.55f),
+                        Transform = new Transform2D(cw * 0.52f, ch * 0.32f, cw * 0.42f, ch * 0.58f),
                         Text = "• Ưu điểm phương án B\n• Chi phí và thời gian",
                         FontSize = 16f,
                         TextColor = 0x334155,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -19027,18 +19052,22 @@ namespace ZenQOffice.UI
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề",
                         Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
-                        Text = "Tiêu đề trang chiếu",
+                        Text = savedTitleText ?? "Tiêu đề trang chiếu",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 30f,
                         Bold = true,
                         Alignment = TextAlignment.Left,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     break;
 
                 case SlideLayoutType.Blank:
+                    // Giữ nguyên toàn bộ hình ảnh và shape tùy biến của người dùng, không thêm placeholder nào
                     break;
 
                 case SlideLayoutType.ContentWithCaption:
@@ -19046,24 +19075,29 @@ namespace ZenQOffice.UI
                     {
                         Type = ShapeType.TextBox,
                         Name = "Tiêu đề",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.32f, 50f),
-                        Text = "Tiêu đề nội dung",
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.24f, cw * 0.32f, 50f),
+                        Text = savedTitleText ?? "Tiêu đề nội dung",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 22f,
                         Bold = true,
                         TextColor = 0x0F172A,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Chú thích",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.38f, cw * 0.32f, ch * 0.5f),
+                        Transform = new Transform2D(cw * 0.06f, ch * 0.36f, cw * 0.32f, ch * 0.5f),
                         Text = "Mô tả chi tiết và giải thích ý nghĩa của hình ảnh hoặc sơ đồ bên cạnh.",
                         FontSize = 14f,
                         TextColor = 0x64748B,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Subtitle",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
@@ -19077,7 +19111,9 @@ namespace ZenQOffice.UI
                         TextColor = 0x94A3B8,
                         FillColor = 0xF1F5F9,
                         StrokeColor = 0xCBD5E1,
-                        StrokeWidth = 1.5f
+                        StrokeWidth = 1.5f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     break;
 
@@ -19094,23 +19130,33 @@ namespace ZenQOffice.UI
                         TextColor = 0x64748B,
                         FillColor = 0xF8FAFC,
                         StrokeColor = 0xCBD5E1,
-                        StrokeWidth = 1.5f
+                        StrokeWidth = 1.5f,
+                        PlaceholderType = "Body",
+                        IsPlaceholder = true
                     });
                     slide.Shapes.Add(new ShapeNode
                     {
                         Type = ShapeType.TextBox,
                         Name = "Chú thích",
                         Transform = new Transform2D(cw * 0.1f, ch * 0.78f, cw * 0.8f, 50f),
-                        Text = "Bấm để thêm chú thích hình ảnh...",
+                        Text = savedTitleText ?? "Bấm để thêm chú thích hình ảnh...",
+                        FontName = existingTitle?.FontName ?? "Segoe UI",
                         FontSize = 15f,
                         Alignment = TextAlignment.Center,
                         VerticalAlignment = VerticalTextAlignment.Middle,
                         TextColor = 0x64748B,
                         FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
+                        StrokeWidth = 0f,
+                        PlaceholderType = "Title",
+                        IsPlaceholder = true
                     });
                     break;
             }
+
+            SelectedShapeIndex = -1;
+            slide.InvalidateThumbnail();
+            slide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
         }
 
         public void ShowSlideContextMenu(Control parentControl, Point screenPos)
