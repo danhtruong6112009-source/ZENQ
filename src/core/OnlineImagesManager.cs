@@ -122,7 +122,7 @@ namespace ZenQOffice.Core
                 // 1. Kiểm tra cache tệp catalog tại AppData
                 if (File.Exists(_catalogCacheFile))
                 {
-                    string json = File.ReadAllText(_catalogCacheFile);
+                    string json = File.ReadAllText(_catalogCacheFile, System.Text.Encoding.UTF8);
                     var cat = JsonSerializer.Deserialize<OnlineImagesResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (cat != null && cat.categories != null && cat.categories.Count > 0)
                     {
@@ -147,7 +147,7 @@ namespace ZenQOffice.Core
                 {
                     if (File.Exists(candidate))
                     {
-                        string json = File.ReadAllText(candidate);
+                        string json = File.ReadAllText(candidate, System.Text.Encoding.UTF8);
                         var cat = JsonSerializer.Deserialize<OnlineImagesResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                         if (cat != null && cat.categories != null && cat.categories.Count > 0)
                         {
@@ -155,7 +155,7 @@ namespace ZenQOffice.Core
                             try
                             {
                                 if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
-                                File.WriteAllText(_catalogCacheFile, json);
+                                File.WriteAllText(_catalogCacheFile, json, System.Text.Encoding.UTF8);
                             }
                             catch { }
                             return _catalog;

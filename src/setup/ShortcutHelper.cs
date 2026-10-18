@@ -209,7 +209,7 @@ namespace ZenQOffice.Setup
                         string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
 
                         key.SetValue("DisplayName", "ZENQ OFFICE");
-                        key.SetValue("DisplayVersion", "5.4");
+                        key.SetValue("DisplayVersion", "5.5");
                         key.SetValue("Publisher", "NEXTGENEDUSPACE STUDIO");
                         key.SetValue("DisplayIcon", File.Exists(icoPath) ? icoPath : exePath);
                         key.SetValue("InstallLocation", installDir);

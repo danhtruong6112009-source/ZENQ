@@ -43,14 +43,14 @@ namespace ZenQOffice
 
                 if (args != null && args.Length > 0 && args[0].Equals("--verify-pptx", StringComparison.OrdinalIgnoreCase))
                 {
-                    VerifyPptx(args.Length > 1 ? args[1] : @"C:\Users\Danh\Downloads\Lesson 1 - GETTING STARTED.pptx");
+                    VerifyPptx(args.Length > 1 ? args[1] : "sample.pptx");
                     return;
                 }
 
                 if (args != null && args.Length > 0 && args[0].Equals("--test-svg", StringComparison.OrdinalIgnoreCase))
                 {
-                    string svgPath = args.Length > 1 ? args[1] : @"C:\Users\Danh\Downloads\3.svg";
-                    string outPath = args.Length > 2 ? args[2] : @"c:\Users\Danh\Desktop\genofficepy\rendered_out.png";
+                    string svgPath = args.Length > 1 ? args[1] : "sample.svg";
+                    string outPath = args.Length > 2 ? args[2] : "rendered_out.png";
                     int tw = args.Length > 3 ? int.Parse(args[3]) : 0;
                     int th = args.Length > 4 ? int.Parse(args[4]) : 0;
                     Console.WriteLine($"Reading SVG {svgPath} -> {outPath} ({tw}x{th})");
@@ -95,40 +95,20 @@ namespace ZenQOffice
         {
             if (ex == null) return;
 
-            string logPath = string.Empty;
             try
             {
                 string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string logDir = Path.Combine(localApp, "ZenQOffice");
                 if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-                logPath = Path.Combine(logDir, "crash.log");
+                string logPath = Path.Combine(logDir, "crash.log");
 
-                string rawDetails = ex.ToString();
+                string cleanDetails = ZenQCrashDialogForm.SanitizeExceptionDetails(ex);
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                File.AppendAllText(logPath, $"[{timestamp}] [{contextTitle}] {rawDetails}\r\n----------------------------------------\r\n");
+                File.AppendAllText(logPath, $"[{timestamp}] [{contextTitle}]\r\n{cleanDetails}\r\n----------------------------------------\r\n");
             }
             catch { }
 
-            string errorName = ex.GetType().Name;
-            string cleanMsg = ex.Message ?? "Đã xảy ra sự cố trong quá trình xử lý.";
-            cleanMsg = System.Text.RegularExpressions.Regex.Replace(cleanMsg, @"[a-zA-Z]:\\[^:\r\n]+", "[đường dẫn tệp]");
-
-            string userNotice = $"ZENQ OFFICE phát hiện sự cố ({contextTitle}):\n\n"
-                              + $"• Loại lỗi: {errorName}\n"
-                              + $"• Chi tiết: {cleanMsg}\n\n";
-
-            if (!string.IsNullOrEmpty(logPath))
-            {
-                userNotice += $"Nhật ký chi tiết đã được ghi tại:\n{logPath}\n\n";
-            }
-            userNotice += isFatal ? "Ứng dụng sẽ tự động đóng lại." : "Nhấn OK để tiếp tục làm việc.";
-
-            MessageBox.Show(
-                userNotice,
-                "ZENQ OFFICE - " + (contextTitle ?? "Thông báo sự cố"),
-                MessageBoxButtons.OK,
-                isFatal ? MessageBoxIcon.Error : MessageBoxIcon.Warning
-            );
+            ZenQCrashDialogForm.ShowDialogSafe(ex, contextTitle, isFatal);
         }
 
 
@@ -160,7 +140,8 @@ namespace ZenQOffice
                             new { Idx = 6, Name = "view" }
                         };
 
-                        string artifactDir = @"C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c";
+                        string artifactDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scratch");
+                        if (!Directory.Exists(artifactDir)) Directory.CreateDirectory(artifactDir);
                         foreach (var t in tabs)
                         {
                             form.Ribbon.ActiveRibbonTab = t.Idx;
@@ -392,7 +373,8 @@ namespace ZenQOffice
                     Application.DoEvents();
                     System.Threading.Thread.Sleep(500);
 
-                    string artifactDir = @"C:\Users\Danh\.gemini\antigravity\brain\f235df56-64c9-4729-af29-751f07f3050c";
+                    string artifactDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scratch");
+                    if (!Directory.Exists(artifactDir)) Directory.CreateDirectory(artifactDir);
 
                     // Render Slide 1
                     using (var bmp = new System.Drawing.Bitmap(1366, 768))
@@ -585,7 +567,7 @@ namespace ZenQOffice
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Lỗi khởi tạo giao diện ZENQ OFFICE:\n" + ex.ToString(), "ZENQ OFFICE Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQCrashDialogForm.ShowDialogSafe(ex, "Lỗi khởi tạo giao diện", true);
                 }
             };
             _splash.Show();

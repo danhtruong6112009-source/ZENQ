@@ -109,6 +109,8 @@ namespace ZenQOffice.UI
         public float WriterCustomBottomMargin { get; set; }
         public Stack<WriterUndoSnapshot> WriterUndoStack { get; set; }
         public Stack<WriterUndoSnapshot> WriterRedoStack { get; set; }
+        public List<DocumentRevision> WriterRevisions { get; set; }
+        public bool WriterTrackChanges { get; set; }
 
         // State cho Calc
         public List<SparseMatrix> CalcSheets { get; set; }
@@ -1152,6 +1154,8 @@ namespace ZenQOffice.UI
                 tab.WriterCustomBottomMargin = CustomBottomMargin;
                 tab.WriterUndoStack = writerView.GetUndoStack();
                 tab.WriterRedoStack = writerView.GetRedoStack();
+                tab.WriterRevisions = writerView.Revisions != null ? WriterUndoSnapshot.CloneRevisions(writerView.Revisions) : new List<DocumentRevision>();
+                tab.WriterTrackChanges = writerView.TrackChanges;
             }
             else if (tab.Mode == OfficeAppMode.Calc && calcView != null)
             {
@@ -1294,6 +1298,9 @@ namespace ZenQOffice.UI
                 if (tab.WriterRedoStack == null) tab.WriterRedoStack = new Stack<WriterUndoSnapshot>();
                 writerView.SetUndoStack(tab.WriterUndoStack);
                 writerView.SetRedoStack(tab.WriterRedoStack);
+                writerView.Revisions = tab.WriterRevisions != null ? WriterUndoSnapshot.CloneRevisions(tab.WriterRevisions) : new List<DocumentRevision>();
+                writerView.TrackChanges = tab.WriterTrackChanges;
+                TrackChangesActive = tab.WriterTrackChanges;
                 }
             }
             else if (tab.Mode == OfficeAppMode.Calc)
@@ -1387,6 +1394,8 @@ namespace ZenQOffice.UI
                 newTab.WriterCursorPosition = 0;
                 newTab.WriterUndoStack = new Stack<WriterUndoSnapshot>();
                 newTab.WriterRedoStack = new Stack<WriterUndoSnapshot>();
+                newTab.WriterRevisions = new List<DocumentRevision>();
+                newTab.WriterTrackChanges = false;
             }
             else if (mode == OfficeAppMode.Calc)
             {
@@ -3477,18 +3486,32 @@ namespace ZenQOffice.UI
         public void DrawTopDocTabBar(System.Drawing.Graphics g, int width)
         {
             if (g == null) return;
-            using (D2DGraphics d2d = new D2DGraphics(g, width, RibbonTopHeight > 0 ? RibbonTopHeight : 36))
+            try
             {
-                DrawTopDocTabBar(d2d, width);
+                using (D2DGraphics d2d = new D2DGraphics(g, width, RibbonTopHeight > 0 ? RibbonTopHeight : 36))
+                {
+                    DrawTopDocTabBar(d2d, width);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("DrawTopDocTabBar GDI wrapper error: " + ex.Message);
             }
         }
 
         public void Draw(System.Drawing.Graphics g, int width, int height, WriterView writerView = null, SlidesView slidesView = null, CalcView calcView = null, PdfView pdfView = null, PhotoView photoView = null)
         {
             if (g == null) return;
-            using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+            try
             {
-                Draw(d2d, width, height, writerView, slidesView, calcView, pdfView, photoView);
+                using (D2DGraphics d2d = new D2DGraphics(g, width, height))
+                {
+                    Draw(d2d, width, height, writerView, slidesView, calcView, pdfView, photoView);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Draw GDI wrapper error: " + ex.Message);
             }
         }
 

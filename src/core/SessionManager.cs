@@ -619,7 +619,17 @@ namespace ZenQOffice.Core
                 // Switch to the active tab only if a real doc tab was restored and requested
                 if (targetActiveIndex > 0 && targetActiveIndex < appForm.Ribbon.DocTabs.Count)
                 {
-                    appForm.Ribbon.SwitchDocTab(targetActiveIndex, appForm.SlidesView, appForm.WriterView, appForm.CalcView, appForm.PdfView);
+                    try
+                    {
+                        appForm.Ribbon.SwitchDocTab(targetActiveIndex, appForm.SlidesView, appForm.WriterView, appForm.CalcView, appForm.PdfView);
+                    }
+                    catch
+                    {
+                        // Fallback an toàn về Trang chủ Home nếu tab được khôi phục gặp lỗi
+                        appForm.Ribbon.CurrentMode = OfficeAppMode.Home;
+                        appForm.Ribbon.ActiveDocIndex = 0;
+                        if (appForm.Ribbon.DocTabs.Count > 0) appForm.Ribbon.DocTabs[0].Active = true;
+                    }
                 }
                 else
                 {

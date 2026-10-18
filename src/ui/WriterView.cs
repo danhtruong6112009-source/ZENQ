@@ -1207,15 +1207,36 @@ namespace ZenQOffice.UI
                     using (Graphics g = Graphics.FromImage(bmp))
                     {
                         g.Clear(Color.Transparent);
-                        Cursors.Default.Draw(g, new Rectangle(0, 0, 32, 32));
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                        // Vector mũi tên hướng Đông Bắc (↗) chuẩn Microsoft Word Selection Gutter
+                        PointF[] arrow = new PointF[]
+                        {
+                            new PointF(22f, 2f),
+                            new PointF(22f, 15f),
+                            new PointF(18f, 11f),
+                            new PointF(11f, 22f),
+                            new PointF(7f, 19.5f),
+                            new PointF(14f, 8.5f),
+                            new PointF(10f, 4.5f)
+                        };
+
+                        using (Pen outline = new Pen(Color.White, 2.5f) { LineJoin = LineJoin.Round })
+                        {
+                            g.DrawPolygon(outline, arrow);
+                        }
+                        using (SolidBrush fill = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                        {
+                            g.FillPolygon(fill, arrow);
+                        }
                     }
-                    bmp.RotateFlip(RotateFlipType.RotateNoneFlipX);
                     IntPtr hIcon = bmp.GetHicon();
                     ICONINFO info = new ICONINFO();
                     if (GetIconInfo(hIcon, ref info))
                     {
-                        info.xHotspot = 31;
-                        info.yHotspot = 0;
+                        info.xHotspot = 22;
+                        info.yHotspot = 2;
                         info.fIcon = false;
                         IntPtr hCur = CreateIconIndirect(ref info);
                         if (info.hbmColor != IntPtr.Zero) DeleteObject(info.hbmColor);
@@ -5394,12 +5415,17 @@ namespace ZenQOffice.UI
 
         public int GetMaxScrollY(int clientHeight, RibbonBar ribbon)
         {
-            if (ViewMode == 0) return 0;
             if (clientHeight <= 0) clientHeight = LastViewHeight > 0 ? LastViewHeight : 800;
             int w = LastViewWidth > 0 ? LastViewWidth : 1200;
 
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(w, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+
+            if (ViewMode == 0)
+            {
+                int availableH = clientHeight - 155 - 26;
+                return Math.Max(0, pageH + 32 - availableH);
+            }
 
             int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
             int pageCount = Math.Max(1, TotalPageCount);
@@ -6482,6 +6508,11 @@ namespace ZenQOffice.UI
                 if (string.IsNullOrEmpty(filepath) || !File.Exists(filepath)) return false;
                 string ext = Path.GetExtension(filepath).ToLower();
 
+                // Luôn xóa sạch Revisions và tắt Track Changes của tài liệu cũ khi mở tài liệu mới
+                TrackChanges = false;
+                Revisions.Clear();
+                if (ribbon != null) ribbon.TrackChangesActive = false;
+
                 if (ext == ".docx")
                 {
                     DocxMetadata meta;
@@ -6585,13 +6616,10 @@ namespace ZenQOffice.UI
                                 ribbon.PaperWidthInches = meta.PageWidthPt / 72.0f;
                                 ribbon.PaperHeightInches = meta.PageHeightPt / 72.0f;
                             }
-                            if (meta.MarginMode == 4)
-                            {
-                                ribbon.CustomLeftMargin = meta.LeftMarginPt / 72.0f;
-                                ribbon.CustomRightMargin = meta.RightMarginPt / 72.0f;
-                                ribbon.CustomTopMargin = meta.TopMarginPt / 72.0f;
-                                ribbon.CustomBottomMargin = meta.BottomMarginPt / 72.0f;
-                            }
+                            ribbon.CustomLeftMargin = meta.LeftMarginPt / 72.0f;
+                            ribbon.CustomRightMargin = meta.RightMarginPt / 72.0f;
+                            ribbon.CustomTopMargin = meta.TopMarginPt / 72.0f;
+                            ribbon.CustomBottomMargin = meta.BottomMarginPt / 72.0f;
                             ribbon.LineSpacingFactor = meta.DefaultLineSpacing;
                             ribbon.ParagraphSpacingBefore = meta.DefaultSpacingBefore;
                             ribbon.ParagraphSpacingAfter = meta.DefaultSpacingAfter;
@@ -10119,10 +10147,16 @@ namespace ZenQOffice.UI
             return f;
         }
 
-        private float MeasureSubstringWidth(D2DGraphics g, string lineText, int lineStartIndex, int subStart, int subLen, float extraSpaceW = 0)
+        private float MeasureSubstringLogicalWidth(D2DGraphics g, string lineText, int lineStartIndex, int subStart, int subLen)
+        {
+            return MeasureSubstringWidth(g, lineText, lineStartIndex, subStart, subLen, 0f, 1.0f);
+        }
+
+        private float MeasureSubstringWidth(D2DGraphics g, string lineText, int lineStartIndex, int subStart, int subLen, float extraSpaceW = 0, float zoomOverride = -1f)
         {
             if (subLen <= 0 || string.IsNullOrEmpty(lineText)) return 0;
 
+            float effZoom = zoomOverride > 0 ? zoomOverride : ZoomLevel;
             float totalW = 0;
             int i = subStart;
             while (i < subStart + subLen && i < lineText.Length)
@@ -10146,12 +10180,12 @@ namespace ZenQOffice.UI
                                 DocShapeObject shp = GetOrCreateDocShape(string.IsNullOrEmpty(shapeId) ? "Temp" : shapeId, shapeType);
                                 if (shp == ActiveShape && DragShapeHandleIndex >= 0)
                                 {
-                                    tagWidth = (float)Math.Max(20, shp.BaseWidth + shp.WidthDelta) * ZoomLevel;
+                                    tagWidth = (float)Math.Max(20, shp.BaseWidth + shp.WidthDelta) * effZoom;
                                 }
-                                else if (tW > 0) tagWidth = (float)tW * ZoomLevel;
+                                else if (tW > 0) tagWidth = (float)tW * effZoom;
                                 else 
                                 {
-                                    tagWidth = (float)Math.Max(20, shp.BaseWidth + shp.WidthDelta) * ZoomLevel;
+                                    tagWidth = (float)Math.Max(20, shp.BaseWidth + shp.WidthDelta) * effZoom;
                                 }
                             }
 
@@ -10200,8 +10234,8 @@ namespace ZenQOffice.UI
                 float effectiveFontSize = fmt.FontSize;
                 if (fmt.Subscript || fmt.Superscript) effectiveFontSize = fmt.FontSize * 0.72f;
 
-                Font runFont = GetCachedFont(fmt.FontName, effectiveFontSize * ZoomLevel, style);
-                SizeF sz = MeasureStringWithTabs(g, runStr, runFont, ZoomLevel);
+                Font runFont = GetCachedFont(fmt.FontName, effectiveFontSize * effZoom, style);
+                SizeF sz = MeasureStringWithTabs(g, runStr, runFont, effZoom);
                 totalW += sz.Width;
 
                 if (extraSpaceW > 0)
@@ -10318,7 +10352,7 @@ namespace ZenQOffice.UI
             return ratio;
         }
 
-        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int bottomMarginY, int topMarginY = -1)
+        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int bottomMarginY, int topMarginY = -1, RibbonBar ribbon = null)
         {
             if (topMarginY < 0) topMarginY = bottomMarginY;
             List<LineSlot> slots = new List<LineSlot>();
@@ -10369,10 +10403,23 @@ namespace ZenQOffice.UI
                 }
             }
 
-            if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
+            float baseH_inches = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape)
+            {
+                float bW = (ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+                baseH_inches = Math.Min(bW, baseH_inches);
+            }
+            float logicalPageH = baseH_inches * 96f;
+            float logicalBottomMargin = (ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96f;
+            float logicalTopMargin = (ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96f;
+
+            float pageBottomY = startPageY + currentPage * (pageH + 30) + (logicalPageH - logicalBottomMargin) * ZoomLevel;
+
+            if (currentY + lineH > pageBottomY + 0.5f * ZoomLevel)
             {
                 currentPage++;
-                currentY = startPageY + currentPage * (pageH + 30) + topMarginY;
+                float newPageTopY = logicalTopMargin * ZoomLevel;
+                currentY = startPageY + currentPage * (pageH + 30) + newPageTopY;
             }
 
             // 2. Square (1), Tight (2), Through (3): Tính toán các khe trống Trái & Phải
@@ -10445,10 +10492,12 @@ namespace ZenQOffice.UI
             if (slots.Count == 0)
             {
                 currentY = sideObstacle.Bottom + gap;
-                if (currentY + lineH > startPageY + currentPage * (pageH + 30) + pageH - bottomMarginY)
+                float pageBottomY2 = startPageY + currentPage * (pageH + 30) + (logicalPageH - logicalBottomMargin) * ZoomLevel;
+                if (currentY + lineH > pageBottomY2 + 0.5f * ZoomLevel)
                 {
                     currentPage++;
-                    currentY = startPageY + currentPage * (pageH + 30) + topMarginY;
+                    float newPageTopY = logicalTopMargin * ZoomLevel;
+                    currentY = startPageY + currentPage * (pageH + 30) + newPageTopY;
                 }
                 slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
             }
@@ -10503,7 +10552,7 @@ namespace ZenQOffice.UI
             float pBefore = (ParagraphSpacingsBefore.ContainsKey(paraStartIndex)) ? ParagraphSpacingsBefore[paraStartIndex] : (ribbon != null ? ribbon.ParagraphSpacingBefore : 0f);
             if (pBefore > 0)
             {
-                currentY += (int)Math.Round(pBefore * ZoomLevel);
+                currentY += pBefore * ZoomLevel;
             }
 
             float pLineSpacing = (ParagraphLineSpacings.ContainsKey(paraStartIndex)) ? ParagraphLineSpacings[paraStartIndex] : (ribbon != null ? ribbon.LineSpacingFactor : 1.15f);
@@ -10549,10 +10598,28 @@ namespace ZenQOffice.UI
                     }
                 }
                 float fontRatio = GetFontLineSpacingRatio(TypingFont);
-                float lH = Math.Max(12.0f * ZoomLevel, pFontSize * 1.333333f * fontRatio * ZoomLevel) * pLineSpacing;
-                int effStartX = textX + (int)((pLeft + pFirstLine) * ZoomLevel);
-                int effMaxW = Math.Max(40, maxTextW - (int)((pLeft + pFirstLine + pRight) * ZoomLevel));
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY);
+                float logicalLH = Math.Max(12.0f, pFontSize * 1.333333f * fontRatio) * pLineSpacing;
+                float lH = logicalLH * ZoomLevel;
+                float indentScale = 1.333333f;
+                float baseW_inches = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+                float baseH_inches = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+                if (ribbon != null && ribbon.IsLandscape)
+                {
+                    baseW_inches = Math.Max(baseW_inches, baseH_inches);
+                }
+                else
+                {
+                    baseW_inches = Math.Min(baseW_inches, baseH_inches);
+                }
+                float basePageW = baseW_inches * 96f;
+                float baseLeftM = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
+                float baseRightM = (ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96f;
+                float baseMaxTextW = (basePageW - baseLeftM - baseRightM);
+                float logicalIndent = (pLeft + pFirstLine + pRight) * indentScale;
+                float logicalMaxW = Math.Max(30f, baseMaxTextW - logicalIndent);
+                int effMaxW = (int)Math.Round(logicalMaxW * ZoomLevel);
+                int effStartX = textX + (int)Math.Round((pLeft + pFirstLine) * indentScale * ZoomLevel);
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon);
                 var slot = slots[0];
 
                 result.Add(new WrapLineInfo
@@ -10571,7 +10638,7 @@ namespace ZenQOffice.UI
                 currentY += lH;
                 if (pAfter > 0)
                 {
-                    currentY += (int)Math.Round(pAfter * ZoomLevel);
+                    currentY += pAfter * ZoomLevel;
                 }
                 
                 _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
@@ -10600,7 +10667,7 @@ namespace ZenQOffice.UI
                     }
                 }
                 float dcFS = baseFS * (dcInfo.Lines - 0.2f);
-                dcIndentW = MeasureSubstringWidth(g, dcChar.ToString(), paraStartIndex, 0, 1) * (dcFS / Math.Max(1f, baseFS)) + 8f;
+                dcIndentW = MeasureSubstringLogicalWidth(g, dcChar.ToString(), paraStartIndex, 0, 1) * (dcFS / Math.Max(1f, baseFS)) + 8f;
             }
 
             // 1. Fast tokenization into word tokens with exact character offsets
@@ -10628,7 +10695,7 @@ namespace ZenQOffice.UI
                 }
                 if (isTag) continue;
 
-                while (pPos < para.Length && para[pPos] != ' ' && para[pPos] != '\t')
+                while (pPos < para.Length && para[pPos] != ' ' && para[pPos] != '\t' && para[pPos] != '\u00A0' && !char.IsWhiteSpace(para[pPos]))
                 {
                     if (pPos + 8 <= para.Length && para[pPos] == '!' && para[pPos+1] == '[')
                     {
@@ -10637,7 +10704,7 @@ namespace ZenQOffice.UI
                     }
                     pPos++;
                 }
-                while (pPos < para.Length && (para[pPos] == ' ' || para[pPos] == '\t'))
+                while (pPos < para.Length && (para[pPos] == ' ' || para[pPos] == '\t' || para[pPos] == '\u00A0' || char.IsWhiteSpace(para[pPos])))
                 {
                     pPos++;
                 }
@@ -10650,10 +10717,7 @@ namespace ZenQOffice.UI
             float[] tokenMaxFontSizes = new float[tokens.Count];
             for (int ti = 0; ti < tokens.Count; ti++)
             {
-                float oldZ = ZoomLevel;
-                ZoomLevel = 1.0f;
-                tokenLogicalWidths[ti] = MeasureSubstringWidth(g, tokens[ti], tokenStarts[ti], 0, tokens[ti].Length);
-                ZoomLevel = oldZ;
+                tokenLogicalWidths[ti] = MeasureSubstringLogicalWidth(g, tokens[ti], tokenStarts[ti], 0, tokens[ti].Length);
                 FormattedRun fr = GetFormatAt(tokenStarts[ti]);
                 tokenMaxFontSizes[ti] = fr.FontSize;
             }
@@ -10662,17 +10726,34 @@ namespace ZenQOffice.UI
             while (tokenIdx < tokens.Count)
             {
                 // First line uses (pLeft + pFirstLine), following lines use (pLeft + pHanging)
-                int effStartX = (result.Count == 0) ? textX + (int)((pLeft + pFirstLine) * ZoomLevel) : textX + (int)((pLeft + pHanging) * ZoomLevel);
-                int effMaxW = (result.Count == 0) ? Math.Max(40, maxTextW - (int)((pLeft + pFirstLine + pRight) * ZoomLevel)) : Math.Max(40, maxTextW - (int)((pLeft + pHanging + pRight) * ZoomLevel));
+                float indentScale = 1.333333f;
+                float baseW_inches = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+                float baseH_inches = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+                if (ribbon != null && ribbon.IsLandscape)
+                {
+                    baseW_inches = Math.Max(baseW_inches, baseH_inches);
+                }
+                else
+                {
+                    baseW_inches = Math.Min(baseW_inches, baseH_inches);
+                }
+                float basePageW = baseW_inches * 96f;
+                float baseLeftM = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
+                float baseRightM = (ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96f;
+                float baseMaxTextW = (basePageW - baseLeftM - baseRightM);
+                float logicalIndent = (result.Count == 0) ? (pLeft + pFirstLine + pRight) * indentScale : (pLeft + pHanging + pRight) * indentScale;
+                float logicalMaxW = Math.Max(30f, baseMaxTextW - logicalIndent);
 
                 // Indent lines that wrap alongside the Drop Cap
                 if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines)
                 {
-                    effStartX += (int)(dcIndentW * ZoomLevel);
-                    effMaxW = Math.Max(30, effMaxW - (int)(dcIndentW * ZoomLevel));
+                    logicalMaxW = Math.Max(30f, logicalMaxW - dcIndentW);
                 }
 
-                float logicalMaxW = effMaxW / Math.Max(0.01f, ZoomLevel);
+                int effMaxW = (int)Math.Round(logicalMaxW * ZoomLevel);
+                float logicalStartX = (result.Count == 0) ? (pLeft + pFirstLine) * indentScale : (pLeft + pHanging) * indentScale;
+                if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines) logicalStartX += dcIndentW;
+                int effStartX = textX + (int)Math.Round(logicalStartX * ZoomLevel);
 
                 // Step 1: Scan which tokens ACTUALLY fit on this line!
                 int startTok = tokenIdx;
@@ -10697,7 +10778,7 @@ namespace ZenQOffice.UI
                             for (int sLen = tok.Length - 2; sLen >= 3; sLen--)
                             {
                                 string headPart = tok.Substring(0, sLen) + "-";
-                                float headW = MeasureSubstringWidth(g, headPart, tokenStarts[endTok], 0, headPart.Length);
+                                float headW = MeasureSubstringLogicalWidth(g, headPart, tokenStarts[endTok], 0, headPart.Length);
                                 if (headW <= remainW)
                                 {
                                     bestSplit = sLen;
@@ -10718,7 +10799,7 @@ namespace ZenQOffice.UI
                                 var newW = new float[tokens.Count];
                                 var newFS = new float[tokens.Count];
                                 for (int k = 0; k < endTok; k++) { newW[k] = tokenLogicalWidths[k]; newFS[k] = tokenMaxFontSizes[k]; }
-                                newW[endTok] = MeasureSubstringWidth(g, tailTok, tokenStarts[endTok], 0, tailTok.Length);
+                                newW[endTok] = MeasureSubstringLogicalWidth(g, tailTok, tokenStarts[endTok], 0, tailTok.Length);
                                 newFS[endTok] = tokenMaxFontSizes[endTok - 1];
                                 for (int k = endTok + 1; k < tokens.Count; k++) { newW[k] = tokenLogicalWidths[k - 1]; newFS[k] = tokenMaxFontSizes[k - 1]; }
                                 tokenLogicalWidths = newW;
@@ -10756,15 +10837,61 @@ namespace ZenQOffice.UI
                     endTok++;
                 }
 
-                if (endTok == startTok) endTok = startTok + 1;
+                if (endTok == startTok)
+                {
+                    string tok = tokens[startTok];
+                    if (tok.StartsWith("![IMAGE:") || tok.StartsWith("![SHAPE:") || tok.Length <= 1)
+                    {
+                        endTok = startTok + 1;
+                    }
+                    else
+                    {
+                        int fitChars = 1;
+                        float accumulatedW = 0f;
+                        for (int c = 1; c < tok.Length; c++)
+                        {
+                            string sub = tok.Substring(0, c);
+                            float w = MeasureSubstringLogicalWidth(g, sub, tokenStarts[startTok], 0, sub.Length);
+                            if (w <= logicalMaxW)
+                            {
+                                fitChars = c;
+                                accumulatedW = w;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+
+                        string headTok = tok.Substring(0, fitChars);
+                        string tailTok = tok.Substring(fitChars);
+                        tokens[startTok] = headTok;
+                        tokenLogicalWidths[startTok] = accumulatedW > 0 ? accumulatedW : MeasureSubstringLogicalWidth(g, headTok, tokenStarts[startTok], 0, headTok.Length);
+
+                        tokens.Insert(startTok + 1, tailTok);
+                        tokenStarts.Insert(startTok + 1, tokenStarts[startTok] + fitChars);
+
+                        var newW = new float[tokens.Count];
+                        var newFS = new float[tokens.Count];
+                        for (int k = 0; k <= startTok; k++) { newW[k] = tokenLogicalWidths[k]; newFS[k] = tokenMaxFontSizes[k]; }
+                        newW[startTok + 1] = MeasureSubstringLogicalWidth(g, tailTok, tokenStarts[startTok + 1], 0, tailTok.Length);
+                        newFS[startTok + 1] = tokenMaxFontSizes[startTok];
+                        for (int k = startTok + 2; k < tokens.Count; k++) { newW[k] = tokenLogicalWidths[k - 1]; newFS[k] = tokenMaxFontSizes[k - 1]; }
+                        tokenLogicalWidths = newW;
+                        tokenMaxFontSizes = newFS;
+
+                        endTok = startTok + 1;
+                    }
+                }
 
                 // Step 2: Calculate line height strictly from the tokens that are ON THIS LINE!
                 float fontRatio = GetFontLineSpacingRatio(TypingFont);
-                float lH = Math.Max(Math.Max(13.5f * ZoomLevel, lineMaxFS * 1.333333f * fontRatio * ZoomLevel) * pLineSpacing, 
-                                    lineMaxShapeH > 0 ? (lineMaxShapeH + 4 * ZoomLevel) : 0);
+                float logicalLH = Math.Max(Math.Max(13.5f, lineMaxFS * 1.333333f * fontRatio) * pLineSpacing, 
+                                    lineMaxShapeH > 0 ? (lineMaxShapeH / Math.Max(0.01f, ZoomLevel) + 4) : 0);
+                float lH = logicalLH * ZoomLevel;
 
                 // Step 3: Check pagination and floating obstacles for this line height
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY);
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon);
 
                 // Step 4: Populate line(s) into slots
                 foreach (var slot in slots)
@@ -10776,7 +10903,7 @@ namespace ZenQOffice.UI
                     float slotLogicalCurW = 0;
                     int firstInSlot = tokenIdx;
                     float slotMaxFS = 11.0f;
-                    float slotLogicalSlotW = slot.Width / Math.Max(0.01f, ZoomLevel);
+                    float slotLogicalSlotW = (slot.Width >= effMaxW - 5) ? logicalMaxW : (slot.Width / Math.Max(0.01f, ZoomLevel));
 
                     while (tokenIdx < endTok)
                     {
@@ -10819,7 +10946,7 @@ namespace ZenQOffice.UI
 
             if (pAfter > 0)
             {
-                currentY += (int)Math.Round(pAfter * ZoomLevel);
+                currentY += pAfter * ZoomLevel;
             }
 
             _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
@@ -11089,14 +11216,7 @@ namespace ZenQOffice.UI
             }
             int stdW = (int)Math.Round(baseW * 96f);
             int stdH = (int)Math.Round(baseH * 96f);
-            if (ViewMode == 0)
-            {
-                stdW = Math.Min(750, Math.Max(400, canvasW - 140));
-                int effH = LastViewHeight > 0 ? LastViewHeight : 800;
-                int availableH = effH - 155 - 26 - 28;
-                stdH = Math.Max(320, availableH);
-            }
-            else if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasW - 80) / Math.Max(0.2f, ZoomLevel))); } // Web mode
+            if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasW - 80) / Math.Max(0.2f, ZoomLevel))); } // Web mode
 
             pageW = (int)Math.Round(stdW * ZoomLevel);
             pageH = (int)Math.Round(stdH * ZoomLevel);
@@ -11105,24 +11225,19 @@ namespace ZenQOffice.UI
             float rightMarginInches = ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f;
             float topMarginInches = ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f;
 
-            if (ViewMode == 0)
-            {
-                marginX = (int)Math.Round(40 * ZoomLevel);
-                rightMarginX = (int)Math.Round(40 * ZoomLevel);
-                marginY = (int)Math.Round(30 * ZoomLevel);
-            }
-            else
-            {
-                marginX = (int)Math.Round(leftMarginInches * 96 * ZoomLevel);
-                rightMarginX = (int)Math.Round(rightMarginInches * 96 * ZoomLevel);
-                marginY = (int)Math.Round(topMarginInches * 96 * ZoomLevel);
-            }
+            marginX = (int)Math.Round(leftMarginInches * 96 * ZoomLevel);
+            rightMarginX = (int)Math.Round(rightMarginInches * 96 * ZoomLevel);
+            marginY = (int)Math.Round(topMarginInches * 96 * ZoomLevel);
 
             int navOffset = ShowNavigationPane ? 280 : 0;
             int selPaneOffset = ShowSelectionPane ? 260 : 0;
             int effectiveCanvasW = canvasW - navOffset - selPaneOffset;
 
-            if (pageW + 80 <= effectiveCanvasW)
+            if (ViewMode == 0)
+            {
+                pageX = Math.Max(70, (canvasW - pageW) / 2);
+            }
+            else if (pageW + 80 <= effectiveCanvasW)
             {
                 pageX = navOffset + (effectiveCanvasW - pageW) / 2;
                 if (ScrollX != 0f) { ScrollX = 0f; TargetScrollX = 0f; SmoothScrollX = 0f; }
@@ -11708,7 +11823,7 @@ namespace ZenQOffice.UI
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(canvasW, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
             float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
-            int bottomMarginY = (ViewMode == 0) ? marginY : (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
+            int bottomMarginY = (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
 
             if (CurrentHeaderPreset != HeaderFooterPreset.None || IsEditingHeaderFooter || !string.IsNullOrEmpty(HeaderText))
             {
@@ -11721,16 +11836,13 @@ namespace ZenQOffice.UI
             int startPageY;
             if (ViewMode == 0)
             {
-                ScrollY = 0;
-                SmoothScrollY = 0;
-                TargetScrollY = 0;
                 ScrollX = 0f;
                 SmoothScrollX = 0f;
                 TargetScrollX = 0f;
                 int effH = height > 0 ? height : (LastViewHeight > 0 ? LastViewHeight : 800);
                 int availableH = effH - 155 - 26;
-                int padY = Math.Max(10, (availableH - pageH) / 2);
-                startPageY = 155 + padY;
+                int padY = Math.Max(16, (availableH - pageH) / 2);
+                startPageY = 155 + padY - ScrollY;
             }
             else
             {
@@ -12417,7 +12529,7 @@ namespace ZenQOffice.UI
                             chartObj.LastBounds = new Rectangle(chartX, chartY, chartW, chartH);
 
                             DrawDocumentChart(g, chartObj, chartX, chartY, chartW, chartH, ribbon);
-                            currentY += chartH + 16;
+                            currentY += chartH + (int)(16 * ZoomLevel);
                         }
                         else
                         {
@@ -12478,7 +12590,7 @@ namespace ZenQOffice.UI
                             }
                         }
 
-                        currentY += noteH + 16;
+                        currentY += noteH + (int)(16 * ZoomLevel);
                         paraStartIndex += para.Length + 1;
                         continue;
                     }
@@ -14505,6 +14617,8 @@ namespace ZenQOffice.UI
                     for (int li = 0; li < RenderedLines.Count; li++)
                     {
                         var rLine = RenderedLines[li];
+                        if (rLine.ScreenY + rLine.ScreenH < 150 || rLine.ScreenY > height) continue;
+
                         int lStart = rLine.StartCharIndex;
                         int lEnd = lStart + rLine.Length;
                         bool hasRev = false;
@@ -14518,7 +14632,7 @@ namespace ZenQOffice.UI
                                 break;
                             }
                         }
-                        if (hasRev && rLine.ScreenY + rLine.ScreenH >= 150 && rLine.ScreenY <= height)
+                        if (hasRev)
                         {
                             g.DrawLine(changeBarPen, barMarginX, rLine.ScreenY, barMarginX, rLine.ScreenY + rLine.ScreenH);
                         }
@@ -18044,6 +18158,11 @@ namespace ZenQOffice.UI
 
         public void HandleMouseMove(int mouseX, int mouseY, int canvasWidth, Graphics g, RibbonBar ribbon)
         {
+            if (LastViewHeight > 100 && mouseY >= LastViewHeight - 25)
+            {
+                return;
+            }
+
             HoveredMousePoint = new Point(mouseX, mouseY);
 
             // =========================================================================
@@ -18902,8 +19021,7 @@ namespace ZenQOffice.UI
             {
                 int stdW = ribbon != null && ribbon.IsLandscape ? 842 : 595;
                 int stdH = ribbon != null && ribbon.IsLandscape ? 595 : 842;
-                if (ViewMode == 0) { stdW = 750; }
-                else if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasWidth - 80) / Math.Max(0.2f, ZoomLevel))); }
+                if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasWidth - 80) / Math.Max(0.2f, ZoomLevel))); }
 
                 int pageW = (int)(stdW * ZoomLevel);
                 int pageH = (int)(stdH * ZoomLevel);
@@ -19374,22 +19492,44 @@ namespace ZenQOffice.UI
             {
                 int pageX_m, pageW_m, pageH_m, marginX_m, rightMarginX_m, marginY_m;
                 GetPageLayoutMetrics(canvasWidth, ribbon, out pageX_m, out pageW_m, out pageH_m, out marginX_m, out rightMarginX_m, out marginY_m);
-                int startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+                int startPageY;
+                if (ViewMode == 0)
+                {
+                    int effH = LastViewHeight > 0 ? LastViewHeight : 800;
+                    int availableH = effH - 155 - 26;
+                    int padY = Math.Max(16, (availableH - pageH_m) / 2);
+                    startPageY = 155 + padY - ScrollY;
+                }
+                else
+                {
+                    startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+                }
 
                 bool isOverLeftGutter = false;
 
-                for (int pg = 0; pg < Math.Max(1, CalculatedPageCount); pg++)
+                if (ViewMode == 0)
                 {
-                    int pY = startPageY + pg * (pageH_m + 30);
-                    Rectangle pageRect = new Rectangle(pageX_m, pY, pageW_m, pageH_m);
+                    Rectangle pageRect = new Rectangle(pageX_m, startPageY, pageW_m, pageH_m);
                     if (pageRect.Contains(mouseX, mouseY))
                     {
                         isInsideAnyPage = true;
-                        if (mouseX >= pageX_m && mouseX < pageX_m + marginX_m)
+                    }
+                }
+                else
+                {
+                    for (int pg = 0; pg < Math.Max(1, CalculatedPageCount); pg++)
+                    {
+                        int pY = startPageY + pg * (pageH_m + 30);
+                        Rectangle pageRect = new Rectangle(pageX_m, pY, pageW_m, pageH_m);
+                        if (pageRect.Contains(mouseX, mouseY))
                         {
-                            isOverLeftGutter = true;
+                            isInsideAnyPage = true;
+                            if (mouseX >= pageX_m && mouseX < pageX_m + marginX_m)
+                            {
+                                isOverLeftGutter = true;
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
 

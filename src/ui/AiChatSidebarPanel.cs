@@ -128,7 +128,7 @@ namespace ZenQOffice.UI
                 Color col = btnSettings.ClientRectangle.Contains(pt)
                     ? Color.FromArgb(79, 70, 229)
                     : Color.FromArgb(100, 116, 139);
-                AiVectorGlassRenderer.DrawVectorCog(e.Graphics, 3, 3, 20, col, 1.8f);
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE713', new RectangleF(3, 3, 20, 20), col, 14f);
             };
             btnSettings.Click += (s, e) =>
             {
@@ -152,7 +152,7 @@ namespace ZenQOffice.UI
                 Color col = btnHistory.ClientRectangle.Contains(pt)
                     ? Color.FromArgb(79, 70, 229)
                     : Color.FromArgb(100, 116, 139);
-                AiVectorGlassRenderer.DrawVectorHistory(e.Graphics, 3, 3, 20, col, 1.8f);
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE81C', new RectangleF(3, 3, 20, 20), col, 14f);
             };
             btnHistory.Click += (s, e) => ShowHistoryDialog();
             pnlHeader.Controls.Add(btnHistory);
@@ -173,26 +173,42 @@ namespace ZenQOffice.UI
                 Color col = btnNewChat.ClientRectangle.Contains(pt)
                     ? Color.FromArgb(79, 70, 229)
                     : Color.FromArgb(100, 116, 139);
-                AiVectorGlassRenderer.DrawVectorPlus(e.Graphics, 3, 3, 20, col, 2.0f);
+                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE710', new RectangleF(3, 3, 20, 20), col, 14f);
             };
             btnNewChat.Click += (s, e) => StartNewChatSession();
             pnlHeader.Controls.Add(btnNewChat);
 
             btnClose = new Button
             {
-                Text = "✷",
-                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                Text = "",
                 Size = new Size(26, 26),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.Transparent,
-                ForeColor = Color.FromArgb(100, 116, 139),
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                Point pt = btnClose.PointToClient(Cursor.Position);
+                bool isHover = btnClose.ClientRectangle.Contains(pt);
+                if (isHover)
+                {
+                    using (SolidBrush hb = new SolidBrush(Color.FromArgb(254, 226, 226)))
+                    using (GraphicsPath gp = AiVectorGlassRenderer.CreateRoundedPath(new RectangleF(1, 1, btnClose.Width - 2, btnClose.Height - 2), 5))
+                    {
+                        g.FillPath(hb, gp);
+                    }
+                }
+                Color col = isHover ? Color.FromArgb(220, 38, 38) : Color.FromArgb(100, 116, 139);
+                FluentIconRenderer.DrawGlyph(g, '\uE711', new RectangleF(3, 3, 20, 20), col, 12f);
+            };
             btnClose.Click += (s, e) =>
             {
                 if (_currentTab != null) _currentTab.IsAiChatOpen = false;
                 this.Visible = false;
+                _appForm?.Invalidate();
             };
             pnlHeader.Controls.Add(btnClose);
 
@@ -387,24 +403,14 @@ namespace ZenQOffice.UI
                 g.FillEllipse(sb, _sendBtnRect);
             }
 
-            // 3. Vẽ biểu tượng Vector (Send hoặc Stop) trong nút bấm
+            // 3. Vẽ biểu tượng Fluent Icon Windows 11 (/send hoặc /stop) trong nút bấm
             if (_isAiStreaming)
             {
-                // Hình vuông dừng (Stop Square)
-                float squareSize = 10f;
-                float squareX = _sendBtnRect.X + (_sendBtnRect.Width - squareSize) / 2f;
-                float squareY = _sendBtnRect.Y + (_sendBtnRect.Height - squareSize) / 2f;
-                using (SolidBrush stopBrush = new SolidBrush(Color.White))
-                {
-                    g.FillRectangle(stopBrush, squareX, squareY, squareSize, squareSize);
-                }
+                FluentIconRenderer.DrawGlyph(g, "/stop", new RectangleF(_sendBtnRect.X, _sendBtnRect.Y, _sendBtnRect.Width, _sendBtnRect.Height), Color.White, 12f);
             }
             else
             {
-                float iconSize = 15f;
-                float iconX = _sendBtnRect.X + (_sendBtnRect.Width - iconSize) / 2f - 0.5f;
-                float iconY = _sendBtnRect.Y + (_sendBtnRect.Height - iconSize) / 2f + 0.5f;
-                AiVectorGlassRenderer.DrawVectorLucideSend(g, iconX, iconY, iconSize, Color.White, 1.8f);
+                FluentIconRenderer.DrawGlyph(g, "/send", new RectangleF(_sendBtnRect.X, _sendBtnRect.Y, _sendBtnRect.Width, _sendBtnRect.Height), Color.White, 13f);
             }
         }
 
@@ -969,11 +975,11 @@ namespace ZenQOffice.UI
             {
                 OfficeAppMode curMode = _appForm != null && _appForm.Ribbon != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
                 if (curMode == OfficeAppMode.Calc)
-                    displayText = "📊 Đang xử lý và ghi dữ liệu bảng tính...";
+                    displayText = "✦ Đang xử lý và ghi dữ liệu bảng tính...";
                 else if (curMode == OfficeAppMode.Writer)
-                    displayText = "📝 Đang soạn thảo văn bản...";
+                    displayText = "✦ Đang soạn thảo văn bản...";
                 else
-                    displayText = "🎨 Đang thiết kế slide cho bạn...";
+                    displayText = "✦ Đang thiết kế slide cho bạn...";
             }
 
             int feedW = pnlChatFeed.ClientSize.Width - 46;
@@ -1448,11 +1454,11 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(text))
                 {
                     if (text.IndexOf("CALC", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("cells", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("spreadsheet", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "📊 Đã cập nhật và ghi dữ liệu thành công vào Bảng tính.";
+                        displayText = "✦ Đã cập nhật và ghi dữ liệu thành công vào Bảng tính.";
                     else if (text.IndexOf("GENERATE_SLIDE", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("slides", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "🎨 Đã kiến tạo thành công bộ Slide theo yêu cầu của bạn.";
+                        displayText = "✦ Đã kiến tạo thành công bộ Slide theo yêu cầu của bạn.";
                     else if (text.IndexOf("MODIFY_SLIDE", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "✅ Đã sửa đổi cấu hình và hiệu ứng trên Slide.";
+                        displayText = "✦ Đã sửa đổi cấu hình và hiệu ứng trên Slide.";
                     else
                         displayText = text.Trim();
                 }
@@ -2021,24 +2027,24 @@ namespace ZenQOffice.UI
             _chips.Clear();
             if (mode == OfficeAppMode.Calc)
             {
-                _chips.Add("📊 Tính tổng cột dữ liệu (=SUM)");
-                _chips.Add("🎨 Tô màu highlight A1:A10 vàng nhạt");
-                _chips.Add("📋 Tạo sheet mới và ghi bản tóm tắt");
-                _chips.Add("💡 Tối ưu hóa bảng tính và công thức");
+                _chips.Add("Tính tổng cột dữ liệu (=SUM)");
+                _chips.Add("Tô màu highlight A1:A10 vàng nhạt");
+                _chips.Add("Tạo sheet mới và ghi bản tóm tắt");
+                _chips.Add("Tối ưu hóa bảng tính và công thức");
             }
             else if (mode == OfficeAppMode.Slides)
             {
-                _chips.Add("🎨 Tạo slide trình chiếu theo mô tả");
-                _chips.Add("✨ Đổi màu nền gradient sang trọng");
-                _chips.Add("💡 Viết dàn ý và nội dung thuyết trình");
-                _chips.Add("📋 Thêm các thẻ phân tích số liệu");
+                _chips.Add("Tạo slide trình chiếu theo mô tả");
+                _chips.Add("Đổi màu nền gradient sang trọng");
+                _chips.Add("Viết dàn ý và nội dung thuyết trình");
+                _chips.Add("Thêm các thẻ phân tích số liệu");
             }
             else
             {
-                _chips.Add("📝 Tóm tắt nội dung tài liệu này");
-                _chips.Add("✨ Sửa lỗi chính tả & câu từ tự động");
-                _chips.Add("💡 Viết tiếp đoạn văn theo ý tưởng");
-                _chips.Add("📋 Lập dàn ý bài viết chi tiết");
+                _chips.Add("Tóm tắt nội dung tài liệu này");
+                _chips.Add("Sửa lỗi chính tả & câu từ tự động");
+                _chips.Add("Viết tiếp đoạn văn theo ý tưởng");
+                _chips.Add("Lập dàn ý bài viết chi tiết");
             }
         }
 
@@ -2138,9 +2144,9 @@ namespace ZenQOffice.UI
                 g.DrawString(_greetingText, titleF, txtB, titleR, sf);
             }
 
-            // 4. Các Suggestion Chips
+            // 4. Các Suggestion Chips với Icon Vector chuẩn HD
             using (Font chipF = new Font("Segoe UI", 9.2f, FontStyle.Regular))
-            using (StringFormat csf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            using (StringFormat csf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
             {
                 for (int i = 0; i < _chips.Count; i++)
                 {
@@ -2155,7 +2161,12 @@ namespace ZenQOffice.UI
                         g.DrawPath(chipPen, cp);
                     }
 
-                    Rectangle textR = new Rectangle(cr.X + 12, cr.Y, cr.Width - 24, cr.Height);
+                    int iconSize = 14;
+                    int iconX = cr.X + 11;
+                    int iconY = cr.Y + (cr.Height - iconSize) / 2;
+                    DrawChipIcon(g, i, iconX, iconY, isHover);
+
+                    Rectangle textR = new Rectangle(cr.X + 32, cr.Y, cr.Width - 42, cr.Height);
                     Color textColor = isHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(51, 65, 85);
                     using (SolidBrush tb = new SolidBrush(textColor))
                     {
@@ -2163,6 +2174,44 @@ namespace ZenQOffice.UI
                     }
                 }
             }
+        }
+
+        private void DrawChipIcon(Graphics g, int chipIndex, int x, int y, bool isHover)
+        {
+            Color iconColor = isHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139);
+            string glyph = "/sparkle";
+            if (_mode == OfficeAppMode.Calc)
+            {
+                switch (chipIndex)
+                {
+                    case 0: glyph = "/chart"; break;      // \uE9D2 Bar chart
+                    case 1: glyph = "/highlight"; break;  // \uE7E6 Highlight
+                    case 2: glyph = "/sheet"; break;      // \uE9D9 Grid / Sheet
+                    default: glyph = "/sparkle"; break;   // \uE945 Sparkle AI
+                }
+            }
+            else if (_mode == OfficeAppMode.Slides)
+            {
+                switch (chipIndex)
+                {
+                    case 0: glyph = "/slide"; break;      // \uE7B5 Presentation
+                    case 1: glyph = "/color"; break;      // \uE790 Palette
+                    case 2: glyph = "/bulb"; break;       // \uEA80 Idea
+                    default: glyph = "/chart"; break;     // \uE9D2 Analytics
+                }
+            }
+            else // Writer / General
+            {
+                switch (chipIndex)
+                {
+                    case 0: glyph = "/doc"; break;        // \uE8A5 Document
+                    case 1: glyph = "/check"; break;      // \uE73E Checkmark / Grammar
+                    case 2: glyph = "/bulb"; break;       // \uEA80 Idea
+                    default: glyph = "/list"; break;      // \uE8FD Bullet List
+                }
+            }
+
+            FluentIconRenderer.DrawGlyph(g, glyph, new RectangleF(x, y - 1, 16, 16), iconColor, 12.5f);
         }
 
         private GraphicsPath CreateRoundRectPath(Rectangle r, int radius)
@@ -2215,9 +2264,7 @@ namespace ZenQOffice.UI
             {
                 if (_chipRects[i].Contains(e.Location))
                 {
-                    string prompt = _chips[i];
-                    int spaceIdx = prompt.IndexOf(' ');
-                    if (spaceIdx > 0 && spaceIdx < 4) prompt = prompt.Substring(spaceIdx + 1).Trim();
+                    string prompt = _chips[i].Trim();
                     if (_onSelectPrompt != null)
                     {
                         _onSelectPrompt(prompt);
@@ -2292,8 +2339,8 @@ namespace ZenQOffice.UI
             int iconAlpha = (int)(130 + wave * 125); // 130 -> 255
             int textAlpha = (int)(110 + wave * 125);
 
-            // Icon Sparkle ✦ bên trái
-            AiVectorGlassRenderer.DrawVectorSparkle(g, 10, 8, 15, Color.FromArgb(iconAlpha, 79, 70, 229));
+            // Icon Sparkle ✦ bên trái (Fluent Icon Windows 11)
+            FluentIconRenderer.DrawGlyph(g, "/sparkle", new RectangleF(8, 8, 16, 16), Color.FromArgb(iconAlpha, 79, 70, 229), 13f);
 
             // Text "Đang suy nghĩ..."
             using (Font font = new Font("Segoe UI", 9f, FontStyle.Italic))
@@ -2517,7 +2564,7 @@ namespace ZenQOffice.UI
                     g.FillPath(sb, p);
                 }
             }
-            DrawVectorPencil(g, _replyBtnRect.X + 6, _replyBtnRect.Y + 4, 13, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184));
+            FluentIconRenderer.DrawGlyph(g, "/edit", new RectangleF(_replyBtnRect.X + 4, _replyBtnRect.Y + 2, 16, 16), _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184), 11f);
             using (Font bf = new Font("Segoe UI", 8.2f))
             {
                 Rectangle textR = new Rectangle(_replyBtnRect.X + 22, _replyBtnRect.Y, _replyBtnRect.Width - 22, _replyBtnRect.Height);
@@ -2536,7 +2583,7 @@ namespace ZenQOffice.UI
 
             if (_isCopied)
             {
-                AiVectorGlassRenderer.DrawVectorCheck(g, _copyBtnRect.X + 4, _copyBtnRect.Y + 3, 14, Color.FromArgb(22, 163, 74));
+                FluentIconRenderer.DrawGlyph(g, "/check", new RectangleF(_copyBtnRect.X + 4, _copyBtnRect.Y + 2, 16, 16), Color.FromArgb(22, 163, 74), 11f);
                 using (Font bf = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 20, _copyBtnRect.Y, _copyBtnRect.Width - 20, _copyBtnRect.Height);
@@ -2545,7 +2592,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                AiVectorGlassRenderer.DrawVectorCopy(g, _copyBtnRect.X + 4, _copyBtnRect.Y + 3, 14, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184));
+                FluentIconRenderer.DrawGlyph(g, "/copy", new RectangleF(_copyBtnRect.X + 4, _copyBtnRect.Y + 2, 16, 16), _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184), 11f);
                 using (Font bf = new Font("Segoe UI", 8.2f))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 20, _copyBtnRect.Y, _copyBtnRect.Width - 20, _copyBtnRect.Height);
@@ -2617,27 +2664,6 @@ namespace ZenQOffice.UI
             gp.AddArc(r.X, r.Height + r.Y - radius, radius, radius, 90, 90);
             gp.CloseFigure();
             return gp;
-        }
-
-        private static void DrawVectorPencil(Graphics g, float x, float y, float size, Color color)
-        {
-            using (Pen p = new Pen(color, 1.4f))
-            using (SolidBrush b = new SolidBrush(color))
-            {
-                p.StartCap = LineCap.Round;
-                p.EndCap = LineCap.Round;
-                // Thân bút chì nghiêng 45 độ
-                g.DrawLine(p, x + 3.0f, y + size - 3.0f, x + size - 3.0f, y + 3.0f);
-                g.DrawLine(p, x + 4.5f, y + size - 1.5f, x + size - 1.5f, y + 4.5f);
-                // Ngòi bút chì
-                PointF[] tip = new PointF[]
-                {
-                    new PointF(x + 1.0f, y + size - 1.0f),
-                    new PointF(x + 5.0f, y + size - 1.5f),
-                    new PointF(x + 1.5f, y + size - 5.0f)
-                };
-                g.FillPolygon(b, tip);
-            }
         }
 
         protected override void Dispose(bool disposing)
@@ -2753,7 +2779,7 @@ namespace ZenQOffice.UI
 
             if (_isCopied)
             {
-                AiVectorGlassRenderer.DrawVectorCheck(g, _copyBtnRect.X + 4, _copyBtnRect.Y + 4, 14, Color.FromArgb(22, 163, 74));
+                FluentIconRenderer.DrawGlyph(g, "/check", new RectangleF(_copyBtnRect.X + 4, _copyBtnRect.Y + 3, 14, 14), Color.FromArgb(22, 163, 74), 11f);
                 using (Font bf = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 20, _copyBtnRect.Y, _copyBtnRect.Width - 20, _copyBtnRect.Height);
@@ -2762,7 +2788,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                AiVectorGlassRenderer.DrawVectorCopy(g, _copyBtnRect.X + 4, _copyBtnRect.Y + 4, 14, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184));
+                FluentIconRenderer.DrawGlyph(g, "/copy", new RectangleF(_copyBtnRect.X + 4, _copyBtnRect.Y + 3, 14, 14), _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(148, 163, 184), 11f);
                 using (Font bf = new Font("Segoe UI", 8.2f))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 20, _copyBtnRect.Y, _copyBtnRect.Width - 20, _copyBtnRect.Height);
@@ -2964,7 +2990,7 @@ namespace ZenQOffice.UI
             btnClearAll.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                AiVectorGlassRenderer.DrawVectorTrash(e.Graphics, 8, 7, 16, Color.FromArgb(239, 68, 68));
+                FluentIconRenderer.DrawGlyph(e.Graphics, "/trash", new RectangleF(8, 7, 16, 16), Color.FromArgb(239, 68, 68), 12f);
             };
             btnClearAll.Click += (s, e) =>
             {
@@ -3223,7 +3249,7 @@ namespace ZenQOffice.UI
                     }
                 }
                 Color delCol = isDelHover ? Color.FromArgb(220, 38, 38) : Color.FromArgb(148, 163, 184);
-                AiVectorGlassRenderer.DrawVectorTrash(e.Graphics, 6, 6, 22, delCol);
+                FluentIconRenderer.DrawGlyph(e.Graphics, "/trash", new RectangleF(6, 6, 22, 22), delCol, 14f);
             };
 
             btnDel.Click += (s, e) =>

@@ -383,7 +383,7 @@ namespace ZenQOffice.Core
                         "gemini-3.5-flash",
                         "gemini-3.5-flash-lite",
                         "gemini-3.1-pro-preview",
-                        "gemini-3.1-flash"
+                        "gemini-3.1-flash-lite"
                     };
                 case AiProviderType.Groq:
                     return new List<string> {

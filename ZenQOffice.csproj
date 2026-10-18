@@ -17,9 +17,10 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <NoWarn>$(NoWarn);CA1416;CS1685;CS0168;CS0219;CS0414;CS0649;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;WFO1000;WFO5001;WFO5002</NoWarn>
     <WarningsNotAsErrors>WFO1000;WFO5001;WFO5002</WarningsNotAsErrors>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildProjectDirectory)=.</PathMap>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
-    <PathMap Condition="'$(Configuration)' == 'Release'">$(MSBuildProjectDirectory)=.</PathMap>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1014,7 +1014,7 @@ namespace ZenQOffice.Core
                 exLower.Contains("404") ||
                 exLower.Contains("not found"))
             {
-                return string.Format("⚠️ Model '{0}' hiện không tồn tại hoặc đã ngừng hỗ trợ (404 Not Found).\n👉 Vui lòng chọn Model khác (ví dụ: gemini-3.7-flash, gemini-3.1-flash, v.v.) trong Cài đặt hoặc danh sách phía trên.", modelDisplay);
+                return string.Format("⚠️ Model '{0}' hiện không tồn tại hoặc đã ngừng hỗ trợ (404 Not Found).\n👉 Vui lòng chọn Model khác (ví dụ: gemini-3.7-flash, gemini-3.1-flash-lite, v.v.) trong Cài đặt hoặc danh sách phía trên.", modelDisplay);
             }
 
             // 2. Hết Token / Hết hạn ngạch sử dụng / Hết lượt / Hết tiền (RESOURCE_EXHAUSTED, insufficient_quota, credits, billing)

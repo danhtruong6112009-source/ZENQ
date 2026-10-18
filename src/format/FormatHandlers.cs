@@ -1022,9 +1022,9 @@ namespace ZenQOffice.Format
                         meta.BottomMarginPt = (int)(bottomTwips / 20f);
                         meta.LeftMarginPt = (int)(leftTwips / 20f);
 
-                        if (Math.Abs(topTwips - 720) <= 40 && Math.Abs(rightTwips - 720) <= 40 && Math.Abs(leftTwips - 720) <= 40) meta.MarginMode = 1; // Narrow
-                        else if (Math.Abs(topTwips - 1440) <= 40 && Math.Abs(rightTwips - 1440) <= 40 && Math.Abs(leftTwips - 1440) <= 40) meta.MarginMode = 0; // Normal
-                        else if (Math.Abs(rightTwips - 2880) <= 80) meta.MarginMode = 3; // Wide
+                        if (Math.Abs(topTwips - 720) <= 40 && Math.Abs(rightTwips - 720) <= 40 && Math.Abs(leftTwips - 720) <= 40 && Math.Abs(bottomTwips - 720) <= 40) meta.MarginMode = 1; // Narrow
+                        else if (Math.Abs(topTwips - 1440) <= 40 && Math.Abs(rightTwips - 1440) <= 40 && Math.Abs(leftTwips - 1440) <= 40 && Math.Abs(bottomTwips - 1440) <= 40) meta.MarginMode = 0; // Normal
+                        else if (Math.Abs(rightTwips - 2880) <= 80 && Math.Abs(leftTwips - 2880) <= 80 && Math.Abs(topTwips - 1440) <= 40 && Math.Abs(bottomTwips - 1440) <= 40) meta.MarginMode = 3; // Wide
                         else meta.MarginMode = 4; // Custom
                     }
 

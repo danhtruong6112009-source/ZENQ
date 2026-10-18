@@ -1944,7 +1944,7 @@ namespace ZenQOffice.UI
                 }
                 else if (_gdiGraphics != null && !_ownsHdc)
                 {
-                    _gdiGraphics.SmoothingMode = value;
+                    try { _gdiGraphics.SmoothingMode = value; } catch { }
                 }
             }
         }
@@ -1964,7 +1964,7 @@ namespace ZenQOffice.UI
                 }
                 else if (_gdiGraphics != null && !_ownsHdc)
                 {
-                    _gdiGraphics.TextRenderingHint = value;
+                    try { _gdiGraphics.TextRenderingHint = value; } catch { }
                 }
             }
         }
@@ -1976,7 +1976,10 @@ namespace ZenQOffice.UI
             set
             {
                 _interpolationMode = value;
-                if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.InterpolationMode = value;
+                if (_gdiGraphics != null && !_ownsHdc)
+                {
+                    try { _gdiGraphics.InterpolationMode = value; } catch { }
+                }
             }
         }
 
@@ -1987,7 +1990,10 @@ namespace ZenQOffice.UI
             set
             {
                 _pixelOffsetMode = value;
-                if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.PixelOffsetMode = value;
+                if (_gdiGraphics != null && !_ownsHdc)
+                {
+                    try { _gdiGraphics.PixelOffsetMode = value; } catch { }
+                }
             }
         }
 
@@ -1998,7 +2004,10 @@ namespace ZenQOffice.UI
             set
             {
                 _compositingQuality = value;
-                if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.CompositingQuality = value;
+                if (_gdiGraphics != null && !_ownsHdc)
+                {
+                    try { _gdiGraphics.CompositingQuality = value; } catch { }
+                }
             }
         }
 
@@ -2018,7 +2027,10 @@ namespace ZenQOffice.UI
                 _clipDepth++;
                 return;
             }
-            if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.SetClip(rect);
+            if (_gdiGraphics != null && !_ownsHdc)
+            {
+                try { _gdiGraphics.SetClip(rect); } catch { }
+            }
         }
 
         public void SetClip(Rectangle rect, System.Drawing.Drawing2D.CombineMode combineMode)

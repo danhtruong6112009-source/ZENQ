@@ -1,8 +1,10 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Text;
 using System.Windows.Forms;
 using ZenQOffice.Core;
+using ZenQOffice.Format;
 
 namespace ZenQOffice.UI
 {
@@ -195,12 +197,19 @@ namespace ZenQOffice.UI
             try
             {
                 string ext = Path.GetExtension(filePath).ToLowerInvariant();
-                if (ext == ".txt" || ext == ".md" || ext == ".csv")
+                if (ext == ".docx")
                 {
-                    return File.ReadAllText(filePath);
+                    DocxMetadata meta;
+                    if (DocxHandler.LoadDocxFile(filePath, out meta))
+                    {
+                        return meta.TextContent ?? "";
+                    }
                 }
-                // Try reading file text
-                return File.ReadAllText(filePath);
+                if (ext == ".txt" || ext == ".md" || ext == ".csv" || ext == ".html" || ext == ".xml")
+                {
+                    return File.ReadAllText(filePath, Encoding.UTF8);
+                }
+                return File.ReadAllText(filePath, Encoding.UTF8);
             }
             catch (Exception ex)
             {

@@ -270,28 +270,201 @@ namespace ZenQOffice.UI
             DrawGlyphD2D(g, glyph, new RectangleF(x, y, size, size), color, fontSize);
         }
 
+        /// <summary>
+        /// Phân giải chuỗi icon Win 11 bất kỳ (bắt đầu bằng dấu '/', '\', mã hex Unicode như /uE711, \uE711, E711 hoặc tên shortcut như /close, /add, /send, /sparkle, /doc) sang ký tự Glyph chuẩn của Segoe Fluent Icons.
+        /// </summary>
+        public static char ParseGlyph(string glyphOrCode)
+        {
+            if (string.IsNullOrEmpty(glyphOrCode)) return '\0';
+            if (glyphOrCode.Length == 1) return glyphOrCode[0];
+
+            string s = glyphOrCode.Trim();
+            if (s.StartsWith("/") || s.StartsWith("\\"))
+            {
+                s = s.Substring(1);
+            }
+            if (s.StartsWith("u", StringComparison.OrdinalIgnoreCase))
+            {
+                s = s.Substring(1);
+            }
+            if (s.Length == 4 && int.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out int hexVal))
+            {
+                return (char)hexVal;
+            }
+
+            switch (s.ToLowerInvariant())
+            {
+                case "close":
+                case "cancel":
+                case "x":
+                    return '\uE711';
+                case "add":
+                case "plus":
+                case "new":
+                    return '\uE710';
+                case "send":
+                    return '\uE724';
+                case "stop":
+                    return '\uE71A';
+                case "sparkle":
+                case "sparkles":
+                case "ai":
+                    return '\uE945';
+                case "doc":
+                case "document":
+                    return '\uE8A5';
+                case "bulb":
+                case "idea":
+                    return '\uEA80';
+                case "list":
+                case "bullets":
+                    return '\uE8FD';
+                case "chart":
+                case "barchart":
+                    return '\uE9D2';
+                case "sheet":
+                case "calc":
+                case "table":
+                case "grid":
+                    return '\uE9D9';
+                case "check":
+                case "checkmark":
+                case "done":
+                    return '\uE73E';
+                case "copy":
+                    return '\uE8C8';
+                case "edit":
+                case "pencil":
+                    return '\uE70F';
+                case "trash":
+                case "delete":
+                    return '\uE74D';
+                case "history":
+                    return '\uE81C';
+                case "settings":
+                case "cog":
+                    return '\uE713';
+                case "color":
+                case "palette":
+                    return '\uE790';
+                case "highlight":
+                    return '\uE7E6';
+                case "slide":
+                case "presentation":
+                    return '\uE7B5';
+                case "save":
+                case "disk":
+                    return '\uE74E';
+                case "key":
+                    return '\uE8D7';
+                case "eye":
+                case "show":
+                    return '\uE7B3';
+                case "hide":
+                case "eyeoff":
+                case "eyeslash":
+                    return '\uE890';
+                case "test":
+                case "lightning":
+                case "flash":
+                    return '\uE945';
+                case "search":
+                case "find":
+                    return '\uE721';
+                case "refresh":
+                case "reload":
+                    return '\uE72C';
+                case "back":
+                case "prev":
+                    return '\uE72B';
+                case "forward":
+                case "next":
+                    return '\uE72A';
+                case "up":
+                    return '\uE70E';
+                case "down":
+                    return '\uE70D';
+                case "folder":
+                case "open":
+                    return '\uE838';
+                case "user":
+                case "profile":
+                    return '\uE77B';
+                case "help":
+                    return '\uE897';
+                case "info":
+                    return '\uE946';
+                case "warning":
+                    return '\uE7BA';
+                case "error":
+                    return '\uE783';
+                case "zoom":
+                    return '\uE71E';
+                case "zoomin":
+                    return '\uE8A3';
+                case "zoomout":
+                    return '\uE71F';
+                case "font":
+                    return '\uE8D2';
+                case "bold":
+                    return '\uE8DD';
+                case "italic":
+                    return '\uE8DB';
+                case "underline":
+                    return '\uE8DC';
+                case "read":
+                case "reading":
+                case "book":
+                    return '\uE8BD';
+                case "print":
+                case "printlayout":
+                case "page":
+                    return '\uE8A5';
+                case "web":
+                case "weblayout":
+                case "globe":
+                    return '\uE774';
+                case "slideshow":
+                case "present":
+                    return '\uE786';
+                case "slidesorter":
+                case "sorter":
+                    return '\uE80A';
+                case "slidenormal":
+                    return '\uE7F4';
+            }
+            return glyphOrCode[0];
+        }
+
+        public static Bitmap GetGlyphBitmap(string glyphOrCode, int width, int height, Color color, float fontSize = 0)
+        {
+            char g = ParseGlyph(glyphOrCode);
+            if (g == '\0') return new Bitmap(Math.Max(1, width), Math.Max(1, height));
+            return GetGlyphBitmap(g, width, height, color, fontSize);
+        }
+
         public static void DrawGlyph(Graphics g, string glyph, Rectangle bounds, Color color, float fontSize = 0)
         {
             if (string.IsNullOrEmpty(glyph)) return;
-            DrawGlyph(g, glyph[0], bounds, color, fontSize);
+            DrawGlyph(g, ParseGlyph(glyph), bounds, color, fontSize);
         }
 
         public static void DrawGlyph(Graphics g, string glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
             if (string.IsNullOrEmpty(glyph)) return;
-            DrawGlyph(g, glyph[0], bounds, color, fontSize);
+            DrawGlyph(g, ParseGlyph(glyph), bounds, color, fontSize);
         }
 
         public static void DrawGlyph(D2DGraphics g, string glyph, Rectangle bounds, Color color, float fontSize = 0)
         {
             if (string.IsNullOrEmpty(glyph)) return;
-            DrawGlyph(g, glyph[0], bounds, color, fontSize);
+            DrawGlyphD2D(g, ParseGlyph(glyph), bounds, color, fontSize);
         }
 
         public static void DrawGlyph(D2DGraphics g, string glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
             if (string.IsNullOrEmpty(glyph)) return;
-            DrawGlyph(g, glyph[0], bounds, color, fontSize);
+            DrawGlyphD2D(g, ParseGlyph(glyph), bounds, color, fontSize);
         }
 
         /// <summary>

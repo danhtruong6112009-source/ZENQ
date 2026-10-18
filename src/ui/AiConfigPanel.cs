@@ -107,7 +107,7 @@ namespace ZenQOffice.UI
             {
                 Text = "Thêm Key",
                 IsPrimary = false,
-                VectorIconDrawer = AiVectorGlassRenderer.DrawVectorPlus
+                FluentIcon = "/add"
             };
             btnAddProfile.Click += (s, e) => AddNewKeyProfile();
             this.Controls.Add(btnAddProfile);
@@ -116,7 +116,7 @@ namespace ZenQOffice.UI
             {
                 Text = "",
                 IsPrimary = false,
-                VectorIconDrawer = AiVectorGlassRenderer.DrawVectorTrash
+                FluentIcon = "/trash"
             };
             btnDeleteProfile.Click += (s, e) => DeleteCurrentKeyProfile();
             this.Controls.Add(btnDeleteProfile);
@@ -258,11 +258,12 @@ namespace ZenQOffice.UI
             {
                 Text = "",
                 IsPrimary = false,
-                VectorIconDrawer = (g, x, y, sz, c) => AiVectorGlassRenderer.DrawVectorEye(g, x, y, sz, Color.FromArgb(71, 85, 105), txtApiKey.UseSystemPasswordChar)
+                FluentIcon = txtApiKey.UseSystemPasswordChar ? "/hide" : "/eye"
             };
             btnToggleKey.Click += (s, e) =>
             {
                 txtApiKey.UseSystemPasswordChar = !txtApiKey.UseSystemPasswordChar;
+                btnToggleKey.FluentIcon = txtApiKey.UseSystemPasswordChar ? "/hide" : "/eye";
                 btnToggleKey.Invalidate();
             };
             this.Controls.Add(btnToggleKey);
@@ -274,7 +275,7 @@ namespace ZenQOffice.UI
             {
                 Text = "Kiểm tra kết nối",
                 IsPrimary = false,
-                VectorIconDrawer = (g, x, y, sz, c) => AiVectorGlassRenderer.DrawVectorLightning(g, x, y, sz, Color.FromArgb(99, 102, 241))
+                FluentIcon = "/test"
             };
             btnTest.Click += (s, e) => RunConnectionTest();
             this.Controls.Add(btnTest);
@@ -283,7 +284,7 @@ namespace ZenQOffice.UI
             {
                 Text = "Lưu cấu hình",
                 IsPrimary = true,
-                VectorIconDrawer = AiVectorGlassRenderer.DrawVectorSaveDisk
+                FluentIcon = "/save"
             };
             btnSave.Click += (s, e) => SaveConfig();
             this.Controls.Add(btnSave);

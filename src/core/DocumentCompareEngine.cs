@@ -226,14 +226,40 @@ namespace ZenQOffice.Core
         {
             if (writerView == null || cmpResult == null) return;
 
-            writerView.PieceTable.SetInitialText(cmpResult.CombinedText ?? "");
+            // 1. Lưu trạng thái trước khi áp dụng để người dùng có thể Ctrl+Z hoàn tác toàn bộ
+            writerView.SaveUndoState();
+
+            string combText = cmpResult.CombinedText ?? "";
+            writerView.PieceTable.SetInitialText(combText);
             writerView.CursorPosition = 0;
             writerView.SelectionStart = 0;
             writerView.SelectionEnd = 0;
+
+            // 2. Tái tạo FormattedRuns cho toàn bộ văn bản mới
+            writerView.FormattedRuns.Clear();
+            if (!string.IsNullOrEmpty(combText))
+            {
+                writerView.FormattedRuns.Add(new FormattedRun(0, combText.Length, writerView.TypingFont ?? "Times New Roman", writerView.TypingFontSize > 0 ? writerView.TypingFontSize : 14f, false, false, false, false, Color.Black, Color.Transparent));
+            }
+
+            // 3. Nạp danh sách Revisions và định dạng trực quan (đoạn xóa gạch ngang đỏ, đoạn thêm gạch chân xanh)
             writerView.Revisions.Clear();
             writerView.Revisions.AddRange(cmpResult.Revisions);
+            foreach (var rev in cmpResult.Revisions)
+            {
+                if (rev.Type == RevisionType.Deletion)
+                {
+                    writerView.ApplyFormatToRange(rev.StartIndex, rev.Length, null, 0, null, null, null, true, rev.Color, null);
+                }
+                else if (rev.Type == RevisionType.Insertion)
+                {
+                    writerView.ApplyFormatToRange(rev.StartIndex, rev.Length, null, 0, null, null, true, false, rev.Color, null);
+                }
+            }
+
             writerView.TrackChanges = true;
             writerView.DisplayMarkupMode = MarkupDisplayMode.AllMarkup;
+            writerView.InvalidateLayoutAndTextCache();
             writerView.Invalidate();
         }
     }

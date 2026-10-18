@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Text.RegularExpressions;
 using ZenQOffice.Core;
 using ZenQOffice;
 
@@ -48,6 +50,9 @@ namespace ZenQOffice.UI
 
         private Timer _cursorTimer;
         private Timer _animTimer;
+        private bool _isPainting;
+        private int _tabPaintErrorCount = 0;
+        private bool _isRecoveringTab = false;
 
         public void ResetCursorBlink()
         {
@@ -1497,12 +1502,45 @@ namespace ZenQOffice.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             if (e.Graphics == null) return;
-            int w = Math.Max(1, ClientSize.Width);
-            int h = Math.Max(1, ClientSize.Height);
-
-            using (D2DGraphics d2d = new D2DGraphics(e.Graphics, w, h))
+            if (_isPainting) return; // prevent re-entrant paint — WinForms will re-queue WM_PAINT
+            _isPainting = true;
+            try
             {
-                RenderFrame(d2d, w, h);
+                int w = Math.Max(1, ClientSize.Width);
+                int h = Math.Max(1, ClientSize.Height);
+
+                using (D2DGraphics d2d = new D2DGraphics(e.Graphics, w, h))
+                {
+                    RenderFrame(d2d, w, h);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("AppForm.OnPaint Critical Error: " + ex);
+                // BẢO VỆ CHỐNG DẤU CHÉO ĐỎ (ANTI RED-X GUARD):
+                // Tuyệt đối không để exception văng ra WinForms runtime
+                try
+                {
+                    using (SolidBrush safeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    {
+                        e.Graphics.FillRectangle(safeBg, ClientRectangle);
+                    }
+                }
+                catch { }
+
+                // Kích hoạt tự động cô lập tab lỗi và trở về Trang chủ an toàn
+                int curIdx = Ribbon?.ActiveDocIndex ?? -1;
+                if (curIdx > 0 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        TriggerEmergencyTabRecovery(curIdx, ex);
+                    }));
+                }
+            }
+            finally
+            {
+                _isPainting = false;
             }
         }
 
@@ -1562,11 +1600,13 @@ namespace ZenQOffice.UI
                 }
 
                 // 1. Draw Active Viewport (Home / Writer / Calc / Slides / Pdf)
+                int currentActiveTab = Ribbon?.ActiveDocIndex ?? -1;
                 try
                 {
                     if (Ribbon.CurrentMode == OfficeAppMode.Home)
                     {
                         HomeView.Draw(g, clientWidth, clientHeight);
+                        _tabPaintErrorCount = 0;
                     }
                     else
                     {
@@ -1596,11 +1636,23 @@ namespace ZenQOffice.UI
                         {
                             PhotoView.Draw(g, effectiveDocWidth, clientHeight, Ribbon);
                         }
+
+                        _tabPaintErrorCount = 0; // Viewport render thành công
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine("AppForm Viewport Draw error: " + ex.Message);
+                    _tabPaintErrorCount++;
+                    System.Diagnostics.Debug.WriteLine($"AppForm Viewport Draw error (Tab: {currentActiveTab}, count: {_tabPaintErrorCount}): " + ex.Message);
+
+                    // Nếu tab bị lỗi vẽ liên tục (từ 2 frame trở lên), kích hoạt cứu hộ khẩn cấp
+                    if (_tabPaintErrorCount >= 2 && currentActiveTab > 0 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                    {
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            TriggerEmergencyTabRecovery(currentActiveTab, ex);
+                        }));
+                    }
                 }
 
                 // 2. Draw Ribbon Bar
@@ -1672,6 +1724,163 @@ namespace ZenQOffice.UI
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("AppForm.RenderFrame error: " + ex);
+            }
+        }
+
+        /// <summary>
+        /// Cơ chế Tự Phục Hồi Khẩn Cấp (Fault-Tolerant Tab Auto-Recovery):
+        /// Khi một Tab bị lỗi kết xuất đồ họa (render crash), tự động:
+        /// 1. Sao lưu dữ liệu tài liệu khẩn cấp vào thư mục Recovery.
+        /// 2. Cô lập và đóng Tab bị lỗi để không làm hỏng ứng dụng.
+        /// 3. Cập nhật SessionManager để Session tiếp theo không bao giờ mở lại tab lỗi lúc khởi động app.
+        /// 4. Chuyển ngay về Trang chủ (Home) an toàn, triệt tiêu vĩnh viễn lỗi 'Dấu chéo đỏ' (Red X).
+        /// 5. Hiển thị thông báo hỗ trợ chuyên nghiệp cho người dùng.
+        /// </summary>
+        public void TriggerEmergencyTabRecovery(int failedTabIndex, Exception ex)
+        {
+            if (_isRecoveringTab) return;
+            _isRecoveringTab = true;
+
+            try
+            {
+                if (Ribbon == null || Ribbon.DocTabs == null || Ribbon.DocTabs.Count == 0)
+                {
+                    return;
+                }
+
+                // Nếu đang ở Home mà có lỗi, chỉ cần reset bộ đếm và vẽ lại
+                if (Ribbon.CurrentMode == OfficeAppMode.Home || failedTabIndex <= 0 || failedTabIndex >= Ribbon.DocTabs.Count)
+                {
+                    _tabPaintErrorCount = 0;
+                    Invalidate();
+                    return;
+                }
+
+                DocTab failedTab = Ribbon.DocTabs[failedTabIndex];
+                string failedTitle = failedTab?.Title ?? "Tài liệu";
+                string savedRecoveryPath = string.Empty;
+
+                // 1. Tự động sao lưu dữ liệu khẩn cấp (Emergency Recovery Auto-Save)
+                try
+                {
+                    string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    string recoveryDir = Path.Combine(appData, "GenOffice", "recovery");
+                    if (!Directory.Exists(recoveryDir)) Directory.CreateDirectory(recoveryDir);
+
+                    string safeTitle = Regex.Replace(failedTitle, @"[\\/:*?""<>|]", "_");
+                    string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                    if (failedTab.Mode == OfficeAppMode.Writer && WriterView != null)
+                    {
+                        savedRecoveryPath = Path.Combine(recoveryDir, $"recovery_writer_{timestamp}_{safeTitle}.docx");
+                        try
+                        {
+                            WriterView.SaveDocumentFile(savedRecoveryPath, Ribbon, true);
+                        }
+                        catch
+                        {
+                            // Fallback plain text nếu nén docx gặp sự cố
+                            string rawTxt = WriterView.PieceTable?.GetText();
+                            if (!string.IsNullOrEmpty(rawTxt))
+                            {
+                                string txtPath = Path.ChangeExtension(savedRecoveryPath, ".txt");
+                                File.WriteAllText(txtPath, rawTxt, System.Text.Encoding.UTF8);
+                                savedRecoveryPath = txtPath;
+                            }
+                        }
+                    }
+                    else if (failedTab.Mode == OfficeAppMode.Calc && CalcView != null)
+                    {
+                        savedRecoveryPath = Path.Combine(recoveryDir, $"recovery_calc_{timestamp}_{safeTitle}.xlsx");
+                        try
+                        {
+                            Format.XlsxHandler.SaveXlsx(savedRecoveryPath, CalcView);
+                        }
+                        catch { }
+                    }
+                    else if (failedTab.Mode == OfficeAppMode.Slides && SlidesView != null && SlidesView.Presentation != null)
+                    {
+                        savedRecoveryPath = Path.Combine(recoveryDir, $"recovery_slides_{timestamp}_{safeTitle}.pptx");
+                        try
+                        {
+                            Format.PptxHandler.SavePptx(savedRecoveryPath, SlidesView.Presentation);
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception saveEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("Emergency save error: " + saveEx.Message);
+                }
+
+                // 2. Cô lập và đóng Tab bị lỗi (đánh dấu IsModified = false để không hiển thị hộp thoại hỏi lưu gây treo giao diện)
+                try
+                {
+                    failedTab.IsModified = false;
+                    Ribbon.CloseDocTab(failedTabIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
+                }
+                catch
+                {
+                    try
+                    {
+                        if (failedTabIndex < Ribbon.DocTabs.Count && Ribbon.DocTabs[failedTabIndex].Mode != OfficeAppMode.Home)
+                        {
+                            Ribbon.DocTabs.RemoveAt(failedTabIndex);
+                        }
+                    }
+                    catch { }
+                }
+
+                // 3. Chuyển hoàn toàn về Trang chủ (Home) an toàn
+                Ribbon.CurrentMode = OfficeAppMode.Home;
+                Ribbon.ActiveDocIndex = 0;
+                for (int i = 0; i < Ribbon.DocTabs.Count; i++)
+                {
+                    Ribbon.DocTabs[i].Active = (Ribbon.DocTabs[i].Mode == OfficeAppMode.Home);
+                    if (Ribbon.DocTabs[i].Active) Ribbon.ActiveDocIndex = i;
+                }
+
+                // 4. Cập nhật SessionManager ngay lập tức để không bao giờ mở lại tab lỗi lúc khởi động app
+                try
+                {
+                    SessionManager.SaveSession(this);
+                }
+                catch { }
+
+                // 5. Reset các cờ và vẽ lại Trang chủ an toàn
+                _tabPaintErrorCount = 0;
+                _isPainting = false;
+                Invalidate();
+
+                // 6. Hiển thị thông báo chuyên nghiệp hỗ trợ người dùng
+                string noticeMsg = $"ZenQ Office phát hiện sự cố kết xuất đồ họa ở tài liệu: '{failedTitle}'.\n\n"
+                                 + "✓ Tab tài liệu đã được cô lập và đóng an toàn để bảo vệ ứng dụng.\n"
+                                 + (!string.IsNullOrEmpty(savedRecoveryPath) && File.Exists(savedRecoveryPath)
+                                     ? $"✓ Dữ liệu của bạn đã được sao lưu khẩn cấp tại:\n{savedRecoveryPath}\n\n"
+                                     : "✓ Phiên làm việc đã được bảo vệ an toàn.\n\n")
+                                 + "Ứng dụng đã chuyển về Trang chủ an toàn. Bạn có thể tiếp tục làm việc bình thường.";
+
+                ZenQCrashDialogForm.ShowDialogSafe(
+                    new InvalidOperationException($"Lỗi kết xuất tại '{failedTitle}': Tab đã được cô lập và chuyển về Trang chủ an toàn."),
+                    "Tự động bảo vệ & Phục hồi",
+                    false
+                );
+            }
+            catch (Exception exRecovery)
+            {
+                System.Diagnostics.Debug.WriteLine("TriggerEmergencyTabRecovery critical error: " + exRecovery);
+                try
+                {
+                    Ribbon.CurrentMode = OfficeAppMode.Home;
+                    Ribbon.ActiveDocIndex = 0;
+                    _isPainting = false;
+                    Invalidate();
+                }
+                catch { }
+            }
+            finally
+            {
+                _isRecoveringTab = false;
             }
         }
 
@@ -1920,7 +2129,7 @@ namespace ZenQOffice.UI
                 {
                     // View Mode Icons for Writer (Read Mode, Print Layout, Web Layout)
                     int modeX = width - 246;
-                    string[] modeGlyphs = new string[] { "\uE736", "\uE8A5", "\uE774" };
+                    string[] modeGlyphs = new string[] { "/read", "/print", "/web" };
                     for (int m = 0; m < 3; m++)
                     {
                         Rectangle mRect = new Rectangle(modeX + m * 24, height - 23, 22, 20);
@@ -1932,7 +2141,7 @@ namespace ZenQOffice.UI
                             }
                             g.DrawRectangle(Pens.White, mRect);
                         }
-                        FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, Color.White, 9f);
+                        FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, Color.White, 9.5f);
                     }
                 }
 
@@ -2021,42 +2230,20 @@ namespace ZenQOffice.UI
 
         private void DrawSlideStatusBarButton(D2DGraphics g, int mode, Rectangle mRect)
         {
-            int x = mRect.X + (mRect.Width - 14) / 2;
-            int y = mRect.Y + (mRect.Height - 11) / 2;
-            using (Pen pen = new Pen(Color.White, 1.2f))
-            using (SolidBrush brush = new SolidBrush(Color.White))
+            switch (mode)
             {
-                switch (mode)
-                {
-                    case 0: // Normal View (Bình thường: Cột thumbnail bên trái & canvas chính)
-                        g.DrawRectangle(pen, x, y, 14, 11);
-                        g.DrawLine(pen, x + 4, y, x + 4, y + 11);
-                        g.FillRectangle(brush, x + 1.5f, y + 2.5f, 1.5f, 2.0f);
-                        g.FillRectangle(brush, x + 1.5f, y + 6.0f, 1.5f, 2.0f);
-                        g.FillRectangle(brush, x + 6.5f, y + 2.5f, 5.5f, 6.0f);
-                        break;
-                    case 1: // Slide Sorter (Bộ sắp xếp slide: Lưới 4 ô chuẩn PowerPoint)
-                        g.DrawRectangle(pen, x, y, 6, 4.5f);
-                        g.DrawRectangle(pen, x + 7.5f, y, 6, 4.5f);
-                        g.DrawRectangle(pen, x, y + 6.5f, 6, 4.5f);
-                        g.DrawRectangle(pen, x + 7.5f, y + 6.5f, 6, 4.5f);
-                        break;
-                    case 2: // Reading View (Chế độ xem Đọc: Quyển sách mở)
-                        FluentIconRenderer.DrawGlyph(g, "\uE736", mRect, Color.White, 9f);
-                        break;
-                    case 3: // Slide Show (Trình chiếu: Màn chiếu ba chân với nút Play)
-                        g.DrawLine(pen, x, y, x + 14, y);
-                        g.DrawRectangle(pen, x + 1, y + 1, 12, 7);
-                        g.FillPolygon(brush, new PointF[] {
-                            new PointF(x + 5.5f, y + 2.8f),
-                            new PointF(x + 9.5f, y + 4.5f),
-                            new PointF(x + 5.5f, y + 6.2f)
-                        });
-                        g.DrawLine(pen, x + 7, y + 8, x + 7, y + 10);
-                        g.DrawLine(pen, x + 4, y + 12, x + 7, y + 10);
-                        g.DrawLine(pen, x + 10, y + 12, x + 7, y + 10);
-                        break;
-                }
+                case 0: // Normal View
+                    FluentIconRenderer.DrawGlyph(g, "/slidenormal", mRect, Color.White, 9.5f);
+                    break;
+                case 1: // Slide Sorter
+                    FluentIconRenderer.DrawGlyph(g, "/slidesorter", mRect, Color.White, 9.5f);
+                    break;
+                case 2: // Reading View
+                    FluentIconRenderer.DrawGlyph(g, "/read", mRect, Color.White, 9.5f);
+                    break;
+                case 3: // Slide Show
+                    FluentIconRenderer.DrawGlyph(g, "/slideshow", mRect, Color.White, 9.5f);
+                    break;
             }
         }
 
@@ -2165,7 +2352,10 @@ namespace ZenQOffice.UI
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Writer)
             {
-                if (WriterView.ShowSelectionPane && e.X >= ClientSize.Width - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
+                if (e.X > docW) return;
+
+                if (WriterView.ShowSelectionPane && e.X >= docW - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
                 {
                     WriterView.HandleSelectionPaneMouseWheel(e.Delta);
                     Invalidate();
@@ -2181,14 +2371,14 @@ namespace ZenQOffice.UI
 
                 if ((ModifierKeys & Keys.Control) != 0)
                 {
-                    WriterView.ZoomAt(e.Location, e.Delta, Ribbon, ClientSize.Width, ClientSize.Height);
+                    WriterView.ZoomAt(e.Location, e.Delta, Ribbon, docW, ClientSize.Height);
                     ZoomLevel = WriterView.ZoomLevel;
                     Invalidate();
                 }
                 else if ((ModifierKeys & Keys.Shift) != 0)
                 {
                     // Shift + MouseWheel: Cuộn ngang tài liệu (Horizontal Scroll)
-                    int maxScrollX = WriterView.GetMaxScrollX(ClientSize.Width);
+                    int maxScrollX = WriterView.GetMaxScrollX(docW);
                     if (maxScrollX > 0)
                     {
                         float hDelta = -wheelNotches * 95f;
@@ -2200,17 +2390,53 @@ namespace ZenQOffice.UI
                 {
                     if (WriterView.ViewMode == 0)
                     {
-                        if (e.Delta < 0 && WriterView.ReadModePageIndex < WriterView.TotalPageCount - 1)
+                        int maxReadScroll = WriterView.GetMaxScrollY(ClientSize.Height, Ribbon);
+                        if (maxReadScroll > 0)
                         {
-                            WriterView.ReadModePageIndex++;
+                            // Nếu trang phóng to cao hơn màn hình: cho phép cuộn mượt nội dung trong trang
+                            float readDelta = -wheelNotches * 95f;
+                            float newScroll = WriterView.TargetScrollY + readDelta;
+                            if (newScroll < -40 && e.Delta > 0 && WriterView.ReadModePageIndex > 0)
+                            {
+                                // Đã cuộn lên quá đỉnh -> lật về trang trước
+                                WriterView.ReadModePageIndex--;
+                                WriterView.ScrollY = maxReadScroll;
+                                WriterView.TargetScrollY = maxReadScroll;
+                                Invalidate();
+                                return;
+                            }
+                            else if (newScroll > maxReadScroll + 40 && e.Delta < 0 && WriterView.ReadModePageIndex < WriterView.TotalPageCount - 1)
+                            {
+                                // Đã cuộn xuống quá đáy -> lật sang trang sau
+                                WriterView.ReadModePageIndex++;
+                                WriterView.ScrollY = 0;
+                                WriterView.TargetScrollY = 0;
+                                Invalidate();
+                                return;
+                            }
+                            WriterView.TargetScrollY = Math.Max(0f, Math.Min(maxReadScroll, newScroll));
                             Invalidate();
+                            return;
                         }
-                        else if (e.Delta > 0 && WriterView.ReadModePageIndex > 0)
+                        else
                         {
-                            WriterView.ReadModePageIndex--;
-                            Invalidate();
+                            // Cả trang vừa vặn màn hình: lăn chuột để lật trang liền mạch
+                            if (e.Delta < 0 && WriterView.ReadModePageIndex < WriterView.TotalPageCount - 1)
+                            {
+                                WriterView.ReadModePageIndex++;
+                                WriterView.ScrollY = 0;
+                                WriterView.TargetScrollY = 0;
+                                Invalidate();
+                            }
+                            else if (e.Delta > 0 && WriterView.ReadModePageIndex > 0)
+                            {
+                                WriterView.ReadModePageIndex--;
+                                WriterView.ScrollY = 0;
+                                WriterView.TargetScrollY = 0;
+                                Invalidate();
+                            }
+                            return;
                         }
-                        return;
                     }
 
                     int maxScroll = WriterView.GetMaxScrollY(ClientSize.Height, Ribbon);
@@ -2771,6 +2997,17 @@ namespace ZenQOffice.UI
                                     WriterView.ScrollY = 0;
                                     WriterView.TargetScrollY = 0;
                                     WriterView.ReadModePageIndex = Math.Max(0, Math.Min(WriterView.TotalPageCount - 1, WriterView.CurrentActivePage - 1));
+
+                                    // Tự động vừa vặn cả trang theo chiều cao (Fit Page) để hiện trọn vẹn cả trang, không bị cắt xén một khúc
+                                    int effH = ClientSize.Height - 155 - 25;
+                                    float stdH = (Ribbon != null && Ribbon.PaperHeightInches > 0) ? (Ribbon.PaperHeightInches * 96f) : (11.69f * 96f);
+                                    if (effH > 200 && stdH > 0)
+                                    {
+                                        float fitZoom = (float)(effH - 36) / stdH;
+                                        fitZoom = Math.Max(0.35f, Math.Min(1.20f, fitZoom));
+                                        WriterView.ZoomLevel = fitZoom;
+                                        ZoomLevel = fitZoom;
+                                    }
                                 }
                                 Invalidate();
                                 return;
@@ -3166,20 +3403,26 @@ namespace ZenQOffice.UI
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                 {
-                    if (WriterView.HandleScrollBarMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height, Ribbon))
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X > docW)
+                    {
+                        return;
+                    }
+
+                    if (WriterView.HandleScrollBarMouseDown(e.X, e.Y, docW, ClientSize.Height, Ribbon))
                     {
                         Invalidate();
                         return;
                     }
-                    if (WriterView.HandleHScrollBarMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height, Ribbon))
+                    if (WriterView.HandleHScrollBarMouseDown(e.X, e.Y, docW, ClientSize.Height, Ribbon))
                     {
                         Invalidate();
                         return;
                     }
 
-                    if (WriterView.ShowSelectionPane && e.X >= ClientSize.Width - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
+                    if (WriterView.ShowSelectionPane && e.X >= docW - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
                     {
-                        if (WriterView.HandleSelectionPaneMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height))
+                        if (WriterView.HandleSelectionPaneMouseDown(e.X, e.Y, docW, ClientSize.Height))
                         {
                             Invalidate();
                             return;
@@ -3188,7 +3431,7 @@ namespace ZenQOffice.UI
 
                     if (WriterView.ShowNavigationPane && e.X <= 280 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
                     {
-                        if (WriterView.HandleNavMouseDown(e.X, e.Y, ClientSize.Width, ClientSize.Height))
+                        if (WriterView.HandleNavMouseDown(e.X, e.Y, docW, ClientSize.Height))
                         {
                             Invalidate();
                             return;
@@ -3210,7 +3453,7 @@ namespace ZenQOffice.UI
                     {
                         using (Graphics g = CreateGraphics())
                         {
-                            WriterView.HandleTripleClick(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                            WriterView.HandleTripleClick(e.X, e.Y, docW, g, Ribbon);
                         }
                         Invalidate();
                         return;
@@ -3219,7 +3462,7 @@ namespace ZenQOffice.UI
                     {
                         using (Graphics g = CreateGraphics())
                         {
-                            WriterView.HandleDoubleClick(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                            WriterView.HandleDoubleClick(e.X, e.Y, docW, g, Ribbon);
                         }
                         Invalidate();
                         return;
@@ -3229,7 +3472,7 @@ namespace ZenQOffice.UI
                     {
                         using (Graphics g = CreateGraphics())
                         {
-                            WriterView.HandleMouseDown(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                            WriterView.HandleMouseDown(e.X, e.Y, docW, g, Ribbon);
                         }
                     }
                     catch (Exception ex)
@@ -3429,27 +3672,29 @@ namespace ZenQOffice.UI
                 if (e.Y >= ClientSize.Height - 25 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
                 {
                     int w = ClientSize.Width;
+                    bool isHand = false;
                     if (!_statusTouchToggleBounds.IsEmpty && _statusTouchToggleBounds.Contains(e.Location))
                     {
-                        Cursor = Cursors.Hand;
-                        Cursor.Current = Cursors.Hand;
+                        isHand = true;
                     }
                     else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                     {
-                        if ((e.X >= w - 344 && e.X <= w - 276) || (e.X >= w - 270 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 35))
+                        if ((e.X >= w - 344 && e.X <= w - 276) || (e.X >= w - 270 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 4))
                         {
-                            Cursor = Cursors.Hand;
-                            Cursor.Current = Cursors.Hand;
+                            isHand = true;
                         }
                     }
                     else
                     {
-                        if ((e.X >= w - 246 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 35))
+                        if ((e.X >= w - 246 && e.X <= w - 174) || (e.X >= w - 164 && e.X <= w - 4))
                         {
-                            Cursor = Cursors.Hand;
-                            Cursor.Current = Cursors.Hand;
+                            isHand = true;
                         }
                     }
+                    Cursor newCur = isHand ? Cursors.Hand : Cursors.Default;
+                    Cursor = newCur;
+                    Cursor.Current = newCur;
+                    return;
                 }
             }
 
@@ -3481,22 +3726,29 @@ namespace ZenQOffice.UI
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                 {
-                    if (WriterView.HandleScrollBarMouseMove(e.X, e.Y, ClientSize.Width, ClientSize.Height, Ribbon))
+                    int docW = GetEffectiveDocWidth(ClientSize.Width);
+                    if (e.X > docW)
+                    {
+                        this.Cursor = Cursors.Default;
+                        return;
+                    }
+
+                    if (WriterView.HandleScrollBarMouseMove(e.X, e.Y, docW, ClientSize.Height, Ribbon))
                     {
                         this.Cursor = Cursor.Current;
                         Invalidate();
                         return;
                     }
-                    if (WriterView.HandleHScrollBarMouseMove(e.X, e.Y, ClientSize.Width, ClientSize.Height, Ribbon))
+                    if (WriterView.HandleHScrollBarMouseMove(e.X, e.Y, docW, ClientSize.Height, Ribbon))
                     {
                         this.Cursor = Cursor.Current;
                         Invalidate();
                         return;
                     }
 
-                    if (WriterView.ShowSelectionPane && e.X >= ClientSize.Width - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
+                    if (WriterView.ShowSelectionPane && e.X >= docW - 260 && e.Y >= 155 && e.Y <= ClientSize.Height - 26)
                     {
-                        WriterView.HandleSelectionPaneMouseMove(e.X, e.Y, ClientSize.Width, ClientSize.Height);
+                        WriterView.HandleSelectionPaneMouseMove(e.X, e.Y, docW, ClientSize.Height);
                         Invalidate();
                     }
 
@@ -3511,7 +3763,7 @@ namespace ZenQOffice.UI
                     {
                         using (Graphics g = CreateGraphics())
                         {
-                            WriterView.HandleMouseMove(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                            WriterView.HandleMouseMove(e.X, e.Y, docW, g, Ribbon);
                         }
                     }
                     catch (Exception ex)
@@ -3674,13 +3926,14 @@ namespace ZenQOffice.UI
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Writer)
             {
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
                 WriterView.HandleScrollBarMouseUp();
                 WriterView.HandleHScrollBarMouseUp();
                 try
                 {
                     using (Graphics g = CreateGraphics())
                     {
-                        WriterView.HandleMouseUp(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                        WriterView.HandleMouseUp(e.X, e.Y, docW, g, Ribbon);
                     }
                 }
                 catch (Exception ex)
@@ -3774,11 +4027,15 @@ namespace ZenQOffice.UI
 
             if (Ribbon.CurrentMode == OfficeAppMode.Writer)
             {
-                using (Graphics g = CreateGraphics())
+                int docW = GetEffectiveDocWidth(ClientSize.Width);
+                if (e.X <= docW)
                 {
-                    WriterView.HandleDoubleClick(e.X, e.Y, ClientSize.Width, g, Ribbon);
+                    using (Graphics g = CreateGraphics())
+                    {
+                        WriterView.HandleDoubleClick(e.X, e.Y, docW, g, Ribbon);
+                    }
+                    Invalidate();
                 }
-                Invalidate();
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
             {
@@ -4326,6 +4583,7 @@ namespace ZenQOffice.UI
                 {
                     if (e.KeyCode == Keys.Escape)
                     {
+                        ActiveViewMode = 1;
                         WriterView.ViewMode = 1; // Exit Read Mode to Print Layout
                         Invalidate();
                         return;

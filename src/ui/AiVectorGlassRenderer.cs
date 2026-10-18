@@ -255,6 +255,7 @@ namespace ZenQOffice.UI
     public class GlassVectorButton : Button
     {
         public Action<Graphics, float, float, float, Color> VectorIconDrawer { get; set; }
+        public string FluentIcon { get; set; }
         public Color AccentColor { get; set; }
         public Color TextCustomColor { get; set; }
         public bool IsPrimary { get; set; }
@@ -329,7 +330,12 @@ namespace ZenQOffice.UI
         {
             pevent.Graphics.SmoothingMode = SmoothingMode.HighQuality;
             RectangleF bounds = new RectangleF(0f, 0f, this.Width, this.Height);
-            AiVectorGlassRenderer.DrawGlassButton(pevent.Graphics, bounds, this.Text, this.VectorIconDrawer, _isHovered, _isPressed, this.AccentColor, this.TextCustomColor, this.IsPrimary);
+            var drawer = this.VectorIconDrawer;
+            if (drawer == null && !string.IsNullOrEmpty(this.FluentIcon))
+            {
+                drawer = (g, x, y, sz, c) => FluentIconRenderer.DrawGlyph(g, this.FluentIcon, new RectangleF(x, y, sz, sz), c, sz * 0.78f);
+            }
+            AiVectorGlassRenderer.DrawGlassButton(pevent.Graphics, bounds, this.Text, drawer, _isHovered, _isPressed, this.AccentColor, this.TextCustomColor, this.IsPrimary);
         }
     }
 

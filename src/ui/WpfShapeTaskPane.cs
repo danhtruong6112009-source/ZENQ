@@ -535,7 +535,7 @@ namespace ZenQOffice.UI
                         using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
                         {
                             g.FillPath(actBg, pShapes);
-                            g.DrawString("🔷 Hình dạng", tabFont, Brushes.White, BtnTabShapesBounds, sfTab);
+                            g.DrawString("Hình dạng", tabFont, Brushes.White, BtnTabShapesBounds, sfTab);
                         }
                     }
                     else
@@ -546,7 +546,7 @@ namespace ZenQOffice.UI
                         {
                             g.FillPath(inactBg, pShapes);
                             g.DrawPath(inactBorder, pShapes);
-                            g.DrawString("🔷 Hình dạng", tabFont, inactTxt, BtnTabShapesBounds, sfTab);
+                            g.DrawString("Hình dạng", tabFont, inactTxt, BtnTabShapesBounds, sfTab);
                         }
                     }
                 }
@@ -559,7 +559,7 @@ namespace ZenQOffice.UI
                         using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
                         {
                             g.FillPath(actBg, pGraphics);
-                            g.DrawString("🎨 Đồ họa", tabFont, Brushes.White, BtnTabGraphicsBounds, sfTab);
+                            g.DrawString("Đồ họa", tabFont, Brushes.White, BtnTabGraphicsBounds, sfTab);
                         }
                     }
                     else
@@ -570,7 +570,7 @@ namespace ZenQOffice.UI
                         {
                             g.FillPath(inactBg, pGraphics);
                             g.DrawPath(inactBorder, pGraphics);
-                            g.DrawString("🎨 Đồ họa", tabFont, inactTxt, BtnTabGraphicsBounds, sfTab);
+                            g.DrawString("Đồ họa", tabFont, inactTxt, BtnTabGraphicsBounds, sfTab);
                         }
                     }
                 }
@@ -583,7 +583,7 @@ namespace ZenQOffice.UI
                         using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
                         {
                             g.FillPath(actBg, pImages);
-                            g.DrawString("🖼️ Hình ảnh", tabFont, Brushes.White, BtnTabImagesBounds, sfTab);
+                            g.DrawString("Hình ảnh", tabFont, Brushes.White, BtnTabImagesBounds, sfTab);
                         }
                     }
                     else
@@ -594,7 +594,7 @@ namespace ZenQOffice.UI
                         {
                             g.FillPath(inactBg, pImages);
                             g.DrawPath(inactBorder, pImages);
-                            g.DrawString("🖼️ Hình ảnh", tabFont, inactTxt, BtnTabImagesBounds, sfTab);
+                            g.DrawString("Hình ảnh", tabFont, inactTxt, BtnTabImagesBounds, sfTab);
                         }
                     }
                 }
@@ -677,6 +677,19 @@ namespace ZenQOffice.UI
             else
             {
                 // Chế độ Mặc định: Hiển thị từng danh mục kèm nút "Xem tất cả"
+                if (Mode == ShapePaneMode.ImagesOnly)
+                {
+                    bool hasPhoto = false;
+                    foreach (var c in WpfShapeLibrary.Categories)
+                    {
+                        if (c.IsPhotoCategory || c.Key.StartsWith("Online_Image_")) { hasPhoto = true; break; }
+                    }
+                    if (!hasPhoto)
+                    {
+                        var catResp = ZenQOffice.Core.OnlineImagesManager.GetCatalogCached();
+                        if (catResp != null) WpfShapeLibrary.AddOnlineImageCategories(catResp);
+                    }
+                }
                 int renderedCount = 0;
                 foreach (var cat in WpfShapeLibrary.Categories)
                 {
