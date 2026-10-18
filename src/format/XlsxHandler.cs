@@ -323,15 +323,25 @@ namespace ZenQOffice.Format
                             XmlDocument doc = new XmlDocument();
                             doc.Load(s);
                             XmlNodeList siNodes = doc.GetElementsByTagName("si");
+                            StringBuilder sb = new StringBuilder(128);
                             foreach (XmlNode si in siNodes)
                             {
-                                XmlNodeList tNodes = si.SelectNodes(".//t", doc.CreateNavigator() != null ? new XmlNamespaceManager(doc.NameTable) : null);
-                                StringBuilder sb = new StringBuilder();
-                                if (tNodes != null && tNodes.Count > 0)
+                                sb.Clear();
+                                foreach (XmlNode ch in si.ChildNodes)
                                 {
-                                    foreach (XmlNode t in tNodes) sb.Append(t.InnerText);
+                                    if (ch.LocalName == "t")
+                                    {
+                                        sb.Append(ch.InnerText);
+                                    }
+                                    else if (ch.LocalName == "r")
+                                    {
+                                        foreach (XmlNode rCh in ch.ChildNodes)
+                                        {
+                                            if (rCh.LocalName == "t") sb.Append(rCh.InnerText);
+                                        }
+                                    }
                                 }
-                                else
+                                if (sb.Length == 0 && !string.IsNullOrEmpty(si.InnerText))
                                 {
                                     sb.Append(si.InnerText);
                                 }
@@ -2754,20 +2764,27 @@ namespace ZenQOffice.Format
         private static int ParseArgbHex(string hex)
         {
             if (string.IsNullOrEmpty(hex)) return 0;
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
             if (hex.Length == 8)
             {
-                int a = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
-                int r = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
-                int g = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
-                int b = int.Parse(hex.Substring(6, 2), NumberStyles.HexNumber);
-                return Color.FromArgb(a, r, g, b).ToArgb();
+                int a, r, g, b;
+                if (int.TryParse(hex.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out a) &&
+                    int.TryParse(hex.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out r) &&
+                    int.TryParse(hex.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out g) &&
+                    int.TryParse(hex.Substring(6, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out b))
+                {
+                    return Color.FromArgb(a, r, g, b).ToArgb();
+                }
             }
             else if (hex.Length == 6)
             {
-                int r = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
-                int g = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
-                int b = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
-                return Color.FromArgb(255, r, g, b).ToArgb();
+                int r, g, b;
+                if (int.TryParse(hex.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out r) &&
+                    int.TryParse(hex.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out g) &&
+                    int.TryParse(hex.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out b))
+                {
+                    return Color.FromArgb(255, r, g, b).ToArgb();
+                }
             }
             return 0;
         }

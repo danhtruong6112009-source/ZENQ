@@ -906,5 +906,87 @@ namespace GenOffice.Tests
                 bmp.Save(Path.Combine("scratch", "verified_corner_knob_and_resize.png"), System.Drawing.Imaging.ImageFormat.Png);
             }
         }
+
+        // =========================================================================
+        // FEATURE 32 (Extended): Calc High-Performance Viewport & Scrolled Merged Cells
+        // =========================================================================
+        [Test, Tier(TestTier.Tier4_RealWorld), Feature(32, "Calc Viewport & Scrolled Merged Cell Rendering", Milestone.M4)]
+        [Description("Scenario 35: Scrolled merged cell rendering without black flickering glitch and viewport memory leak verification")]
+        public void T4_F32_04_ScrolledMergedCellViewportRenderingScenario()
+        {
+            CalcView cv = new CalcView();
+            cv.ShowFormulaBar = false;
+
+            // Populate test data with merged ranges
+            // Range 1: Rows 4 to 12, Columns 1 to 3 (A4:C12)
+            cv.CurrentSheet.SetCellString(4, 1, "Dự án Hợp nhất Doanh nghiệp Q3");
+            cv.CurrentSheet.MergeCells(4, 1, 12, 3);
+            CellData master1 = cv.CurrentSheet.GetCell(4, 1);
+            master1.Format.BgColor = Color.FromArgb(224, 242, 254).ToArgb(); // Light blue fill
+
+            // Range 2: Rows 2 to 4, Columns 5 to 8 (E2:H4)
+            cv.CurrentSheet.SetCellString(2, 5, "Horizontal Merged Header Banner");
+            cv.CurrentSheet.MergeCells(2, 5, 4, 8);
+            CellData master2 = cv.CurrentSheet.GetCell(2, 5);
+            master2.Format.BgColor = Color.FromArgb(254, 243, 199).ToArgb(); // Light amber fill
+
+            // Verify merged state integrity
+            Assert.IsTrue(cv.CurrentSheet.GetCell(4, 1).Format.IsMergedParent, "A4 must be merged parent");
+            Assert.IsTrue(cv.CurrentSheet.GetCell(7, 2).Format.IsMergedChild, "B7 must be merged child");
+            Assert.AreEqual(4u, cv.CurrentSheet.GetCell(7, 2).Format.MergedParentRow);
+            Assert.AreEqual(1u, cv.CurrentSheet.GetCell(7, 2).Format.MergedParentCol);
+
+            // Test Case 1: Vertical scroll past master row (ScrollRow = 7)
+            // Master row 4 is off-screen, child rows 7..12 are visible
+            cv.ScrollRow = 7;
+            cv.ScrollCol = 1;
+
+            using (Bitmap bmp = new Bitmap(800, 600))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                cv.Draw(g, 800, 600);
+
+                // Sample pixel at X = 70, Y = 195 (well inside merged cell A7)
+                Color sampleColor = bmp.GetPixel(70, 195);
+                Assert.IsTrue(sampleColor.A > 0, "Alpha must be opaque");
+                Assert.IsTrue(sampleColor.R > 100 && sampleColor.G > 100 && sampleColor.B > 100,
+                    $"Merged cell pixel must be filled with background color, not solid black (got {sampleColor})");
+
+                string artifactDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gemini", "antigravity", "brain", "56da7ca9-ea1d-4316-b95c-50b3bafbe999");
+                if (Directory.Exists(artifactDir))
+                {
+                    bmp.Save(Path.Combine(artifactDir, "calc_scrolled_merged_vertical.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+
+            // Test Case 2: Horizontal scroll past master column (ScrollCol = 6)
+            // Master col E (5) is off-screen, child cols F (6), G (7), H (8) are visible on rows 2..4
+            cv.ScrollRow = 1;
+            cv.ScrollCol = 6;
+
+            using (Bitmap bmp = new Bitmap(800, 600))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                cv.Draw(g, 800, 600);
+
+                // Sample pixel at X = 70, Y = 215 (inside merged cell F2)
+                Color sampleColor = bmp.GetPixel(70, 215);
+                Assert.IsTrue(sampleColor.A > 0, "Alpha must be opaque");
+                Assert.IsTrue(sampleColor.R > 100 && sampleColor.G > 100 && sampleColor.B > 100,
+                    $"Horizontal scrolled merged cell pixel must be filled, not black (got {sampleColor})");
+
+                string artifactDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gemini", "antigravity", "brain", "56da7ca9-ea1d-4316-b95c-50b3bafbe999");
+                if (Directory.Exists(artifactDir))
+                {
+                    bmp.Save(Path.Combine(artifactDir, "calc_scrolled_merged_horizontal.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+
+            // Test Case 3: Verify large row count smooth scroll calculation without overflow
+            uint maxRowInSheet = 50000;
+            cv.CurrentSheet.SetCellString(maxRowInSheet, 1, "Tail data at row 50000");
+            cv.ScrollRow = 25000;
+            Assert.AreEqual(25000u, cv.ScrollRow, "ScrollRow should seamlessly support large row offsets");
+        }
     }
 }

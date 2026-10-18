@@ -2141,7 +2141,7 @@ namespace ZenQOffice.UI
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
             {
-                if (ModifierKeys == Keys.Control)
+                if ((ModifierKeys & Keys.Control) != 0)
                 {
                     float zoomStep = (e.Delta > 0) ? 0.10f : -0.10f;
                     if (CalcView.ZoomFactor <= 0) CalcView.ZoomFactor = 1.0f;
@@ -2150,16 +2150,33 @@ namespace ZenQOffice.UI
                     Invalidate();
                     return;
                 }
-                else
+                else if ((ModifierKeys & Keys.Shift) != 0)
                 {
+                    uint colsToScroll = (uint)Math.Max(1, Math.Abs(e.Delta / 120) * 2);
                     if (e.Delta > 0)
                     {
-                        if (CalcView.ScrollRow > 1) CalcView.ScrollRow--;
+                        if (CalcView.ScrollCol > 1) CalcView.ScrollCol = (uint)Math.Max(1, (int)CalcView.ScrollCol - (int)colsToScroll);
                     }
                     else
                     {
-                        CalcView.ScrollRow++;
+                        CalcView.ScrollCol += colsToScroll;
                     }
+                    Invalidate();
+                    return;
+                }
+                else
+                {
+                    uint rowsToScroll = (uint)Math.Max(1, Math.Abs(e.Delta / 120) * 3);
+                    if (e.Delta > 0)
+                    {
+                        if (CalcView.ScrollRow > 1) CalcView.ScrollRow = (uint)Math.Max(1, (int)CalcView.ScrollRow - (int)rowsToScroll);
+                    }
+                    else
+                    {
+                        CalcView.ScrollRow += rowsToScroll;
+                    }
+                    Invalidate();
+                    return;
                 }
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Slides)

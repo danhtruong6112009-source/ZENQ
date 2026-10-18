@@ -278,6 +278,93 @@ namespace ZenQOffice.UI
         public int CurrentCaretScreenY { get; set; }
         public int CurrentCaretScreenH { get; set; }
 
+        // Cached drawing resources for smooth high-performance lag-free rendering
+        private static readonly Pen _gridLinePen = new Pen(Color.FromArgb(229, 231, 235), 1f);
+        private static readonly Pen _headerBorderPen = new Pen(Color.FromArgb(226, 232, 240), 1f);
+        private static readonly SolidBrush _headerBgBrush = new SolidBrush(Color.FromArgb(248, 250, 252));
+        private static readonly SolidBrush _headerSelBgBrush = new SolidBrush(Color.FromArgb(220, 252, 231));
+        private static readonly SolidBrush _headerTextBrush = new SolidBrush(Color.FromArgb(71, 85, 105));
+        private static readonly SolidBrush _headerSelTextBrush = new SolidBrush(Color.FromArgb(16, 124, 65));
+        private static readonly Pen _headerSelBorderPen = new Pen(Color.FromArgb(16, 124, 65), 2f);
+        private static readonly Pen _dividerPen = new Pen(Color.FromArgb(203, 213, 225), 1f);
+        private static readonly Font _headerFont = new Font("Segoe UI", 9f, FontStyle.Regular);
+        private static readonly Font _headerSelFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+        private static readonly Font _headerRowFont = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+        private static readonly Font _headerRowSelFont = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+
+        private static readonly StringFormat _sfCenterCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap, Trimming = StringTrimming.EllipsisCharacter };
+        private static readonly StringFormat _sfFarCenter = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap, Trimming = StringTrimming.EllipsisCharacter };
+        private static readonly StringFormat _sfNearCenter = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap, Trimming = StringTrimming.EllipsisCharacter };
+        private static readonly StringFormat _sfNearNear = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Near };
+
+        private static readonly Dictionary<string, Font> _fontCache = new Dictionary<string, Font>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<int, SolidBrush> _brushCache = new Dictionary<int, SolidBrush>();
+        private static readonly StringFormat[,,] _cachedStringFormats;
+
+        static CalcView()
+        {
+            _cachedStringFormats = new StringFormat[3, 3, 2];
+            for (int h = 0; h < 3; h++)
+            {
+                for (int v = 0; v < 3; v++)
+                {
+                    for (int w = 0; w < 2; w++)
+                    {
+                        StringFormat sf = new StringFormat();
+                        if (h == 1) sf.Alignment = StringAlignment.Center;
+                        else if (h == 2) sf.Alignment = StringAlignment.Far;
+                        else sf.Alignment = StringAlignment.Near;
+
+                        if (v == 0) sf.LineAlignment = StringAlignment.Near;
+                        else if (v == 2) sf.LineAlignment = StringAlignment.Far;
+                        else sf.LineAlignment = StringAlignment.Center;
+
+                        if (w == 0)
+                        {
+                            sf.FormatFlags = StringFormatFlags.NoWrap;
+                            sf.Trimming = StringTrimming.EllipsisCharacter;
+                        }
+                        _cachedStringFormats[h, v, w] = sf;
+                    }
+                }
+            }
+        }
+
+        public static Font GetCellFont(string fontName, float size, FontStyle style)
+        {
+            string key = string.Format("{0}_{1}_{2}", fontName, (int)(size * 10), (int)style);
+            Font f;
+            if (!_fontCache.TryGetValue(key, out f))
+            {
+                try { f = new Font(fontName, size, style); }
+                catch { f = new Font("Segoe UI", size, style); }
+                _fontCache[key] = f;
+            }
+            return f;
+        }
+
+        public static SolidBrush GetCachedBrush(Color color)
+        {
+            int argb = color.ToArgb();
+            if (argb == -1) return (SolidBrush)Brushes.White;
+            if (argb == unchecked((int)0xFF000000)) return (SolidBrush)Brushes.Black;
+            SolidBrush b;
+            if (!_brushCache.TryGetValue(argb, out b))
+            {
+                b = new SolidBrush(color);
+                _brushCache[argb] = b;
+            }
+            return b;
+        }
+
+        public static StringFormat GetCachedStringFormat(int hAlign, int vAlign, bool wrapText)
+        {
+            int h = (hAlign >= 0 && hAlign <= 2) ? hAlign : 0;
+            int v = (vAlign >= 0 && vAlign <= 2) ? vAlign : 1;
+            int w = wrapText ? 1 : 0;
+            return _cachedStringFormats[h, v, w];
+        }
+
         // Excel 365 Data Validation, Auditing, Scenarios & Names
         public List<DataValidationRule> DataValidations { get; set; } = new List<DataValidationRule>();
         public bool CircleInvalidData { get; set; } = false;
@@ -1226,17 +1313,31 @@ namespace ZenQOffice.UI
         {
             int headerW = ShowHeadings ? 48 : 0;
             int x = headerW;
-            for (uint c = ScrollCol; c < col; c++) x += GetColWidth(c);
+            if (col >= ScrollCol)
+            {
+                for (uint c = ScrollCol; c < col; c++) x += GetColWidth(c);
+            }
+            else
+            {
+                for (uint c = col; c < ScrollCol; c++) x -= GetColWidth(c);
+            }
             return x;
         }
 
         public int GetRowY(uint row)
         {
             int fBarY = 155;
-            int startY = ShowFormulaBar ? (fBarY + 30) : fBarY;
+            int startY = ShowFormulaBar ? (fBarY + FormulaBarHeight) : fBarY;
             int headerH = ShowHeadings ? 26 : 0;
             int y = startY + headerH;
-            for (uint r = ScrollRow; r < row; r++) y += GetRowHeight(r);
+            if (row >= ScrollRow)
+            {
+                for (uint r = ScrollRow; r < row; r++) y += GetRowHeight(r);
+            }
+            else
+            {
+                for (uint r = row; r < ScrollRow; r++) y -= GetRowHeight(r);
+            }
             return y;
         }
 
@@ -1423,16 +1524,8 @@ namespace ZenQOffice.UI
                         }
                     }
                     Rectangle fTextBounds = new Rectangle(fBox.X + 8, fBox.Y + 4, fBox.Width - 16, fBox.Height - 8);
-                    TextFormatFlags fFlags = TextFormatFlags.Left | TextFormatFlags.NoPadding;
-                    if (IsFormulaBarExpanded)
-                    {
-                        fFlags |= TextFormatFlags.Top | TextFormatFlags.WordBreak;
-                    }
-                    else
-                    {
-                        fFlags |= TextFormatFlags.SingleLine;
-                    }
-                    TextRenderer.DrawText(g, fDisplay, normFont, fTextBounds, Color.Black, fFlags);
+                    StringFormat fBarSf = IsFormulaBarExpanded ? _sfNearNear : _sfNearCenter;
+                    g.DrawString(fDisplay, normFont, Brushes.Black, fTextBounds, fBarSf);
 
                     if (IsEditing)
                     {
@@ -1482,43 +1575,36 @@ namespace ZenQOffice.UI
             uint minSelR = Math.Min(SelectedRow, SelEndRow);
             uint maxSelR = Math.Max(SelectedRow, SelEndRow);
 
-            using (Font hFont = new Font("Segoe UI", 9f, FontStyle.Regular))
-            using (Font hSelFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            while (curX < gridW)
             {
-                while (curX < gridW)
+                int cW = GetColWidth(colIdx);
+                Rectangle cRect = new Rectangle(curX, startY, cW, headerH);
+                bool isColSelected = (colIdx >= minSelC && colIdx <= maxSelC);
+
+                if (ShowHeadings)
                 {
-                    int cW = GetColWidth(colIdx);
-                    Rectangle cRect = new Rectangle(curX, startY, cW, headerH);
-                    bool isColSelected = (colIdx >= minSelC && colIdx <= maxSelC);
-
-                    if (ShowHeadings)
+                    if (isColSelected)
                     {
-                        if (isColSelected)
-                        {
-                            using (SolidBrush selB = new SolidBrush(Color.FromArgb(220, 252, 231))) g.FillRectangle(selB, cRect);
-                            using (Pen selP = new Pen(Color.FromArgb(16, 124, 65), 2)) g.DrawLine(selP, curX, startY + headerH - 1, curX + cW, startY + headerH - 1);
-                        }
-                        else
-                        {
-                            using (SolidBrush bgB = new SolidBrush(Color.FromArgb(248, 250, 252))) g.FillRectangle(bgB, cRect);
-                        }
-
-                        using (Pen p = new Pen(Color.FromArgb(226, 232, 240))) g.DrawRectangle(p, cRect);
-
-                        string colName = SparseMatrix.ColIndexToName(colIdx);
-                        Rectangle colTextRect = new Rectangle(curX, startY, cW, headerH);
-                        TextRenderer.DrawText(g, colName, isColSelected ? hSelFont : hFont, colTextRect, isColSelected ? Color.FromArgb(16, 124, 65) : Color.FromArgb(71, 85, 105), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-
-                        // Split divider line
-                        using (Pen divP = new Pen(Color.FromArgb(203, 213, 225)))
-                        {
-                            g.DrawLine(divP, curX + cW - 1, startY + 4, curX + cW - 1, startY + headerH - 4);
-                        }
+                        g.FillRectangle(_headerSelBgBrush, cRect);
+                        g.DrawLine(_headerSelBorderPen, curX, startY + headerH - 1, curX + cW, startY + headerH - 1);
+                    }
+                    else
+                    {
+                        g.FillRectangle(_headerBgBrush, cRect);
                     }
 
-                    curX += cW;
-                    colIdx++;
+                    g.DrawRectangle(_headerBorderPen, cRect);
+
+                    string colName = SparseMatrix.ColIndexToName(colIdx);
+                    Rectangle colTextRect = new Rectangle(curX, startY, cW, headerH);
+                    g.DrawString(colName, isColSelected ? _headerSelFont : _headerFont, isColSelected ? _headerSelTextBrush : _headerTextBrush, colTextRect, _sfCenterCenter);
+
+                    // Split divider line
+                    g.DrawLine(_dividerPen, curX + cW - 1, startY + 4, curX + cW - 1, startY + headerH - 4);
                 }
+
+                curX += cW;
+                colIdx++;
             }
 
             // 2.2 Rows & Cells
@@ -1527,6 +1613,13 @@ namespace ZenQOffice.UI
 
             // Tracking active editing cell bounding box for in-place rendering
             Rectangle editingCellRect = Rectangle.Empty;
+
+            // Pre-fill entire grid viewport to pure white to ensure no unpainted Direct2D alpha=0 pixels exist
+            Rectangle gridClipArea = new Rectangle(headerW, startY + headerH, Math.Max(0, gridW - headerW), Math.Max(0, maxGridY - (startY + headerH)));
+            g.FillRectangle(Brushes.White, gridClipArea);
+
+            // Track which merged cells have already been rendered in this frame
+            HashSet<long> renderedMergedCells = new HashSet<long>();
 
             while (curY < maxGridY)
             {
@@ -1544,21 +1637,18 @@ namespace ZenQOffice.UI
                     Rectangle rRect = new Rectangle(0, curY, headerW, rH);
                     if (isRowSelected)
                     {
-                        using (SolidBrush selB = new SolidBrush(Color.FromArgb(220, 252, 231))) g.FillRectangle(selB, rRect);
-                        using (Pen selP = new Pen(Color.FromArgb(16, 124, 65), 2)) g.DrawLine(selP, headerW - 1, curY, headerW - 1, curY + rH);
+                        g.FillRectangle(_headerSelBgBrush, rRect);
+                        g.DrawLine(_headerSelBorderPen, headerW - 1, curY, headerW - 1, curY + rH);
                     }
                     else
                     {
-                        using (SolidBrush bgB = new SolidBrush(Color.FromArgb(248, 250, 252))) g.FillRectangle(bgB, rRect);
+                        g.FillRectangle(_headerBgBrush, rRect);
                     }
-                    using (Pen p = new Pen(Color.FromArgb(226, 232, 240))) g.DrawRectangle(p, rRect);
+                    g.DrawRectangle(_headerBorderPen, rRect);
 
-                    using (Font rFont = new Font("Segoe UI", 8.5f, isRowSelected ? FontStyle.Bold : FontStyle.Regular))
-                    {
-                        string rStr = rowIdx.ToString();
-                        Rectangle rowTextRect = new Rectangle(0, curY, headerW - 6, rH);
-                        TextRenderer.DrawText(g, rStr, rFont, rowTextRect, isRowSelected ? Color.FromArgb(16, 124, 65) : Color.FromArgb(71, 85, 105), TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                    }
+                    string rStr = rowIdx.ToString();
+                    Rectangle rowTextRect = new Rectangle(0, curY, headerW - 6, rH);
+                    g.DrawString(rStr, isRowSelected ? _headerRowSelFont : _headerRowFont, isRowSelected ? _headerSelTextBrush : _headerTextBrush, rowTextRect, _sfFarCenter);
                 }
 
                 // Render Cells across columns
@@ -1570,247 +1660,128 @@ namespace ZenQOffice.UI
                     int cW = GetColWidth(colIdx);
                     CellData cell = CurrentSheet.GetCell(rowIdx, colIdx);
 
-                    // Skip merged child cells (they are part of an enclosing merged cell)
-                    if (cell != null && cell.Format != null && cell.Format.IsMergedChild)
+                    // Check if this cell is part of a merged range
+                    bool isMerged = cell != null && cell.Format != null && (cell.Format.IsMergedParent || cell.Format.IsMergedChild);
+                    if (isMerged)
                     {
+                        uint masterRow = cell.Format.IsMergedParent ? rowIdx : cell.Format.MergedParentRow;
+                        uint masterCol = cell.Format.IsMergedParent ? colIdx : cell.Format.MergedParentCol;
+                        long mKey = ((long)masterRow << 32) | (long)masterCol;
+
+                        if (renderedMergedCells.Contains(mKey))
+                        {
+                            curX += cW;
+                            colIdx++;
+                            continue;
+                        }
+
+                        renderedMergedCells.Add(mKey);
+
+                        CellData masterCell = cell.Format.IsMergedParent ? cell : (CurrentSheet.GetCell(masterRow, masterCol) ?? cell);
+                        int mColSpan = (masterCell.Format != null && masterCell.Format.MergeColSpan > 0) ? masterCell.Format.MergeColSpan : 1;
+                        int mRowSpan = (masterCell.Format != null && masterCell.Format.MergeRowSpan > 0) ? masterCell.Format.MergeRowSpan : 1;
+
+                        int mX = GetColScreenX(masterCol, headerW);
+                        int mY = GetRowScreenY(masterRow, startY, headerH);
+                        int mW = 0;
+                        for (uint mc = 0; mc < mColSpan; mc++) mW += GetColWidth(masterCol + mc);
+                        int mH = 0;
+                        for (uint mr = 0; mr < mRowSpan; mr++) mH += GetRowHeight(masterRow + mr);
+
+                        Rectangle cellRect = new Rectangle(mX, mY, mW, mH);
+
+                        if (IsEditing && rowIdx == SelectedRow && colIdx == SelectedCol)
+                        {
+                            editingCellRect = cellRect;
+                        }
+
+                        Color cellBg = Color.White;
+                        if (masterCell.Format != null && masterCell.Format.BgColor != unchecked((int)0xFFFFFFFF) && masterCell.Format.BgColor != 0)
+                        {
+                            int bg = masterCell.Format.BgColor;
+                            if ((bg & unchecked((int)0xFF000000)) == 0 && bg != 0) bg |= unchecked((int)0xFF000000);
+                            cellBg = Color.FromArgb(bg);
+                        }
+
+                        g.PushClip(gridClipArea);
+
+                        SolidBrush bgB = GetCachedBrush(cellBg);
+                        g.FillRectangle(bgB, cellRect);
+
+                        if (ShowGridlines)
+                        {
+                            g.DrawRectangle(_gridLinePen, cellRect);
+                        }
+
+                        if (masterCell.Format != null && masterCell.Format.Borders != null)
+                        {
+                            DrawCellBorders(g, masterCell.Format.Borders, cellRect);
+                        }
+
+                        if (!(IsEditing && rowIdx == SelectedRow && colIdx == SelectedCol))
+                        {
+                            Rectangle visibleMergedRect = Rectangle.Intersect(cellRect, gridClipArea);
+                            if (visibleMergedRect.Width > 0 && visibleMergedRect.Height > 0)
+                            {
+                                DrawCellText(g, masterCell, cellRect, cellBg, visibleMergedRect);
+                            }
+                        }
+
+                        g.PopClip();
+
                         curX += cW;
                         colIdx++;
                         continue;
                     }
 
-                    // Calculate effective render width & height (spans multiple cells if merged parent)
-                    int renderW = cW;
-                    int renderH = rH;
-                    if (cell != null && cell.Format != null && cell.Format.IsMergedParent)
-                    {
-                        int mColSpan = Math.Max(1, cell.Format.MergeColSpan);
-                        int mRowSpan = Math.Max(1, cell.Format.MergeRowSpan);
-                        renderW = 0;
-                        for (uint mc = 0; mc < mColSpan; mc++) renderW += GetColWidth(colIdx + mc);
-                        renderH = 0;
-                        for (uint mr = 0; mr < mRowSpan; mr++) renderH += GetRowHeight(rowIdx + mr);
-                    }
-
-                    Rectangle cellRect = new Rectangle(curX, curY, renderW, renderH);
+                    // Normal Non-merged cell
+                    Rectangle cellRectNorm = new Rectangle(curX, curY, cW, rH);
 
                     if (IsEditing && rowIdx == SelectedRow && colIdx == SelectedCol)
                     {
-                        editingCellRect = cellRect;
+                        editingCellRect = cellRectNorm;
                     }
 
-                    // Background color
-                    Color cellBg = Color.White;
+                    Color cellBgNorm = Color.White;
                     if (cell != null && cell.Format != null && cell.Format.BgColor != unchecked((int)0xFFFFFFFF) && cell.Format.BgColor != 0)
                     {
                         int bg = cell.Format.BgColor;
                         if ((bg & unchecked((int)0xFF000000)) == 0 && bg != 0) bg |= unchecked((int)0xFF000000);
-                        cellBg = Color.FromArgb(bg);
+                        cellBgNorm = Color.FromArgb(bg);
                     }
 
-                    using (SolidBrush bgB = new SolidBrush(cellBg))
-                    {
-                        g.FillRectangle(bgB, cellRect);
-                    }
+                    SolidBrush bgBNorm = GetCachedBrush(cellBgNorm);
+                    g.FillRectangle(bgBNorm, cellRectNorm);
 
-                    // Grid line
                     if (ShowGridlines)
                     {
-                        using (Pen gridPen = new Pen(Color.FromArgb(229, 231, 235)))
-                        {
-                            g.DrawRectangle(gridPen, cellRect);
-                        }
+                        g.DrawRectangle(_gridLinePen, cellRectNorm);
                     }
 
-                    // Custom Cell Borders (if any)
                     if (cell != null && cell.Format != null && cell.Format.Borders != null)
                     {
-                        var b = cell.Format.Borders;
-                        if (b.Top)
-                        {
-                            int tThick = b.TopThickness > 0 ? b.TopThickness : (b.Thickness > 0 ? b.Thickness : 1);
-                            Color tCol = b.TopColor != 0 ? Color.FromArgb(b.TopColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            DrawBorderSegment(g, cellRect.Left, cellRect.Top, cellRect.Right, cellRect.Top, tThick, tCol, true);
-                        }
-                        if (b.Bottom)
-                        {
-                            int bThick = b.BottomThickness > 0 ? b.BottomThickness : (b.Thickness > 0 ? b.Thickness : 1);
-                            Color bCol = b.BottomColor != 0 ? Color.FromArgb(b.BottomColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            DrawBorderSegment(g, cellRect.Left, cellRect.Bottom, cellRect.Right, cellRect.Bottom, bThick, bCol, true);
-                        }
-                        if (b.Left)
-                        {
-                            int lThick = b.LeftThickness > 0 ? b.LeftThickness : (b.Thickness > 0 ? b.Thickness : 1);
-                            Color lCol = b.LeftColor != 0 ? Color.FromArgb(b.LeftColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            DrawBorderSegment(g, cellRect.Left, cellRect.Top, cellRect.Left, cellRect.Bottom, lThick, lCol, false);
-                        }
-                        if (b.Right)
-                        {
-                            int rThick = b.RightThickness > 0 ? b.RightThickness : (b.Thickness > 0 ? b.Thickness : 1);
-                            Color rCol = b.RightColor != 0 ? Color.FromArgb(b.RightColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            DrawBorderSegment(g, cellRect.Right, cellRect.Top, cellRect.Right, cellRect.Bottom, rThick, rCol, false);
-                        }
-                        if (b.DiagonalDown)
-                        {
-                            int dThick = b.DiagonalThickness > 0 ? b.DiagonalThickness : 1;
-                            Color dCol = b.DiagonalColor != 0 ? Color.FromArgb(b.DiagonalColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            using (Pen dPen = new Pen(dCol, dThick))
-                            {
-                                g.DrawLine(dPen, cellRect.Left, cellRect.Top, cellRect.Right, cellRect.Bottom);
-                            }
-                        }
-                        if (b.DiagonalUp)
-                        {
-                            int dThick = b.DiagonalThickness > 0 ? b.DiagonalThickness : 1;
-                            Color dCol = b.DiagonalColor != 0 ? Color.FromArgb(b.DiagonalColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
-                            using (Pen dPen = new Pen(dCol, dThick))
-                            {
-                                g.DrawLine(dPen, cellRect.Left, cellRect.Bottom, cellRect.Right, cellRect.Top);
-                            }
-                        }
+                        DrawCellBorders(g, cell.Format.Borders, cellRectNorm);
                     }
 
-                    // Cell Text Content (if not currently editing this specific cell in-place)
                     if (!(IsEditing && rowIdx == SelectedRow && colIdx == SelectedCol))
                     {
-                        if (cell != null && (!string.IsNullOrEmpty(cell.EvaluatedStr) || !string.IsNullOrEmpty(cell.RawValue) || (cell.Format != null && cell.Format.IsDiagonalHeader)))
+                        int textRenderW = cW;
+                        bool wrapText = cell != null && cell.Format != null && cell.Format.WrapText;
+                        if (!wrapText && (cell == null || cell.Format == null || cell.Format.Align == 0))
                         {
-                            string dispText;
-                            if (ShowFormulas && !string.IsNullOrEmpty(cell.RawValue) && cell.RawValue.StartsWith("="))
+                            uint nextC = colIdx + 1;
+                            while (curX + textRenderW < gridW)
                             {
-                                dispText = cell.RawValue;
-                            }
-                            else
-                            {
-                                dispText = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : (cell.RawValue ?? "");
-                            }
-                            int tc = (cell.Format != null && cell.Format.TextColor != 0) ? cell.Format.TextColor : unchecked((int)0xFF000000);
-                            if ((tc & unchecked((int)0xFF000000)) == 0 && tc != 0) tc |= unchecked((int)0xFF000000);
-                            Color txtColor = Color.FromArgb(tc);
-
-                            // Auto-contrast safeguard: nếu màu chữ trùng/quá gần màu nền ô, tự động đổi màu để luôn nhìn thấy rõ
-                            if (cellBg.A > 0)
-                            {
-                                int diffR = Math.Abs(txtColor.R - cellBg.R);
-                                int diffG = Math.Abs(txtColor.G - cellBg.G);
-                                int diffB = Math.Abs(txtColor.B - cellBg.B);
-                                if (diffR + diffG + diffB < 60)
-                                {
-                                    int bgLum = (cellBg.R * 299 + cellBg.G * 587 + cellBg.B * 114) / 1000;
-                                    txtColor = bgLum > 130 ? Color.FromArgb(15, 23, 42) : Color.White;
-                                }
-                            }
-
-                            FontStyle fontStyle = FontStyle.Regular;
-                            if (cell.Format != null)
-                            {
-                                if (cell.Format.Bold) fontStyle |= FontStyle.Bold;
-                                if (cell.Format.Italic) fontStyle |= FontStyle.Italic;
-                                if (cell.Format.Underline) fontStyle |= FontStyle.Underline;
-                                if (cell.Format.Strikethrough) fontStyle |= FontStyle.Strikeout;
-                            }
-
-                            string fName = (cell.Format != null && !string.IsNullOrEmpty(cell.Format.FontName)) ? cell.Format.FontName : "Calibri";
-                            float fSize = (cell.Format != null && cell.Format.FontSize > 0) ? cell.Format.FontSize : 11.0f;
-
-                            using (Font font = new Font(fName, fSize * ZoomFactor, fontStyle))
-                            using (SolidBrush txtB = new SolidBrush(txtColor))
-                            {
-                                bool isDiagCell = cell.Format != null && (cell.Format.IsDiagonalHeader || (cell.Format.Borders != null && (cell.Format.Borders.DiagonalDown || cell.Format.Borders.DiagonalUp)));
-                                if (isDiagCell && (dispText.Contains("\n") || !string.IsNullOrEmpty(cell.Format.DiagonalTopRightText) || !string.IsNullOrEmpty(cell.Format.DiagonalBottomLeftText)))
-                                {
-                                    string trText = cell.Format.DiagonalTopRightText;
-                                    string blText = cell.Format.DiagonalBottomLeftText;
-                                    if (string.IsNullOrEmpty(trText) && string.IsNullOrEmpty(blText))
-                                    {
-                                        string[] lines = dispText.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                                        if (lines.Length >= 2)
-                                        {
-                                            trText = lines[0].Trim();
-                                            blText = lines[1].Trim();
-                                        }
-                                        else
-                                        {
-                                            trText = dispText;
-                                        }
-                                    }
-
-                                    // Top-Right Text (Column Header)
-                                    if (!string.IsNullOrEmpty(trText))
-                                    {
-                                        SizeF szTR = g.MeasureString(trText, font);
-                                        float xTR = cellRect.Right - szTR.Width - 6;
-                                        float yTR = cellRect.Top + 3;
-                                        g.DrawString(trText, font, txtB, xTR, yTR);
-                                    }
-
-                                    // Bottom-Left Text (Row Header)
-                                    if (!string.IsNullOrEmpty(blText))
-                                    {
-                                        SizeF szBL = g.MeasureString(blText, font);
-                                        float xBL = cellRect.Left + 6;
-                                        float yBL = cellRect.Bottom - szBL.Height - 3;
-                                        g.DrawString(blText, font, txtB, xBL, yBL);
-                                    }
-                                }
-                                else
-                                {
-                                    bool isTallRow = renderH >= 30;
-                                    bool hasNewlines = dispText.Contains("\r") || dispText.Contains("\n");
-                                    bool isExplicitWrap = cell.Format != null && cell.Format.WrapText;
-                                    bool wrapText = isExplicitWrap || isTallRow || hasNewlines;
-                                    int indentPx = (cell.Format != null && cell.Format.Indent > 0) ? cell.Format.Indent * 10 : 0;
-
-                                    string textToDraw = dispText;
-                                    if (!wrapText && (textToDraw.Contains("\r") || textToDraw.Contains("\n")))
-                                    {
-                                        textToDraw = textToDraw.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
-                                    }
-
-                                    // Determine horizontal render bounds (overflow only into truly empty adjacent cells)
-                                    int textRenderW = renderW;
-                                    if (!wrapText && (cell.Format == null || cell.Format.Align == 0))
-                                    {
-                                        uint nextC = colIdx + (cell.Format != null && cell.Format.IsMergedParent ? (uint)Math.Max(1, cell.Format.MergeColSpan) : 1);
-                                        while (curX + textRenderW < gridW)
-                                        {
-                                            CellData nextCell = CurrentSheet.GetCell(rowIdx, nextC);
-                                            bool hasContent = nextCell != null && (!string.IsNullOrEmpty(nextCell.EvaluatedStr) || !string.IsNullOrEmpty(nextCell.RawValue) || (nextCell.Format != null && nextCell.Format.BgColor != 0 && nextCell.Format.BgColor != unchecked((int)0xFFFFFFFF)));
-                                            if (hasContent) break;
-                                            textRenderW += GetColWidth(nextC);
-                                            nextC++;
-                                        }
-                                    }
-
-                                    Rectangle textBounds = new Rectangle(curX + 4 + indentPx, curY + (wrapText ? 2 : 0), Math.Max(0, textRenderW - 8 - indentPx), wrapText ? Math.Max(0, renderH - 4) : renderH);
-                                    TextFormatFlags flags = TextFormatFlags.Left | (wrapText ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter) | TextFormatFlags.NoPadding | TextFormatFlags.PreserveGraphicsClipping;
-
-                                    if (wrapText)
-                                    {
-                                        flags |= TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl;
-                                    }
-                                    else
-                                    {
-                                        flags |= TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
-                                    }
-
-                                    if (cell.Format != null)
-                                    {
-                                        if (cell.Format.Align == 1) { flags &= ~TextFormatFlags.Left; flags |= TextFormatFlags.HorizontalCenter; }
-                                        else if (cell.Format.Align == 2) { flags &= ~TextFormatFlags.Left; flags |= TextFormatFlags.Right; }
-
-                                        if (cell.Format.VAlign == 0) { flags &= ~(TextFormatFlags.VerticalCenter); flags |= TextFormatFlags.Top; }
-                                        else if (cell.Format.VAlign == 1) { flags &= ~TextFormatFlags.Top; flags |= TextFormatFlags.VerticalCenter; }
-                                        else if (cell.Format.VAlign == 2) { flags &= ~(TextFormatFlags.Top | TextFormatFlags.VerticalCenter); flags |= TextFormatFlags.Bottom; }
-                                    }
-
-                                    // Strict clipping prevents any vertical bleeding onto rows below or across neighboring data cells
-                                    Rectangle cellClip = new Rectangle(curX, curY, textRenderW, renderH);
-                                    g.PushClip(cellClip);
-                                    TextRenderer.DrawText(g, textToDraw, font, textBounds, txtColor, flags);
-                                    g.PopClip();
-                                }
+                                CellData nextCell = CurrentSheet.GetCell(rowIdx, nextC);
+                                bool hasContent = nextCell != null && (!string.IsNullOrEmpty(nextCell.EvaluatedStr) || !string.IsNullOrEmpty(nextCell.RawValue) || (nextCell.Format != null && nextCell.Format.BgColor != 0 && nextCell.Format.BgColor != unchecked((int)0xFFFFFFFF)));
+                                if (hasContent) break;
+                                textRenderW += GetColWidth(nextC);
+                                nextC++;
                             }
                         }
+
+                        Rectangle textClip = new Rectangle(curX, curY, textRenderW, rH);
+                        DrawCellText(g, cell, cellRectNorm, cellBgNorm, textClip);
                     }
 
                     // Render Sparkline in Cell if exists
@@ -1893,7 +1864,6 @@ namespace ZenQOffice.UI
             int selH = 0;
             for (uint r = minSelR; r <= maxSelR; r++) selH += GetRowHeight(r);
 
-            Rectangle gridClipArea = new Rectangle(headerW, startY + headerH, width - headerW - vScrollW, maxGridY - (startY + headerH));
             GraphicsState gStateSel = g.Save();
             g.SetClip(gridClipArea);
 
@@ -2051,54 +2021,44 @@ namespace ZenQOffice.UI
                     if (editCell.Format.Underline) edFStyle |= FontStyle.Underline;
                 }
 
-                using (Font edFont = new Font(edFName, edFSize * ZoomFactor, edFStyle))
+                Font edFont = GetCellFont(edFName, edFSize * ZoomFactor, edFStyle);
+                Rectangle clipBox = new Rectangle(editingCellRect.X + 2, editingCellRect.Y + 2, Math.Max(1, editingCellRect.Width - 4), Math.Max(1, editingCellRect.Height - 4));
+                g.PushClip(clipBox);
+
+                // Selection highlight in editing cell
+                if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
                 {
-                    Rectangle clipBox = new Rectangle(editingCellRect.X + 2, editingCellRect.Y + 2, Math.Max(1, editingCellRect.Width - 4), Math.Max(1, editingCellRect.Height - 4));
-                    g.PushClip(clipBox);
+                    string pre = EditText.Substring(0, EditSelStart);
+                    string sel = EditText.Substring(EditSelStart, EditSelLength);
+                    SizeF preSz = pre.Length > 0 ? g.MeasureString(pre, edFont) : SizeF.Empty;
+                    SizeF selSz = g.MeasureString(sel, edFont);
 
-                    // Selection highlight in editing cell
-                    if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
+                    float selX = editingCellRect.X + 4 + (pre.Length > 0 ? preSz.Width : 0);
+                    RectangleF selBox = new RectangleF(selX, editingCellRect.Y + 3, selSz.Width, editingCellRect.Height - 6);
+                    using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(180, 215, 255)))
                     {
-                        string pre = EditText.Substring(0, EditSelStart);
-                        string sel = EditText.Substring(EditSelStart, EditSelLength);
-                        Size preSz = pre.Length > 0 ? TextRenderer.MeasureText(g, pre, edFont, Size.Empty, TextFormatFlags.NoPadding) : Size.Empty;
-                        Size selSz = TextRenderer.MeasureText(g, sel, edFont, Size.Empty, TextFormatFlags.NoPadding);
-
-                        float selX = editingCellRect.X + 4 + (pre.Length > 0 ? preSz.Width : 0);
-                        RectangleF selBox = new RectangleF(selX, editingCellRect.Y + 3, selSz.Width, editingCellRect.Height - 6);
-                        using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(180, 215, 255)))
-                        {
-                            g.FillRectangle(selBrush, selBox);
-                        }
+                        g.FillRectangle(selBrush, selBox);
                     }
-
-                    Rectangle edTextBounds = new Rectangle(editingCellRect.X + 4, editingCellRect.Y + 3, Math.Max(0, editingCellRect.Width - 8), editingCellRect.Height - 6);
-                    bool edWrap = (editCell != null && editCell.Format != null && editCell.Format.WrapText) || editingCellRect.Height >= 30 || EditText.Contains("\n") || EditText.Contains("\r");
-                    TextFormatFlags edFlags = TextFormatFlags.Left | (edWrap ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter) | TextFormatFlags.NoPadding;
-                    if (edWrap)
-                    {
-                        edFlags |= TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl;
-                    }
-                    else
-                    {
-                        edFlags |= TextFormatFlags.SingleLine;
-                    }
-                    TextRenderer.DrawText(g, EditText, edFont, edTextBounds, Color.Black, edFlags);
-
-                    float curXPos = editingCellRect.X + 4;
-                    if (EditSelLength == 0)
-                    {
-                        string sub = EditText.Substring(0, Math.Min(EditText.Length, EditCursorPos));
-                        Size sz = sub.Length > 0 ? TextRenderer.MeasureText(g, sub, edFont, Size.Empty, TextFormatFlags.NoPadding) : Size.Empty;
-                        curXPos = editingCellRect.X + 4 + (sub.Length > 0 ? sz.Width : 0);
-                        g.DrawLine(Pens.Black, curXPos, editingCellRect.Y + 3, curXPos, editingCellRect.Y + editingCellRect.Height - 4);
-                    }
-                    CurrentCaretScreenX = (int)curXPos;
-                    CurrentCaretScreenY = editingCellRect.Bottom + 2;
-                    CurrentCaretScreenH = editingCellRect.Height;
-
-                    g.PopClip();
                 }
+
+                Rectangle edTextBounds = new Rectangle(editingCellRect.X + 4, editingCellRect.Y + 3, Math.Max(0, editingCellRect.Width - 8), editingCellRect.Height - 6);
+                bool edWrap = (editCell != null && editCell.Format != null && editCell.Format.WrapText) || editingCellRect.Height >= 30 || EditText.Contains("\n") || EditText.Contains("\r");
+                StringFormat edSf = GetCachedStringFormat(0, edWrap ? 0 : 1, edWrap);
+                g.DrawString(EditText, edFont, Brushes.Black, edTextBounds, edSf);
+
+                float curXPos = editingCellRect.X + 4;
+                if (EditSelLength == 0)
+                {
+                    string sub = EditText.Substring(0, Math.Min(EditText.Length, EditCursorPos));
+                    SizeF sz = sub.Length > 0 ? g.MeasureString(sub, edFont) : SizeF.Empty;
+                    curXPos = editingCellRect.X + 4 + (sub.Length > 0 ? sz.Width : 0);
+                    g.DrawLine(Pens.Black, curXPos, editingCellRect.Y + 3, curXPos, editingCellRect.Y + editingCellRect.Height - 4);
+                }
+                CurrentCaretScreenX = (int)curXPos;
+                CurrentCaretScreenY = editingCellRect.Bottom + 2;
+                CurrentCaretScreenH = editingCellRect.Height;
+
+                g.PopClip();
 
                 // Floating Formula Suggestions Popup
                 if (EditText.StartsWith("="))
@@ -2254,7 +2214,9 @@ namespace ZenQOffice.UI
             // Vertical Thumb
             int vTrackAvail = vScrollH - 32;
             int vThumbH = Math.Max(25, (int)(vTrackAvail * 0.25f));
-            int vThumbY = vScrollY + 16 + (int)((ScrollRow - 1) / 100.0f * (vTrackAvail - vThumbH));
+            uint maxR = Math.Max(100, CurrentSheet != null ? CurrentSheet.GetMaxRow() + 30 : 100);
+            float scrollProgress = Math.Min(1.0f, (ScrollRow - 1) / (float)maxR);
+            int vThumbY = vScrollY + 16 + (int)(scrollProgress * (vTrackAvail - vThumbH));
             vThumbY = Math.Max(vScrollY + 16, Math.Min(maxGridY - 16 - vThumbH, vThumbY));
             Rectangle vThumb = new Rectangle(vScrollX + 2, vThumbY, vScrollW - 4, vThumbH);
             using (GraphicsPath tp = CreateRoundedPath(vThumb, 3))
@@ -3299,8 +3261,11 @@ namespace ZenQOffice.UI
             if (IsDraggingVertScroll)
             {
                 int deltaY = y - ScrollDragStartPos;
-                int rowDelta = deltaY / 5;
-                ScrollRow = (uint)Math.Max(1, (int)ScrollDragStartVal + rowDelta);
+                uint maxR = Math.Max(100, CurrentSheet != null ? CurrentSheet.GetMaxRow() + 30 : 100);
+                int vScrollH = Math.Max(50, (height - 56) - (startY + headerH));
+                int vTrackAvail = Math.Max(1, vScrollH - 32 - Math.Max(25, (int)((vScrollH - 32) * 0.25f)));
+                int rowDelta = (int)Math.Round((float)deltaY / vTrackAvail * maxR);
+                ScrollRow = (uint)Math.Max(1, Math.Min(maxR, (int)ScrollDragStartVal + rowDelta));
                 return;
             }
 
@@ -4911,7 +4876,167 @@ namespace ZenQOffice.UI
             }
         }
 
-        // ==================== Formatting & Inspection Actions ====================
+        private void DrawCellBorders(D2DGraphics g, CellBorderSettings b, Rectangle cellRect)
+        {
+            if (b == null) return;
+            if (b.Top)
+            {
+                int tThick = b.TopThickness > 0 ? b.TopThickness : (b.Thickness > 0 ? b.Thickness : 1);
+                Color tCol = b.TopColor != 0 ? Color.FromArgb(b.TopColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                DrawBorderSegment(g, cellRect.Left, cellRect.Top, cellRect.Right, cellRect.Top, tThick, tCol, true);
+            }
+            if (b.Bottom)
+            {
+                int bThick = b.BottomThickness > 0 ? b.BottomThickness : (b.Thickness > 0 ? b.Thickness : 1);
+                Color bCol = b.BottomColor != 0 ? Color.FromArgb(b.BottomColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                DrawBorderSegment(g, cellRect.Left, cellRect.Bottom, cellRect.Right, cellRect.Bottom, bThick, bCol, true);
+            }
+            if (b.Left)
+            {
+                int lThick = b.LeftThickness > 0 ? b.LeftThickness : (b.Thickness > 0 ? b.Thickness : 1);
+                Color lCol = b.LeftColor != 0 ? Color.FromArgb(b.LeftColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                DrawBorderSegment(g, cellRect.Left, cellRect.Top, cellRect.Left, cellRect.Bottom, lThick, lCol, false);
+            }
+            if (b.Right)
+            {
+                int rThick = b.RightThickness > 0 ? b.RightThickness : (b.Thickness > 0 ? b.Thickness : 1);
+                Color rCol = b.RightColor != 0 ? Color.FromArgb(b.RightColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                DrawBorderSegment(g, cellRect.Right, cellRect.Top, cellRect.Right, cellRect.Bottom, rThick, rCol, false);
+            }
+            if (b.DiagonalDown)
+            {
+                int dThick = b.DiagonalThickness > 0 ? b.DiagonalThickness : 1;
+                Color dCol = b.DiagonalColor != 0 ? Color.FromArgb(b.DiagonalColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                using (Pen dPen = new Pen(dCol, dThick))
+                {
+                    g.DrawLine(dPen, cellRect.Left, cellRect.Top, cellRect.Right, cellRect.Bottom);
+                }
+            }
+            if (b.DiagonalUp)
+            {
+                int dThick = b.DiagonalThickness > 0 ? b.DiagonalThickness : 1;
+                Color dCol = b.DiagonalColor != 0 ? Color.FromArgb(b.DiagonalColor) : (b.Color != 0 ? Color.FromArgb(b.Color) : Color.FromArgb(15, 23, 42));
+                using (Pen dPen = new Pen(dCol, dThick))
+                {
+                    g.DrawLine(dPen, cellRect.Left, cellRect.Bottom, cellRect.Right, cellRect.Top);
+                }
+            }
+        }
+
+        private void DrawCellText(D2DGraphics g, CellData cell, Rectangle cellRect, Color cellBg, Rectangle textClipRect)
+        {
+            if (cell == null || (string.IsNullOrEmpty(cell.EvaluatedStr) && string.IsNullOrEmpty(cell.RawValue) && !(cell.Format != null && cell.Format.IsDiagonalHeader)))
+                return;
+
+            string dispText;
+            if (ShowFormulas && !string.IsNullOrEmpty(cell.RawValue) && cell.RawValue.StartsWith("="))
+            {
+                dispText = cell.RawValue;
+            }
+            else
+            {
+                dispText = !string.IsNullOrEmpty(cell.EvaluatedStr) ? cell.EvaluatedStr : (cell.RawValue ?? "");
+            }
+
+            int tc = (cell.Format != null && cell.Format.TextColor != 0) ? cell.Format.TextColor : unchecked((int)0xFF000000);
+            if ((tc & unchecked((int)0xFF000000)) == 0 && tc != 0) tc |= unchecked((int)0xFF000000);
+            Color txtColor = Color.FromArgb(tc);
+
+            if (cellBg.A > 0)
+            {
+                int diffR = Math.Abs(txtColor.R - cellBg.R);
+                int diffG = Math.Abs(txtColor.G - cellBg.G);
+                int diffB = Math.Abs(txtColor.B - cellBg.B);
+                if (diffR + diffG + diffB < 60)
+                {
+                    int bgLum = (cellBg.R * 299 + cellBg.G * 587 + cellBg.B * 114) / 1000;
+                    txtColor = bgLum > 130 ? Color.FromArgb(15, 23, 42) : Color.White;
+                }
+            }
+
+            FontStyle fontStyle = FontStyle.Regular;
+            if (cell.Format != null)
+            {
+                if (cell.Format.Bold) fontStyle |= FontStyle.Bold;
+                if (cell.Format.Italic) fontStyle |= FontStyle.Italic;
+                if (cell.Format.Underline) fontStyle |= FontStyle.Underline;
+                if (cell.Format.Strikethrough) fontStyle |= FontStyle.Strikeout;
+            }
+
+            string fName = (cell.Format != null && !string.IsNullOrEmpty(cell.Format.FontName)) ? cell.Format.FontName : "Calibri";
+            float fSize = (cell.Format != null && cell.Format.FontSize > 0) ? cell.Format.FontSize : 11.0f;
+
+            Font font = GetCellFont(fName, fSize * ZoomFactor, fontStyle);
+            SolidBrush txtB = GetCachedBrush(txtColor);
+
+            bool isDiagCell = cell.Format != null && (cell.Format.IsDiagonalHeader || (cell.Format.Borders != null && (cell.Format.Borders.DiagonalDown || cell.Format.Borders.DiagonalUp)));
+            if (isDiagCell && (dispText.Contains("\n") || !string.IsNullOrEmpty(cell.Format.DiagonalTopRightText) || !string.IsNullOrEmpty(cell.Format.DiagonalBottomLeftText)))
+            {
+                string trText = cell.Format.DiagonalTopRightText;
+                string blText = cell.Format.DiagonalBottomLeftText;
+                if (string.IsNullOrEmpty(trText) && string.IsNullOrEmpty(blText))
+                {
+                    string[] lines = dispText.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length >= 2)
+                    {
+                        trText = lines[0].Trim();
+                        blText = lines[1].Trim();
+                    }
+                    else
+                    {
+                        trText = dispText;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(trText))
+                {
+                    SizeF szTR = g.MeasureString(trText, font);
+                    float xTR = cellRect.Right - szTR.Width - 6;
+                    float yTR = cellRect.Top + 3;
+                    g.DrawString(trText, font, txtB, xTR, yTR);
+                }
+
+                if (!string.IsNullOrEmpty(blText))
+                {
+                    SizeF szBL = g.MeasureString(blText, font);
+                    float xBL = cellRect.Left + 6;
+                    float yBL = cellRect.Bottom - szBL.Height - 3;
+                    g.DrawString(blText, font, txtB, xBL, yBL);
+                }
+            }
+            else
+            {
+                bool isTallRow = cellRect.Height >= 30;
+                bool hasNewlines = dispText.Contains("\r") || dispText.Contains("\n");
+                bool isExplicitWrap = cell.Format != null && cell.Format.WrapText;
+                bool wrapText = isExplicitWrap || isTallRow || hasNewlines;
+
+                int indentPx = (cell.Format != null && cell.Format.Indent > 0) ? cell.Format.Indent * 10 : 0;
+                string textToDraw = dispText;
+                if (!wrapText && (textToDraw.Contains("\r") || textToDraw.Contains("\n")))
+                {
+                    textToDraw = textToDraw.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+                }
+
+                int hAlign = (cell.Format != null) ? cell.Format.Align : 0;
+                if (hAlign < 0 || hAlign > 2) hAlign = 0;
+                int vAlign = (cell.Format != null) ? cell.Format.VAlign : 1;
+                if (vAlign < 0 || vAlign > 2) vAlign = 1;
+
+                StringFormat sf = GetCachedStringFormat(hAlign, vAlign, wrapText);
+
+                Rectangle textBounds = new Rectangle(
+                    cellRect.Left + 4 + indentPx,
+                    cellRect.Top + (wrapText ? 2 : 0),
+                    Math.Max(0, cellRect.Width - 8 - indentPx),
+                    wrapText ? Math.Max(0, cellRect.Height - 4) : cellRect.Height
+                );
+
+                g.PushClip(textClipRect);
+                g.DrawString(textToDraw, font, txtB, textBounds, sf);
+                g.PopClip();
+            }
+        }
 
         public CalcSelectionFormat GetSelectionFormat()
         {
