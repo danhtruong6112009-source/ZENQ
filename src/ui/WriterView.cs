@@ -5394,6 +5394,7 @@ namespace ZenQOffice.UI
 
         public int GetMaxScrollY(int clientHeight, RibbonBar ribbon)
         {
+            if (ViewMode == 0) return 0;
             if (clientHeight <= 0) clientHeight = LastViewHeight > 0 ? LastViewHeight : 800;
             int w = LastViewWidth > 0 ? LastViewWidth : 1200;
 
@@ -10452,6 +10453,7 @@ namespace ZenQOffice.UI
         private int _lastLayoutMaxW = 0;
         private int _lastLayoutTextX = -1;
         private int _lastLayoutPageX = -1;
+        private int _lastLayoutViewMode = -1;
         private string[] _cachedParagraphs = null;
         private int _cachedParagraphsVersion = -1;
         private int _lastShapesScannedVersion = -1;
@@ -10466,6 +10468,7 @@ namespace ZenQOffice.UI
             _lastLayoutMaxW = -1;
             _lastLayoutTextX = -1;
             _lastLayoutPageX = -1;
+            _lastLayoutViewMode = -1;
             _lastShapesScannedVersion = -1;
             if (_paraLayoutCache != null) _paraLayoutCache.Clear();
             DocShapeObject.ClearTagParseCache();
@@ -11064,7 +11067,13 @@ namespace ZenQOffice.UI
             }
             int stdW = (int)Math.Round(baseW * 96f);
             int stdH = (int)Math.Round(baseH * 96f);
-            if (ViewMode == 0) { stdW = 750; } // Read mode
+            if (ViewMode == 0)
+            {
+                stdW = Math.Min(750, Math.Max(400, canvasW - 140));
+                int effH = LastViewHeight > 0 ? LastViewHeight : 800;
+                int availableH = effH - 155 - 26 - 28;
+                stdH = Math.Max(320, availableH);
+            }
             else if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasW - 80) / Math.Max(0.2f, ZoomLevel))); } // Web mode
 
             pageW = (int)Math.Round(stdW * ZoomLevel);
@@ -11074,9 +11083,18 @@ namespace ZenQOffice.UI
             float rightMarginInches = ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f;
             float topMarginInches = ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f;
 
-            marginX = (int)Math.Round(leftMarginInches * 96 * ZoomLevel);
-            rightMarginX = (int)Math.Round(rightMarginInches * 96 * ZoomLevel);
-            marginY = (int)Math.Round(topMarginInches * 96 * ZoomLevel);
+            if (ViewMode == 0)
+            {
+                marginX = (int)Math.Round(40 * ZoomLevel);
+                rightMarginX = (int)Math.Round(40 * ZoomLevel);
+                marginY = (int)Math.Round(30 * ZoomLevel);
+            }
+            else
+            {
+                marginX = (int)Math.Round(leftMarginInches * 96 * ZoomLevel);
+                rightMarginX = (int)Math.Round(rightMarginInches * 96 * ZoomLevel);
+                marginY = (int)Math.Round(topMarginInches * 96 * ZoomLevel);
+            }
 
             int navOffset = ShowNavigationPane ? 280 : 0;
             int selPaneOffset = ShowSelectionPane ? 260 : 0;
@@ -11668,7 +11686,7 @@ namespace ZenQOffice.UI
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(canvasW, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
             float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
-            int bottomMarginY = (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
+            int bottomMarginY = (ViewMode == 0) ? marginY : (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
 
             if (CurrentHeaderPreset != HeaderFooterPreset.None || IsEditingHeaderFooter || !string.IsNullOrEmpty(HeaderText))
             {
@@ -11678,7 +11696,24 @@ namespace ZenQOffice.UI
                 }
             }
             int maxTextW = pageW - marginX - rightMarginX;
-            int startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+            int startPageY;
+            if (ViewMode == 0)
+            {
+                ScrollY = 0;
+                SmoothScrollY = 0;
+                TargetScrollY = 0;
+                ScrollX = 0f;
+                SmoothScrollX = 0f;
+                TargetScrollX = 0f;
+                int effH = height > 0 ? height : (LastViewHeight > 0 ? LastViewHeight : 800);
+                int availableH = effH - 155 - 26;
+                int padY = Math.Max(10, (availableH - pageH) / 2);
+                startPageY = 155 + padY;
+            }
+            else
+            {
+                startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+            }
             int textX = pageX + marginX;
             CurrentRenderTextX = textX;
             
@@ -11686,14 +11721,14 @@ namespace ZenQOffice.UI
             int runsHash = FormattedRuns.Count;
             if (FormattedRuns.Count > 0) runsHash ^= FormattedRuns[0].FontSize.GetHashCode() ^ FormattedRuns[FormattedRuns.Count - 1].Length;
             
-            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || textX != _lastLayoutTextX || pageX != _lastLayoutPageX || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
+            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || textX != _lastLayoutTextX || pageX != _lastLayoutPageX || ViewMode != _lastLayoutViewMode || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
             if (layoutDirty)
             {
                 _paraLayoutCache.Clear();
                 DocShapeObject.ClearTagParseCache();
                 ClearCellLineCache();
                 _wordMeasureCache.Clear();
-                if (ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW)
+                if (ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || ViewMode != _lastLayoutViewMode)
                 {
                     // Zoom or page width changed: force table column/row recalculation at new scale
                     TableColWidths.Clear();
@@ -11705,6 +11740,7 @@ namespace ZenQOffice.UI
                 _lastLayoutMaxW = maxTextW;
                 _lastLayoutTextX = textX;
                 _lastLayoutPageX = pageX;
+                _lastLayoutViewMode = ViewMode;
             }
 
             float currentY = startPageY + marginY;
@@ -12825,7 +12861,10 @@ namespace ZenQOffice.UI
                             bool caretInsideTable = TableCharRanges.ContainsKey(tblIdx) && CursorPosition >= TableCharRanges[tblIdx][0] && CursorPosition <= TableCharRanges[tblIdx][0] + TableCharRanges[tblIdx][1];
                             bool isTableHoveredOrActive = thisTableDragging || (ActiveTableLayoutOptionsIndex == tblIdx) || (SelectedColumnTableIndex == tblIdx) || mouseInsideTable || mouseOverHandle || caretInsideTable;
 
-                            bool isTableVisible = (tableY + tableH >= 140 && tableY <= height + 20) || (ViewMode == 0);
+                            int effTableY = (ViewMode == 0) ? (tableY - ReadModePageIndex * (pageH + 30)) : tableY;
+                            bool isTableVisible = (ViewMode == 0)
+                                ? (effTableY + tableH >= startPageY - 20 && effTableY <= startPageY + pageH + 20)
+                                : (tableY + tableH >= 140 && tableY <= height + 20);
                             if (!isTableVisible && !isTableHoveredOrActive)
                             {
                                 if (tWrap == 0)
@@ -13769,7 +13808,10 @@ namespace ZenQOffice.UI
                     {
                         var line = wrappedLines[lIdx];
                         float dynamicLineHeight = line.LineHeight;
-                        bool isLineVisible = (line.LineY + dynamicLineHeight >= 155 && line.LineY <= height - 26);
+                        float effLineY = (ViewMode == 0) ? (line.LineY - ReadModePageIndex * (pageH + 30)) : line.LineY;
+                        bool isLineVisible = (ViewMode == 0)
+                            ? (effLineY + dynamicLineHeight >= startPageY - 10 && effLineY <= startPageY + pageH + 10)
+                            : (effLineY + dynamicLineHeight >= 155 && effLineY <= height - 26);
                         bool hasCursor = (CursorPosition >= line.StartIndex && CursorPosition <= line.StartIndex + line.Length);
 
                         docLineNumber++;
@@ -14303,10 +14345,18 @@ namespace ZenQOffice.UI
             }
             CalculatedPageCount = finalPages;
             TotalPageCount = finalPages;
-            CurrentActivePage = Math.Max(1, Math.Min(finalPages, (int)((ScrollY + (height / 2)) / (pageH + 30)) + 1));
+            if (ViewMode == 0)
+            {
+                ReadModePageIndex = Math.Max(0, Math.Min(finalPages - 1, ReadModePageIndex));
+                CurrentActivePage = ReadModePageIndex + 1;
+            }
+            else
+            {
+                CurrentActivePage = Math.Max(1, Math.Min(finalPages, (int)((ScrollY + (height / 2)) / (pageH + 30)) + 1));
+            }
 
             // Draw End of Document Marker in Read Mode (ViewMode == 0)
-            if (ViewMode == 0)
+            if (ViewMode == 0 && ReadModePageIndex == finalPages - 1)
             {
                 using (Font endFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
                 using (SolidBrush sqBrush = new SolidBrush(Color.FromArgb(0, 120, 212)))
@@ -14321,7 +14371,8 @@ namespace ZenQOffice.UI
             {
                 if (sh.Visible && sh.WrapMode != 0 && sh.WrapMode != 5 && sh.WrapMode != 6 && !sh.LastBounds.IsEmpty)
                 {
-                    if (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height)
+                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height);
+                    if (isShapeVis)
                         ShapeRenderer.DrawShape(g, sh, sh.LastBounds, ribbon, ZoomLevel);
                 }
             }
@@ -14329,7 +14380,8 @@ namespace ZenQOffice.UI
             {
                 if (ch.Visible && ch.WrapMode != 0 && ch.WrapMode != 5 && ch.WrapMode != 6 && !ch.LastBounds.IsEmpty)
                 {
-                    if (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height)
+                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height);
+                    if (isChartVis)
                         DrawDocumentChart(g, ch, ch.LastBounds.X, ch.LastBounds.Y, ch.LastBounds.Width, ch.LastBounds.Height, ribbon);
                 }
             }
@@ -14339,7 +14391,8 @@ namespace ZenQOffice.UI
             {
                 if (sh.Visible && sh.WrapMode == 6 && !sh.LastBounds.IsEmpty)
                 {
-                    if (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height)
+                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height);
+                    if (isShapeVis)
                         ShapeRenderer.DrawShape(g, sh, sh.LastBounds, ribbon, ZoomLevel);
                 }
             }
@@ -14347,7 +14400,8 @@ namespace ZenQOffice.UI
             {
                 if (ch.Visible && ch.WrapMode == 6 && !ch.LastBounds.IsEmpty)
                 {
-                    if (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height)
+                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height);
+                    if (isChartVis)
                         DrawDocumentChart(g, ch, ch.LastBounds.X, ch.LastBounds.Y, ch.LastBounds.Width, ch.LastBounds.Height, ribbon);
                 }
             }
@@ -14384,7 +14438,7 @@ namespace ZenQOffice.UI
             CurrentCaretScreenX = cursorX;
             CurrentCaretScreenY = cursorY;
             CurrentCaretScreenH = cursorH;
-            if (CursorVisible && ActiveShape == null && ActiveChart == null && !hasSelection)
+            if (CursorVisible && ActiveShape == null && ActiveChart == null && !hasSelection && ViewMode != 0)
             {
                 float cursorW = (ZoomLevel >= 1.5f) ? 1.5f : 1.0f;
                 SmoothingMode prevSmooth = g.SmoothingMode;
@@ -17348,8 +17402,9 @@ namespace ZenQOffice.UI
 
             if (ViewMode == 0)
             {
+                int canvasH = LastViewHeight > 0 ? LastViewHeight : 800;
                 // Check Left Arrow Hit (◀)
-                if (mouseX <= 70)
+                if (mouseX <= 70 && mouseY >= 155 && mouseY <= canvasH - 26)
                 {
                     if (ReadModePageIndex > 0)
                     {
@@ -17358,7 +17413,7 @@ namespace ZenQOffice.UI
                     return;
                 }
                 // Check Right Arrow Hit (▶)
-                if (mouseX >= canvasWidth - 70)
+                if (mouseX >= canvasWidth - 70 && mouseY >= 155 && mouseY <= canvasH - 26)
                 {
                     if (ReadModePageIndex < TotalPageCount - 1)
                     {
@@ -18052,7 +18107,8 @@ namespace ZenQOffice.UI
 
             if (ViewMode == 0)
             {
-                if (mouseX <= 70 || mouseX >= canvasWidth - 70)
+                int canvasH = LastViewHeight > 0 ? LastViewHeight : 800;
+                if ((mouseX <= 70 || mouseX >= canvasWidth - 70) && mouseY >= 155 && mouseY <= canvasH - 26)
                 {
                     Cursor.Current = Cursors.Hand;
                     return;

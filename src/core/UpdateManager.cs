@@ -38,8 +38,8 @@ namespace ZenQOffice.Core
 
     public static class UpdateManager
     {
-        public const string CURRENT_VERSION = "4.2.0";
-        public const string CURRENT_VERSION_TAG = "v4.2";
+        public const string CURRENT_VERSION = "5.0.0";
+        public const string CURRENT_VERSION_TAG = "v5.0";
         public const string GITHUB_OWNER = "danhtruong6112009-source";
         public const string GITHUB_REPO = "ZENQ";
 
