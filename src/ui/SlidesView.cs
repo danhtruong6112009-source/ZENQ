@@ -6804,13 +6804,12 @@ namespace ZenQOffice.UI
             if (preset.IsOnlineImage)
             {
                 string localPath = ZenQOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
-                Bitmap bmp = ZenQOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl);
-                if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(localPath))
+                Bitmap bmp = ZenQOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl, 1600);
+                if (bmp == null && localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(localPath))
                 {
                     try
                     {
-                        string svgXml = System.IO.File.ReadAllText(localPath);
-                        bmp = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgXml, 1600, 1600) ?? bmp;
+                        bmp = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(localPath, 1600, 1600);
                     }
                     catch { }
                 }
@@ -15145,27 +15144,15 @@ namespace ZenQOffice.UI
 
             if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
             {
-                if (!string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
                 {
                     try
                     {
                         if (shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                         {
-                            int minRequiredW = Math.Max(1200, (int)(baseW * 1.5f));
-                            int minRequiredH = Math.Max(1200, (int)(baseH * 1.5f));
-                            if (shape.CachedImage == null || shape.CachedImage.Width < minRequiredW || shape.CachedImage.Height < minRequiredH)
-                            {
-                                int renderW = Math.Max(minRequiredW, 1600);
-                                int renderH = Math.Max(minRequiredH, 1600);
-                                Bitmap sharpSvg = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(System.IO.File.ReadAllText(shape.ImagePath), renderW, renderH);
-                                if (sharpSvg != null)
-                                {
-                                    shape.CachedImage = sharpSvg;
-                                    shape.InvalidateDisplayCache();
-                                }
-                            }
+                            shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(shape.ImagePath, 1600, 1600);
                         }
-                        else if (shape.CachedImage == null)
+                        else
                         {
                             shape.CachedImage = Image.FromFile(shape.ImagePath);
                         }
@@ -15197,57 +15184,62 @@ namespace ZenQOffice.UI
 
                     bool hasFillRect = (Math.Abs(shape.FillRectLeft) > 0.0001f || Math.Abs(shape.FillRectTop) > 0.0001f || Math.Abs(shape.FillRectRight) > 0.0001f || Math.Abs(shape.FillRectBottom) > 0.0001f);
 
-                    // High-performance display cache: avoids re-downsampling large 4K images on every animation frame
-                    bool isLargeImage = (shape.CachedImage.Width > bw * 1.25f || shape.CachedImage.Height > bh * 1.25f);
+                    // High-performance display rendering:
+                    // Direct2D GPU acceleration handles textures with hardware texture filtering instantly (0.01ms).
+                    // CPU downsampling is ONLY needed if hardware acceleration is unavailable (pure GDI+ fallback).
                     Image imageToDraw = shape.CachedImage;
                     RectangleF drawSrcRect = srcRect;
 
-                    if (shape.DisplayCachedImage != null && !hasFillRect && !IsCropping && (bw <= 300 || bh <= 200))
+                    if (!g.IsDirectXActive)
                     {
-                        imageToDraw = shape.DisplayCachedImage;
-                        drawSrcRect = new RectangleF(0, 0, shape.DisplayCachedW, shape.DisplayCachedH);
-                    }
-                    else if (isLargeImage && !hasFillRect && !IsCropping && bw > 300 && bh > 200)
-                    {
-                        if (shape.DisplayCachedImage == null ||
-                            Math.Abs(shape.DisplayCachedW - bw) > 24 ||
-                            Math.Abs(shape.DisplayCachedH - bh) > 24 ||
-                            Math.Abs(shape.DisplayCachedCropL - cropL) > 0.001f ||
-                            Math.Abs(shape.DisplayCachedCropT - cropT) > 0.001f ||
-                            Math.Abs(shape.DisplayCachedCropR - cropR) > 0.001f ||
-                            Math.Abs(shape.DisplayCachedCropB - cropB) > 0.001f)
-                        {
-                            shape.InvalidateDisplayCache();
-                            try
-                            {
-                                Bitmap dispBmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                                using (Graphics gDisp = Graphics.FromImage(dispBmp))
-                                {
-                                    gDisp.SmoothingMode = SmoothingMode.AntiAlias;
-                                    gDisp.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    gDisp.PixelOffsetMode = PixelOffsetMode.Half;
-                                    PointF[] dispDest = new PointF[] {
-                                        new PointF(0, 0),
-                                        new PointF(bw, 0),
-                                        new PointF(0, bh)
-                                    };
-                                    gDisp.DrawImage(shape.CachedImage, dispDest, srcRect, GraphicsUnit.Pixel);
-                                }
-                                shape.DisplayCachedImage = dispBmp;
-                                shape.DisplayCachedW = bw;
-                                shape.DisplayCachedH = bh;
-                                shape.DisplayCachedCropL = cropL;
-                                shape.DisplayCachedCropT = cropT;
-                                shape.DisplayCachedCropR = cropR;
-                                shape.DisplayCachedCropB = cropB;
-                            }
-                            catch { }
-                        }
-
-                        if (shape.DisplayCachedImage != null)
+                        bool isLargeImage = (shape.CachedImage.Width > bw * 1.5f || shape.CachedImage.Height > bh * 1.5f);
+                        if (shape.DisplayCachedImage != null && !hasFillRect && !IsCropping)
                         {
                             imageToDraw = shape.DisplayCachedImage;
-                            drawSrcRect = new RectangleF(0, 0, bw, bh);
+                            drawSrcRect = new RectangleF(0, 0, shape.DisplayCachedW, shape.DisplayCachedH);
+                        }
+                        else if (isLargeImage && !hasFillRect && !IsCropping && bw > 100 && bh > 100)
+                        {
+                            if (shape.DisplayCachedImage == null ||
+                                Math.Abs(shape.DisplayCachedW - bw) > 64 ||
+                                Math.Abs(shape.DisplayCachedH - bh) > 64 ||
+                                Math.Abs(shape.DisplayCachedCropL - cropL) > 0.001f ||
+                                Math.Abs(shape.DisplayCachedCropT - cropT) > 0.001f ||
+                                Math.Abs(shape.DisplayCachedCropR - cropR) > 0.001f ||
+                                Math.Abs(shape.DisplayCachedCropB - cropB) > 0.001f)
+                            {
+                                shape.InvalidateDisplayCache();
+                                try
+                                {
+                                    Bitmap dispBmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                                    using (Graphics gDisp = Graphics.FromImage(dispBmp))
+                                    {
+                                        gDisp.SmoothingMode = SmoothingMode.AntiAlias;
+                                        gDisp.InterpolationMode = InterpolationMode.Bilinear;
+                                        gDisp.PixelOffsetMode = PixelOffsetMode.Half;
+                                        PointF[] dispDest = new PointF[] {
+                                            new PointF(0, 0),
+                                            new PointF(bw, 0),
+                                            new PointF(0, bh)
+                                        };
+                                        gDisp.DrawImage(shape.CachedImage, dispDest, srcRect, GraphicsUnit.Pixel);
+                                    }
+                                    shape.DisplayCachedImage = dispBmp;
+                                    shape.DisplayCachedW = bw;
+                                    shape.DisplayCachedH = bh;
+                                    shape.DisplayCachedCropL = cropL;
+                                    shape.DisplayCachedCropT = cropT;
+                                    shape.DisplayCachedCropR = cropR;
+                                    shape.DisplayCachedCropB = cropB;
+                                }
+                                catch { }
+                            }
+
+                            if (shape.DisplayCachedImage != null)
+                            {
+                                imageToDraw = shape.DisplayCachedImage;
+                                drawSrcRect = new RectangleF(0, 0, bw, bh);
+                            }
                         }
                     }
 

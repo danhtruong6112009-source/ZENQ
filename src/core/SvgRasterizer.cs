@@ -92,14 +92,68 @@ namespace ZenQOffice.Core
         private static readonly Regex _transformRegex = new Regex(@"([a-zA-Z]+)\s*\(([^)]*)\)", RegexOptions.Compiled);
         private static readonly Regex _cssRuleRegex = new Regex(@"([^{]+)\{([^}]*)\}", RegexOptions.Compiled);
 
+        private static readonly object _svgCacheLock = new object();
+        private static readonly Dictionary<string, Bitmap> _svgCache = new Dictionary<string, Bitmap>(StringComparer.Ordinal);
+        private static readonly LinkedList<string> _svgCacheLru = new LinkedList<string>();
+        private const int MaxSvgCacheEntries = 128;
+
+        public static void ClearCache()
+        {
+            lock (_svgCacheLock)
+            {
+                _svgCache.Clear();
+                _svgCacheLru.Clear();
+            }
+        }
+
         public static Bitmap RenderSvgToBitmap(string svgXml, int targetWidth = 1200, int targetHeight = 1200)
         {
             if (string.IsNullOrWhiteSpace(svgXml)) return null;
 
+            string trimmed = svgXml.Trim();
+            string cacheKey = null;
+            bool isFile = false;
+
             try
             {
-                string trimmed = svgXml.Trim();
                 if (!trimmed.StartsWith("<") && File.Exists(trimmed))
+                {
+                    isFile = true;
+                    cacheKey = "F:" + trimmed + "|" + targetWidth + "x" + targetHeight + "|" + File.GetLastWriteTimeUtc(trimmed).Ticks;
+                }
+                else
+                {
+                    ulong h = 14695981039346656037UL;
+                    int len = trimmed.Length;
+                    int step = Math.Max(1, len / 64);
+                    for (int i = 0; i < len; i += step)
+                    {
+                        h ^= trimmed[i];
+                        h *= 1099511628211UL;
+                    }
+                    cacheKey = "X:" + targetWidth + "x" + targetHeight + "|" + len + "|" + h;
+                }
+
+                lock (_svgCacheLock)
+                {
+                    if (_svgCache.TryGetValue(cacheKey, out Bitmap cached) && cached != null)
+                    {
+                        try
+                        {
+                            int w = cached.Width;
+                            _svgCacheLru.Remove(cacheKey);
+                            _svgCacheLru.AddLast(cacheKey);
+                            return cached;
+                        }
+                        catch
+                        {
+                            _svgCache.Remove(cacheKey);
+                            _svgCacheLru.Remove(cacheKey);
+                        }
+                    }
+                }
+
+                if (isFile)
                 {
                     svgXml = File.ReadAllText(trimmed);
                 }
@@ -217,6 +271,24 @@ namespace ZenQOffice.Core
                 finally
                 {
                     bmp.UnlockBits(bmpData);
+                }
+
+                if (cacheKey != null && bmp != null)
+                {
+                    lock (_svgCacheLock)
+                    {
+                        if (_svgCache.Count >= MaxSvgCacheEntries)
+                        {
+                            var oldest = _svgCacheLru.First?.Value;
+                            if (oldest != null)
+                            {
+                                _svgCacheLru.RemoveFirst();
+                                _svgCache.Remove(oldest);
+                            }
+                        }
+                        _svgCache[cacheKey] = bmp;
+                        _svgCacheLru.AddLast(cacheKey);
+                    }
                 }
 
                 return bmp;

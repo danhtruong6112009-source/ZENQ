@@ -3444,7 +3444,10 @@ namespace ZenQOffice.UI
                         Cursor = newCur;
                         Cursor.Current = newCur;
                     }
-                    Invalidate();
+                    if (e.Button != MouseButtons.None || SlidesView.ShowRuler || SlidesView.IsDrawingActive || SlidesView.IsPanningCanvas)
+                    {
+                        Invalidate();
+                    }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
                 {

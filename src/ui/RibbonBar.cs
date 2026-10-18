@@ -23913,7 +23913,7 @@ namespace ZenQOffice.UI
                                     shape.ImagePath = ofd.FileName;
                                     shape.IsSvg = true;
                                     shape.IsGraphic = true;
-                                    shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(ofd.FileName, 800, 800);
+                                    shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(ofd.FileName, 1600, 1600);
                                 }
                                 else
                                 {

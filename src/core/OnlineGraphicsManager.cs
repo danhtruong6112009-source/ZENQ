@@ -201,7 +201,7 @@ namespace ZenQOffice.Core
             }
         }
 
-        public static Bitmap GetCachedOrDownloadImage(string id, string url, int targetSize = 1200)
+        public static Bitmap GetCachedOrDownloadImage(string id, string url, int targetSize = 1600)
         {
             try
             {
@@ -212,8 +212,7 @@ namespace ZenQOffice.Core
                     {
                         if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                         {
-                            string svgContent = File.ReadAllText(localPath);
-                            return SvgRasterizer.RenderSvgToBitmap(svgContent, targetSize, targetSize);
+                            return SvgRasterizer.RenderSvgToBitmap(localPath, targetSize, targetSize);
                         }
                         using (var fs = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                         {
@@ -235,8 +234,7 @@ namespace ZenQOffice.Core
                         File.Copy(localRepoFile, localPath, true);
                         if (localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                         {
-                            string svgContent = File.ReadAllText(localPath);
-                            return SvgRasterizer.RenderSvgToBitmap(svgContent, targetSize, targetSize);
+                            return SvgRasterizer.RenderSvgToBitmap(localPath, targetSize, targetSize);
                         }
                     }
                 }
