@@ -17,7 +17,7 @@ const DICTIONARY = {
     nav_lang_btn: "English",
 
     // Hero Section
-    hero_badge: "Phiên bản chính thức v5.0 • Đa Nền Tảng Windows & Android",
+    hero_badge: "Phiên bản chính thức v5.7 • Đa Nền Tảng Windows & Android",
     hero_title_1: "Bộ Ứng Dụng Văn Phòng",
     hero_title_accent: "Hiện Đại Cho Windows & Di Động",
     hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà trên máy tính Windows và điện thoại Android. Tương thích chuẩn OpenXML quốc tế và bảo mật ngoại tuyến 100%.",
@@ -212,7 +212,7 @@ const DICTIONARY = {
     nav_lang_btn: "Tiếng Việt",
 
     // Hero Section
-    hero_badge: "Official Release v5.0 • Cross-Platform Windows & Android Suite",
+    hero_badge: "Official Release v5.7 • Cross-Platform Windows & Android Suite",
     hero_title_1: "Modern Office Suite",
     hero_title_accent: "Crafted for Windows & Mobile",
     hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling across Windows PC and Android mobile. 100% offline and standard OpenXML compatible.",
