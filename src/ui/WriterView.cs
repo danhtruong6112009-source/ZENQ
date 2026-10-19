@@ -2025,11 +2025,233 @@ namespace ZenQOffice.UI
         public List<RenderedLineInfo> RenderedLines = new List<RenderedLineInfo>();
         public int LastCursorScreenX = -1; // remembered X for up/down navigation
 
-        public void SetPendingAiCorrections(object obj) {}
-        public void ReplaceSelectedText(string text, bool selectNew = false) {}
-        public void ApplyPendingAiCorrections() {}
-        public void CancelPendingAiCorrections() {}
-        public void InsertTextFromAI(string text) {}
+        public List<PendingAiDiffItem> PendingAiDiffs = new List<PendingAiDiffItem>();
+        public bool HasPendingAiDiff
+        {
+            get { return PendingAiDiffs != null && PendingAiDiffs.Count > 0; }
+        }
+
+        public void SetPendingAiCorrections(object obj)
+        {
+            PendingAiDiffs.Clear();
+            if (obj == null || PieceTable == null) return;
+
+            List<SpellCorrectionItem> corrs = obj as List<SpellCorrectionItem>;
+            if (corrs == null)
+            {
+                var singleCorr = obj as SpellCorrectionItem;
+                if (singleCorr != null) corrs = new List<SpellCorrectionItem> { singleCorr };
+                else
+                {
+                    var diffList = obj as List<PendingAiDiffItem>;
+                    if (diffList != null)
+                    {
+                        PendingAiDiffs.AddRange(diffList);
+                    }
+                }
+            }
+
+            string docText = PieceTable.GetText();
+            if (string.IsNullOrEmpty(docText)) return;
+
+            if (corrs != null && corrs.Count > 0)
+            {
+                int searchStart = 0;
+                int searchEnd = docText.Length;
+                if (SelectionStart != SelectionEnd)
+                {
+                    searchStart = Math.Min(SelectionStart, SelectionEnd);
+                    searchEnd = Math.Max(SelectionStart, SelectionEnd);
+                }
+
+                foreach (var c in corrs)
+                {
+                    if (string.IsNullOrEmpty(c.Original)) continue;
+                    string repl = c.Replacement ?? "";
+
+                    int foundIdx = -1;
+                    if (searchEnd > searchStart)
+                    {
+                        string selSub = docText.Substring(searchStart, searchEnd - searchStart);
+                        int localIdx = selSub.IndexOf(c.Original, StringComparison.OrdinalIgnoreCase);
+                        if (localIdx >= 0)
+                        {
+                            foundIdx = searchStart + localIdx;
+                        }
+                    }
+
+                    if (foundIdx < 0)
+                    {
+                        foundIdx = docText.IndexOf(c.Original, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (foundIdx >= 0)
+                    {
+                        bool overlaps = false;
+                        foreach (var existing in PendingAiDiffs)
+                        {
+                            if (foundIdx < existing.CharIndex + existing.OriginalLength && foundIdx + c.Original.Length > existing.CharIndex)
+                            {
+                                overlaps = true;
+                                break;
+                            }
+                        }
+                        if (!overlaps)
+                        {
+                            PendingAiDiffs.Add(new PendingAiDiffItem(foundIdx, c.Original.Length, docText.Substring(foundIdx, c.Original.Length), repl, c.Context));
+                        }
+                    }
+                }
+            }
+
+            if (PendingAiDiffs.Count > 0)
+            {
+                ScrollToCharIndex(PendingAiDiffs[0].CharIndex);
+            }
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ScrollToCharIndex(int charIndex, RibbonBar ribbon = null)
+        {
+            if (charIndex < 0) charIndex = 0;
+            CursorPosition = charIndex;
+            SelectionStart = charIndex;
+            SelectionEnd = charIndex;
+
+            int effH = LastViewHeight > 0 ? LastViewHeight : 800;
+            int topOffset = (ribbon != null && ribbon.ShowRuler ? 190 : 165);
+
+            bool found = false;
+            for (int i = 0; i < RenderedLines.Count; i++)
+            {
+                var rl = RenderedLines[i];
+                if (charIndex >= rl.StartCharIndex && charIndex <= rl.StartCharIndex + rl.Length)
+                {
+                    int lineAbsoluteY = rl.ScreenY + (int)ScrollY;
+                    int viewCenterY = topOffset + (effH - topOffset - 26) / 2;
+                    int targetScroll = Math.Max(0, lineAbsoluteY - viewCenterY);
+                    ScrollY = targetScroll;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                EnsureCursorVisible(effH, ribbon);
+            }
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ApplyPendingAiCorrections()
+        {
+            if (PendingAiDiffs == null || PendingAiDiffs.Count == 0 || PieceTable == null) return;
+
+            SaveUndoState();
+            PendingAiDiffs.Sort((a, b) => b.CharIndex.CompareTo(a.CharIndex));
+
+            string text = PieceTable.GetText();
+            int lastModifiedPos = 0;
+
+            foreach (var diff in PendingAiDiffs)
+            {
+                if (diff.CharIndex >= 0 && diff.CharIndex + diff.OriginalLength <= text.Length)
+                {
+                    PieceTable.Remove(diff.CharIndex, diff.OriginalLength);
+                    AdjustFormattedRunsOnDelete(diff.CharIndex, diff.OriginalLength);
+
+                    if (!string.IsNullOrEmpty(diff.ReplacementText))
+                    {
+                        PieceTable.Insert(diff.CharIndex, diff.ReplacementText);
+                        AdjustFormattedRunsOnInsert(diff.CharIndex, diff.ReplacementText.Length);
+                    }
+
+                    text = PieceTable.GetText();
+                    lastModifiedPos = diff.CharIndex + (diff.ReplacementText != null ? diff.ReplacementText.Length : 0);
+                }
+            }
+
+            PendingAiDiffs.Clear();
+
+            CursorPosition = Math.Min(text.Length, lastModifiedPos);
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void CancelPendingAiCorrections()
+        {
+            if (PendingAiDiffs != null)
+            {
+                PendingAiDiffs.Clear();
+            }
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void ReplaceSelectedText(string text, bool selectNew = false)
+        {
+            if (text == null) text = "";
+            if (PieceTable == null) return;
+
+            SaveUndoState();
+            int min = Math.Min(SelectionStart, SelectionEnd);
+            int max = Math.Max(SelectionStart, SelectionEnd);
+            int len = max - min;
+
+            if (len > 0)
+            {
+                PieceTable.Remove(min, len);
+                AdjustFormattedRunsOnDelete(min, len);
+            }
+
+            if (text.Length > 0)
+            {
+                PieceTable.Insert(min, text);
+                AdjustFormattedRunsOnInsert(min, text.Length);
+            }
+
+            if (selectNew && text.Length > 0)
+            {
+                SelectionStart = min;
+                SelectionEnd = min + text.Length;
+                CursorPosition = SelectionEnd;
+            }
+            else
+            {
+                CursorPosition = min + text.Length;
+                SelectionStart = CursorPosition;
+                SelectionEnd = CursorPosition;
+            }
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void InsertTextFromAI(string text)
+        {
+            if (string.IsNullOrEmpty(text) || PieceTable == null) return;
+            SaveUndoState();
+            if (SelectionStart != SelectionEnd)
+            {
+                DeleteSelection();
+            }
+            PieceTable.Insert(CursorPosition, text);
+            AdjustFormattedRunsOnInsert(CursorPosition, text.Length);
+            CursorPosition += text.Length;
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
         public void DeleteWordBeforeCursor() {}
         public void InvalidateLayout() {}
 
@@ -14235,6 +14457,39 @@ namespace ZenQOffice.UI
                             }
                         }
 
+                        // IDE Diff: Red background highlight behind deleted text
+                        if (PendingAiDiffs != null && PendingAiDiffs.Count > 0 && isLineVisible)
+                        {
+                            for (int d = 0; d < PendingAiDiffs.Count; d++)
+                            {
+                                var diff = PendingAiDiffs[d];
+                                int dStart = diff.CharIndex;
+                                int dEnd = diff.CharIndex + diff.OriginalLength;
+                                if (line.Length > 0 && dEnd > line.StartIndex && dStart < line.StartIndex + line.Length)
+                                {
+                                    int dsIdx = Math.Max(0, Math.Min(line.Length, dStart - line.StartIndex));
+                                    int deIdx = Math.Max(0, Math.Min(line.Length, dEnd - line.StartIndex));
+                                    if (deIdx > dsIdx)
+                                    {
+                                        float dPreW = dsIdx > 0 ? MeasureSubstringWidth(g, line.Text, line.StartIndex, 0, dsIdx, extraSpaceW) : 0f;
+                                        float dMatchW = MeasureSubstringWidth(g, line.Text, line.StartIndex, dsIdx, deIdx - dsIdx, extraSpaceW);
+                                        float dX = (float)Math.Round(lineStartX + dPreW);
+                                        float dTop = (float)Math.Round(line.LineY);
+                                        float dH = dynamicLineHeight;
+
+                                        using (SolidBrush redBg = new SolidBrush(Color.FromArgb(210, 254, 202, 202))) // Pastel red (#FEE2E2)
+                                        {
+                                            g.FillRectangle(redBg, dX, dTop, dMatchW, dH);
+                                        }
+                                        using (Pen redBorder = new Pen(Color.FromArgb(239, 68, 68), 1f)) // Red border (#EF4444)
+                                        {
+                                            g.DrawRectangle(redBorder, dX, dTop, dMatchW, dH);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Draw line formatted runs
                         float curX = lineStartX;
                         
@@ -14500,6 +14755,109 @@ namespace ZenQOffice.UI
                                         if (tb.Bottom) g.DrawLine(bPen, rx, ry + rh, rx + rw, ry + rh);
                                         if (tb.Left) g.DrawLine(bPen, rx, ry, rx, ry + rh);
                                         if (tb.Right) g.DrawLine(bPen, rx + rw, ry, rx + rw, ry + rh);
+                                    }
+                                }
+                            }
+                        }
+
+                        // IDE Diff: Red Strikethrough line and Green Addition Callout Badge
+                        if (PendingAiDiffs != null && PendingAiDiffs.Count > 0 && isLineVisible)
+                        {
+                            for (int d = 0; d < PendingAiDiffs.Count; d++)
+                            {
+                                var diff = PendingAiDiffs[d];
+                                int dStart = diff.CharIndex;
+                                int dEnd = diff.CharIndex + diff.OriginalLength;
+                                if (line.Length > 0 && dEnd > line.StartIndex && dStart < line.StartIndex + line.Length)
+                                {
+                                    int dsIdx = Math.Max(0, Math.Min(line.Length, dStart - line.StartIndex));
+                                    int deIdx = Math.Max(0, Math.Min(line.Length, dEnd - line.StartIndex));
+                                    if (deIdx > dsIdx)
+                                    {
+                                        float dPreW = dsIdx > 0 ? MeasureSubstringWidth(g, line.Text, line.StartIndex, 0, dsIdx, extraSpaceW) : 0f;
+                                        float dMatchW = MeasureSubstringWidth(g, line.Text, line.StartIndex, dsIdx, deIdx - dsIdx, extraSpaceW);
+                                        float dX = (float)Math.Round(lineStartX + dPreW);
+                                        float dTop = (float)Math.Round(line.LineY);
+                                        float dH = dynamicLineHeight;
+
+                                        // Draw strikethrough line across deleted text
+                                        using (Pen strikePen = new Pen(Color.FromArgb(220, 38, 38), Math.Max(1.5f, 1.6f * ZoomLevel)))
+                                        {
+                                            float strikeY = dTop + dH * 0.55f;
+                                            g.DrawLine(strikePen, dX, strikeY, dX + dMatchW, strikeY);
+                                        }
+
+                                        // If this line contains the end of the diff or is last in paragraph, draw Green Replacement Callout
+                                        if (dEnd <= line.StartIndex + line.Length || line.IsLastInPara)
+                                        {
+                                            float badgeX = dX + dMatchW + 6.0f * ZoomLevel;
+                                            float badgeY = dTop;
+                                            float badgeH = Math.Max(22.0f * ZoomLevel, dH);
+
+                                            string greenText = "+ " + (string.IsNullOrEmpty(diff.ReplacementText) ? "(xoá)" : diff.ReplacementText);
+                                            if (greenText.Length > 40) greenText = greenText.Substring(0, 37) + "...";
+
+                                            using (Font badgeFont = new Font("Segoe UI", Math.Max(8.0f, 9.5f * ZoomLevel), FontStyle.Bold))
+                                            {
+                                                SizeF txtSz = g.MeasureString(greenText, badgeFont);
+                                                float btnW = 58.0f * ZoomLevel;
+                                                float badgeW = txtSz.Width + 14.0f * ZoomLevel + (btnW * 2) + 8.0f * ZoomLevel;
+
+                                                if (badgeX + badgeW > pageX + pageW - rightMarginX)
+                                                {
+                                                    badgeX = (float)Math.Round(lineStartX);
+                                                    badgeY = dTop + dH + 2.0f * ZoomLevel;
+                                                }
+
+                                                RectangleF badgeRect = new RectangleF(badgeX, badgeY, badgeW, badgeH);
+                                                diff.BadgeBounds = badgeRect;
+
+                                                // Soft green pastel background (#DCFCE7)
+                                                using (SolidBrush gBg = new SolidBrush(Color.FromArgb(245, 220, 252, 231)))
+                                                using (Pen gBorder = new Pen(Color.FromArgb(34, 197, 94), 1.2f))
+                                                {
+                                                    g.FillRectangle(gBg, badgeRect);
+                                                    g.DrawRectangle(gBorder, badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height);
+                                                }
+
+                                                // Green text (#15803D)
+                                                using (SolidBrush gTxt = new SolidBrush(Color.FromArgb(21, 128, 61)))
+                                                {
+                                                    float tY = badgeY + (badgeH - txtSz.Height) / 2;
+                                                    g.DrawString(greenText, badgeFont, gTxt, badgeX + 6.0f * ZoomLevel, tY);
+                                                }
+
+                                                // Mini inline Accept button [✓ Đồng ý]
+                                                float btn1X = badgeX + txtSz.Width + 12.0f * ZoomLevel;
+                                                float btnY = badgeY + 2.0f * ZoomLevel;
+                                                float btnH = badgeH - 4.0f * ZoomLevel;
+                                                RectangleF btnAccept = new RectangleF(btn1X, btnY, btnW, btnH);
+                                                diff.AcceptButtonBounds = btnAccept;
+
+                                                using (SolidBrush bAcceptBg = new SolidBrush(Color.FromArgb(22, 163, 74)))
+                                                using (Font btnFont = new Font("Segoe UI", Math.Max(7.5f, 8.2f * ZoomLevel), FontStyle.Bold))
+                                                using (SolidBrush bWhite = new SolidBrush(Color.White))
+                                                {
+                                                    g.FillRectangle(bAcceptBg, btnAccept);
+                                                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                                                    g.DrawString("✓ Đồng ý", btnFont, bWhite, btnAccept, sf);
+                                                }
+
+                                                // Mini inline Reject button [✕ Hủy]
+                                                float btn2X = btn1X + btnW + 4.0f * ZoomLevel;
+                                                RectangleF btnReject = new RectangleF(btn2X, btnY, btnW - 10.0f * ZoomLevel, btnH);
+                                                diff.RejectButtonBounds = btnReject;
+
+                                                using (SolidBrush bRejectBg = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                                                using (Font btnFont = new Font("Segoe UI", Math.Max(7.5f, 8.2f * ZoomLevel), FontStyle.Bold))
+                                                using (SolidBrush bWhite = new SolidBrush(Color.White))
+                                                {
+                                                    g.FillRectangle(bRejectBg, btnReject);
+                                                    StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                                                    g.DrawString("✕ Hủy", btnFont, bWhite, btnReject, sf);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -16900,6 +17258,26 @@ namespace ZenQOffice.UI
             int rightM_m = rightMarginX;
             int topM_m = marginY;
 
+            // Intercept clicks on pending AI diff buttons
+            if (PendingAiDiffs != null && PendingAiDiffs.Count > 0)
+            {
+                PointF mPt = new PointF(mouseX, mouseY);
+                for (int i = 0; i < PendingAiDiffs.Count; i++)
+                {
+                    var diff = PendingAiDiffs[i];
+                    if (!diff.AcceptButtonBounds.IsEmpty && diff.AcceptButtonBounds.Contains(mPt))
+                    {
+                        ApplyPendingAiCorrections();
+                        return;
+                    }
+                    if (!diff.RejectButtonBounds.IsEmpty && diff.RejectButtonBounds.Contains(mPt))
+                    {
+                        CancelPendingAiCorrections();
+                        return;
+                    }
+                }
+            }
+
             // =========================================================================
             // -1b. DRAW TOOL INTERCEPTION (Tab Vẽ: Bút vẽ tay & Tẩy)
             // =========================================================================
@@ -18298,6 +18676,21 @@ namespace ZenQOffice.UI
             }
 
             HoveredMousePoint = new Point(mouseX, mouseY);
+
+            if (PendingAiDiffs != null && PendingAiDiffs.Count > 0)
+            {
+                PointF mPt = new PointF(mouseX, mouseY);
+                for (int i = 0; i < PendingAiDiffs.Count; i++)
+                {
+                    var diff = PendingAiDiffs[i];
+                    if ((!diff.AcceptButtonBounds.IsEmpty && diff.AcceptButtonBounds.Contains(mPt)) ||
+                        (!diff.RejectButtonBounds.IsEmpty && diff.RejectButtonBounds.Contains(mPt)))
+                    {
+                        Cursor.Current = Cursors.Hand;
+                        return;
+                    }
+                }
+            }
 
             // =========================================================================
             // -1b. DRAW TOOL INTERCEPTION (Tab Vẽ: Bút vẽ tay & Tẩy)

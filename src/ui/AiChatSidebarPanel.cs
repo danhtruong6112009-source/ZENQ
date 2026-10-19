@@ -1205,11 +1205,19 @@ namespace ZenQOffice.UI
                 };
                 
                 var detectedCorrs = AiActionEngine.ExtractSpellCorrections(textToInsert);
-                if (detectedCorrs != null && detectedCorrs.Count > 0)
+                if (_appForm != null && _appForm.WriterView != null && _appForm.WriterView.PieceTable != null && detectedCorrs != null && detectedCorrs.Count > 0)
                 {
+                    string docTxt = _appForm.WriterView.PieceTable.GetText();
+                    detectedCorrs = detectedCorrs.FindAll(c => !string.IsNullOrEmpty(c.Original) && docTxt.IndexOf(c.Original, StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+
+                if (detectedCorrs != null && detectedCorrs.Count > 0 && _appForm != null && _appForm.WriterView != null)
+                {
+                    _appForm.WriterView.SetPendingAiCorrections(detectedCorrs);
+
                     AiInsertActionButton btnConfirm = new AiInsertActionButton
                     {
-                        Text = string.Format("Xác nhận sửa {0} lỗi", detectedCorrs.Count),
+                        Text = string.Format("✓ Đồng ý áp dụng ({0})", detectedCorrs.Count),
                         Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74)),
                         ImageAlign = ContentAlignment.MiddleLeft,
                         TextAlign = ContentAlignment.MiddleCenter,
@@ -1219,7 +1227,7 @@ namespace ZenQOffice.UI
                         ForeColor = Color.FromArgb(22, 163, 74),
                         BackColor = Color.FromArgb(240, 253, 244),
                         FlatStyle = FlatStyle.Flat,
-                        Size = new Size(135, 24),
+                        Size = new Size(140, 24),
                         Location = new Point(14, _streamingAiBubble.Height + 4),
                         Cursor = Cursors.Hand,
                     };
@@ -1229,7 +1237,7 @@ namespace ZenQOffice.UI
 
                     AiInsertActionButton btnCancel = new AiInsertActionButton
                     {
-                        Text = "Bỏ qua",
+                        Text = "✕ Từ chối",
                         Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 11, 11, Color.FromArgb(220, 38, 38)),
                         ImageAlign = ContentAlignment.MiddleLeft,
                         TextAlign = ContentAlignment.MiddleCenter,
@@ -1239,8 +1247,8 @@ namespace ZenQOffice.UI
                         ForeColor = Color.FromArgb(220, 38, 38),
                         BackColor = Color.FromArgb(254, 242, 242),
                         FlatStyle = FlatStyle.Flat,
-                        Size = new Size(80, 24),
-                        Location = new Point(155, _streamingAiBubble.Height + 4),
+                        Size = new Size(85, 24),
+                        Location = new Point(160, _streamingAiBubble.Height + 4),
                         Cursor = Cursors.Hand,
                     };
                     btnCancel.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
@@ -1252,7 +1260,7 @@ namespace ZenQOffice.UI
                         if (_appForm != null && _appForm.WriterView != null)
                         {
                             _appForm.WriterView.ApplyPendingAiCorrections();
-                            btnConfirm.Text = "Đã sửa!";
+                            btnConfirm.Text = "Đã áp dụng!";
                             btnConfirm.Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74));
                             btnConfirm.Enabled = false;
                             btnCancel.Visible = false;
@@ -1263,7 +1271,7 @@ namespace ZenQOffice.UI
                         if (_appForm != null && _appForm.WriterView != null)
                         {
                             _appForm.WriterView.CancelPendingAiCorrections();
-                            btnCancel.Text = "Đã bỏ qua";
+                            btnCancel.Text = "Đã hủy";
                             btnCancel.Image = null;
                             btnCancel.Enabled = false;
                             btnConfirm.Visible = false;
@@ -1332,6 +1340,42 @@ namespace ZenQOffice.UI
 
             int userIdx = (targetTab != null && targetTab.AiChatHistory != null) ? (targetTab.AiChatHistory.Count - 1) : 0;
             AddUserBubble(query, userIdx);
+
+            // Xử lý đàm thoại tương tác với đề xuất sửa đổi (Pending AI Diff)
+            if (_appForm != null && _appForm.WriterView != null && _appForm.WriterView.HasPendingAiDiff)
+            {
+                if (IsUserAgreement(query))
+                {
+                    _appForm.WriterView.ApplyPendingAiCorrections();
+                    string acceptReply = "✅ Tôi đã áp dụng các thay đổi đề xuất vào tài liệu của bạn rồi nhé!";
+                    var aiReplyMsg = new AiChatMessage { Role = "model", Content = acceptReply, Timestamp = DateTime.Now };
+                    if (targetTab != null && targetTab.AiChatHistory != null)
+                    {
+                        targetTab.AiChatHistory.Add(aiReplyMsg);
+                        AiChatHistoryManager.SaveCurrentSession(targetSessionId, targetTab.AiChatHistory);
+                    }
+                    AddAiBubble(acceptReply);
+                    return;
+                }
+                else if (IsUserRejection(query))
+                {
+                    _appForm.WriterView.CancelPendingAiCorrections();
+                    string rejectReply = "❌ Tôi đã hủy bỏ đề xuất sửa đổi và giữ nguyên nội dung gốc của tài liệu.";
+                    var aiReplyMsg = new AiChatMessage { Role = "model", Content = rejectReply, Timestamp = DateTime.Now };
+                    if (targetTab != null && targetTab.AiChatHistory != null)
+                    {
+                        targetTab.AiChatHistory.Add(aiReplyMsg);
+                        AiChatHistoryManager.SaveCurrentSession(targetSessionId, targetTab.AiChatHistory);
+                    }
+                    AddAiBubble(rejectReply);
+                    return;
+                }
+                else
+                {
+                    // Người dùng hỏi câu khác: tự động xóa diff cũ để không làm phiền mắt và tiếp tục hỏi câu mới
+                    _appForm.WriterView.CancelPendingAiCorrections();
+                }
+            }
 
             // Kiểm tra lệnh Slash Command (ví dụ: /help, /file, /summary, /page, /translate, /table, /quiz, /explain)
             string slashPrompt;
@@ -1544,6 +1588,52 @@ namespace ZenQOffice.UI
                     }
                 }
             }, targetTab != null ? targetTab.AiChatHistory : null, () => (gen.AbortRequested || _abortAiStream));
+        }
+
+        private bool IsUserAgreement(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return false;
+            q = q.Trim().ToLowerInvariant().Trim('.', '!', '?', ',', ' ');
+
+            string[] exacts = { "đồng ý", "dong y", "ok", "oke", "okay", "ừ", "u", "uh", "ừm", "um", "áp dụng", "ap dung", 
+                                "áp dụng đi", "ap dung di", "sửa đi", "sua di", "sửa luôn", "sua luon", "chấp nhận", "chap nhan",
+                                "thay đổi", "thay doi", "được", "duoc", "được rồi", "duoc roi", "yes", "y", "apply", "accept",
+                                "confirm", "tiến hành", "chấp thuận", "làm đi", "lam di", "lưu", "luu", "chốt", "chot" };
+            foreach (var word in exacts)
+            {
+                if (q == word) return true;
+            }
+
+            if (q.StartsWith("đồng ý") || q.StartsWith("dong y") || q.StartsWith("áp dụng") || q.StartsWith("ap dung") ||
+                q.StartsWith("chấp nhận") || q.StartsWith("ok ") || q.StartsWith("oke ") || q.StartsWith("sửa đi") ||
+                q.Contains("áp dụng giúp") || q.Contains("áp dụng giùm") || q.Contains("sửa giúp") || q.Contains("sửa giùm"))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        private bool IsUserRejection(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return false;
+            q = q.Trim().ToLowerInvariant().Trim('.', '!', '?', ',', ' ');
+
+            string[] exacts = { "từ chối", "tu choi", "thôi", "thoi", "thôi khỏi", "thoi khoi", "hủy", "huy", "hủy bỏ", "huy bo",
+                                "đừng", "dung", "đừng sửa", "dung sua", "không", "khong", "ko", "k", "không cần", "khong can",
+                                "giữ nguyên", "giu nguyen", "bỏ qua", "bo qua", "bỏ", "bo", "cancel", "no", "reject", "dismiss",
+                                "khỏi sửa", "khoi sua", "không sửa", "khong sua", "dừng", "dung lai" };
+            foreach (var word in exacts)
+            {
+                if (q == word) return true;
+            }
+
+            if (q.StartsWith("từ chối") || q.StartsWith("tu choi") || q.StartsWith("không cần") || q.StartsWith("khong can") ||
+                q.StartsWith("đừng sửa") || q.StartsWith("dung sua") || q.StartsWith("thôi") || q.StartsWith("hủy") ||
+                q.Contains("giữ nguyên") || q.Contains("không sửa") || q.Contains("khỏi sửa"))
+            {
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -1886,21 +1976,12 @@ namespace ZenQOffice.UI
                     sb.AppendLine("</selected_text>");
                 }
                 sb.AppendLine();
-                sb.AppendLine("[HƯỚNG DẪN TRỢ LÝ SOẠN THẢO VĂN BẢN & TÌM SỬA LỖI CHÍNH TẢ / VIẾT BÀI CHI TIẾT]:");
-                sb.AppendLine("1. KHI NGƯỜI DÙNG YÊU CẦU TÌM LỖI, SỬA CHÍNH TẢ, SOÁT LỖI, SỬA NGỮ PHÁP (TIẾNG VIỆT, TIẾNG ANH, HOẶC BẤT KỲ TIẾNG NÀO):");
-                sb.AppendLine("   - Nếu có <selected_text> (vùng đang quét khối), CHỈ tìm và sửa lỗi chính tả BÊN TRONG thẻ <selected_text>. TUYỆT ĐỐI BỎ QUA các lỗi ở phần khác của <document_context>.");
-                sb.AppendLine("   - Nếu không có <selected_text>, hãy kiểm tra toàn bộ văn bản trong <document_context>.");
-                sb.AppendLine("   - Liệt kê chi tiết từng từ sai BỊ GIỚI HẠN trong phạm vi quét khối, giải thích và từ sửa đúng theo định dạng chuẩn:");
-                sb.AppendLine("     ❌ `từ_sai` ➔ ✅ `từ_đúng` (Giải thích / Ngữ cảnh)");
-                sb.AppendLine("   - BẮT BUỘC KÈM THEO KHỐI HÀNH ĐỘNG XÁC NHẬN SỬA ĐỂ PHẦN MỀM TỰ ĐỘNG THAY THẾ CHÍNH XÁC:");
-                sb.AppendLine("     [GENOFFICE_ACTION:APPLY_SPELL_CORRECTIONS]");
-                sb.AppendLine("     {");
-                sb.AppendLine("       \"corrections\": [");
-                sb.AppendLine("         { \"original\": \"từ_sai_1\", \"replacement\": \"từ_đúng_1\" },");
-                sb.AppendLine("         { \"original\": \"từ_sai_2\", \"replacement\": \"từ_đúng_2\" }");
-                sb.AppendLine("       ]");
-                sb.AppendLine("     }");
-                sb.AppendLine("     [/GENOFFICE_ACTION]");
+                sb.AppendLine("[HƯỚNG DẪN TRỢ LÝ SOẠN THẢO VĂN BẢN & TÌM SỬA LỖI / VIẾT BÀI]:");
+                sb.AppendLine("1. KHI NGƯỜI DÙNG YÊU CẦU TÌM LỖI, SỬA CHÍNH TẢ, SOÁT LỖI, SỬA CÂU, THAY THẾ HOẶC VIẾT LẠI:");
+                sb.AppendLine("   - BẮT BUỘC TRẢ LỜI NGẮN GỌN trong khung chat: 'Tôi đã tạo đề xuất sửa đổi trực tiếp trên trang (đoạn màu đỏ sẽ xoá, đoạn màu xanh sẽ thêm). Bạn hãy nhấp Đồng ý để áp dụng hoặc Từ chối để giữ nguyên.'");
+                sb.AppendLine("   - TUYỆT ĐỐI KHÔNG lặp lại toàn bộ tài liệu dài dòng trong khung chat.");
+                sb.AppendLine("   - Kèm theo các thẻ hành động thay thế: <replace find=\"từ_hoặc_câu_cần_thay\" replace=\"từ_hoặc_câu_mới\" /> HOẶC khối [GENOFFICE_ACTION:APPLY_SPELL_CORRECTIONS].");
+                sb.AppendLine("   - Nếu có <selected_text> (vùng đang quét khối), CHỈ tìm và sửa lỗi BÊN TRONG thẻ <selected_text>.");
                 sb.AppendLine();
                 sb.AppendLine("2. KHI NGƯỜI DÙNG YÊU CẦU VIẾT VĂN BẢN DÀI, BÀI VĂN / TIỂU LUẬN / PHÂN TÍCH (1000 từ, 2000 từ, viết chi tiết...):");
                 sb.AppendLine("   - Hãy viết thật đầy đủ, chi tiết từng phần (Mở bài, Thân bài gồm nhiều luận điểm và ví dụ phân tích sâu sắc, Kết luận).");

@@ -25,6 +25,28 @@ namespace ZenQOffice.Core
         }
     }
 
+    public class PendingAiDiffItem
+    {
+        public int CharIndex { get; set; }
+        public int OriginalLength { get; set; }
+        public string OriginalText { get; set; }
+        public string ReplacementText { get; set; }
+        public string Context { get; set; }
+        public System.Drawing.RectangleF BadgeBounds { get; set; }
+        public System.Drawing.RectangleF AcceptButtonBounds { get; set; }
+        public System.Drawing.RectangleF RejectButtonBounds { get; set; }
+
+        public PendingAiDiffItem() { }
+        public PendingAiDiffItem(int charIndex, int length, string original, string replacement, string context = "")
+        {
+            CharIndex = charIndex;
+            OriginalLength = length;
+            OriginalText = original ?? "";
+            ReplacementText = replacement ?? "";
+            Context = context ?? "";
+        }
+    }
+
     public class AiActionResult
     {
         public bool HasAction { get; set; }
@@ -501,15 +523,21 @@ namespace ZenQOffice.Core
                 }
 
                 var replaceMatches = Regex.Matches(rawAiResponse, @"<replace\b([^>]*)/?>", RegexOptions.IgnoreCase);
-                foreach (Match m in replaceMatches)
+                if (replaceMatches.Count > 0)
                 {
-                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
-                    if (attrs.ContainsKey("find") && attrs.ContainsKey("replace"))
+                    List<SpellCorrectionItem> corrs = new List<SpellCorrectionItem>();
+                    foreach (Match m in replaceMatches)
                     {
-                        string f = attrs["find"];
-                        string r = attrs["replace"];
-                        int c = writer.ReplaceAll(f, r);
-                        summaries.Add(string.Format("Đã thay thế '{0}' thành '{1}' ({2} lần)", f, r, c));
+                        var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                        if (attrs.ContainsKey("find") && attrs.ContainsKey("replace"))
+                        {
+                            corrs.Add(new SpellCorrectionItem(attrs["find"], attrs["replace"]));
+                        }
+                    }
+                    if (corrs.Count > 0)
+                    {
+                        writer.SetPendingAiCorrections(corrs);
+                        summaries.Add(string.Format("Đã tạo đề xuất sửa {0} vị trí trên trang (đoạn đỏ xoá, đoạn xanh thêm)", corrs.Count));
                         anyExecuted = true;
                     }
                 }
@@ -703,7 +731,26 @@ namespace ZenQOffice.Core
 
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // 1. Try parsing JSON format
+            // 1. Parse XML tags: <replace find="..." replace="..." /> or <diff original="..." replacement="..." />
+            try
+            {
+                var xmlMatches = Regex.Matches(rawText, @"<(?:replace|diff)\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match xm in xmlMatches)
+                {
+                    var attrs = ParseXmlAttributes(xm.Groups[1].Value);
+                    string f = attrs.ContainsKey("find") ? attrs["find"] : (attrs.ContainsKey("original") ? attrs["original"] : "");
+                    string r = attrs.ContainsKey("replace") ? attrs["replace"] : (attrs.ContainsKey("replacement") ? attrs["replacement"] : "");
+                    string ctx = attrs.ContainsKey("context") ? attrs["context"] : "";
+                    if (!string.IsNullOrEmpty(f) && r != null && f != r && !seen.Contains(f))
+                    {
+                        seen.Add(f);
+                        list.Add(new SpellCorrectionItem(f, r, ctx));
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Try parsing JSON format
             int jsonStart = rawText.IndexOf("{");
             int jsonEnd = rawText.LastIndexOf("}");
             if (jsonStart >= 0 && jsonEnd > jsonStart)
@@ -738,14 +785,19 @@ namespace ZenQOffice.Core
                 catch { }
             }
 
-            // 2. Line by line text / markdown arrow parsing (->, =>, ➔, -->, thành)
+            // 3. Line by line text / markdown arrow parsing ONLY when line explicitly marks a correction
             var lines = rawText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
                 string l = line.Trim();
                 if (string.IsNullOrEmpty(l) || l.StartsWith("{") || l.StartsWith("}") || l.StartsWith("[GENOFFICE_ACTION")) continue;
 
-                // Pattern: "❌ từ_sai ➔ ✅ từ_đúng" or "từ_sai -> từ_đúng"
+                // Explicit indicators: "❌ từ_sai ➔ ✅ từ_đúng", "Từ sai: ... -> Sửa: ...", or bullet with arrow
+                bool isCorrectionIndicator = l.StartsWith("❌") || l.StartsWith("Lỗi:") || l.StartsWith("Từ sai:") ||
+                                             l.StartsWith("Sai:") || l.Contains("➔") || l.Contains("-->") ||
+                                             ((l.StartsWith("-") || l.StartsWith("•") || l.StartsWith("*")) && (l.Contains("->") || l.Contains("=>")));
+                if (!isCorrectionIndicator) continue;
+
                 string find = "";
                 string replace = "";
 
@@ -758,17 +810,10 @@ namespace ZenQOffice.Core
                         replace = CleanWordToken(parts[1]);
                     }
                 }
-                else if (l.Contains(" thành ") || l.Contains(" thanh "))
-                {
-                    var parts = l.Split(new[] { " thành ", " thanh " }, StringSplitOptions.None);
-                    if (parts.Length >= 2)
-                    {
-                        find = CleanWordToken(parts[0]);
-                        replace = CleanWordToken(parts[1]);
-                    }
-                }
 
-                if (!string.IsNullOrEmpty(find) && !string.IsNullOrEmpty(replace) && find != replace && !seen.Contains(find))
+                // Strictly validate length: corrections are words or phrases, not entire paragraphs
+                if (!string.IsNullOrEmpty(find) && !string.IsNullOrEmpty(replace) && find != replace &&
+                    find.Length <= 150 && replace.Length <= 150 && !seen.Contains(find))
                 {
                     seen.Add(find);
                     list.Add(new SpellCorrectionItem(find, replace));
