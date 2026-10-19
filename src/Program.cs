@@ -38,6 +38,7 @@ namespace ZenQOffice
                 }
                 try { SetCurrentProcessExplicitAppUserModelID(appId); } catch { }
 
+                try { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); } catch { }
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
