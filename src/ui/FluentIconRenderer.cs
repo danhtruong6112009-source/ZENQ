@@ -520,6 +520,10 @@ namespace ZenQOffice.UI
                 case "read":
                 case "reading":
                 case "book":
+                    return '\uE736'; // Standard Microsoft Fluent Icons Reading Mode (Open Book)
+                case "chat":
+                case "message":
+                case "comment":
                     return '\uE8BD';
                 case "print":
                 case "printlayout":

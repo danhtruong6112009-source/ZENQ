@@ -2272,7 +2272,8 @@ namespace ZenQOffice.UI
                     for (int m = 0; m < 3; m++)
                     {
                         Rectangle mRect = new Rectangle(modeX + m * 24, height - 23, 22, 20);
-                        if (ActiveViewMode == m)
+                        int curVm = (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null) ? WriterView.ViewMode : ActiveViewMode;
+                        if (curVm == m)
                         {
                             using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
                             {

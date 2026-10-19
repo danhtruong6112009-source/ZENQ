@@ -1211,33 +1211,35 @@ namespace ZenQOffice.UI
                         g.SmoothingMode = SmoothingMode.AntiAlias;
                         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-                        // Vector mũi tên hướng Đông Bắc (↗) chuẩn Microsoft Word Selection Gutter
+                        // Vector mũi tên đảo ngược hướng Đông Bắc (↗) chuẩn Microsoft Word Selection Margin
                         PointF[] arrow = new PointF[]
                         {
-                            new PointF(22f, 2f),
-                            new PointF(22f, 15f),
-                            new PointF(18f, 11f),
-                            new PointF(11f, 22f),
-                            new PointF(7f, 19.5f),
-                            new PointF(14f, 8.5f),
-                            new PointF(10f, 4.5f)
+                            new PointF(17f, 1f),
+                            new PointF(17f, 17f),
+                            new PointF(13f, 13f),
+                            new PointF(9.5f, 20.5f),
+                            new PointF(6.5f, 19.5f),
+                            new PointF(10f, 12f),
+                            new PointF(5f, 12f)
                         };
 
-                        using (Pen outline = new Pen(Color.White, 2.5f) { LineJoin = LineJoin.Round })
-                        {
-                            g.DrawPolygon(outline, arrow);
-                        }
-                        using (SolidBrush fill = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                        // Thân màu trắng chuẩn Microsoft Word
+                        using (SolidBrush fill = new SolidBrush(Color.White))
                         {
                             g.FillPolygon(fill, arrow);
+                        }
+                        // Viền đen sắc nét chuẩn Windows cursor
+                        using (Pen outline = new Pen(Color.FromArgb(20, 20, 20), 1.2f) { LineJoin = LineJoin.Miter })
+                        {
+                            g.DrawPolygon(outline, arrow);
                         }
                     }
                     IntPtr hIcon = bmp.GetHicon();
                     ICONINFO info = new ICONINFO();
                     if (GetIconInfo(hIcon, ref info))
                     {
-                        info.xHotspot = 22;
-                        info.yHotspot = 2;
+                        info.xHotspot = 17;
+                        info.yHotspot = 1;
                         info.fIcon = false;
                         IntPtr hCur = CreateIconIndirect(ref info);
                         if (info.hbmColor != IntPtr.Zero) DeleteObject(info.hbmColor);
@@ -12541,9 +12543,12 @@ namespace ZenQOffice.UI
                     {
                         if (pCache.Text == para && pCache.Zoom == ZoomLevel && pCache.MaxW == maxTextW && Math.Abs(pCache.CurrentYOffset - yOffset) < 0.05f)
                         {
-                            float paraScreenTop = startPageY + pCache.CurrentYOffset;
-                            float paraScreenBottom = startPageY + pCache.FinalYOffset;
-                            bool isOffscreen = (paraScreenBottom < -100 || paraScreenTop > height + 100);
+                            float readModeOffset = (ViewMode == 0) ? (ReadModePageIndex * (pageH + 30)) : 0f;
+                            float paraScreenTop = startPageY + pCache.CurrentYOffset - readModeOffset;
+                            float paraScreenBottom = startPageY + pCache.FinalYOffset - readModeOffset;
+                            bool isOffscreen = (ViewMode == 0)
+                                ? (paraScreenBottom < startPageY - 20 || paraScreenTop > startPageY + pageH + 20)
+                                : (paraScreenBottom < -100 || paraScreenTop > height + 100);
                             bool containsCursor = (CursorPosition >= paraStartIndex && CursorPosition <= paraStartIndex + para.Length);
                             bool containsSelection = hasSelection && (selMax >= paraStartIndex && selMin <= paraStartIndex + para.Length);
 
@@ -20015,9 +20020,9 @@ namespace ZenQOffice.UI
             }
 
             bool isInsideAnyPage = false;
+            int pageX_m = 0, pageW_m = 0, pageH_m = 0, marginX_m = 0, rightMarginX_m = 0, marginY_m = 0;
             if (!hoverSet)
             {
-                int pageX_m, pageW_m, pageH_m, marginX_m, rightMarginX_m, marginY_m;
                 GetPageLayoutMetrics(canvasWidth, ribbon, out pageX_m, out pageW_m, out pageH_m, out marginX_m, out rightMarginX_m, out marginY_m);
                 int startPageY;
                 if (ViewMode == 0)
@@ -20040,6 +20045,10 @@ namespace ZenQOffice.UI
                     if (pageRect.Contains(mouseX, mouseY))
                     {
                         isInsideAnyPage = true;
+                        if (mouseX >= pageX_m && mouseX < pageX_m + marginX_m)
+                        {
+                            isOverLeftGutter = true;
+                        }
                     }
                 }
                 else
@@ -20084,7 +20093,9 @@ namespace ZenQOffice.UI
                 if (moveDist >= 3)
                 {
                     _hasDraggedSelection = true;
-                    int index = GetCharIndexFromPoint(mouseX, mouseY, canvasWidth, g, ribbon);
+                    int effPageH = pageH_m > 0 ? pageH_m : (int)(11.69f * 96f * ZoomLevel);
+                    int effMouseY = (ViewMode == 0) ? (mouseY + ReadModePageIndex * (effPageH + 30)) : mouseY;
+                    int index = GetCharIndexFromPoint(mouseX, effMouseY, canvasWidth, g, ribbon);
                     SelectionEnd = index;
                     CursorPosition = index;
                     UpdateRibbonState(ribbon);
