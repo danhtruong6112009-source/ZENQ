@@ -1407,6 +1407,9 @@ namespace ZenQOffice.UI
             int fBarY = 155;
             int fBarH = IsFormulaBarExpanded ? 84 : 30;
 
+            // Pre-fill entire Calc canvas background from formula bar to bottom to eliminate any unpainted D2D alpha=0 pixels
+            g.FillRectangle(Brushes.White, 0, fBarY, width, Math.Max(0, height - fBarY));
+
             // ==================== 1. Formula Bar & Name Box (Y: 155 to 185) ====================
             if (ShowFormulaBar)
             {
@@ -1572,7 +1575,7 @@ namespace ZenQOffice.UI
             int gridW = width - vScrollW;
             int maxGridY = height - bottomBarH;
 
-            // Top-Left Header Intersection (Select All Triangle)
+            // Top-Left Header Intersection (Select All Triangle) & Top-Right Header Corner (above vertical scrollbar)
             if (ShowHeadings)
             {
                 Rectangle tlRect = new Rectangle(0, startY, headerW, headerH);
@@ -1586,6 +1589,11 @@ namespace ZenQOffice.UI
                         new PointF(headerW - 6, startY + headerH - 14)
                     });
                 }
+
+                // Top-Right Header Corner (fills the 16x26px gap directly above vertical scrollbar)
+                Rectangle trRect = new Rectangle(gridW, startY, vScrollW, headerH);
+                g.FillRectangle(_headerBgBrush, trRect);
+                g.DrawRectangle(_headerBorderPen, trRect);
             }
 
             // 2.1 Column Headers (A, B, C, D... Z, AA, AB...)
@@ -1597,14 +1605,18 @@ namespace ZenQOffice.UI
             uint minSelR = Math.Min(SelectedRow, SelEndRow);
             uint maxSelR = Math.Max(SelectedRow, SelEndRow);
 
-            while (curX < gridW)
+            if (ShowHeadings)
             {
-                int cW = GetColWidth(colIdx);
-                Rectangle cRect = new Rectangle(curX, startY, cW, headerH);
-                bool isColSelected = (colIdx >= minSelC && colIdx <= maxSelC);
+                GraphicsState gsColHeaders = g.Save();
+                Rectangle colHeaderClip = new Rectangle(headerW, startY, Math.Max(0, gridW - headerW), headerH);
+                g.SetClip(colHeaderClip);
 
-                if (ShowHeadings)
+                while (curX < gridW)
                 {
+                    int cW = GetColWidth(colIdx);
+                    Rectangle cRect = new Rectangle(curX, startY, cW, headerH);
+                    bool isColSelected = (colIdx >= minSelC && colIdx <= maxSelC);
+
                     if (isColSelected)
                     {
                         g.FillRectangle(_headerSelBgBrush, cRect);
@@ -1623,10 +1635,12 @@ namespace ZenQOffice.UI
 
                     // Split divider line
                     g.DrawLine(_dividerPen, curX + cW - 1, startY + 4, curX + cW - 1, startY + headerH - 4);
+
+                    curX += cW;
+                    colIdx++;
                 }
 
-                curX += cW;
-                colIdx++;
+                g.Restore(gsColHeaders);
             }
 
             // 2.2 Rows & Cells
