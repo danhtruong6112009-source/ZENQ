@@ -190,7 +190,7 @@ namespace ZenQOffice.Core
             if (string.IsNullOrWhiteSpace(rawAiResponse) || appForm == null) return false;
 
             // Kiểm tra sự xuất hiện của các thẻ XML hành động
-            bool hasXmlTag = Regex.IsMatch(rawAiResponse, @"<(zenq_action|action|zenq|highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|write|ghi|clear|xoa|create_slide|tao_slide|slide|insert_text|replace)\b", RegexOptions.IgnoreCase);
+            bool hasXmlTag = Regex.IsMatch(rawAiResponse, @"<(zenq_action|action|zenq|highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|write|ghi|clear|xoa|create_slide|tao_slide|slide|insert_text|replace|goto_page|chuyen_trang)\b", RegexOptions.IgnoreCase);
             if (!hasXmlTag) return false;
 
             List<string> summaries = new List<string>();
@@ -515,6 +515,27 @@ namespace ZenQOffice.Core
                 }
             }
 
+            // 4. Xử lý PDF (Xem tài liệu PDF & Điều hướng trang)
+            if (appForm.PdfView != null && appForm.PdfView.Document != null)
+            {
+                var pdf = appForm.PdfView;
+                var pageMatches = Regex.Matches(rawAiResponse, @"<(?:goto_page|chuyen_trang)\b([^>]*)/?>", RegexOptions.IgnoreCase);
+                foreach (Match m in pageMatches)
+                {
+                    var attrs = ParseXmlAttributes(m.Groups[1].Value);
+                    string pStr = attrs.ContainsKey("page") ? attrs["page"] : (attrs.ContainsKey("trang") ? attrs["trang"] : "");
+                    int targetPage;
+                    if (int.TryParse(pStr, out targetPage) && targetPage >= 1 && pdf.Document.Pages != null && targetPage <= pdf.Document.Pages.Count)
+                    {
+                        pdf.ActivePageIndex = targetPage - 1;
+                        pdf.ScrollToPage(targetPage - 1, appForm.ClientSize.Width, appForm.ClientSize.Height);
+                        appForm.Invalidate();
+                        summaries.Add(string.Format("Đã chuyển đến Trang {0} của tài liệu PDF", targetPage));
+                        anyExecuted = true;
+                    }
+                }
+            }
+
             if (anyExecuted)
             {
                 result.HasAction = true;
@@ -525,7 +546,7 @@ namespace ZenQOffice.Core
                 // Làm sạch thẻ XML khỏi message trả lời để hiển thị cho người dùng
                 string clean = rawAiResponse;
                 clean = Regex.Replace(clean, @"</?(?:zenq_action|action|zenq)\b[^>]*>", "", RegexOptions.IgnoreCase);
-                clean = Regex.Replace(clean, @"<(?:highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|clear|xoa|replace)\b[^>]*\/?>", "", RegexOptions.IgnoreCase);
+                clean = Regex.Replace(clean, @"<(?:highlight|to_mau|format|set|cell|dien_o|create_sheet|add_sheet|tao_sheet|clear|xoa|replace|goto_page|chuyen_trang)\b[^>]*\/?>", "", RegexOptions.IgnoreCase);
                 clean = Regex.Replace(clean, @"<(?:write|ghi|create_slide|tao_slide|slide|insert_text)\b[^>]*>[\s\S]*?<\/(?:write|ghi|create_slide|tao_slide|slide|insert_text)>", "", RegexOptions.IgnoreCase);
                 result.CleanUserMessage = clean.Trim();
                 if (string.IsNullOrEmpty(result.CleanUserMessage))

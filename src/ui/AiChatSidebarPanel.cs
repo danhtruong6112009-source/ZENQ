@@ -43,6 +43,7 @@ namespace ZenQOffice.UI
         private Panel pnlInputContainer;
         private Panel pnlInputPill;
         private TextBox txtInput;
+        private AiSlashCommandPopup _slashPopup;
 
         // Thinking animation
         private Control _thinkingBubble;
@@ -52,7 +53,7 @@ namespace ZenQOffice.UI
         private bool _isSendPressed = false;
 
         private bool _isBinding = false;
-        private string _placeholderText = "Hỏi AI hoặc nhập yêu cầu... (Enter)";
+        private string _placeholderText = "Hỏi AI hoặc gõ / để ra lệnh... (Enter)";
         private bool _isPlaceholderActive = true;
 
                 private static readonly string[] _greetings = new string[]
@@ -337,8 +338,75 @@ namespace ZenQOffice.UI
                 }
                 pnlInputPill.Invalidate();
             };
+            _slashPopup = new AiSlashCommandPopup();
+            _slashPopup.CommandSelected += HandleSlashCommandSelected;
+
+            txtInput.TextChanged += (s, e) =>
+            {
+                if (_isPlaceholderActive) return;
+                string curText = txtInput.Text ?? "";
+                if (curText.StartsWith("/"))
+                {
+                    int spaceIdx = curText.IndexOf(' ');
+                    string prefix = spaceIdx > 0 ? curText.Substring(0, spaceIdx) : curText;
+                    var matchingCmds = AiSlashCommandEngine.FilterCommands(prefix);
+                    if (matchingCmds.Count > 0)
+                    {
+                        _slashPopup.UpdateList(matchingCmds);
+                        if (this.Visible && this.IsHandleCreated)
+                        {
+                            Point screenPt = pnlInputPill.PointToScreen(new Point(0, -_slashPopup.Height - 4));
+                            if (!_slashPopup.Visible)
+                            {
+                                _slashPopup.Show(screenPt);
+                            }
+                            else
+                            {
+                                _slashPopup.Location = screenPt;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (_slashPopup.Visible) _slashPopup.Close();
+                    }
+                }
+                else
+                {
+                    if (_slashPopup.Visible) _slashPopup.Close();
+                }
+            };
+
             txtInput.KeyDown += (s, e) =>
             {
+                if (_slashPopup != null && _slashPopup.Visible)
+                {
+                    if (e.KeyCode == Keys.Down)
+                    {
+                        _slashPopup.SelectNext();
+                        e.SuppressKeyPress = true;
+                        return;
+                    }
+                    if (e.KeyCode == Keys.Up)
+                    {
+                        _slashPopup.SelectPrevious();
+                        e.SuppressKeyPress = true;
+                        return;
+                    }
+                    if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Tab)
+                    {
+                        _slashPopup.ConfirmSelection();
+                        e.SuppressKeyPress = true;
+                        return;
+                    }
+                    if (e.KeyCode == Keys.Escape)
+                    {
+                        _slashPopup.Close();
+                        e.SuppressKeyPress = true;
+                        return;
+                    }
+                }
+
                 if (e.KeyCode == Keys.Escape)
                 {
                     if (this.ParentForm != null)
@@ -361,6 +429,55 @@ namespace ZenQOffice.UI
 
             this.ResumeLayout(false);
             PerformCustomLayout();
+        }
+
+        private void HandleSlashCommandSelected(AiSlashCommand cmd)
+        {
+            if (cmd == null) return;
+
+            if (cmd.IsFilePicker)
+            {
+                using (var ofd = new OpenFileDialog())
+                {
+                    ofd.Title = "Chọn một hoặc nhiều tệp để AI đọc và phân tích";
+                    ofd.Multiselect = true;
+                    ofd.Filter = "Tất cả tệp văn phòng (*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv)|*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv|Tệp Word (*.docx)|*.docx|Tệp PDF (*.pdf)|*.pdf|Bảng tính Excel (*.xlsx;*.csv)|*.xlsx;*.csv|Bài trình chiếu PowerPoint (*.pptx)|*.pptx|Tất cả tệp (*.*)|*.*";
+                    if (ofd.ShowDialog(this.FindForm()) == DialogResult.OK && ofd.FileNames != null && ofd.FileNames.Length > 0)
+                    {
+                        var quotedList = new List<string>();
+                        foreach (var fn in ofd.FileNames) quotedList.Add("\"" + fn + "\"");
+                        txtInput.Text = "/file " + string.Join(" ", quotedList.ToArray()) + " ";
+                        _isPlaceholderActive = false;
+                        txtInput.ForeColor = Color.FromArgb(15, 23, 42);
+                        txtInput.SelectionStart = txtInput.Text.Length;
+                        txtInput.Focus();
+                        return;
+                    }
+                }
+
+                txtInput.Text = "/file ";
+            }
+            else if (cmd.Name == "/translate")
+            {
+                txtInput.Text = "/translate Tiếng Việt ";
+            }
+            else if (cmd.Name == "/quiz")
+            {
+                txtInput.Text = "/quiz 5 câu trắc nghiệm ";
+            }
+            else if (cmd.Name == "/help")
+            {
+                txtInput.Text = "/help";
+            }
+            else
+            {
+                txtInput.Text = cmd.Name + " ";
+            }
+
+            _isPlaceholderActive = false;
+            txtInput.ForeColor = Color.FromArgb(15, 23, 42);
+            txtInput.SelectionStart = txtInput.Text.Length;
+            txtInput.Focus();
         }
 
         /// <summary>
@@ -997,6 +1114,8 @@ namespace ZenQOffice.UI
                     displayText = "✦ Đang xử lý và ghi dữ liệu bảng tính...";
                 else if (curMode == OfficeAppMode.Writer)
                     displayText = "✦ Đang soạn thảo văn bản...";
+                else if (curMode == OfficeAppMode.Pdf)
+                    displayText = "✦ Đang phân tích tài liệu PDF...";
                 else
                     displayText = "✦ Đang thiết kế slide cho bạn...";
             }
@@ -1032,8 +1151,8 @@ namespace ZenQOffice.UI
                 string textToInsert = _streamingAiLabel.Text;
                 
                 OfficeAppMode curMode = _appForm != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
-                string actionBtnText = (curMode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((curMode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản"));
-                char glyph = (curMode == OfficeAppMode.Slides) ? '\uE714' : ((curMode == OfficeAppMode.Calc) ? '\uE80A' : '\uE70F');
+                string actionBtnText = (curMode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((curMode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((curMode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản")));
+                char glyph = (curMode == OfficeAppMode.Slides) ? '\uE714' : ((curMode == OfficeAppMode.Calc) ? '\uE80A' : ((curMode == OfficeAppMode.Pdf) ? '\uE8C8' : '\uE70F'));
 
                 AiInsertActionButton btnAction = new AiInsertActionButton
                 {
@@ -1074,6 +1193,11 @@ namespace ZenQOffice.UI
                                 _appForm.WriterView.InsertTextFromAI(textSnapshot);
                             }
                             _appForm.Invalidate();
+                        }
+                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Pdf && _appForm.PdfView != null)
+                        {
+                            Clipboard.SetText(textSnapshot);
+                            MessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     } catch (Exception ex) {
                         MessageBox.Show(ex.ToString(), "ZENQ AI - Lỗi Chèn Text");
@@ -1209,6 +1333,24 @@ namespace ZenQOffice.UI
             int userIdx = (targetTab != null && targetTab.AiChatHistory != null) ? (targetTab.AiChatHistory.Count - 1) : 0;
             AddUserBubble(query, userIdx);
 
+            // Kiểm tra lệnh Slash Command (ví dụ: /help, /file, /summary, /page, /translate, /table, /quiz, /explain)
+            string slashPrompt;
+            string instantLocalReply;
+            bool isSlash = AiSlashCommandEngine.ProcessSlashCommand(query, _appForm, targetTab, out slashPrompt, out instantLocalReply);
+
+            if (isSlash && !string.IsNullOrEmpty(instantLocalReply))
+            {
+                AddAiBubble(instantLocalReply);
+                var localModelMsg = new AiChatMessage { Role = "model", Content = instantLocalReply, Timestamp = DateTime.Now };
+                if (targetTab != null)
+                {
+                    targetTab.AiChatHistory.Add(localModelMsg);
+                    AiChatHistoryManager.SaveHistory(targetTab.AiChatHistory);
+                    AiChatHistoryManager.SaveCurrentSession(targetSessionId, targetTab.AiChatHistory);
+                }
+                return;
+            }
+
             if (_currentProfile == null)
             {
                 string noConfigMsg = "⚠️ Chưa có cấu hình AI nào. Vui lòng vào Cài đặt để thiết lập API Key hoặc Ollama trước khi sử dụng.";
@@ -1228,10 +1370,10 @@ namespace ZenQOffice.UI
                 _currentProfile.SelectedModel = _currentProfile.SavedModels[0];
             }
 
-            // Hiá»‡n animation "Ä ang suy nghÄ©..."
+            // Hiện animation "Đang suy nghĩ..."
             ShowThinkingBubble();
 
-            string promptToSend = BuildPromptWithDocumentContext(query);
+            string promptToSend = BuildPromptWithDocumentContext(isSlash ? slashPrompt : query);
 
             ActiveAiGeneration gen = new ActiveAiGeneration
             {
@@ -1505,9 +1647,15 @@ namespace ZenQOffice.UI
                         {
                             _appForm.WriterView.ReplaceSelectedText(insertText, true);
                         }
-                        else
+                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Pdf && _appForm.PdfView != null)
                         {
-                            _appForm.WriterView.InsertTextFromAI(insertText);
+                            Clipboard.SetText(insertText);
+                            MessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Calc && _appForm.CalcView != null)
+                        {
+                            Clipboard.SetText(insertText);
+                            MessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         _appForm.Invalidate();
                     }
@@ -1943,6 +2091,89 @@ namespace ZenQOffice.UI
                 sb.AppendLine("   - Đọc trực tiếp các con số trong bảng tính ở trên, tính toán và trả lời ngay lập tức.");
                 sb.AppendLine("   - TUYỆT ĐỐI KHÔNG HỎI LẠI! Dữ liệu đã có đủ 100%.");
             }
+            else if (mode == OfficeAppMode.Pdf && _appForm != null && _appForm.PdfView != null && _appForm.PdfView.Document != null)
+            {
+                var pdfView = _appForm.PdfView;
+                var pdfDoc = pdfView.Document;
+                int totalPages = (pdfDoc.Pages != null) ? pdfDoc.Pages.Count : 0;
+                int activePage = Math.Max(0, Math.Min(pdfView.ActivePageIndex, Math.Max(0, totalPages - 1)));
+                string docTitle = !string.IsNullOrEmpty(pdfDoc.Title) ? pdfDoc.Title : (!string.IsNullOrEmpty(pdfDoc.FilePath) ? Path.GetFileName(pdfDoc.FilePath) : "Tài liệu PDF");
+                string selText = (pdfView.SelectedText != null && !string.IsNullOrEmpty(pdfView.SelectedText.Text)) ? pdfView.SelectedText.Text : "";
+
+                sb.AppendLine("<pdf_context>");
+                sb.AppendLine(string.Format("Tài liệu PDF: {0}", docTitle));
+                sb.AppendLine(string.Format("Tổng số trang: {0}, Trang đang xem: {1}", totalPages, activePage + 1));
+
+                if (!string.IsNullOrWhiteSpace(selText))
+                {
+                    sb.AppendLine("<selected_text>");
+                    sb.AppendLine(selText);
+                    sb.AppendLine("</selected_text>");
+                }
+
+                // Outline / Bookmarks (Table of Contents)
+                if (pdfDoc.Bookmarks != null && pdfDoc.Bookmarks.Count > 0)
+                {
+                    sb.AppendLine("<table_of_contents>");
+                    foreach (var bm in pdfDoc.Bookmarks)
+                    {
+                        sb.AppendLine(string.Format("- {0} (Trang {1})", bm.Title, bm.TargetPageIndex + 1));
+                    }
+                    sb.AppendLine("</table_of_contents>");
+                }
+
+                // Trang hiện tại
+                string curPageText = PdfConverterEngine.ExtractPageText(pdfDoc, activePage);
+                if (string.IsNullOrWhiteSpace(curPageText))
+                {
+                    try { pdfView.AutoDetectTextForPage(activePage); curPageText = PdfConverterEngine.ExtractPageText(pdfDoc, activePage); } catch { }
+                }
+                sb.AppendLine(string.Format("<current_page number=\"{0}\">", activePage + 1));
+                sb.AppendLine(!string.IsNullOrWhiteSpace(curPageText) ? curPageText : "[Trang này chủ yếu là hình ảnh/biểu đồ scan, không chứa văn bản ký tự]");
+                sb.AppendLine("</current_page>");
+
+                // Ngữ cảnh tài liệu tổng quát nếu yêu cầu tóm tắt hoặc tài liệu ngắn
+                string qLower = (userQuery ?? "").ToLowerInvariant();
+                bool isGeneralSummaryQuery = string.IsNullOrWhiteSpace(selText) && 
+                    (qLower.Contains("tóm tắt") || 
+                     qLower.Contains("tổng quan") || 
+                     qLower.Contains("toàn bộ") ||
+                     qLower.Contains("/summary") ||
+                     qLower.Contains("nội dung tài liệu"));
+
+                if (isGeneralSummaryQuery || totalPages <= 5)
+                {
+                    var docSb = new StringBuilder();
+                    int charBudget = 25000;
+                    for (int p = 0; p < totalPages && docSb.Length < charBudget; p++)
+                    {
+                        if (p == activePage) continue;
+                        string pTxt = PdfConverterEngine.ExtractPageText(pdfDoc, p);
+                        if (!string.IsNullOrWhiteSpace(pTxt))
+                        {
+                            docSb.AppendLine(string.Format("--- [Trang {0}] ---", p + 1));
+                            docSb.AppendLine(pTxt.Length > 2000 ? pTxt.Substring(0, 2000) + "..." : pTxt);
+                            docSb.AppendLine();
+                        }
+                    }
+                    if (docSb.Length > 0)
+                    {
+                        sb.AppendLine("<document_pages_context>");
+                        sb.AppendLine(docSb.ToString());
+                        sb.AppendLine("</document_pages_context>");
+                    }
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("[HƯỚNG DẪN TRỢ LÝ ĐỌC & PHÂN TÍCH TÀI LIỆU PDF CHUYÊN NGHIỆP]:");
+                sb.AppendLine("1. BẠN CÓ TOÀN BỘ NGỮ CẢNH CỦA TÀI LIỆU PDF TRÊN.");
+                sb.AppendLine("   - Khi người dùng hỏi hoặc yêu cầu 'Tóm tắt nội dung tài liệu này': hãy dựa vào mục lục, nội dung các trang đã trích xuất ở trên để tóm tắt chi tiết, nêu rõ chủ đề, các phần chính và các luận điểm quan trọng.");
+                sb.AppendLine("   - TUYỆT ĐỐI KHÔNG TRẢ LỜI RẰNG 'Tôi chưa nhận được nội dung' vì dữ liệu đã được trích xuất đầy đủ trong ngữ cảnh <pdf_context>.");
+                sb.AppendLine("2. HÀNH ĐỘNG ĐIỀU HƯỚNG TRANG PDF:");
+                sb.AppendLine("   - Khi dẫn chứng thông tin ở trang cụ thể, bạn có thể xuất thẻ XML để phần mềm tự động cuộn đến trang đó:");
+                sb.AppendLine("     <goto_page page=\"X\" /> (Ví dụ: <goto_page page=\"3\" />)");
+                sb.AppendLine("</pdf_context>");
+            }
 
             // 0. Multi-Turn Context Memory: Nhớ các tin nhắn trước của phiên chat tab hiện tại (ít nhất 1 tin nhắn trước)
             if (_currentTab != null && _currentTab.AiChatHistory != null && _currentTab.AiChatHistory.Count > 0)
@@ -2057,6 +2288,13 @@ namespace ZenQOffice.UI
                 _chips.Add("Đổi màu nền gradient sang trọng");
                 _chips.Add("Viết dàn ý và nội dung thuyết trình");
                 _chips.Add("Thêm các thẻ phân tích số liệu");
+            }
+            else if (mode == OfficeAppMode.Pdf)
+            {
+                _chips.Add("Tóm tắt nội dung tài liệu PDF này");
+                _chips.Add("Tóm tắt trang hiện tại đang xem");
+                _chips.Add("Trích xuất các luận điểm và từ khóa chính");
+                _chips.Add("Dịch nội dung trang này sang tiếng Anh");
             }
             else
             {
@@ -2217,6 +2455,16 @@ namespace ZenQOffice.UI
                     case 1: glyph = "/color"; break;      // \uE790 Palette
                     case 2: glyph = "/bulb"; break;       // \uEA80 Idea
                     default: glyph = "/chart"; break;     // \uE9D2 Analytics
+                }
+            }
+            else if (_mode == OfficeAppMode.Pdf)
+            {
+                switch (chipIndex)
+                {
+                    case 0: glyph = "/doc"; break;        // Document summary
+                    case 1: glyph = "/page"; break;       // Current page
+                    case 2: glyph = "/list"; break;       // Key points
+                    default: glyph = "/globe"; break;     // Translate
                 }
             }
             else // Writer / General
@@ -2733,7 +2981,7 @@ namespace ZenQOffice.UI
             _bubbleW = Math.Max(46, Math.Min(maxBubbleW, txtSize.Width + padX * 2));
             _bubbleH = Math.Max(32, txtSize.Height + padY * 2);
 
-            _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản"));
+            _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((mode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản")));
             _actionBtnRect = new Rectangle(8, _bubbleH + 6, 140, 22);
             _copyBtnRect = new Rectangle(8 + 140 + 6, _bubbleH + 6, 80, 22);
 
@@ -2773,12 +3021,14 @@ namespace ZenQOffice.UI
             if (_isActionHover)
             {
                 using (GraphicsPath abp = RoundRect(_actionBtnRect, 6f))
-                using (SolidBrush abb = new SolidBrush(Color.FromArgb(241, 245, 249)))
                 {
-                    g.FillPath(abb, abp);
+                    using (SolidBrush abb = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    {
+                        g.FillPath(abb, abp);
+                    }
                 }
             }
-            char actGlyph = (_mode == OfficeAppMode.Slides) ? '\uE714' : ((_mode == OfficeAppMode.Calc) ? '\uE80A' : '\uE70F');
+            char actGlyph = (_mode == OfficeAppMode.Slides) ? '\uE714' : ((_mode == OfficeAppMode.Calc) ? '\uE80A' : ((_mode == OfficeAppMode.Pdf) ? '\uE8C8' : '\uE70F'));
             FluentIconRenderer.DrawGlyph(g, actGlyph, new RectangleF(_actionBtnRect.X + 4, _actionBtnRect.Y + 4, 14, 14), _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), 11f);
             using (Font abf = new Font("Segoe UI", 8.2f))
             {
