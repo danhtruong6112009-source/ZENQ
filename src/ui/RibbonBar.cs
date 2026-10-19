@@ -4765,22 +4765,13 @@ namespace ZenQOffice.UI
                 curX += 10;
 
                 // 8. Nhóm Ký hiệu (Symbols)
-                DrawVectorBtn(g, curX, 68, 100, 26, (g1, x1, y1) => {
-                    using (Pen p = new Pen(slate, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-                    using (Font xF = new Font("Segoe UI", 7.5f, FontStyle.Italic))
-                    using (SolidBrush xB = new SolidBrush(slate))
+                DrawSplitVectorBtn(g, curX, 68, 100, 26, (g1, x1, y1) => {
+                    using (Font piF = new Font("Segoe UI", 11.0f, FontStyle.Bold))
+                    using (SolidBrush piB = new SolidBrush(Color.FromArgb(0, 95, 184)))
                     {
-                        PointF[] rad = new PointF[] {
-                            new PointF(x1, y1 + 6),
-                            new PointF(x1 + 2.5f, y1 + 6),
-                            new PointF(x1 + 4.5f, y1 + 13),
-                            new PointF(x1 + 7.5f, y1 + 2),
-                            new PointF(x1 + 14, y1 + 2)
-                        };
-                        g1.DrawLines(p, rad);
-                        g1.DrawString("x", xF, xB, x1 + 7.5f, y1 + 1.5f);
+                        g1.DrawString("π", piF, piB, x1, y1 - 2);
                     }
-                }, "Công thức ▾");
+                }, "Công thức", 24);
 
                 DrawVectorBtn(g, curX, 98, 100, 26, (g1, x1, y1) => {
                     using (Font omF = new Font("Segoe UI", 11.0f, FontStyle.Regular))
@@ -4791,6 +4782,48 @@ namespace ZenQOffice.UI
                 }, "Ký hiệu ▾");
                 curX += 106;
                 g.DrawString("Ký hiệu", labelFont, Brushes.Gray, curX - 75, 137);
+            }
+        }
+
+        private void DrawSplitVectorBtn(Graphics g, int x, int y, int w, int h, Action<Graphics, int, int> drawIcon, string title, int arrowW = 24)
+        {
+            int mainW = w - arrowW;
+            Rectangle mainBox = new Rectangle(x, y, mainW, h);
+            Rectangle arrowBox = new Rectangle(x + mainW, y, arrowW, h);
+
+            bool isMainHover = IsHovering(mainBox);
+            bool isArrowHover = IsHovering(arrowBox);
+
+            DrawInteractiveButton(g, mainBox, false, 2);
+            DrawInteractiveButton(g, arrowBox, false, 2);
+
+            using (Pen sepPen = new Pen(isMainHover || isArrowHover ? Color.FromArgb(170, 175, 185) : Color.FromArgb(215, 218, 224), 1.0f))
+            {
+                g.DrawLine(sepPen, x + mainW, y + 3, x + mainW, y + h - 4);
+            }
+
+            SmoothingMode prevSmooth = g.SmoothingMode;
+            PixelOffsetMode prevOffset = g.PixelOffsetMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            drawIcon(g, x + 5, y + (h - 14) / 2);
+            g.SmoothingMode = prevSmooth;
+            g.PixelOffsetMode = prevOffset;
+
+            if (!string.IsNullOrEmpty(title))
+            {
+                using (Font txtFont = new Font("Segoe UI", 7.8f, FontStyle.Regular))
+                using (SolidBrush tb = new SolidBrush(isMainHover ? Color.FromArgb(16, 110, 190) : Color.FromArgb(50, 49, 48)))
+                {
+                    g.DrawString(title, txtFont, tb, x + 24, y + (h - 14) / 2 - 1);
+                }
+            }
+
+            using (Font arrowFont = new Font("Segoe UI", 7.2f, FontStyle.Regular))
+            using (SolidBrush ab = new SolidBrush(isArrowHover ? Color.FromArgb(16, 110, 190) : Color.FromArgb(80, 80, 80)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.DrawString("▾", arrowFont, ab, arrowBox, sf);
             }
         }
 
@@ -4812,6 +4845,46 @@ namespace ZenQOffice.UI
                 {
                     g.DrawString(title, txtFont, tb, x + 24, y + (h - 14) / 2 - 1);
                 }
+            }
+        }
+
+        private void DrawSplitToolBtnLarge(Graphics g, int x, int y, int w, int h, Action<Graphics, int, int> drawIcon, string title, int arrowW = 16)
+        {
+            int mainW = w - arrowW;
+            Rectangle mainBox = new Rectangle(x, y, mainW, h);
+            Rectangle arrowBox = new Rectangle(x + mainW, y, arrowW, h);
+
+            bool isMainHover = IsHovering(mainBox);
+            bool isArrowHover = IsHovering(arrowBox);
+
+            DrawInteractiveButton(g, mainBox, false, 3);
+            DrawInteractiveButton(g, arrowBox, false, 3);
+
+            using (Pen sepPen = new Pen(isMainHover || isArrowHover ? Color.FromArgb(170, 175, 185) : Color.FromArgb(215, 218, 224), 1.0f))
+            {
+                g.DrawLine(sepPen, x + mainW, y + 6, x + mainW, y + h - 8);
+            }
+
+            SmoothingMode prevSmooth = g.SmoothingMode;
+            PixelOffsetMode prevOffset = g.PixelOffsetMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            drawIcon(g, x + (mainW - 20) / 2, y + 8);
+            g.SmoothingMode = prevSmooth;
+            g.PixelOffsetMode = prevOffset;
+
+            using (Font txtFont = new Font("Segoe UI", 7.8f, FontStyle.Regular))
+            using (SolidBrush tb = new SolidBrush(isMainHover ? Color.FromArgb(16, 110, 190) : Color.FromArgb(50, 49, 48)))
+            using (StringFormat sf = new StringFormat() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.DrawString(title, txtFont, tb, new RectangleF(x, y + 36, mainW, h - 38), sf);
+            }
+
+            using (Font arrowFont = new Font("Segoe UI", 7.2f, FontStyle.Regular))
+            using (SolidBrush ab = new SolidBrush(isArrowHover ? Color.FromArgb(16, 110, 190) : Color.FromArgb(80, 80, 80)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.DrawString("▾", arrowFont, ab, arrowBox, sf);
             }
         }
 
@@ -8396,9 +8469,13 @@ namespace ZenQOffice.UI
                 int curX = 14;
 
                 // 1. Nhóm Công cụ (Tools)
-                DrawVectorToolBtnLarge(g, curX, 68, 64, 60, (g1, x1, y1) => {
-                    using (Font piF = new Font("Segoe UI", 13.0f, FontStyle.Bold)) g1.DrawString("π", piF, Brushes.DarkBlue, x1 + 2, y1);
-                }, "Công thức ▾");
+                DrawSplitToolBtnLarge(g, curX, 68, 64, 60, (g1, x1, y1) => {
+                    using (Font piF = new Font("Segoe UI", 13.0f, FontStyle.Bold))
+                    using (SolidBrush piB = new SolidBrush(Color.FromArgb(0, 95, 184)))
+                    {
+                        g1.DrawString("π", piF, piB, x1 + 2, y1);
+                    }
+                }, "Công thức", 16);
                 curX += 68;
 
                 DrawVectorToolBtnLarge(g, curX, 68, 60, 60, (g1, x1, y1) => {
@@ -15298,10 +15375,9 @@ namespace ZenQOffice.UI
 
                 // ==================== Group 7: Ký hiệu (Symbols) ====================
                 int g7Start = curX;
-                Rectangle eqBox = new Rectangle(curX, 68, 58, 56);
-                DrawInteractiveButton(g, eqBox, false, 4);
-                DrawPptEquationVector(g, curX, 70, 58, 24);
-                g.DrawString("Công thức ▾", smallFont, darkBrush, new RectangleF(eqBox.X - 2, 96, eqBox.Width + 4, 26), sfCenter);
+                DrawSplitToolBtnLarge(g, curX, 68, 58, 56, (g1, x1, y1) => {
+                    DrawPptEquationVector(g1, x1, y1, 38, 24);
+                }, "Công thức", 20);
                 curX += 62;
 
                 Rectangle symBox = new Rectangle(curX, 68, 54, 56);
@@ -19777,16 +19853,29 @@ namespace ZenQOffice.UI
                         // 8. Nhóm Ký hiệu (Vẽ tại curX = 1130, rộng 100 -> 1130..1230)
                         if (x >= 1130 && x <= 1230)
                         {
-                            if (y >= 68 && y <= 98) // Phương trình Equation
+                            if (y >= 68 && y <= 98) // Phương trình Equation (Split Button)
                             {
-                                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1130, 132)) : new Point(1130, 132);
-                                QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(pt);
-                                eqDlg.OnEquationSelected = (latex) =>
+                                if (x < 1206) // Nhấp vào nút (KHÔNG nhấp vào mũi tên) -> Thêm luôn công thức!
                                 {
-                                    writerView.InsertText(" [" + latex + "] ");
+                                    writerView.InsertEquation();
                                     if (parentForm != null) parentForm.Invalidate();
-                                };
-                                eqDlg.Show();
+                                }
+                                else // Nhấp vào mũi tên (x >= 1206) -> Hiện thanh chọn công thức
+                                {
+                                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(1130, 132)) : new Point(1130, 132);
+                                    QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(pt);
+                                    eqDlg.OnEquationSelected = (latex) =>
+                                    {
+                                        writerView.InsertEquation(latex);
+                                        if (parentForm != null) parentForm.Invalidate();
+                                    };
+                                    eqDlg.OnInsertNewEquationClicked = () =>
+                                    {
+                                        writerView.InsertEquation();
+                                        if (parentForm != null) parentForm.Invalidate();
+                                    };
+                                    eqDlg.Show();
+                                }
                             }
                             else if (y >= 98 && y <= 128) // Symbol
                             {
@@ -21148,21 +21237,29 @@ namespace ZenQOffice.UI
                     else if (writerView != null && writerView.IsEditingEquation)
                     {
                         // 1. Nhóm Công cụ (X: 14..140)
-                        if (x >= 14 && x <= 78) // Công thức ▾
+                        if (x >= 14 && x <= 78) // Công thức ▾ (Split Button)
                         {
-                            Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(14, 132)) : new Point(14, 132);
-                            QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
-                            eqDlg.OnEquationSelected = (formula) =>
-                            {
-                                writerView.InsertEquation(formula);
-                                if (parentForm != null) parentForm.Invalidate();
-                            };
-                            eqDlg.OnInsertNewEquationClicked = () =>
+                            if (x < 62) // Nhấp vào nút (KHÔNG nhấp vào mũi tên) -> Thêm luôn công thức!
                             {
                                 writerView.InsertEquation();
                                 if (parentForm != null) parentForm.Invalidate();
-                            };
-                            eqDlg.Show();
+                            }
+                            else // Nhấp vào mũi tên (x >= 62) -> Hiện thanh chọn công thức
+                            {
+                                Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(14, 132)) : new Point(14, 132);
+                                QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
+                                eqDlg.OnEquationSelected = (formula) =>
+                                {
+                                    writerView.InsertEquation(formula);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                };
+                                eqDlg.OnInsertNewEquationClicked = () =>
+                                {
+                                    writerView.InsertEquation();
+                                    if (parentForm != null) parentForm.Invalidate();
+                                };
+                                eqDlg.Show();
+                            }
                             return true;
                         }
                         else if (x >= 80 && x <= 142) // Viết công thức tay / Nhập Equation
@@ -25695,31 +25792,29 @@ namespace ZenQOffice.UI
                     return true;
                 }
                 // ==================== Group 7: Ký hiệu (Symbols) ====================
-                else if (x >= 860 && x <= 918 && y >= 68 && y <= 124) // Công thức ▾
+                else if (x >= 860 && x <= 918 && y >= 68 && y <= 124) // Công thức ▾ (Split Button)
                 {
-                    Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(860, 130)) : new Point(860, 130);
-                    QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
-                    eqDlg.OnEquationSelected = (formula) =>
+                    if (x < 898) // Nhấp vào nút (KHÔNG nhấp vào mũi tên) -> Thêm luôn công thức!
                     {
-                        slidesView.InsertEquation(formula);
+                        slidesView.InsertEquation("A = πr²");
                         if (parentForm != null) parentForm.Invalidate();
-                    };
-                    eqDlg.OnInsertNewEquationClicked = () =>
+                    }
+                    else // Nhấp vào mũi tên (x >= 898) -> Hiện thanh chọn công thức
                     {
-                        using (EquationGalleryForm eqGal = new EquationGalleryForm())
+                        Point eqPt = parentForm != null ? parentForm.PointToScreen(new Point(860, 130)) : new Point(860, 130);
+                        QuickEquationDropDownForm eqDlg = new QuickEquationDropDownForm(eqPt);
+                        eqDlg.OnEquationSelected = (formula) =>
                         {
-                            if (eqGal.ShowDialog(parentForm) == DialogResult.OK)
-                            {
-                                slidesView.InsertEquation(eqGal.SelectedEquationText);
-                            }
-                            else
-                            {
-                                slidesView.InsertEquation("A = πr²");
-                            }
-                        }
-                        if (parentForm != null) parentForm.Invalidate();
-                    };
-                    eqDlg.Show();
+                            slidesView.InsertEquation(formula);
+                            if (parentForm != null) parentForm.Invalidate();
+                        };
+                        eqDlg.OnInsertNewEquationClicked = () =>
+                        {
+                            slidesView.InsertEquation("A = πr²");
+                            if (parentForm != null) parentForm.Invalidate();
+                        };
+                        eqDlg.Show();
+                    }
                     return true;
                 }
                 else if (x >= 922 && x <= 976 && y >= 68 && y <= 124) // Ký hiệu ▾

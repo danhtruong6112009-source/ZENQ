@@ -249,10 +249,29 @@ namespace ZenQOffice.UI
         private static readonly Color BorderColor = Color.FromArgb(30, 64, 175);    // #1E40AF
         private static readonly Color WhiteColor = Color.White;
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Bitmap> _transitionBmpCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, Bitmap>(StringComparer.Ordinal);
+
         public static void DrawIcon(D2DGraphics g, Rectangle r, TransitionType type, bool isSelected)
         {
-            if (g == null) return;
-            g.DrawGdi(nativeG => DrawIcon(nativeG, r, type, isSelected));
+            if (g == null || r.Width <= 0 || r.Height <= 0) return;
+            string key = $"{type}_{r.Width}_{r.Height}_{isSelected}";
+            Bitmap bmp = _transitionBmpCache.GetOrAdd(key, _ =>
+            {
+                Bitmap b = new Bitmap(r.Width, r.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                using (Graphics gImg = Graphics.FromImage(b))
+                {
+                    gImg.Clear(Color.Transparent);
+                    gImg.SmoothingMode = SmoothingMode.HighQuality;
+                    gImg.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    DrawIcon(gImg, new Rectangle(0, 0, r.Width, r.Height), type, isSelected);
+                }
+                return b;
+            });
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, r);
+            }
         }
 
         public static void DrawIcon(Graphics g, Rectangle r, TransitionType type, bool isSelected)

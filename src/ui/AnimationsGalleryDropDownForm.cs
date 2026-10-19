@@ -338,10 +338,30 @@ namespace ZenQOffice.UI
             curY += 160;
         }
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Bitmap> _animationBmpCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, Bitmap>(StringComparer.Ordinal);
+
         public static void DrawAnimationVector(D2DGraphics g, float cx, float cy, AnimationType type, string category)
         {
             if (g == null) return;
-            g.DrawGdi(nativeG => DrawAnimationVector(nativeG, cx, cy, type, category));
+            int sz = 32;
+            string key = $"{type}_{category}_{sz}";
+            Bitmap bmp = _animationBmpCache.GetOrAdd(key, _ =>
+            {
+                Bitmap b = new Bitmap(sz, sz, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                using (Graphics gImg = Graphics.FromImage(b))
+                {
+                    gImg.Clear(Color.Transparent);
+                    gImg.SmoothingMode = SmoothingMode.HighQuality;
+                    gImg.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    DrawAnimationVector(gImg, sz / 2f, sz / 2f, type, category);
+                }
+                return b;
+            });
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, cx - sz / 2f, cy - sz / 2f, sz, sz);
+            }
         }
 
         public static void DrawAnimationVector(Graphics g, float cx, float cy, AnimationType type, string category)

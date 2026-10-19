@@ -363,6 +363,7 @@ namespace ZenQOffice.Setup
         private ModernRoundedButton _btnBrowse;
         private ModernRoundedCheckBox _chkDesktopShortcut;
         private ModernRoundedCheckBox _chkStartMenuShortcut;
+        private ModernRoundedCheckBox _chkCleanInstall;
         private ModernRoundedButton _btnStep2Back;
         private ModernRoundedButton _btnStep2Install;
 
@@ -566,6 +567,15 @@ namespace ZenQOffice.Setup
             };
             Controls.Add(_chkStartMenuShortcut);
 
+            _chkCleanInstall = new ModernRoundedCheckBox
+            {
+                Text = "Cài đặt mới hoàn toàn (Xóa sạch dữ liệu cũ và cấu hình trước đó)",
+                Location = new Point(48, 374),
+                Size = new Size(464, 24),
+                Checked = false
+            };
+            Controls.Add(_chkCleanInstall);
+
             _btnStep2Back = new ModernRoundedButton
             {
                 Text = "← Quay lại",
@@ -617,6 +627,7 @@ namespace ZenQOffice.Setup
             _btnBrowse.Visible = isStep2;
             _chkDesktopShortcut.Visible = isStep2;
             _chkStartMenuShortcut.Visible = isStep2;
+            _chkCleanInstall.Visible = isStep2;
             _btnStep2Back.Visible = isStep2;
             _btnStep2Install.Visible = isStep2;
 
@@ -632,6 +643,7 @@ namespace ZenQOffice.Setup
 
             bool createDesktop = _chkDesktopShortcut.Checked;
             bool createStartMenu = _chkStartMenuShortcut.Checked;
+            bool cleanInstall = _chkCleanInstall != null && _chkCleanInstall.Checked;
 
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -650,6 +662,13 @@ namespace ZenQOffice.Setup
                         }
                     }
                     catch { }
+
+                    if (cleanInstall)
+                    {
+                        SetStatus("Đang dọn dẹp dữ liệu và cấu hình phiên bản cũ...", 0.10f);
+                        ShortcutHelper.RemoveUserData();
+                        Thread.Sleep(300);
+                    }
 
                     if (!Directory.Exists(chosenPath)) Directory.CreateDirectory(chosenPath);
 

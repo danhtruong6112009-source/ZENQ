@@ -4,7 +4,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
+using System.IO;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace ZenQOffice.UI
 {
@@ -18,6 +20,15 @@ namespace ZenQOffice.UI
     /// </summary>
     public static class FluentIconRenderer
     {
+        private static readonly PrivateFontCollection _pfc = new PrivateFontCollection();
+        private static FontFamily _customFontFamily = null;
+        private static bool _fontInitialized = false;
+        private static readonly object _fontInitLock = new object();
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll", EntryPoint = "AddFontResourceExW")]
+        private static extern int AddFontResourceEx([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string lpszFilename, uint fl, IntPtr pdv);
+        private const uint FR_PRIVATE = 0x10;
+
         public static readonly string FontFamilyName = DetectBestIconFontFamily();
 
         private static readonly ConcurrentDictionary<float, Font> _fontCache =
@@ -28,10 +39,97 @@ namespace ZenQOffice.UI
 
         private static readonly object _glyphRasterSync = new object();
 
+        public static void EnsureFontLoaded()
+        {
+            if (_fontInitialized) return;
+            lock (_fontInitLock)
+            {
+                if (_fontInitialized) return;
+                try
+                {
+                    string targetFontFile = null;
+
+                    string[] candidatePaths = new string[]
+                    {
+                        System.IO.Path.Combine(Application.StartupPath, "fonts", "SegoeIcons.ttf"),
+                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts", "SegoeIcons.ttf"),
+                        System.IO.Path.Combine(Directory.GetCurrentDirectory(), "fonts", "SegoeIcons.ttf"),
+                        @"fonts\SegoeIcons.ttf",
+                        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZenQOffice", "fonts", "SegoeIcons.ttf"),
+                        @"C:\Windows\Fonts\SegoeIcons.ttf"
+                    };
+
+                    foreach (var p in candidatePaths)
+                    {
+                        if (System.IO.File.Exists(p))
+                        {
+                            targetFontFile = p;
+                            break;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(targetFontFile))
+                    {
+                        try
+                        {
+                            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                            using (var st = asm.GetManifestResourceStream("SegoeIcons.ttf") ?? asm.GetManifestResourceStream("fonts.SegoeIcons.ttf"))
+                            {
+                                if (st != null)
+                                {
+                                    string dir = System.IO.Path.Combine(Application.StartupPath, "fonts");
+                                    if (!Directory.Exists(dir))
+                                    {
+                                        try { Directory.CreateDirectory(dir); } catch { dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ZenQOffice_Fonts"); Directory.CreateDirectory(dir); }
+                                    }
+                                    string extractPath = System.IO.Path.Combine(dir, "SegoeIcons.ttf");
+                                    using (var fs = new FileStream(extractPath, FileMode.Create, FileAccess.Write))
+                                    {
+                                        st.CopyTo(fs);
+                                    }
+                                    targetFontFile = extractPath;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (!string.IsNullOrEmpty(targetFontFile) && System.IO.File.Exists(targetFontFile))
+                    {
+                        try { AddFontResourceEx(targetFontFile, FR_PRIVATE, IntPtr.Zero); } catch { }
+                        try
+                        {
+                            _pfc.AddFontFile(targetFontFile);
+                            if (_pfc.Families.Length > 0)
+                            {
+                                _customFontFamily = _pfc.Families.FirstOrDefault(f => string.Equals(f.Name, "Segoe Fluent Icons", StringComparison.OrdinalIgnoreCase)) ?? _pfc.Families[0];
+                            }
+                        }
+                        catch { }
+
+                        try
+                        {
+                            D2DGraphics.RegisterCustomFontFile(targetFontFile, "Segoe Fluent Icons");
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+                finally
+                {
+                    _fontInitialized = true;
+                }
+            }
+        }
+
         private static string DetectBestIconFontFamily()
         {
             try
             {
+                EnsureFontLoaded();
+                if (_customFontFamily != null)
+                    return _customFontFamily.Name;
+
                 using (var ifc = new InstalledFontCollection())
                 {
                     var names = ifc.Families.Select(f => f.Name).ToArray();
@@ -50,8 +148,15 @@ namespace ZenQOffice.UI
         public static Font GetFont(float size)
         {
             if (size <= 0) size = 14f;
+            EnsureFontLoaded();
             return _fontCache.GetOrAdd(size, s =>
-                new Font(FontFamilyName, s, FontStyle.Regular, GraphicsUnit.Pixel));
+            {
+                if (_customFontFamily != null)
+                {
+                    try { return new Font(_customFontFamily, s, FontStyle.Regular, GraphicsUnit.Pixel); } catch { }
+                }
+                return new Font(FontFamilyName, s, FontStyle.Regular, GraphicsUnit.Pixel);
+            });
         }
 
         /// <summary>

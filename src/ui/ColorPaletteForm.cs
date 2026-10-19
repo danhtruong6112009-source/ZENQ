@@ -479,23 +479,24 @@ namespace ZenQOffice.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-            // Outer 1px clean border
-            using (Pen borderPen = new Pen(Color.FromArgb(195, 202, 212), 1.0f))
+            using (D2DGraphics g = new D2DGraphics(e.Graphics, this.Width, this.Height))
             {
-                g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
-            }
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            if (Mode == ColorPaletteMode.Highlight)
-            {
-                PaintHighlightMode(g);
-                return;
-            }
+                // Outer 1px clean border
+                using (Pen borderPen = new Pen(Color.FromArgb(195, 202, 212), 1.0f))
+                {
+                    g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
+                }
 
-            int curY = 6;
+                if (Mode == ColorPaletteMode.Highlight)
+                {
+                    PaintHighlightMode(g);
+                    return;
+                }
+
+                int curY = 6;
 
             // ==================== 1. TOP ACTION BUTTON (AUTOMATIC / NO COLOR) ====================
             Rectangle topBtnRect = new Rectangle(6, curY, Width - 12, 26);
@@ -718,9 +719,10 @@ namespace ZenQOffice.UI
             {
                 g.DrawString("Eyedropper", itemFont, tb, 42, curY + 4);
             }
+            }
         }
 
-        private void PaintHighlightMode(Graphics g)
+        private void PaintHighlightMode(D2DGraphics g)
         {
             int startX = 14;
             int startY = 10;
@@ -795,7 +797,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawArtistPaletteIcon(Graphics g, int x, int y)
+        private void DrawArtistPaletteIcon(D2DGraphics g, int x, int y)
         {
             GraphicsPath path = new GraphicsPath();
             path.AddBezier(x + 2, y + 6, x + 3, y + 1, x + 13, y + 1, x + 15, y + 6);
@@ -832,7 +834,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawGradientIcon(Graphics g, int x, int y)
+        private void DrawGradientIcon(D2DGraphics g, int x, int y)
         {
             Rectangle rect = new Rectangle(x, y + 1, 16, 16);
             using (LinearGradientBrush lgb = new LinearGradientBrush(rect, Color.White, Color.FromArgb(140, 150, 165), 45f))
@@ -846,7 +848,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawEyedropperIcon(Graphics g, int x, int y)
+        private void DrawEyedropperIcon(D2DGraphics g, int x, int y)
         {
             GraphicsState gs = g.Save();
             g.TranslateTransform(x + 8, y + 8);

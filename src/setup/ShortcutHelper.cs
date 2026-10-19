@@ -209,7 +209,7 @@ namespace ZenQOffice.Setup
                         string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
 
                         key.SetValue("DisplayName", "ZENQ OFFICE");
-                        key.SetValue("DisplayVersion", "5.5");
+                        key.SetValue("DisplayVersion", "5.7");
                         key.SetValue("Publisher", "NEXTGENEDUSPACE STUDIO");
                         key.SetValue("DisplayIcon", File.Exists(icoPath) ? icoPath : exePath);
                         key.SetValue("InstallLocation", installDir);
@@ -230,13 +230,130 @@ namespace ZenQOffice.Setup
         {
             try
             {
-                string keyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
-                using (RegistryKey parent = Registry.CurrentUser.OpenSubKey(keyPath, true))
+                // 1. Xóa mục gỡ cài đặt trong Windows Uninstall (Programs and Features / Apps)
+                string[] uninstallKeys = new string[] {
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+                    @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+                };
+                foreach (string uk in uninstallKeys)
                 {
-                    if (parent != null)
+                    try
                     {
-                        parent.DeleteSubKeyTree("ZenQOffice", false);
-                        parent.DeleteSubKeyTree("ZenQOffice", false);
+                        using (RegistryKey parent = Registry.CurrentUser.OpenSubKey(uk, true))
+                        {
+                            if (parent != null)
+                            {
+                                parent.DeleteSubKeyTree("ZenQOffice", false);
+                                parent.DeleteSubKeyTree("GenOffice", false);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 2. Xóa khỏi RegisteredApplications
+                try
+                {
+                    using (RegistryKey reg = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true))
+                    {
+                        if (reg != null)
+                        {
+                            reg.DeleteValue("ZenQOffice", false);
+                            reg.DeleteValue("GenOffice", false);
+                        }
+                    }
+                }
+                catch { }
+
+                // 3. Xóa các nhánh cấu hình HKCU\Software\ZenQOffice và HKCU\Software\GenOffice
+                try
+                {
+                    using (RegistryKey sw = Registry.CurrentUser.OpenSubKey(@"Software", true))
+                    {
+                        if (sw != null)
+                        {
+                            sw.DeleteSubKeyTree("ZenQOffice", false);
+                            sw.DeleteSubKeyTree("GenOffice", false);
+                        }
+                    }
+                }
+                catch { }
+
+                // 4. Gỡ bỏ File Associations (ProgIds & OpenWithProgids)
+                string[] progIds = new string[] {
+                    "ZenQOffice.Docx", "ZenQOffice.Doc", "ZenQOffice.Rtf", "ZenQOffice.Txt",
+                    "ZenQOffice.Xlsx", "ZenQOffice.Xls", "ZenQOffice.Csv",
+                    "ZenQOffice.Pptx", "ZenQOffice.Ppt", "ZenQOffice.Pdf",
+                    "ZenQOffice.Zdoc", "ZenQOffice.Zsheet", "ZenQOffice.Zslide",
+                    "GenOffice.Docx", "GenOffice.Doc", "GenOffice.Xlsx", "GenOffice.Pptx", "GenOffice.Pdf"
+                };
+
+                using (RegistryKey classes = Registry.CurrentUser.OpenSubKey(@"Software\Classes", true))
+                {
+                    if (classes != null)
+                    {
+                        foreach (string progId in progIds)
+                        {
+                            try { classes.DeleteSubKeyTree(progId, false); } catch { }
+                        }
+
+                        string[] customExts = new string[] { ".zdoc", ".zsheet", ".zslide" };
+                        foreach (string ext in customExts)
+                        {
+                            try { classes.DeleteSubKeyTree(ext, false); } catch { }
+                        }
+
+                        string[] stdExts = new string[] { ".docx", ".doc", ".rtf", ".txt", ".xlsx", ".xls", ".csv", ".pptx", ".ppt", ".pdf" };
+                        foreach (string ext in stdExts)
+                        {
+                            try
+                            {
+                                using (RegistryKey ek = classes.OpenSubKey(ext + @"\OpenWithProgids", true))
+                                {
+                                    if (ek != null)
+                                    {
+                                        foreach (string progId in progIds)
+                                        {
+                                            ek.DeleteValue(progId, false);
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static void RemoveUserData()
+        {
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+                string[] dirsToPurge = new string[]
+                {
+                    Path.Combine(appData, "GenOffice"),
+                    Path.Combine(appData, "ZenQOffice"),
+                    Path.Combine(localAppData, "GenOfficeDesktop"),
+                    Path.Combine(localAppData, "ZenQOffice")
+                };
+
+                foreach (string dir in dirsToPurge)
+                {
+                    try
+                    {
+                        if (Directory.Exists(dir))
+                        {
+                            Directory.Delete(dir, true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Could not delete dir " + dir + ": " + ex.Message);
                     }
                 }
             }

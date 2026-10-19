@@ -41,6 +41,7 @@ namespace ZenQOffice
                 try { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); } catch { }
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                try { FluentIconRenderer.EnsureFontLoaded(); } catch { }
 
                 if (args != null && args.Length > 0 && args[0].Equals("--verify-pptx", StringComparison.OrdinalIgnoreCase))
                 {

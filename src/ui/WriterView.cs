@@ -2983,7 +2983,33 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-            FormattedRuns = newRuns;
+            newRuns.Sort((a, b) => a.StartIndex.CompareTo(b.StartIndex));
+            List<FormattedRun> mergedDelRuns = new List<FormattedRun>();
+            foreach (var r in newRuns)
+            {
+                if (r.Length <= 0) continue;
+                if (mergedDelRuns.Count > 0)
+                {
+                    var lastRun = mergedDelRuns[mergedDelRuns.Count - 1];
+                    if (lastRun.StartIndex + lastRun.Length == r.StartIndex &&
+                        string.Equals(lastRun.FontName, r.FontName, StringComparison.OrdinalIgnoreCase) &&
+                        Math.Abs(lastRun.FontSize - r.FontSize) < 0.05f &&
+                        lastRun.Bold == r.Bold &&
+                        lastRun.Italic == r.Italic &&
+                        lastRun.Underline == r.Underline &&
+                        lastRun.Strike == r.Strike &&
+                        lastRun.Color.ToArgb() == r.Color.ToArgb() &&
+                        lastRun.Highlight.ToArgb() == r.Highlight.ToArgb() &&
+                        lastRun.Subscript == r.Subscript &&
+                        lastRun.Superscript == r.Superscript)
+                    {
+                        lastRun.Length += r.Length;
+                        continue;
+                    }
+                }
+                mergedDelRuns.Add(r);
+            }
+            FormattedRuns = mergedDelRuns;
 
             if (ParagraphAlignments != null && ParagraphAlignments.Count > 0)
             {
@@ -3282,7 +3308,34 @@ namespace ZenQOffice.UI
                 newRuns.Add(new FormattedRun(insStart, insLen, targetFont, targetSize, targetBold, targetItalic, targetUnderline, targetStrike, targetColor, targetHL, targetSub, targetSup));
             }
 
-            FormattedRuns = newRuns;
+            newRuns.Sort((a, b) => a.StartIndex.CompareTo(b.StartIndex));
+            List<FormattedRun> mergedInsRuns = new List<FormattedRun>();
+            foreach (var r in newRuns)
+            {
+                if (r.Length <= 0) continue;
+                if (mergedInsRuns.Count > 0)
+                {
+                    var lastRun = mergedInsRuns[mergedInsRuns.Count - 1];
+                    if (lastRun.StartIndex + lastRun.Length == r.StartIndex &&
+                        string.Equals(lastRun.FontName, r.FontName, StringComparison.OrdinalIgnoreCase) &&
+                        Math.Abs(lastRun.FontSize - r.FontSize) < 0.05f &&
+                        lastRun.Bold == r.Bold &&
+                        lastRun.Italic == r.Italic &&
+                        lastRun.Underline == r.Underline &&
+                        lastRun.Strike == r.Strike &&
+                        lastRun.Color.ToArgb() == r.Color.ToArgb() &&
+                        lastRun.Highlight.ToArgb() == r.Highlight.ToArgb() &&
+                        lastRun.Subscript == r.Subscript &&
+                        lastRun.Superscript == r.Superscript)
+                    {
+                        lastRun.Length += r.Length;
+                        continue;
+                    }
+                }
+                mergedInsRuns.Add(r);
+            }
+
+            FormattedRuns = mergedInsRuns;
             _lastFoundRun = null;
             _lastFoundRunIndex = -1;
         }
@@ -4436,7 +4489,9 @@ namespace ZenQOffice.UI
                     if (oldTag != newTag)
                     {
                         PieceTable.Remove(idx, oldTag.Length);
+                        AdjustFormattedRunsOnDelete(idx, oldTag.Length);
                         PieceTable.Insert(idx, newTag);
+                        AdjustFormattedRunsOnInsert(idx, newTag.Length);
                     }
                 }
             }
@@ -4985,7 +5040,9 @@ namespace ZenQOffice.UI
                             if (idx >= 0)
                             {
                                 PieceTable.Remove(idx, dupPair.Length);
+                                AdjustFormattedRunsOnDelete(idx, dupPair.Length);
                                 PieceTable.Insert(idx, newVal);
+                                AdjustFormattedRunsOnInsert(idx, newVal.Length);
                                 InvalidateLayoutAndTextCache();
                                 if (InvalidateCallback != null) InvalidateCallback();
                             }
@@ -5016,7 +5073,9 @@ namespace ZenQOffice.UI
                             if (idx >= 0)
                             {
                                 PieceTable.Remove(idx, cleanW.Length);
+                                AdjustFormattedRunsOnDelete(idx, cleanW.Length);
                                 PieceTable.Insert(idx, newVal);
+                                AdjustFormattedRunsOnInsert(idx, newVal.Length);
                                 InvalidateLayoutAndTextCache();
                                 if (InvalidateCallback != null) InvalidateCallback();
                             }
@@ -5049,7 +5108,9 @@ namespace ZenQOffice.UI
                                 if (idx >= 0)
                                 {
                                     PieceTable.Remove(idx, wordToFix.Length);
+                                    AdjustFormattedRunsOnDelete(idx, wordToFix.Length);
                                     PieceTable.Insert(idx, newVal);
+                                    AdjustFormattedRunsOnInsert(idx, newVal.Length);
                                     InvalidateLayoutAndTextCache();
                                     if (InvalidateCallback != null) InvalidateCallback();
                                 }
@@ -5729,16 +5790,39 @@ namespace ZenQOffice.UI
                 return;
             }
             SaveUndoState();
-            InsertText(sym);
+            DeleteSelection();
+            int insertPos = CursorPosition;
+            PieceTable.Insert(insertPos, sym);
+            ShiftRevisionsOnInsert(insertPos, sym.Length);
+
+            FormattedRun symRun;
+            if (IsEditingEquation)
+            {
+                symRun = new FormattedRun(insertPos, sym.Length, "Cambria Math", Math.Max(12.0f, TypingFontSize * 1.1f), false, true, false, false, Color.Navy, Color.Transparent);
+            }
+            else
+            {
+                symRun = new FormattedRun(insertPos, sym.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight);
+            }
+            AdjustFormattedRunsOnInsert(insertPos, sym.Length, symRun);
+
+            CursorPosition += sym.Length;
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
         }
 
         public void InsertEquation(string formula = "")
         {
             SaveUndoState();
+            DeleteSelection();
             string eqStr = string.IsNullOrEmpty(formula) ? " [ Nhập công thức vào đây ] " : " " + formula + " ";
             int insertPos = CursorPosition;
             PieceTable.Insert(insertPos, eqStr);
-            FormattedRuns.Add(new FormattedRun(insertPos, eqStr.Length, "Cambria Math", Math.Max(12.0f, TypingFontSize * 1.1f), false, true, false, false, Color.Navy, Color.FromArgb(235, 243, 255)));
+            ShiftRevisionsOnInsert(insertPos, eqStr.Length);
+
+            FormattedRun eqRun = new FormattedRun(insertPos, eqStr.Length, "Cambria Math", Math.Max(12.0f, TypingFontSize * 1.1f), false, true, false, false, Color.Navy, Color.FromArgb(235, 243, 255));
+            AdjustFormattedRunsOnInsert(insertPos, eqStr.Length, eqRun);
+
             CursorPosition += eqStr.Length;
             SelectionStart = insertPos;
             SelectionEnd = CursorPosition;
@@ -5771,12 +5855,16 @@ namespace ZenQOffice.UI
             {
                 var rev = RecordChange(RevisionType.Insertion, insertPos, text.Length, text);
                 ShiftRevisionsOnInsert(insertPos, text.Length, rev);
-                FormattedRuns.Add(new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, true, false, rev.Color, TypingHighlight));
+                FormattedRun revRun = new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, true, false, rev.Color, TypingHighlight);
+                AdjustFormattedRunsOnInsert(insertPos, text.Length, revRun);
             }
             else
             {
                 ShiftRevisionsOnInsert(insertPos, text.Length);
-                FormattedRuns.Add(new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight));
+                FormattedRun insRun = IsEditingEquation
+                    ? new FormattedRun(insertPos, text.Length, "Cambria Math", Math.Max(12.0f, TypingFontSize * 1.1f), false, true, false, false, Color.Navy, Color.Transparent)
+                    : new FormattedRun(insertPos, text.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight);
+                AdjustFormattedRunsOnInsert(insertPos, text.Length, insRun);
             }
             CursorPosition += text.Length;
             SelectionStart = CursorPosition;
@@ -5790,7 +5878,9 @@ namespace ZenQOffice.UI
             int insertPos = CursorPosition;
             string linkText = string.IsNullOrEmpty(text) ? url : text;
             PieceTable.Insert(insertPos, linkText);
-            FormattedRuns.Add(new FormattedRun(insertPos, linkText.Length, TypingFont, TypingFontSize, false, false, true, false, Color.FromArgb(0, 102, 204), Color.Transparent));
+            ShiftRevisionsOnInsert(insertPos, linkText.Length);
+            FormattedRun linkRun = new FormattedRun(insertPos, linkText.Length, TypingFont, TypingFontSize, false, false, true, false, Color.FromArgb(0, 102, 204), Color.Transparent);
+            AdjustFormattedRunsOnInsert(insertPos, linkText.Length, linkRun);
             CursorPosition += linkText.Length;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -8107,6 +8197,11 @@ namespace ZenQOffice.UI
 
                 PieceTable.Remove(targetStart, targetLen);
                 PieceTable.Insert(targetStart, res);
+                if (res.Length != targetLen)
+                {
+                    AdjustFormattedRunsOnDelete(targetStart, targetLen);
+                    AdjustFormattedRunsOnInsert(targetStart, res.Length);
+                }
                 SelectionStart = targetStart;
                 SelectionEnd = targetStart + res.Length;
                 CursorPosition = SelectionEnd;
@@ -8162,6 +8257,11 @@ namespace ZenQOffice.UI
 
                 PieceTable.Remove(targetStart, targetLen);
                 PieceTable.Insert(targetStart, res);
+                if (res.Length != targetLen)
+                {
+                    AdjustFormattedRunsOnDelete(targetStart, targetLen);
+                    AdjustFormattedRunsOnInsert(targetStart, res.Length);
+                }
                 SelectionStart = targetStart;
                 SelectionEnd = targetStart + res.Length;
                 CursorPosition = SelectionEnd;
@@ -8620,6 +8720,11 @@ namespace ZenQOffice.UI
                 string upper = target.ToUpper();
                 PieceTable.Remove(min, len);
                 PieceTable.Insert(min, upper);
+                if (upper.Length != len)
+                {
+                    AdjustFormattedRunsOnDelete(min, len);
+                    AdjustFormattedRunsOnInsert(min, upper.Length);
+                }
                 SelectionStart = min;
                 SelectionEnd = min + upper.Length;
                 CursorPosition = SelectionEnd;
@@ -8702,7 +8807,9 @@ namespace ZenQOffice.UI
             DeleteSelection();
             int curPos = CursorPosition;
             PieceTable.Insert(curPos, "\n");
-            FormattedRuns.Add(new FormattedRun(curPos, 1, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight, TypingSubscript, TypingSuperscript));
+            ShiftRevisionsOnInsert(curPos, 1);
+            FormattedRun brRun = new FormattedRun(curPos, 1, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight, TypingSubscript, TypingSuperscript);
+            AdjustFormattedRunsOnInsert(curPos, 1, brRun);
             CursorPosition++;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -8885,7 +8992,9 @@ namespace ZenQOffice.UI
                     if (selectedStr.Equals(query, StringComparison.OrdinalIgnoreCase))
                     {
                         PieceTable.Remove(min, len);
+                        AdjustFormattedRunsOnDelete(min, len);
                         PieceTable.Insert(min, replacement);
+                        AdjustFormattedRunsOnInsert(min, replacement.Length);
                         SelectionStart = min;
                         SelectionEnd = min + replacement.Length;
                         CursorPosition = SelectionEnd;
@@ -8905,7 +9014,9 @@ namespace ZenQOffice.UI
             {
                 int idx = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
                 PieceTable.Remove(idx, query.Length);
+                AdjustFormattedRunsOnDelete(idx, query.Length);
                 PieceTable.Insert(idx, replacement);
+                AdjustFormattedRunsOnInsert(idx, replacement.Length);
                 count++;
                 text = PieceTable.GetText();
             }
@@ -19863,6 +19974,7 @@ namespace ZenQOffice.UI
                             {
                                 SaveUndoState();
                                 PieceTable.Remove(oldIdx, fullTag.Length);
+                                AdjustFormattedRunsOnDelete(oldIdx, fullTag.Length);
                                 
                                 string currentText = PieceTable.GetText();
                                 string insertTag = fullTag;
@@ -19870,6 +19982,7 @@ namespace ZenQOffice.UI
                                 // In-Line shapes are true characters now, no need to inject newlines!
 
                                 PieceTable.Insert(newPos, insertTag);
+                                AdjustFormattedRunsOnInsert(newPos, insertTag.Length);
                                 // Optional: Update cursor position to new shape location
                                 CursorPosition = newPos + insertTag.Length;
                                 SelectionStart = CursorPosition;
@@ -21748,9 +21861,11 @@ namespace ZenQOffice.UI
             }
             else
             {
-                PieceTable.Insert(CursorPosition, url);
-                ApplyFormatToRange(CursorPosition, url.Length, null, -1, null, null, true, null, Color.FromArgb(16, 110, 190), null);
-                AdjustFormattedRunsOnInsert(CursorPosition, url.Length);
+                int insertPos = CursorPosition;
+                PieceTable.Insert(insertPos, url);
+                ShiftRevisionsOnInsert(insertPos, url.Length);
+                FormattedRun linkRun = new FormattedRun(insertPos, url.Length, TypingFont, TypingFontSize, TypingBold, TypingItalic, true, TypingStrike, Color.FromArgb(16, 110, 190), TypingHighlight, TypingSubscript, TypingSuperscript);
+                AdjustFormattedRunsOnInsert(insertPos, url.Length, linkRun);
                 CursorPosition += url.Length;
                 SelectionStart = CursorPosition;
                 SelectionEnd = CursorPosition;
@@ -22693,7 +22808,9 @@ namespace ZenQOffice.UI
             DeleteSelection();
             curPos = CursorPosition;
             PieceTable.Insert(curPos, "\t");
-            FormattedRuns.Add(new FormattedRun(curPos, 1, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight, TypingSubscript, TypingSuperscript));
+            ShiftRevisionsOnInsert(curPos, 1);
+            FormattedRun tabRun = new FormattedRun(curPos, 1, TypingFont, TypingFontSize, TypingBold, TypingItalic, TypingUnderline, TypingStrike, TypingColor, TypingHighlight, TypingSubscript, TypingSuperscript);
+            AdjustFormattedRunsOnInsert(curPos, 1, tabRun);
             CursorPosition++;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -22744,6 +22861,8 @@ namespace ZenQOffice.UI
                 if (spacesToRemove > 0)
                 {
                     PieceTable.Remove(lineStart, spacesToRemove);
+                    ShiftRevisionsOnDelete(lineStart, spacesToRemove);
+                    AdjustFormattedRunsOnDelete(lineStart, spacesToRemove);
                     CursorPosition = Math.Max(lineStart, CursorPosition - spacesToRemove);
                     SelectionStart = CursorPosition;
                     SelectionEnd = CursorPosition;
@@ -23334,7 +23453,10 @@ namespace ZenQOffice.UI
             SaveUndoState();
             DeleteSelection();
             string bp = "\n[--- PAGE BREAK ---]\n[--- PAGE BREAK ---]\n";
-            PieceTable.Insert(CursorPosition, bp);
+            int curPos = CursorPosition;
+            PieceTable.Insert(curPos, bp);
+            ShiftRevisionsOnInsert(curPos, bp.Length);
+            AdjustFormattedRunsOnInsert(curPos, bp.Length);
             CursorPosition += bp.Length;
             SelectionStart = CursorPosition;
             SelectionEnd = CursorPosition;
@@ -23351,6 +23473,7 @@ namespace ZenQOffice.UI
                 SaveUndoState();
                 int removeLen = (endIdx + 46) - startIdx;
                 PieceTable.Remove(startIdx, removeLen);
+                ShiftRevisionsOnDelete(startIdx, removeLen);
                 AdjustFormattedRunsOnDelete(startIdx, removeLen);
                 
                 if (CursorPosition > startIdx)
@@ -23395,6 +23518,8 @@ namespace ZenQOffice.UI
             }
 
             PieceTable.Insert(0, cp);
+            ShiftRevisionsOnInsert(0, cp.Length);
+            AdjustFormattedRunsOnInsert(0, cp.Length);
 
             int titleIdx = cp.IndexOf("[");
             if (titleIdx >= 0)

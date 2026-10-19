@@ -289,7 +289,7 @@ namespace ZenQOffice.UI
                 g.DrawString("© 2026 NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sf);
 
                 StringFormat sfLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                g.DrawString("Phiên bản 5.5", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
+                g.DrawString("Phiên bản 5.7", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
             }
         }
 

@@ -23,13 +23,14 @@ namespace ZenQOffice.Setup
 
         private ModernRoundedButton _btnKeep;
         private ModernRoundedButton _btnUninstall;
+        private ModernRoundedCheckBox _chkCleanUserData;
         private Button _btnClose;
 
         public UninstallForm()
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(500, 390);
+            Size = new Size(500, 420);
             BackColor = Color.FromArgb(248, 250, 252);
             DoubleBuffered = true;
             ShowInTaskbar = true;
@@ -108,12 +109,24 @@ namespace ZenQOffice.Setup
 
         private void InitButtons()
         {
+            // Tùy chọn xóa sạch dữ liệu người dùng (Mặc định tích chọn để gỡ triệt để)
+            _chkCleanUserData = new ModernRoundedCheckBox
+            {
+                Text = "Xóa sạch dữ liệu cá nhân, tệp nháp, lịch sử & cài đặt",
+                Checked = true,
+                Size = new Size(410, 24),
+                Location = new Point(54, 280),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
+            Controls.Add(_chkCleanUserData);
+
             // Nút Ở lại (Khuyến khích giữ lại app)
             _btnKeep = new ModernRoundedButton
             {
                 Text = "Ở lại với ZENQ OFFICE",
                 Size = new Size(184, 42),
-                Location = new Point(78, 316),
+                Location = new Point(78, 328),
                 BaseColor = Color.FromArgb(16, 185, 129), // Emerald Green
                 HoverColor = Color.FromArgb(5, 150, 105),
                 PressedColor = Color.FromArgb(4, 120, 87),
@@ -130,7 +143,7 @@ namespace ZenQOffice.Setup
             {
                 Text = "Gỡ cài đặt",
                 Size = new Size(130, 42),
-                Location = new Point(282, 316),
+                Location = new Point(282, 328),
                 BaseColor = Color.FromArgb(241, 245, 249),
                 HoverColor = Color.FromArgb(254, 226, 226),
                 PressedColor = Color.FromArgb(254, 202, 202),
@@ -167,8 +180,11 @@ namespace ZenQOffice.Setup
             if (_isUninstalling) return;
             _isUninstalling = true;
 
+            bool cleanUserData = _chkCleanUserData != null && _chkCleanUserData.Checked;
+
             _btnKeep.Visible = false;
             _btnUninstall.Visible = false;
+            if (_chkCleanUserData != null) _chkCleanUserData.Visible = false;
             _btnClose.Enabled = false;
 
             _stopwatch.Restart();
@@ -177,27 +193,42 @@ namespace ZenQOffice.Setup
             {
                 try
                 {
-                    SetStatus("Đang đóng các tiến trình ZENQ OFFICE...", 0.20f);
+                    SetStatus("Đang đóng các tiến trình ZENQ OFFICE...", 0.15f);
                     try
                     {
                         foreach (var p in Process.GetProcessesByName("ZenQOffice"))
                         {
-                            try { p.Kill(); } catch { }
+                            try { p.Kill(); p.WaitForExit(1000); } catch { }
+                        }
+                        foreach (var p in Process.GetProcessesByName("GenOffice"))
+                        {
+                            try { p.Kill(); p.WaitForExit(1000); } catch { }
                         }
                     }
                     catch { }
-                    Thread.Sleep(600);
+                    Thread.Sleep(400);
 
-                    SetStatus("Đang xóa lối tắt Desktop & Start Menu...", 0.45f);
+                    SetStatus("Đang xóa lối tắt Desktop & Start Menu...", 0.35f);
                     ShortcutHelper.RemoveShortcuts();
-                    Thread.Sleep(500);
+                    Thread.Sleep(400);
 
-                    SetStatus("Đang gỡ bỏ cấu hình đăng ký hệ thống...", 0.70f);
+                    SetStatus("Đang gỡ bỏ cấu hình đăng ký hệ thống...", 0.55f);
                     ShortcutHelper.UnregisterUninstall();
-                    Thread.Sleep(500);
+                    Thread.Sleep(400);
+
+                    if (cleanUserData)
+                    {
+                        SetStatus("Đang xóa dữ liệu cá nhân, lịch sử & tệp nháp...", 0.75f);
+                        ShortcutHelper.RemoveUserData();
+                        Thread.Sleep(400);
+                    }
 
                     SetStatus("Đang dọn dẹp tập tin ứng dụng...", 0.90f);
-                    string installDir = ShortcutHelper.DefaultInstallPath;
+                    string installDir = AppDomain.CurrentDomain.BaseDirectory;
+                    if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir) || installDir.TrimEnd('\\', '/').Equals(Path.GetTempPath().TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                    {
+                        installDir = ShortcutHelper.DefaultInstallPath;
+                    }
 
                     string tempBat = Path.Combine(Path.GetTempPath(), "cleanup_ZenQOffice.bat");
                     StringBuilder sb = new StringBuilder();
@@ -205,6 +236,19 @@ namespace ZenQOffice.Setup
                     sb.AppendLine("timeout /t 1 /nobreak >nul");
                     sb.AppendLine(":wait_del");
                     sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", installDir));
+                    if (!string.Equals(installDir, ShortcutHelper.DefaultInstallPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", ShortcutHelper.DefaultInstallPath));
+                    }
+                    if (cleanUserData)
+                    {
+                        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                        sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", Path.Combine(appData, "GenOffice")));
+                        sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", Path.Combine(appData, "ZenQOffice")));
+                        sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", Path.Combine(localAppData, "GenOfficeDesktop")));
+                        sb.AppendLine(string.Format("rmdir /s /q \"{0}\" >nul 2>&1", Path.Combine(localAppData, "ZenQOffice")));
+                    }
                     sb.AppendLine(string.Format("if exist \"{0}\" (", installDir));
                     sb.AppendLine("    timeout /t 1 /nobreak >nul");
                     sb.AppendLine("    goto wait_del");
@@ -221,7 +265,7 @@ namespace ZenQOffice.Setup
                     psi.UseShellExecute = true;
                     Process.Start(psi);
 
-                    SetStatus("Đã gỡ cài đặt hoàn tất. Tạm biệt và hẹn gặp lại bạn nhé!", 1.0f);
+                    SetStatus("Đã gỡ cài đặt hoàn tất và sạch sẽ. Tạm biệt và hẹn gặp lại bạn nhé!", 1.0f);
                     _isCompleted = true;
                 }
                 catch (Exception ex)
@@ -258,11 +302,11 @@ namespace ZenQOffice.Setup
 
             // 2. VẼ BIỂU TƯỢNG NHÂN VẬT ZenQOffice BUỒN BÃ RƠI NƯỚC MẮT
             float mascotX = Width / 2f;
-            float mascotY = 120f;
+            float mascotY = 114f;
             MascotRenderer.DrawMascot(g, mascotX, mascotY, 1.12f, timeSec, MascotMood.SadCrying);
 
             // 3. TIÊU ĐỀ & MÔ TẢ TÂM TRẠNG
-            float textY = 226f;
+            float textY = 214f;
             using (Font titleFont = new Font("Segoe UI", 16f, FontStyle.Bold))
             using (SolidBrush titleB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
@@ -287,7 +331,7 @@ namespace ZenQOffice.Setup
                 float barW = 340f;
                 float barH = 4.0f;
                 float barX = (Width - barW) / 2f;
-                float barY = 300f;
+                float barY = 308f;
 
                 RectangleF trackRect = new RectangleF(barX, barY, barW, barH);
                 using (GraphicsPath trackPath = SetupForm.CreateRoundedRectanglePath(trackRect, barH / 2f))

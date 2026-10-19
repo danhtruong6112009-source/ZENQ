@@ -2,11 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Text;
 using System.Windows.Forms;
 
 namespace ZenQOffice.UI
 {
+    /// <summary>
+    /// Microsoft 365 Authentic Full Symbol Dialog Form
+    /// Direct2D GPU (D2DGraphics) accelerated symbol grid and recently used palette.
+    /// Perfectly matches Microsoft Office Symbol dialog (Symbols & Special Characters tabs,
+    /// dynamic Unicode name, hex character code, shortcut hint, and crisp antialiasing).
+    /// </summary>
     public class FullSymbolDialogForm : Form
     {
         public Action<string> OnInsertSymbol;
@@ -16,12 +21,16 @@ namespace ZenQOffice.UI
         private DoubleBufferedPanel pnlGrid;
         private Label lblCharName;
         private TextBox txtCharCode;
+        private ComboBox cbFrom;
+        private Label lblShortcut;
+        private Button btnAutoCorrect;
+        private Button btnShortcutKey;
         private Button btnInsert;
         private Button btnClose;
 
         private List<string> CurrentSymbols = new List<string>();
         private static List<string> RecentlyUsed = new List<string> {
-            "€", "£", "¥", "©", "®", "™", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α", "β", "π", "Ω"
+            "√", "€", "£", "¥", "©", "®", "™", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α"
         };
 
         private int SelectedIndex = 0;
@@ -47,7 +56,7 @@ namespace ZenQOffice.UI
 
         public FullSymbolDialogForm()
         {
-            this.Text = "Ký hiệu (Symbol)";
+            this.Text = "Symbol";
             this.Size = new Size(580, 520);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -55,23 +64,17 @@ namespace ZenQOffice.UI
             this.StartPosition = FormStartPosition.CenterParent;
             this.BackColor = Color.FromArgb(248, 249, 250);
             this.DoubleBuffered = true;
+            this.Font = new Font("Segoe UI", 9.0f);
 
             InitSubsets();
+            InitSymbolNames();
             InitControls();
         }
 
         private void InitSubsets()
         {
-            // 1. Currency Symbols (Ký hiệu Tiền tệ)
-            Subsets["Currency Symbols (Ký hiệu Tiền tệ)"] = new string[] {
-                "$", "¢", "£", "¤", "¥", "֏", "؋", "৲", "৳", "৻", "૱", "௹", "฿", "៛", "₠", "₡",
-                "₢", "₣", "₤", "₥", "₦", "₧", "₨", "₩", "₪", "₫", "€", "₭", "₮", "₯", "₰", "₱",
-                "₲", "₳", "₴", "₵", "₶", "₷", "₸", "₹", "₺", "₼", "₽", "₾", "₿", "元", "円", "Rp",
-                "Kč", "zł", "Fr", "kr", "ден", "lei", "din", "Ft", "R$", "kn", "лв"
-            };
-
-            // 2. Mathematical Operators (Toán tử Toán học)
-            Subsets["Mathematical Operators (Toán tử Toán học)"] = new string[] {
+            // 1. Mathematical Operators (Toán tử Toán học) - Standard Office 365 Default
+            Subsets["Mathematical Operators"] = new string[] {
                 "+", "−", "±", "∓", "×", "÷", "∕", "∗", "∘", "∙", "√", "∛", "∜", "∝", "∞", "∟",
                 "∠", "∡", "∢", "∣", "∤", "∥", "∦", "∧", "∨", "∩", "∪", "∫", "∬", "∭", "∮", "∯",
                 "∰", "∱", "∲", "∳", "∴", "∵", "∶", "∷", "∼", "∽", "≀", "≁", "≃", "≄", "≅", "≆",
@@ -83,120 +86,144 @@ namespace ZenQOffice.UI
                 "⋆", "⋇", "⋈", "⋉", "⋊", "⋋", "⋌", "⋍", "⋎", "⋏", "⋐", "⋑", "⋒", "⋓", "⋮", "⋯"
             };
 
+            // 2. Currency Symbols (Ký hiệu Tiền tệ)
+            Subsets["Currency Symbols"] = new string[] {
+                "$", "¢", "£", "¤", "¥", "֏", "؋", "৲", "৳", "৻", "૱", "௹", "฿", "៛", "₠", "₡",
+                "₢", "₣", "₤", "₥", "₦", "₧", "₨", "₩", "₪", "₫", "€", "₭", "₮", "₯", "₰", "₱",
+                "₲", "₳", "₴", "₵", "₶", "₷", "₸", "₹", "₺", "₼", "₽", "₾", "₿", "元", "円", "Rp",
+                "Kč", "zł", "Fr", "kr", "ден", "lei", "din", "Ft", "R$", "kn", "лв"
+            };
+
             // 3. Greek and Coptic (Ký tự Hy Lạp)
-            Subsets["Greek and Coptic (Ký tự Hy Lạp)"] = new string[] {
+            Subsets["Greek and Coptic"] = new string[] {
                 "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π",
                 "ρ", "ς", "σ", "τ", "υ", "φ", "χ", "ψ", "ω", "ϑ", "ϒ", "ϖ", "ϰ", "ϱ", "ϵ", "϶",
                 "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π",
                 "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "Ϙ", "ϙ", "Ϛ", "ϛ", "Ϝ", "ϝ", "Ϟ", "ϟ"
             };
 
-            // 4. Arrows & Directions (Mũi tên & Hướng)
-            Subsets["Arrows (Mũi tên & Hướng)"] = new string[] {
+            // 4. Arrows (Mũi tên)
+            Subsets["Arrows"] = new string[] {
                 "←", "↑", "→", "↓", "↔", "↕", "↖", "↗", "↘", "↙", "↚", "↛", "↜", "↝", "↞", "↟",
                 "↠", "↡", "↢", "↣", "↤", "↥", "↦", "↧", "↨", "↩", "↪", "↫", "↬", "↭", "↮", "↯",
                 "↰", "↱", "↲", "↳", "↴", "↵", "↶", "↷", "↸", "↹", "↺", "↻", "↼", "↽", "↾", "↿",
                 "⇀", "⇁", "⇂", "⇃", "⇄", "⇅", "⇆", "⇇", "⇈", "⇉", "⇊", "⇋", "⇌", "⇍", "⇎", "⇏",
-                "⇐", "⇑", "⇒", "⇓", "⇔", "⇕", "⇖", "⇗", "⇘", "⇙", "⇚", "⇛", "⇜", "⇝", "⇞", "⇟",
-                "⇠", "⇡", "⇢", "⇣", "⇤", "⇥", "⇦", "⇧", "⇨", "⇩", "⇪", "➔", "➘", "➙", "➚", "➛",
-                "➜", "➝", "➞", "➟", "➠", "➡", "➢", "➣", "➤", "➥", "➦", "➧", "➨", "➩", "➪", "➫"
+                "⇐", "⇑", "⇒", "⇓", "⇔", "⇕", "⇖", "⇗", "⇘", "⇙", "⇚", "⇛", "⇜", "⇝", "⇞", "⇟"
             };
 
-            // 5. Number Forms & Fractions (Dạng chữ số & Phân số)
-            Subsets["Number Forms (Dạng chữ số & Phân số)"] = new string[] {
+            // 5. Number Forms (Dạng chữ số & Phân số)
+            Subsets["Number Forms"] = new string[] {
                 "¼", "½", "¾", "⅐", "⅑", "⅒", "⅓", "⅔", "⅕", "⅖", "⅗", "⅘", "⅙", "⅚", "⅛", "⅜",
                 "⅝", "⅞", "⅟", "Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ", "Ⅺ", "Ⅻ", "Ⅼ",
-                "Ⅽ", "Ⅾ", "Ⅿ", "ⅰ", "ⅱ", "ⅲ", "ⅳ", "ⅴ", "ⅵ", "ⅶ", "ⅷ", "ⅸ", "ⅹ", "ⅺ", "ⅻ", "ⅼ",
-                "ⅽ", "ⅾ", "ⅿ", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⑪", "⑫", "⑬",
-                "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳", "⑴", "⑵", "⑶", "⑷", "⑸", "⑹", "⑺", "⑻", "⑼",
-                "⑽", "⒈", "⒉", "⒊", "⒋", "⒌", "⒍", "⒎", "⒏", "⒐", "⒑", "❶", "❷", "❸", "❹", "❺"
+                "Ⅽ", "Ⅾ", "Ⅿ", "ⅰ", "ⅱ", "ⅲ", "ⅳ", "ⅴ", "ⅵ", "ⅶ", "ⅷ", "ⅸ", "ⅹ", "ⅺ", "ⅻ", "ⅼ"
             };
 
-            // 6. Letterlike Symbols & Units (Ký hiệu dạng chữ cái & Đơn vị)
-            Subsets["Letterlike Symbols (Ký hiệu chữ cái & Đơn vị)"] = new string[] {
+            // 6. Letterlike Symbols (Ký hiệu chữ cái & Đơn vị)
+            Subsets["Letterlike Symbols"] = new string[] {
                 "©", "®", "™", "℠", "№", "℗", "℃", "℉", "K", "Å", "℮", "ℵ", "ℓ", "℘", "ℜ", "ℑ",
                 "ℬ", "ℰ", "ℯ", "ℱ", "ℊ", "ℋ", "ℌ", "ℍ", "ℎ", "ℏ", "ℐ", "ℒ", "ℳ", "ℕ", "№", "℗",
-                "℘", "ℙ", "ℚ", "ℛ", "ℜ", "ℝ", "℞", "℟", "℠", "℡", "™", "℣", "ℤ", "℥", "Ω", "℧",
-                "ℨ", "℩", "K", "Å", "ℬ", "ℭ", "℮", "ℯ", "ℰ", "ℱ", "Ⅎ", "ℳ", "µ", "‰", "‱", "ℶ"
+                "℘", "ℙ", "ℚ", "ℛ", "ℜ", "ℝ", "℞", "℟", "℠", "℡", "™", "℣", "ℤ", "℥", "Ω", "℧"
             };
 
-            // 7. Geometric Shapes & Stars (Hình khối & Biểu tượng)
-            Subsets["Geometric Shapes (Hình khối & Biểu tượng)"] = new string[] {
+            // 7. Geometric Shapes (Hình khối & Biểu tượng)
+            Subsets["Geometric Shapes"] = new string[] {
                 "■", "□", "▢", "▣", "▤", "▥", "▦", "▧", "▨", "▩", "▪", "▫", "▬", "▭", "▮", "▯",
                 "▲", "△", "▴", "▵", "▶", "▷", "▸", "▹", "►", "▼", "▽", "▾", "▿", "◀", "◁", "◂",
                 "◃", "◄", "◆", "◇", "◈", "◉", "◊", "○", "◌", "◍", "◎", "●", "◐", "◑", "◒", "◓",
-                "★", "☆", "✦", "✧", "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰", "⭐", "🌟", "✓", "✔",
-                "✕", "✖", "✗", "✘", "✚", "✛", "✜", "✝", "✞", "✟", "✠", "✡", "♠", "♣", "♥", "♦",
-                "♪", "♫", "♬", "♭", "♮", "♯", "☺", "☻", "☼", "☽", "♀", "♂", "☎", "✉", "✂", "✈"
+                "★", "☆", "✦", "✧", "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰", "⭐", "🌟", "✓", "✔"
             };
 
-            // 8. Box Drawing & Enclosed (Khung viền bảng biểu)
-            Subsets["Box Drawing (Khung viền bảng biểu)"] = new string[] {
+            // 8. Box Drawing (Khung viền)
+            Subsets["Box Drawing"] = new string[] {
                 "─", "━", "│", "┃", "┄", "┅", "┆", "┇", "┈", "┉", "┊", "┋", "┌", "┍", "┎", "┏",
                 "┐", "┑", "┒", "┓", "└", "┕", "┖", "┗", "┘", "┙", "┚", "┛", "├", "┝", "┞", "┟",
                 "┠", "┡", "┢", "┣", "┤", "┥", "┦", "┧", "┨", "┩", "┪", "┫", "┬", "┭", "┮", "┯",
-                "┰", "┱", "┲", "┳", "┴", "┵", "┶", "┷", "┸", "┹", "┺", "┻", "┼", "┽", "┾", "┿",
-                "═", "║", "╒", "╓", "╔", "╕", "╖", "╗", "╘", "╙", "╚", "╛", "╜", "╝", "╞", "╟",
-                "╠", "╡", "╢", "╣", "╤", "╥", "╦", "╧", "╨", "╩", "╪", "╫", "╬", "╭", "╮", "╯"
+                "═", "║", "╒", "╓", "╔", "╕", "╖", "╗", "╘", "╙", "╚", "╛", "╜", "╝", "╞", "╟"
             };
+        }
 
-            // 9. Special Characters (Ký tự đặc biệt)
-            Subsets["Special Characters (Ký tự đặc biệt)"] = new string[] {
-                "—", "–", "―", "…", "‘", "’", "‚", "“", "”", "„", "′", "″", "‴", "‵", "‹", "›",
-                "«", "»", "§", "¶", "†", "‡", "•", "‰", "‱", "※", "‼", "⁇", "⁈", "⁉", "‿", "⁀"
-            };
-
-            // Names map for Euro, Dollar, etc.
+        private void InitSymbolNames()
+        {
+            SymbolNames["√"] = "Square Root";
+            SymbolNames["∛"] = "Cube Root";
+            SymbolNames["∜"] = "Fourth Root";
+            SymbolNames["∞"] = "Infinity";
+            SymbolNames["∝"] = "Proportional To";
+            SymbolNames["∫"] = "Integral";
+            SymbolNames["∬"] = "Double Integral";
+            SymbolNames["∭"] = "Triple Integral";
+            SymbolNames["∮"] = "Contour Integral";
+            SymbolNames["∑"] = "N-Ary Summation";
+            SymbolNames["∏"] = "N-Ary Product";
+            SymbolNames["±"] = "Plus-Minus Sign";
+            SymbolNames["∓"] = "Minus-Or-Plus Sign";
+            SymbolNames["×"] = "Multiplication Sign";
+            SymbolNames["÷"] = "Division Sign";
+            SymbolNames["≠"] = "Not Equal To";
+            SymbolNames["≡"] = "Identical To";
+            SymbolNames["≤"] = "Less-Than or Equal To";
+            SymbolNames["≥"] = "Greater-Than or Equal To";
+            SymbolNames["≪"] = "Much Less-Than";
+            SymbolNames["≫"] = "Much Greater-Than";
+            SymbolNames["≈"] = "Almost Equal To";
+            SymbolNames["≅"] = "Approximately Equal To";
+            SymbolNames["∂"] = "Partial Differential";
+            SymbolNames["∇"] = "Nabla";
+            SymbolNames["∈"] = "Element Of";
+            SymbolNames["∉"] = "Not An Element Of";
+            SymbolNames["∋"] = "Contains As Member";
+            SymbolNames["⊂"] = "Subset Of";
+            SymbolNames["⊃"] = "Superset Of";
+            SymbolNames["∩"] = "Intersection";
+            SymbolNames["∪"] = "Union";
             SymbolNames["€"] = "Euro Sign";
             SymbolNames["$"] = "Dollar Sign";
             SymbolNames["£"] = "Pound Sign";
             SymbolNames["¥"] = "Yen Sign";
-            SymbolNames["₫"] = "Dong Sign (Việt Nam)";
+            SymbolNames["₫"] = "Dong Sign";
             SymbolNames["©"] = "Copyright Sign";
             SymbolNames["®"] = "Registered Sign";
             SymbolNames["™"] = "Trade Mark Sign";
-            SymbolNames["±"] = "Plus-Minus Sign";
-            SymbolNames["≠"] = "Not Equal To";
-            SymbolNames["≤"] = "Less-Than or Equal To";
-            SymbolNames["≥"] = "Greater-Than or Equal To";
-            SymbolNames["÷"] = "Division Sign";
-            SymbolNames["×"] = "Multiplication Sign";
-            SymbolNames["∞"] = "Infinity";
             SymbolNames["µ"] = "Micro Sign";
             SymbolNames["α"] = "Greek Small Letter Alpha";
             SymbolNames["β"] = "Greek Small Letter Beta";
+            SymbolNames["γ"] = "Greek Small Letter Gamma";
+            SymbolNames["δ"] = "Greek Small Letter Delta";
+            SymbolNames["ε"] = "Greek Small Letter Epsilon";
+            SymbolNames["θ"] = "Greek Small Letter Theta";
             SymbolNames["π"] = "Greek Small Letter Pi";
+            SymbolNames["σ"] = "Greek Small Letter Sigma";
+            SymbolNames["ω"] = "Greek Small Letter Omega";
             SymbolNames["Ω"] = "Greek Capital Letter Omega";
-            SymbolNames["∑"] = "N-Ary Summation";
-            SymbolNames["√"] = "Square Root";
-            SymbolNames["∫"] = "Integral";
+            SymbolNames["Δ"] = "Greek Capital Letter Delta";
+            SymbolNames["°"] = "Degree Sign";
         }
 
         private void InitControls()
         {
             TabControl tabCtrl = new TabControl
             {
-                Location = new Point(12, 12),
-                Size = new Size(540, 395)
+                Location = new Point(12, 10),
+                Size = new Size(540, 420)
             };
 
-            TabPage tabSymbols = new TabPage { Text = "Ký hiệu (Symbols)", BackColor = Color.White };
-            TabPage tabSpecial = new TabPage { Text = "Ký tự đặc biệt (Special Characters)", BackColor = Color.White };
+            TabPage tabSymbols = new TabPage { Text = "Symbols", BackColor = Color.White };
+            TabPage tabSpecial = new TabPage { Text = "Special Characters", BackColor = Color.White };
 
             // Controls on tabSymbols
-            Label lblF = new Label { Text = "Phông chữ (Font):", Location = new Point(15, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblF = new Label { Text = "Font:", Location = new Point(15, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
             tabSymbols.Controls.Add(lblF);
 
-            cbFont = new ComboBox { Location = new Point(135, 9), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cbFont.Items.AddRange(new object[] { "Calibri", "Segoe UI Symbol", "Arial", "Times New Roman", "(normal text)" });
+            cbFont = new ComboBox { Location = new Point(55, 9), Size = new Size(180, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cbFont.Items.AddRange(new object[] { "Arial Black", "Calibri", "Segoe UI Symbol", "Arial", "Cambria Math", "Times New Roman", "(normal text)" });
             cbFont.SelectedIndex = 0;
             cbFont.SelectedIndexChanged += (s, e) => pnlGrid.Invalidate();
             tabSymbols.Controls.Add(cbFont);
 
-            Label lblS = new Label { Text = "Phân nhóm (Subset):", Location = new Point(275, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblS = new Label { Text = "Subset:", Location = new Point(255, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
             tabSymbols.Controls.Add(lblS);
 
-            cbSubset = new ComboBox { Location = new Point(395, 9), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cbSubset = new ComboBox { Location = new Point(310, 9), Size = new Size(210, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             foreach (var key in Subsets.Keys) cbSubset.Items.Add(key);
             cbSubset.SelectedIndex = 0;
             cbSubset.SelectedIndexChanged += (s, e) =>
@@ -205,11 +232,11 @@ namespace ZenQOffice.UI
             };
             tabSymbols.Controls.Add(cbSubset);
 
-            // Symbol Grid Panel (Double Buffered - No Flickering)
+            // Symbol Grid Panel (Direct2D GPU Accelerated)
             pnlGrid = new DoubleBufferedPanel
             {
                 Location = new Point(15, 40),
-                Size = new Size(505, 185),
+                Size = new Size(505, 180),
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
                 AutoScroll = true
@@ -250,6 +277,7 @@ namespace ZenQOffice.UI
                         RecentSelectedIndex = -1;
                         UpdateSelectedInfo();
                         pnlGrid.Invalidate();
+                        if (pnlGrid.Parent != null) pnlGrid.Parent.Invalidate(true);
                     }
                 }
             };
@@ -263,48 +291,68 @@ namespace ZenQOffice.UI
             };
             tabSymbols.Controls.Add(pnlGrid);
 
-            // Recently used label & paint
-            Label lblRecent = new Label { Text = "Ký hiệu dùng gần đây (Recently used symbols):", Location = new Point(15, 235), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            // Recently used label & panel (Direct2D GPU Accelerated)
+            Label lblRecent = new Label { Text = "Recently used symbols:", Location = new Point(15, 230), AutoSize = true, Font = new Font("Segoe UI", 9) };
             tabSymbols.Controls.Add(lblRecent);
 
             DoubleBufferedPanel pnlRecent = new DoubleBufferedPanel
             {
-                Location = new Point(15, 255),
+                Location = new Point(15, 250),
                 Size = new Size(505, 34),
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
             };
             pnlRecent.Paint += (s, e) =>
             {
-                Graphics g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.HighQuality;
-                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-
-                using (Font symFont = new Font(cbFont.Text == "(normal text)" ? "Segoe UI" : cbFont.Text, 11f))
+                using (D2DGraphics g = new D2DGraphics(e.Graphics, pnlRecent.Width, pnlRecent.Height))
                 {
-                    for (int i = 0; i < Math.Min(16, RecentlyUsed.Count); i++)
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.White))
                     {
-                        int x = i * 31;
-                        Rectangle rect = new Rectangle(x, 0, 31, 32);
+                        g.FillRectangle(bgBrush, 0, 0, pnlRecent.Width, pnlRecent.Height);
+                    }
 
-                        bool isSel = (RecentSelectedIndex == i);
-                        bool isHov = (RecentHoveredIndex == i);
-
-                        if (isSel)
+                    string fontName = cbFont.Text == "(normal text)" ? "Segoe UI" : cbFont.Text;
+                    using (Font symFont = new Font(fontName, 11.5f))
+                    using (Pen gridPen = new Pen(Color.FromArgb(200, 204, 210), 1.0f))
+                    using (Pen selBorderPen = new Pen(Color.FromArgb(0, 90, 180), 1.0f))
+                    using (Pen hovBorderPen = new Pen(Color.FromArgb(120, 175, 235), 1.0f))
+                    using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                    using (SolidBrush hovBrush = new SolidBrush(Color.FromArgb(235, 243, 255)))
+                    using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                    using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(25, 25, 25)))
+                    {
+                        for (int i = 0; i < Math.Min(16, RecentlyUsed.Count); i++)
                         {
-                            g.FillRectangle(Brushes.SteelBlue, rect);
-                        }
-                        else if (isHov)
-                        {
-                            using (SolidBrush hb = new SolidBrush(Color.FromArgb(235, 243, 255))) g.FillRectangle(hb, rect);
-                            g.DrawRectangle(Pens.SteelBlue, rect);
-                        }
+                            int x = i * 31;
+                            Rectangle rect = new Rectangle(x, 0, 31, pnlRecent.Height);
 
-                        g.DrawLine(Pens.LightGray, x + 31, 0, x + 31, 32);
+                            bool isSel = (RecentSelectedIndex == i);
+                            bool isHov = (RecentHoveredIndex == i);
 
-                        SizeF sz = g.MeasureString(RecentlyUsed[i], symFont);
-                        Brush b = isSel ? Brushes.White : Brushes.Black;
-                        g.DrawString(RecentlyUsed[i], symFont, b, x + (31 - sz.Width) / 2, (32 - sz.Height) / 2);
+                            if (isSel)
+                            {
+                                g.FillRectangle(selBrush, rect);
+                                g.DrawRectangle(selBorderPen, rect);
+                                using (Pen focusPen = new Pen(Color.White, 1.0f) { DashStyle = DashStyle.Dot })
+                                {
+                                    g.DrawRectangle(focusPen, x + 2, 2, 27, pnlRecent.Height - 5);
+                                }
+                            }
+                            else if (isHov)
+                            {
+                                g.FillRectangle(hovBrush, rect);
+                                g.DrawRectangle(hovBorderPen, rect);
+                            }
+
+                            g.DrawLine(gridPen, x + 31, 0, x + 31, pnlRecent.Height);
+
+                            SizeF sz = g.MeasureString(RecentlyUsed[i], symFont);
+                            SolidBrush b = isSel ? whiteBrush : textBrush;
+                            g.DrawString(RecentlyUsed[i], symFont, b, x + (31 - sz.Width) / 2, (pnlRecent.Height - sz.Height) / 2);
+                        }
                     }
                 }
             };
@@ -345,56 +393,122 @@ namespace ZenQOffice.UI
             };
             tabSymbols.Controls.Add(pnlRecent);
 
-            // Unicode info section
+            // Unicode details row
+            Label lblUnicodeNameHeader = new Label
+            {
+                Text = "Unicode name:",
+                Location = new Point(15, 292),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular)
+            };
+            tabSymbols.Controls.Add(lblUnicodeNameHeader);
+
             lblCharName = new Label
             {
-                Text = "Tên: Euro Sign",
-                Location = new Point(15, 300),
-                Size = new Size(250, 20),
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold)
+                Text = "Square Root",
+                Location = new Point(15, 308),
+                Size = new Size(200, 18),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular)
             };
             tabSymbols.Controls.Add(lblCharName);
 
-            Label lblCode = new Label { Text = "Mã ký tự (hex):", Location = new Point(280, 300), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
+            btnAutoCorrect = new Button
+            {
+                Text = "AutoCorrect...",
+                Location = new Point(15, 332),
+                Size = new Size(95, 25),
+                BackColor = Color.White,
+                FlatStyle = FlatStyle.System
+            };
+            tabSymbols.Controls.Add(btnAutoCorrect);
+
+            btnShortcutKey = new Button
+            {
+                Text = "Shortcut Key...",
+                Location = new Point(116, 332),
+                Size = new Size(95, 25),
+                BackColor = Color.White,
+                FlatStyle = FlatStyle.System
+            };
+            tabSymbols.Controls.Add(btnShortcutKey);
+
+            lblShortcut = new Label
+            {
+                Text = "Shortcut key: 221A, Alt+X",
+                Location = new Point(220, 336),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5f)
+            };
+            tabSymbols.Controls.Add(lblShortcut);
+
+            Label lblCode = new Label
+            {
+                Text = "Character code:",
+                Location = new Point(280, 298),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5f)
+            };
             tabSymbols.Controls.Add(lblCode);
 
-            txtCharCode = new TextBox { Location = new Point(365, 297), Size = new Size(60, 22), ReadOnly = true, Text = "20AC" };
+            txtCharCode = new TextBox
+            {
+                Location = new Point(370, 295),
+                Size = new Size(50, 22),
+                ReadOnly = true,
+                Text = "221A"
+            };
             tabSymbols.Controls.Add(txtCharCode);
 
-            Label lblFrom = new Label { Text = "từ: Unicode (hex)", Location = new Point(430, 300), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
+            Label lblFrom = new Label
+            {
+                Text = "from:",
+                Location = new Point(425, 298),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.5f)
+            };
             tabSymbols.Controls.Add(lblFrom);
+
+            cbFrom = new ComboBox
+            {
+                Location = new Point(460, 295),
+                Size = new Size(60, 22),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cbFrom.Items.AddRange(new object[] { "Unicode (hex)", "ASCII (decimal)" });
+            cbFrom.SelectedIndex = 0;
+            tabSymbols.Controls.Add(cbFrom);
 
             // Special Characters list on tabSpecial
             ListView lvSpecial = new ListView
             {
                 Location = new Point(15, 15),
-                Size = new Size(505, 335),
+                Size = new Size(505, 350),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 Font = new Font("Segoe UI", 9.5f)
             };
-            lvSpecial.Columns.Add("Ký tự", 80);
-            lvSpecial.Columns.Add("Tên Ký tự đặc biệt (Special Character)", 300);
-            lvSpecial.Columns.Add("Phím tắt", 110);
+            lvSpecial.Columns.Add("Character", 80);
+            lvSpecial.Columns.Add("Special Character", 300);
+            lvSpecial.Columns.Add("Shortcut key", 110);
 
             string[,] specials = new string[,] {
-                { "—", "Em Dash (Gạch ngang dài)", "Alt+Ctrl+Num -" },
-                { "–", "En Dash (Gạch ngang ngắn)", "Ctrl+Num -" },
-                { "©", "Copyright (Bản quyền)", "Alt+Ctrl+C" },
-                { "®", "Registered (Thương hiệu đăng ký)", "Alt+Ctrl+R" },
-                { "™", "Trademark (Nhãn hiệu)", "Alt+Ctrl+T" },
-                { "§", "Section (Mục đoạn)", "" },
-                { "¶", "Paragraph (Dấu đoạn văn)", "" },
-                { "…", "Ellipsis (Dấu ba chấm)", "Alt+Ctrl+." },
-                { "‘", "Single Opening Quote (Ngoặc đơn mở)", "Ctrl+`, `" },
-                { "’", "Single Closing Quote (Ngoặc đơn đóng)", "Ctrl+', '" },
-                { "“", "Double Opening Quote (Ngoặc kép mở)", "Ctrl+`, \"" },
-                { "”", "Double Closing Quote (Ngoặc kép đóng)", "Ctrl+', \"" },
-                { "€", "Euro Sign (Đồng Euro)", "Alt+Ctrl+E" },
-                { "°", "Degree Sign (Ký hiệu độ)", "" },
-                { "µ", "Micro Sign (Micro)", "" },
-                { "±", "Plus-Minus (Cộng trừ)", "" }
+                { "—", "Em Dash", "Alt+Ctrl+Num -" },
+                { "–", "En Dash", "Ctrl+Num -" },
+                { "©", "Copyright", "Alt+Ctrl+C" },
+                { "®", "Registered", "Alt+Ctrl+R" },
+                { "™", "Trademark", "Alt+Ctrl+T" },
+                { "§", "Section", "" },
+                { "¶", "Paragraph", "" },
+                { "…", "Ellipsis", "Alt+Ctrl+." },
+                { "‘", "Single Opening Quote", "Ctrl+`, `" },
+                { "’", "Single Closing Quote", "Ctrl+', '" },
+                { "“", "Double Opening Quote", "Ctrl+`, \"" },
+                { "”", "Double Closing Quote", "Ctrl+', \"" },
+                { "€", "Euro Sign", "Alt+Ctrl+E" },
+                { "°", "Degree Sign", "" },
+                { "µ", "Micro Sign", "" },
+                { "±", "Plus-Minus", "" }
             };
 
             for (int i = 0; i < specials.GetLength(0); i++)
@@ -417,15 +531,15 @@ namespace ZenQOffice.UI
             tabCtrl.TabPages.Add(tabSpecial);
             this.Controls.Add(tabCtrl);
 
-            // Bottom Buttons
+            // Bottom Buttons (MS 365 Standard)
             btnInsert = new Button
             {
-                Text = "Chèn (Insert)",
-                Location = new Point(360, 425),
-                Size = new Size(100, 32),
-                BackColor = Color.FromArgb(43, 87, 154),
+                Text = "Insert",
+                Location = new Point(366, 442),
+                Size = new Size(88, 28),
+                BackColor = Color.FromArgb(0, 95, 184),
                 ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.System
             };
             btnInsert.Click += (s, e) =>
             {
@@ -439,11 +553,11 @@ namespace ZenQOffice.UI
 
             btnClose = new Button
             {
-                Text = "Đóng",
-                Location = new Point(468, 425),
-                Size = new Size(84, 32),
+                Text = "Cancel",
+                Location = new Point(464, 442),
+                Size = new Size(88, 28),
                 BackColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
+                FlatStyle = FlatStyle.System,
                 DialogResult = DialogResult.Cancel
             };
             btnClose.Click += (s, e) => this.Close();
@@ -466,40 +580,61 @@ namespace ZenQOffice.UI
 
         private void DrawSymbolGrid(object sender, PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-
-            string fontName = cbFont.Text == "(normal text)" ? "Segoe UI" : cbFont.Text;
-            using (Font symFont = new Font(fontName, 12f))
+            using (D2DGraphics g = new D2DGraphics(e.Graphics, pnlGrid.Width, pnlGrid.Height))
             {
-                for (int i = 0; i < CurrentSymbols.Count; i++)
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                using (SolidBrush bgBrush = new SolidBrush(Color.White))
                 {
-                    int c = i % 16;
-                    int r = i / 16;
-                    int x = c * 31;
-                    int y = r * 30 + pnlGrid.AutoScrollPosition.Y;
-                    Rectangle rect = new Rectangle(x, y, 31, 30);
+                    g.FillRectangle(bgBrush, 0, 0, pnlGrid.Width, pnlGrid.Height);
+                }
 
-                    bool isSel = (SelectedIndex == i && RecentSelectedIndex == -1);
-                    bool isHov = (HoveredIndex == i);
-
-                    if (isSel)
+                string fontName = cbFont.Text == "(normal text)" ? "Segoe UI" : cbFont.Text;
+                using (Font symFont = new Font(fontName, 12f))
+                using (Pen gridPen = new Pen(Color.FromArgb(200, 204, 210), 1.0f))
+                using (Pen selBorderPen = new Pen(Color.FromArgb(0, 90, 180), 1.0f))
+                using (Pen hovBorderPen = new Pen(Color.FromArgb(120, 175, 235), 1.0f))
+                using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                using (SolidBrush hovBrush = new SolidBrush(Color.FromArgb(235, 243, 255)))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(25, 25, 25)))
+                {
+                    for (int i = 0; i < CurrentSymbols.Count; i++)
                     {
-                        g.FillRectangle(Brushes.SteelBlue, rect);
-                    }
-                    else if (isHov)
-                    {
-                        using (SolidBrush hb = new SolidBrush(Color.FromArgb(235, 243, 255))) g.FillRectangle(hb, rect);
-                        g.DrawRectangle(Pens.SteelBlue, rect);
-                    }
+                        int c = i % 16;
+                        int r = i / 16;
+                        int x = c * 31;
+                        int y = r * 30 + pnlGrid.AutoScrollPosition.Y;
+                        Rectangle rect = new Rectangle(x, y, 31, 30);
 
-                    g.DrawLine(Pens.LightGray, x + 31, y, x + 31, y + 30);
-                    g.DrawLine(Pens.LightGray, x, y + 30, x + 31, y + 30);
+                        if (rect.Bottom < 0 || rect.Top > pnlGrid.Height) continue;
 
-                    SizeF sz = g.MeasureString(CurrentSymbols[i], symFont);
-                    Brush b = isSel ? Brushes.White : Brushes.Black;
-                    g.DrawString(CurrentSymbols[i], symFont, b, x + (31 - sz.Width) / 2, y + (30 - sz.Height) / 2);
+                        bool isSel = (SelectedIndex == i && RecentSelectedIndex == -1);
+                        bool isHov = (HoveredIndex == i);
+
+                        if (isSel)
+                        {
+                            g.FillRectangle(selBrush, rect);
+                            g.DrawRectangle(selBorderPen, rect);
+                            using (Pen focusPen = new Pen(Color.White, 1.0f) { DashStyle = DashStyle.Dot })
+                            {
+                                g.DrawRectangle(focusPen, x + 2, y + 2, 27, 26);
+                            }
+                        }
+                        else if (isHov)
+                        {
+                            g.FillRectangle(hovBrush, rect);
+                            g.DrawRectangle(hovBorderPen, rect);
+                        }
+
+                        g.DrawLine(gridPen, x + 31, y, x + 31, y + 30);
+                        g.DrawLine(gridPen, x, y + 30, x + 31, y + 30);
+
+                        SizeF sz = g.MeasureString(CurrentSymbols[i], symFont);
+                        SolidBrush b = isSel ? whiteBrush : textBrush;
+                        g.DrawString(CurrentSymbols[i], symFont, b, x + (31 - sz.Width) / 2, y + (30 - sz.Height) / 2);
+                    }
                 }
             }
         }
@@ -523,12 +658,14 @@ namespace ZenQOffice.UI
             if (string.IsNullOrEmpty(sym)) return;
 
             string name = SymbolNames.ContainsKey(sym) ? SymbolNames[sym] : sym;
-            lblCharName.Text = "Tên: Ký tự: " + name;
+            lblCharName.Text = name;
 
             if (sym.Length > 0)
             {
                 int code = char.ConvertToUtf32(sym, 0);
-                txtCharCode.Text = code.ToString("X4");
+                string hex = code.ToString("X4");
+                txtCharCode.Text = hex;
+                lblShortcut.Text = "Shortcut key: " + hex + ", Alt+X";
             }
         }
 

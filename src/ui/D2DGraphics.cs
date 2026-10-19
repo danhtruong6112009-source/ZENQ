@@ -110,6 +110,20 @@ namespace ZenQOffice.UI
         private static ID2D1DCRenderTarget _sharedDcRenderTarget;
         private static bool _sharedDcInUse = false;
         private static readonly object _sharedDcLock = new object();
+
+        public static void ResetSharedDcTarget()
+        {
+            lock (_sharedDcLock)
+            {
+                if (_sharedDcRenderTarget != null)
+                {
+                    try { _sharedDcRenderTarget.Dispose(); } catch { }
+                    _sharedDcRenderTarget = null;
+                }
+                _sharedDcInUse = false;
+            }
+            ClearSharedBitmapCache();
+        }
         private ID2D1GdiInteropRenderTarget _gdiInterop;
         private bool _isUsingSharedDc = false;
         private bool _inGdiDc = false;
@@ -434,8 +448,24 @@ namespace ZenQOffice.UI
             }
             if (_renderTarget != null && _isDrawing)
             {
-                _renderTarget.EndDraw();
-                _isDrawing = false;
+                try
+                {
+                    _renderTarget.EndDraw();
+                }
+                catch (SharpGen.Runtime.SharpGenException ex)
+                {
+                    if (ex.ResultCode == Vortice.Direct2D1.ResultCode.RecreateTarget || ex.HResult == unchecked((int)0x8899000C))
+                    {
+                        ResetSharedDcTarget();
+                    }
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    _isDrawing = false;
+                }
             }
         }
 
@@ -460,10 +490,20 @@ namespace ZenQOffice.UI
                 { 
                     _renderTarget.EndDraw(); 
                 } 
+                catch (SharpGen.Runtime.SharpGenException ex)
+                {
+                    if (ex.ResultCode == Vortice.Direct2D1.ResultCode.RecreateTarget || ex.HResult == unchecked((int)0x8899000C))
+                    {
+                        ResetSharedDcTarget();
+                    }
+                }
                 catch 
                 { 
                 }
-                _isDrawing = false;
+                finally
+                {
+                    _isDrawing = false;
+                }
             }
 
             if (_gdiInterop != null)

@@ -52,6 +52,10 @@ if exist img (
     if not exist temp_dist\img mkdir temp_dist\img >nul 2>&1
     xcopy /s /e /y img\* temp_dist\img\ >nul
 )
+if exist fonts (
+    if not exist temp_dist\fonts mkdir temp_dist\fonts >nul 2>&1
+    copy /y fonts\* temp_dist\fonts\ >nul
+)
 
 powershell -Command "Compress-Archive -Path 'temp_dist\*' -DestinationPath 'payload.zip' -Force"
 rmdir /s /q temp_dist

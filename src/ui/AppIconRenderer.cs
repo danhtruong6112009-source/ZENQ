@@ -22,12 +22,13 @@ namespace ZenQOffice.UI
         {
             switch (mode)
             {
+                case OfficeAppMode.Home: return "ZENQOFFICE.png";
                 case OfficeAppMode.Writer: return "writer.png";
                 case OfficeAppMode.Calc: return "calc.png";
                 case OfficeAppMode.Slides: return "present.png";
                 case OfficeAppMode.Pdf: return "pdf.png";
                 case OfficeAppMode.Photo: return "vector.png";
-                default: return "writer.png";
+                default: return "ZENQOFFICE.png";
             }
         }
 
@@ -35,12 +36,13 @@ namespace ZenQOffice.UI
         {
             switch (mode)
             {
+                case OfficeAppMode.Home: return "app_logo.png";
                 case OfficeAppMode.Writer: return "icon_writer.png";
                 case OfficeAppMode.Calc: return "icon_calc.png";
                 case OfficeAppMode.Slides: return "icon_present.png";
                 case OfficeAppMode.Pdf: return "icon_pdf.png";
                 case OfficeAppMode.Photo: return "icon_vector.png";
-                default: return "icon_writer.png";
+                default: return "app_logo.png";
             }
         }
 
@@ -163,6 +165,40 @@ namespace ZenQOffice.UI
             }
         }
 
+        private static void DrawFallbackEmblem(Graphics g, float x, float y, float size, OfficeAppMode mode)
+        {
+            if (g == null || size <= 0) return;
+            RectangleF box = new RectangleF(x, y, size, size);
+            Color c1, c2;
+            string letter = "Z";
+            switch (mode)
+            {
+                case OfficeAppMode.Writer:
+                    c1 = Color.FromArgb(37, 99, 235); c2 = Color.FromArgb(29, 78, 216); letter = "W"; break;
+                case OfficeAppMode.Calc:
+                    c1 = Color.FromArgb(16, 185, 129); c2 = Color.FromArgb(5, 150, 105); letter = "C"; break;
+                case OfficeAppMode.Slides:
+                    c1 = Color.FromArgb(249, 115, 22); c2 = Color.FromArgb(217, 70, 239); letter = "S"; break;
+                case OfficeAppMode.Pdf:
+                    c1 = Color.FromArgb(220, 38, 38); c2 = Color.FromArgb(185, 28, 28); letter = "P"; break;
+                case OfficeAppMode.Photo:
+                    c1 = Color.FromArgb(99, 102, 241); c2 = Color.FromArgb(79, 70, 229); letter = "V"; break;
+                default:
+                    c1 = Color.FromArgb(99, 102, 241); c2 = Color.FromArgb(59, 130, 246); letter = "Z"; break;
+            }
+            using (GraphicsPath p = CreateRoundedRectanglePath(box, Math.Max(2f, size * 0.22f)))
+            using (LinearGradientBrush b = new LinearGradientBrush(box, c1, c2, 45f))
+            {
+                g.FillPath(b, p);
+            }
+            using (Font f = new Font("Segoe UI", Math.Max(8f, size * 0.52f), FontStyle.Bold, GraphicsUnit.Pixel))
+            using (SolidBrush tb = new SolidBrush(Color.White))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                g.DrawString(letter, f, tb, box, sf);
+            }
+        }
+
         public static bool DrawAppIcon(Graphics g, float x, float y, float size, OfficeAppMode mode)
         {
             int s = (int)Math.Round(size);
@@ -173,7 +209,8 @@ namespace ZenQOffice.UI
                 g.DrawImage(bmp, x, y, size, size);
                 return true;
             }
-            return false;
+            DrawFallbackEmblem(g, x, y, size, mode);
+            return true;
         }
 
         public static bool DrawAppIcon(Graphics g, RectangleF rect, OfficeAppMode mode)
@@ -192,7 +229,8 @@ namespace ZenQOffice.UI
                 g.DrawImage(bmp, x, y, size, size);
                 return true;
             }
-            return false;
+            g.DrawGdi(nativeG => DrawFallbackEmblem(nativeG, x, y, size, mode));
+            return true;
         }
 
         public static bool DrawAppIcon(D2DGraphics g, RectangleF rect, OfficeAppMode mode)
