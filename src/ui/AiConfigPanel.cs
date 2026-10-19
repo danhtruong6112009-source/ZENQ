@@ -1189,31 +1189,46 @@ namespace ZenQOffice.UI
                 _config.SystemInstructions = (txtSystemPrompt.Text ?? "").Trim();
             }
 
-            _currentProfile.SavedModels.Clear();
-            foreach (var item in cboModel.Items)
-            {
-                string modelName = item.ToString().Trim();
-                if (!string.IsNullOrEmpty(modelName))
-                {
-                    _currentProfile.SavedModels.Add(modelName);
-                }
-            }
+            if (_currentProfile.SavedModels == null) _currentProfile.SavedModels = new List<string>();
 
             if (cboModel.SelectedIndex >= 0)
             {
-                _currentProfile.SelectedModel = cboModel.SelectedItem.ToString();
+                string pickedModel = cboModel.SelectedItem.ToString();
+                if (!string.IsNullOrEmpty(pickedModel) && !pickedModel.StartsWith("⏳") && !pickedModel.StartsWith("⚠️"))
+                {
+                    if (_currentProfile.Provider == AiProviderType.GoogleAIStudio && pickedModel == "gemini-3.1-flash") pickedModel = "gemini-3.1-flash-lite";
+                    _currentProfile.SelectedModel = pickedModel;
+                    if (!_currentProfile.SavedModels.Contains(pickedModel)) _currentProfile.SavedModels.Add(pickedModel);
+                }
             }
             else
             {
-                string typedModel = cboModel.Text.Trim();
-                if (!string.IsNullOrEmpty(typedModel))
+                string typedModel = cboModel.Text != null ? cboModel.Text.Trim() : "";
+                if (!string.IsNullOrEmpty(typedModel) && !typedModel.StartsWith("⏳") && !typedModel.StartsWith("⚠️"))
                 {
+                    if (_currentProfile.Provider == AiProviderType.GoogleAIStudio && typedModel == "gemini-3.1-flash") typedModel = "gemini-3.1-flash-lite";
                     _currentProfile.SelectedModel = typedModel;
                     if (!_currentProfile.SavedModels.Contains(typedModel))
                     {
                         _currentProfile.SavedModels.Add(typedModel);
                     }
                 }
+            }
+
+            if (_currentProfile.Provider == AiProviderType.GoogleAIStudio)
+            {
+                if (_currentProfile.SelectedModel == "gemini-3.1-flash") _currentProfile.SelectedModel = "gemini-3.1-flash-lite";
+                for (int si = 0; si < _currentProfile.SavedModels.Count; si++)
+                {
+                    if (_currentProfile.SavedModels[si] == "gemini-3.1-flash") _currentProfile.SavedModels[si] = "gemini-3.1-flash-lite";
+                }
+                _currentProfile.SavedModels.RemoveAll(m => m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro");
+                List<string> cleanList = new List<string>();
+                foreach (var m in _currentProfile.SavedModels)
+                {
+                    if (!cleanList.Contains(m)) cleanList.Add(m);
+                }
+                _currentProfile.SavedModels = cleanList;
             }
 
             if (string.IsNullOrWhiteSpace(_currentProfile.SelectedModel) && _currentProfile.SavedModels.Count > 0)

@@ -877,6 +877,7 @@ namespace ZenQOffice.UI
         public Rectangle FilterBtnChartRect;
 
         public List<FormattedRun> FormattedRuns { get; set; }
+        public RibbonBar Ribbon { get; set; }
         public List<string> Bookmarks = new List<string>();
         public List<string> Footnotes = new List<string>();
         public List<FootnoteItem> DetailedFootnotes = new List<FootnoteItem>();
@@ -3010,6 +3011,7 @@ namespace ZenQOffice.UI
                 mergedDelRuns.Add(r);
             }
             FormattedRuns = mergedDelRuns;
+            SyncCurrentTabRuns();
 
             if (ParagraphAlignments != null && ParagraphAlignments.Count > 0)
             {
@@ -3336,8 +3338,27 @@ namespace ZenQOffice.UI
             }
 
             FormattedRuns = mergedInsRuns;
+            SyncCurrentTabRuns();
             _lastFoundRun = null;
             _lastFoundRunIndex = -1;
+        }
+
+        public void SyncCurrentTabRuns()
+        {
+            try
+            {
+                var ribbon = this.Ribbon ?? (AppForm.Instance != null ? AppForm.Instance.Ribbon : null);
+                if (ribbon != null && ribbon.DocTabs != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count)
+                {
+                    var curTab = ribbon.DocTabs[ribbon.ActiveDocIndex];
+                    if (curTab != null && curTab.Mode == OfficeAppMode.Writer)
+                    {
+                        curTab.WriterFormattedRuns = FormattedRuns;
+                        curTab.WriterPieceTable = PieceTable;
+                    }
+                }
+            }
+            catch { }
         }
 
         public void ApplyFormatToSelection(string font, float size, bool? bold, bool? italic, bool? underline, bool? strike, Color? col, Color? hl, bool? sub = null, bool? sup = null)
@@ -3392,6 +3413,7 @@ namespace ZenQOffice.UI
             }
             updatedRuns.Add(newRun);
             FormattedRuns = updatedRuns;
+            SyncCurrentTabRuns();
             _lastFoundRun = null;
             _lastFoundRunIndex = -1;
 
@@ -3760,6 +3782,7 @@ namespace ZenQOffice.UI
             PieceTable.SetInitialText(prev.Text ?? "");
 
             FormattedRuns = WriterUndoSnapshot.CloneRuns(prev.FormattedRuns);
+            SyncCurrentTabRuns();
             _lastFoundRun = null;
             _lastFoundRunIndex = -1;
 
@@ -6601,7 +6624,7 @@ namespace ZenQOffice.UI
                 // Luôn xóa sạch Revisions và tắt Track Changes của tài liệu cũ khi mở tài liệu mới
                 TrackChanges = false;
                 Revisions.Clear();
-                if (ribbon != null) ribbon.TrackChangesActive = false;
+                if (ribbon != null) { this.Ribbon = ribbon; ribbon.TrackChangesActive = false; }
 
                 if (ext == ".docx")
                 {

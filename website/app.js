@@ -35,6 +35,7 @@
       "Bảng tính thông minh, phân tích mạnh mẽ",
       "Trình chiếu bài giảng & thuyết trình chuyên nghiệp",
       "Đọc & xử lý tài liệu PDF bảo mật",
+      "ZenQ Mobile — Văn phòng di động thuần C# siêu mượt",
       "Bảo mật ngoại tuyến 100% an toàn"
     ],
     en: [
@@ -42,7 +43,8 @@
       "Smart spreadsheets & powerful analysis",
       "Captivating & dynamic slide presentations",
       "Secure local PDF document reader",
-      "100% Offline & Private on Windows"
+      "ZenQ Mobile — High-performance native mobile suite",
+      "100% Offline & Private on Windows and Android"
     ]
   };
 
@@ -198,6 +200,26 @@
           <div class="mockup-text-line w80"></div>
           <div class="mockup-text-line w90"></div>
           <div class="mockup-text-line w70"></div>
+        </div>
+      `
+    },
+    mobile: {
+      title: "ZenQ_Mobile_App.apk — Native C# Android",
+      icon: "icon/ZENQOFFICE.png",
+      html: `
+        <div style="max-width: 280px; margin: 0 auto; background: #ffffff; border-radius: 18px; border: 3px solid #0f172a; padding: 14px 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.1);">
+          <div style="width: 40px; height: 3px; background: #cbd5e1; border-radius: 3px; margin: 0 auto 10px auto;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-weight: 700; font-size: 0.78rem; color: #0f172a;">📄 Baocao_A4.docx</span>
+            <span style="font-size: 0.65rem; background: #ccfbf1; color: #0f766e; padding: 2px 6px; border-radius: 6px; font-weight: 700;">A4 Chuẩn</span>
+          </div>
+          <div class="mockup-text-line title" style="height: 8px; margin-bottom: 6px;"></div>
+          <div class="mockup-text-line w90" style="height: 6px; margin-bottom: 4px;"></div>
+          <div class="mockup-text-line w80" style="height: 6px; margin-bottom: 4px;"></div>
+          <div class="mockup-text-line w70" style="height: 6px; margin-bottom: 10px;"></div>
+          <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 6px; padding: 6px; font-size: 0.7rem; color: #0f766e; text-align: center; font-weight: 600;">
+            ✓ Động cơ C# Native • Không tràn dòng
+          </div>
         </div>
       `
     }

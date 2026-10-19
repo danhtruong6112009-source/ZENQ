@@ -1232,9 +1232,14 @@ namespace ZenQOffice.UI
                 if (writerView != null)
                 {
                     if (tab.WriterPieceTable == null) tab.WriterPieceTable = new PieceTable();
-                writerView.PieceTable = tab.WriterPieceTable;
-                writerView.InvalidateLayoutAndTextCache();
-                writerView.FormattedRuns = tab.WriterFormattedRuns ?? new List<FormattedRun>();
+                    writerView.PieceTable = tab.WriterPieceTable;
+                    writerView.InvalidateLayoutAndTextCache();
+                    writerView.FormattedRuns = tab.WriterFormattedRuns ?? new List<FormattedRun>();
+                    if (writerView.FormattedRuns.Count == 0 && writerView.PieceTable.Length > 0)
+                    {
+                        writerView.FormattedRuns.Add(new FormattedRun(0, writerView.PieceTable.Length, "Times New Roman", 11.0f, false, false, false, false, Color.Black, Color.Transparent));
+                        tab.WriterFormattedRuns = writerView.FormattedRuns;
+                    }
                 writerView.DocumentShapes = tab.WriterShapes ?? new List<DocShapeObject>();
                 writerView.DocumentCharts = tab.WriterCharts ?? new List<DocChartObject>();
                 writerView.CursorPosition = tab.WriterCursorPosition;

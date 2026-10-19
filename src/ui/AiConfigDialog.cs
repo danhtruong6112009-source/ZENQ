@@ -333,25 +333,66 @@ namespace ZenQOffice.UI
 
         private void LoadConfigToUi()
         {
-            if (Config == null) Config = new AiConfig();
+            if (Config == null) Config = AiConfig.Load();
 
-            int pIdx = (int)Config.Provider;
-            if (pIdx >= 0 && pIdx < cboProvider.Items.Count)
+            var activeProf = Config.GetActiveProfile();
+            if (activeProf != null)
             {
-                cboProvider.SelectedIndex = pIdx;
+                int pIdx = (int)activeProf.Provider;
+                if (pIdx >= 0 && pIdx < cboProvider.Items.Count)
+                {
+                    cboProvider.SelectedIndex = pIdx;
+                }
+                else
+                {
+                    cboProvider.SelectedIndex = 0;
+                }
+
+                UpdateModelList();
+                string modelToSelect = activeProf.SelectedModel ?? "";
+                if (activeProf.Provider == AiProviderType.GoogleAIStudio && modelToSelect == "gemini-3.1-flash")
+                {
+                    modelToSelect = "gemini-3.1-flash-lite";
+                }
+                if (!string.IsNullOrEmpty(modelToSelect))
+                {
+                    if (!cboModel.Items.Contains(modelToSelect))
+                    {
+                        cboModel.Items.Insert(0, modelToSelect);
+                    }
+                    cboModel.Text = modelToSelect;
+                }
+                txtApiKey.Text = activeProf.ApiKey ?? "";
+                txtEndpoint.Text = activeProf.CustomEndpoint ?? "";
+                trkTemp.Value = Math.Max(0, Math.Min(15, (int)(activeProf.Temperature * 10)));
+                lblTempValue.Text = (trkTemp.Value / 10.0f).ToString("0.0");
+                txtSystemPrompt.Text = Config.SystemInstructions ?? "";
             }
             else
             {
-                cboProvider.SelectedIndex = 0;
-            }
+                int pIdx = (int)Config.Provider;
+                if (pIdx >= 0 && pIdx < cboProvider.Items.Count)
+                {
+                    cboProvider.SelectedIndex = pIdx;
+                }
+                else
+                {
+                    cboProvider.SelectedIndex = 0;
+                }
 
-            UpdateModelList();
-            cboModel.Text = Config.ModelName ?? "";
-            txtApiKey.Text = Config.ApiKey ?? "";
-            txtEndpoint.Text = Config.CustomEndpoint ?? "";
-            trkTemp.Value = Math.Max(0, Math.Min(15, (int)(Config.Temperature * 10)));
-            lblTempValue.Text = (trkTemp.Value / 10.0f).ToString("0.0");
-            txtSystemPrompt.Text = Config.SystemInstructions ?? "";
+                UpdateModelList();
+                string modelToSelect = Config.ModelName ?? "";
+                if (Config.Provider == AiProviderType.GoogleAIStudio && modelToSelect == "gemini-3.1-flash")
+                {
+                    modelToSelect = "gemini-3.1-flash-lite";
+                }
+                cboModel.Text = modelToSelect;
+                txtApiKey.Text = Config.ApiKey ?? "";
+                txtEndpoint.Text = Config.CustomEndpoint ?? "";
+                trkTemp.Value = Math.Max(0, Math.Min(15, (int)(Config.Temperature * 10)));
+                lblTempValue.Text = (trkTemp.Value / 10.0f).ToString("0.0");
+                txtSystemPrompt.Text = Config.SystemInstructions ?? "";
+            }
         }
 
         private void UpdateModelList()
@@ -413,12 +454,52 @@ namespace ZenQOffice.UI
 
         private void ReadUiToConfig()
         {
-            Config.Provider = (AiProviderType)Math.Max(0, cboProvider.SelectedIndex);
-            Config.ModelName = cboModel.Text.Trim();
-            Config.ApiKey = txtApiKey.Text.Trim();
-            Config.CustomEndpoint = txtEndpoint.Text.Trim();
-            Config.Temperature = trkTemp.Value / 10.0f;
-            Config.SystemInstructions = txtSystemPrompt.Text.Trim();
+            AiProviderType prov = (AiProviderType)Math.Max(0, cboProvider.SelectedIndex);
+            string model = cboModel.Text.Trim();
+            if (prov == AiProviderType.GoogleAIStudio && model == "gemini-3.1-flash")
+            {
+                model = "gemini-3.1-flash-lite";
+            }
+            string apiKey = txtApiKey.Text.Trim();
+            string endpoint = txtEndpoint.Text.Trim();
+            float temp = trkTemp.Value / 10.0f;
+            string sysPrompt = txtSystemPrompt.Text.Trim();
+
+            Config.Provider = prov;
+            Config.ModelName = model;
+            Config.ApiKey = apiKey;
+            Config.CustomEndpoint = endpoint;
+            Config.Temperature = temp;
+            Config.SystemInstructions = sysPrompt;
+
+            var activeProf = Config.GetActiveProfile();
+            if (activeProf == null && !string.IsNullOrWhiteSpace(apiKey))
+            {
+                activeProf = new AiKeyProfile(AiConfig.GetSimpleProviderName(prov), prov, apiKey, model);
+                Config.Profiles.Add(activeProf);
+                Config.ActiveProfileId = activeProf.Id;
+            }
+
+            if (activeProf != null)
+            {
+                activeProf.Provider = prov;
+                activeProf.ApiKey = apiKey;
+                activeProf.SelectedModel = model;
+                activeProf.CustomEndpoint = endpoint;
+                activeProf.Temperature = temp;
+
+                if (activeProf.SavedModels == null) activeProf.SavedModels = new List<string>();
+                if (!string.IsNullOrEmpty(model) && !activeProf.SavedModels.Contains(model))
+                {
+                    activeProf.SavedModels.Insert(0, model);
+                }
+                // Sanitize obsolete models
+                activeProf.SavedModels.RemoveAll(m => m == "gemini-3.1-flash" || (prov == AiProviderType.GoogleAIStudio && (m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro")));
+                if (activeProf.SavedModels.Count == 0 && !string.IsNullOrEmpty(model))
+                {
+                    activeProf.SavedModels.Add(model);
+                }
+            }
         }
 
         private void BtnTest_Click(object sender, EventArgs e)
@@ -451,6 +532,14 @@ namespace ZenQOffice.UI
         {
             ReadUiToConfig();
             Config.Save();
+            if (AppForm.Instance != null)
+            {
+                AppForm.Instance.RefreshAiChatProfileSelectors();
+                if (AppForm.Instance.AiSidebar != null)
+                {
+                    AppForm.Instance.AiSidebar.ReloadProfilesAndModels();
+                }
+            }
             MessageBox.Show("Đã lưu thiết lập Trợ lý AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
             this.DialogResult = DialogResult.OK;
             this.Close();

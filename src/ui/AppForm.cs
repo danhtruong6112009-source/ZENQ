@@ -809,14 +809,26 @@ namespace ZenQOffice.UI
 
         public void ShowAiConfig()
         {
-            Ribbon.CurrentMode = OfficeAppMode.Home;
-            if (Ribbon.DocTabs != null && Ribbon.DocTabs.Count > 0)
+            if (Ribbon != null)
             {
-                for (int i = 0; i < Ribbon.DocTabs.Count; i++)
+                if (Ribbon.ActiveDocIndex >= 0 && Ribbon.ActiveDocIndex < Ribbon.DocTabs.Count)
                 {
-                    Ribbon.DocTabs[i].Active = (Ribbon.DocTabs[i].Mode == OfficeAppMode.Home);
-                    if (Ribbon.DocTabs[i].Active) Ribbon.ActiveDocIndex = i;
+                    Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                 }
+                Ribbon.CurrentMode = OfficeAppMode.Home;
+                if (Ribbon.DocTabs != null && Ribbon.DocTabs.Count > 0)
+                {
+                    for (int i = 0; i < Ribbon.DocTabs.Count; i++)
+                    {
+                        bool isHome = (Ribbon.DocTabs[i].Mode == OfficeAppMode.Home);
+                        Ribbon.DocTabs[i].Active = isHome;
+                        if (isHome) Ribbon.ActiveDocIndex = i;
+                    }
+                }
+            }
+            if (_aiSidebar != null)
+            {
+                _aiSidebar.Visible = false;
             }
             HomeView.ActiveTab = 2; // Cài đặt (nơi tích hợp cấu hình AI)
             RectangleF sTab = HomeView.GetSettingsTabBounds(ClientSize.Width, 0);
@@ -872,6 +884,11 @@ namespace ZenQOffice.UI
                 {
                     _aiSidebar.SwitchTab(curTab);
                 }
+            }
+
+            if (WriterView != null)
+            {
+                WriterView.InvalidateLayoutAndTextCache();
             }
 
             PositionAiSidebar();
@@ -963,6 +980,7 @@ namespace ZenQOffice.UI
             NewTabRadialLauncher.TargetAppForm = this;
             HomeView = new HomeView();
             WriterView = new WriterView();
+            WriterView.Ribbon = Ribbon;
             CalcView = new CalcView();
             CalcView.ParentForm = this;
             SlidesView = new SlidesView();
@@ -1246,11 +1264,15 @@ namespace ZenQOffice.UI
         /// Đảm bảo ứng dụng luôn giành trọn vẹn Win32 Keyboard Focus để gõ chữ tức thì
         /// mà không cần phải ẩn/hiện hoặc thu nhỏ mở lại cửa sổ.
         /// </summary>
-        public void EnsureKeyboardFocus()
+        public void EnsureKeyboardFocus(bool force = true)
         {
             try
             {
-                if (this.ActiveControl != null && !(this.ActiveControl is TextBoxBase))
+                if (force)
+                {
+                    this.ActiveControl = null;
+                }
+                else if (this.ActiveControl != null && !(this.ActiveControl is TextBoxBase))
                 {
                     this.ActiveControl = null;
                 }
@@ -1444,8 +1466,17 @@ namespace ZenQOffice.UI
 
             if (m.Msg == WM_MOUSEACTIVATE)
             {
-                m.Result = (IntPtr)MA_ACTIVATE;
-                EnsureKeyboardFocus();
+                Point screenPt = Cursor.Position;
+                Point clientPt = this.PointToClient(screenPt);
+                bool overChild = false;
+                if (_aiSidebar != null && _aiSidebar.Visible && _aiSidebar.Bounds.Contains(clientPt)) overChild = true;
+                if (_aiConfigPanel != null && _aiConfigPanel.Visible && _aiConfigPanel.Bounds.Contains(clientPt)) overChild = true;
+
+                if (!overChild)
+                {
+                    EnsureKeyboardFocus(true);
+                }
+                base.WndProc(ref m);
                 return;
             }
 
@@ -2898,9 +2929,14 @@ namespace ZenQOffice.UI
             WriterFloatingMiniToolbarForm.CloseCurrent();
 
             // Đảm bảo Form luôn giành trọn vẹn Win32 Keyboard Focus ngay khi nhấp chuột vào bất cứ đâu
-            if (this.ActiveControl == null || !(this.ActiveControl is TextBoxBase))
+            Point pt = e.Location;
+            bool overChild = false;
+            if (_aiSidebar != null && _aiSidebar.Visible && _aiSidebar.Bounds.Contains(pt)) overChild = true;
+            if (_aiConfigPanel != null && _aiConfigPanel.Visible && _aiConfigPanel.Bounds.Contains(pt)) overChild = true;
+
+            if (!overChild)
             {
-                EnsureKeyboardFocus();
+                EnsureKeyboardFocus(true);
             }
 
             if (BackstageView != null && BackstageView.IsOpen)

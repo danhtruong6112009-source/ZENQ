@@ -132,7 +132,13 @@ namespace ZenQOffice.UI
             };
             btnSettings.Click += (s, e) =>
             {
-                if (_appForm != null) _appForm.ShowAiConfig();
+                using (var dlg = new AiConfigDialog())
+                {
+                    if (dlg.ShowDialog(this.FindForm()) == DialogResult.OK)
+                    {
+                        ReloadProfilesAndModels();
+                    }
+                }
             };
             pnlHeader.Controls.Add(btnSettings);
 
@@ -531,10 +537,23 @@ namespace ZenQOffice.UI
             {
                 foreach (var m in _currentProfile.SavedModels)
                 {
-                    if (!string.IsNullOrEmpty(m) && !m.StartsWith("⏳") && !m.StartsWith("⚠️") && !models.Contains(m))
+                    string cleanM = m;
+                    if (_currentProfile.Provider == AiProviderType.GoogleAIStudio && cleanM == "gemini-3.1-flash")
                     {
-                        models.Add(m);
+                        cleanM = "gemini-3.1-flash-lite";
                     }
+                    if (!string.IsNullOrEmpty(cleanM) && !cleanM.StartsWith("⏳") && !cleanM.StartsWith("⚠️") && !models.Contains(cleanM))
+                    {
+                        models.Add(cleanM);
+                    }
+                }
+            }
+
+            if (_currentProfile.Provider == AiProviderType.GoogleAIStudio)
+            {
+                if (_currentProfile.SelectedModel == "gemini-3.1-flash")
+                {
+                    _currentProfile.SelectedModel = "gemini-3.1-flash-lite";
                 }
             }
 

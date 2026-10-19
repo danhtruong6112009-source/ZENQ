@@ -1,6 +1,6 @@
 # ZENQ OFFICE - OFFICIAL WEBSITE
 
-Trang web chính thức giới thiệu bộ ứng dụng văn phòng thế hệ mới **ZENQ OFFICE 4.2** (Writer, Calc, Slides, PDF, Remote).
+Trang web chính thức giới thiệu bộ ứng dụng văn phòng thế hệ mới **ZENQ OFFICE 4.0** (Writer, Calc, Slides, PDF, Remote).
 
 ## Tính Năng Nổi Bật Của Website
 - **Song ngữ Anh - Việt (Bilingual VI / EN)**: Mặc định ưu tiên Tiếng Việt, có nút chuyển đổi tức thì. Toàn bộ nội dung được biên soạn từ bộ từ điển thuật ngữ công nghệ chuẩn xác (`dictionary.js`), không dùng máy dịch tự động.
@@ -15,7 +15,7 @@ Trang web chính thức giới thiệu bộ ứng dụng văn phòng thế hệ 
   - **Trang chủ (HOME)**: Giới thiệu tổng quan, số liệu ấn tượng, mô phỏng giao diện, bảng so sánh tính năng với MS Office & WPS.
   - **Về chúng tôi (ABOUT US)**: Câu chuyện khởi nguồn của NextGenEduSpace Studio, Tầm nhìn, Sứ mệnh và 3 Giá trị cốt lõi.
   - **Hỏi & Đáp (FAQ)**: 8 câu hỏi cốt lõi giải đáp chi tiết mọi thắc mắc của người dùng.
-  - **Tải về (DOWNLOAD)**: Liên kết tải bản cài đặt `ZenQOffice-Setup.exe` (v4.2) và thông số kỹ thuật.
+  - **Tải về (DOWNLOAD)**: Liên kết tải bản cài đặt `ZenQOffice-Setup.exe` (v4.0) và thông số kỹ thuật.
 
 ## Hướng Dẫn Deploy Lên GitHub Pages (`https://github.com/danhtruong6112009-source/ZENQ.git`)
 

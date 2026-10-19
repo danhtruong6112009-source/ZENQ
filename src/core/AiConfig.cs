@@ -524,9 +524,13 @@ namespace ZenQOffice.Core
                                     string mVal = mNode.InnerText != null ? mNode.InnerText.Trim() : "";
                                     if (!string.IsNullOrEmpty(mVal))
                                     {
-                                        if (prof.Provider == AiProviderType.GoogleAIStudio && (mVal.StartsWith("gemini-1.") || mVal.StartsWith("gemini-2.") || mVal == "gemini-2.5-flash" || mVal == "gemini-2.5-pro"))
+                                        if (prof.Provider == AiProviderType.GoogleAIStudio)
                                         {
-                                            continue; // Bỏ các model Google Gemini từ 2.5 trở xuống đã ngưng hỗ trợ
+                                            if (mVal == "gemini-3.1-flash") mVal = "gemini-3.1-flash-lite";
+                                            if (mVal.StartsWith("gemini-1.") || mVal.StartsWith("gemini-2.") || mVal == "gemini-2.5-flash" || mVal == "gemini-2.5-pro")
+                                            {
+                                                continue; // Bỏ các model Google Gemini từ 2.5 trở xuống đã ngưng hỗ trợ
+                                            }
                                         }
 
                                         if (!prof.SavedModels.Contains(mVal))
@@ -537,9 +541,14 @@ namespace ZenQOffice.Core
                                 }
                             }
 
-                            if (prof.Provider == AiProviderType.GoogleAIStudio && (prof.SelectedModel.StartsWith("gemini-1.") || prof.SelectedModel.StartsWith("gemini-2.") || prof.SelectedModel == "gemini-2.5-flash" || prof.SelectedModel == "gemini-2.5-pro"))
+                            if (prof.Provider == AiProviderType.GoogleAIStudio)
                             {
-                                prof.SelectedModel = "gemini-3.7-flash";
+                                if (prof.SelectedModel == "gemini-3.1-flash") prof.SelectedModel = "gemini-3.1-flash-lite";
+                                if (prof.SelectedModel.StartsWith("gemini-1.") || prof.SelectedModel.StartsWith("gemini-2.") || prof.SelectedModel == "gemini-2.5-flash" || prof.SelectedModel == "gemini-2.5-pro")
+                                {
+                                    prof.SelectedModel = "gemini-3.7-flash";
+                                }
+                                prof.SavedModels.RemoveAll(m => m == "gemini-3.1-flash" || m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro");
                             }
 
                             if (!string.IsNullOrEmpty(prof.SelectedModel) && !prof.SavedModels.Contains(prof.SelectedModel))
@@ -635,6 +644,25 @@ namespace ZenQOffice.Core
                 {
                     // CHỈ lưu profile đã cấu hình đầy đủ
                     if (!prof.IsConfigured) continue;
+
+                    if (prof.Provider == AiProviderType.GoogleAIStudio)
+                    {
+                        if (prof.SelectedModel == "gemini-3.1-flash") prof.SelectedModel = "gemini-3.1-flash-lite";
+                        if (prof.SavedModels != null)
+                        {
+                            for (int si = 0; si < prof.SavedModels.Count; si++)
+                            {
+                                if (prof.SavedModels[si] == "gemini-3.1-flash") prof.SavedModels[si] = "gemini-3.1-flash-lite";
+                            }
+                            prof.SavedModels.RemoveAll(m => m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro");
+                            List<string> cleanList = new List<string>();
+                            foreach (var m in prof.SavedModels)
+                            {
+                                if (!cleanList.Contains(m)) cleanList.Add(m);
+                            }
+                            prof.SavedModels = cleanList;
+                        }
+                    }
 
                     XmlElement pNode = doc.CreateElement("Profile");
                     nodeProfiles.AppendChild(pNode);

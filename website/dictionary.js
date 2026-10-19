@@ -17,18 +17,19 @@ const DICTIONARY = {
     nav_lang_btn: "English",
 
     // Hero Section
-    hero_badge: "Phiên bản chính thức v4.2 • Bộ Ứng Dụng Văn Phòng Thế Hệ Mới",
+    hero_badge: "Phiên bản chính thức v5.7 • Đa Nền Tảng Windows & Android",
     hero_title_1: "Bộ Ứng Dụng Văn Phòng",
-    hero_title_accent: "Hiện Đại Cho Windows",
-    hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà. Tương thích hoàn hảo chuẩn tài liệu OpenXML quốc tế và bảo mật ngoại tuyến 100%.",
-    hero_cta_download: "Tải ZenQ Office Cho Windows",
+    hero_title_accent: "Hiện Đại Cho Windows & Di Động",
+    hero_desc: "Trải nghiệm soạn thảo văn bản, bảng tính, bài trình chiếu và tài liệu PDF mượt mà trên máy tính Windows và điện thoại Android. Tương thích chuẩn OpenXML quốc tế và bảo mật ngoại tuyến 100%.",
+    hero_cta_download: "Tải Cho Windows (EXE)",
+    hero_cta_download_mobile: "Tải ZenQ Mobile (APK)",
     hero_cta_explore: "Khám Phá Tính Năng",
-    hero_subtext: "Miễn phí trọn đời • Hoạt động ngoại tuyến không cần Internet • Tối ưu cho Windows 10 & 11",
+    hero_subtext: "Miễn phí trọn đời • Hoạt động ngoại tuyến không cần Internet • Tối ưu cho Windows 10/11 & Android",
 
     // Quick Highlights Bar
-    stat_apps_val: "4 Ứng dụng",
-    stat_apps_lbl: "Bộ công cụ toàn diện",
-    stat_apps_sub: "Writer, Calc, Slides và PDF",
+    stat_apps_val: "5 Ứng dụng & Nền tảng",
+    stat_apps_lbl: "Hệ sinh thái toàn diện",
+    stat_apps_sub: "Writer, Calc, Slides, PDF & ZenQ Mobile",
 
     stat_compat_val: "100%",
     stat_compat_lbl: "Tương thích chuẩn Office",
@@ -50,15 +51,16 @@ const DICTIONARY = {
     mockup_prop_view_lbl: "Chế độ xem",
     mockup_prop_view_val: "Khổ giấy in ấn A4 chuẩn",
 
-    // Apps Showcase Section (Only 4 Apps: Writer, Calc, Slides, PDF)
+    // Apps Showcase Section (Writer, Calc, Slides, PDF & ZenQ Mobile)
     apps_section_badge: "BỘ ỨNG DỤNG VĂN PHÒNG",
-    apps_section_title: "Bốn Phân Hệ Cốt Lõi Cho Mọi Nhu Cầu Công Việc",
-    apps_section_desc: "ZenQ Office cho phép mở từng ứng dụng độc lập từ lối tắt Desktop hoặc sử dụng chung trong giao diện Tab thông minh. Thao tác tiện lợi, không cửa sổ thừa.",
+    apps_section_title: "Bộ Ứng Dụng Toàn Diện Trên Mọi Thiết Bị",
+    apps_section_desc: "ZenQ Office mang đến trải nghiệm đồng nhất trên máy tính Windows và thiết bị di động Android. Tự động nhận diện định dạng, thao tác tiện lợi, không quảng cáo hay theo dõi.",
     
     app_tab_writer: "ZenQ Writer",
     app_tab_calc: "ZenQ Calc",
     app_tab_slides: "ZenQ Slides",
     app_tab_pdf: "ZenQ PDF",
+    app_tab_mobile: "ZenQ Mobile",
 
     // Writer Details
     writer_title: "ZenQ Writer — Soạn thảo văn bản chuẩn in ấn đỉnh cao",
@@ -91,6 +93,14 @@ const DICTIONARY = {
     pdf_feat_2: "Tìm kiếm từ khóa tức thì và xem trước thumbnail trang tiện lợi",
     pdf_feat_3: "Đăng ký ứng dụng đọc PDF mặc định Windows 10 & Windows 11 dễ dàng",
     pdf_feat_4: "Bảo mật nội bộ 100%, không lo rò rỉ tài liệu nhạy cảm",
+
+    // Mobile Details
+    mobile_title: "ZenQ Mobile — Văn phòng di động thuần C# hiệu năng cao",
+    mobile_desc: "Ứng dụng văn phòng native chạy trên nền tảng .NET 10 Android, không sử dụng WebView hay JavaScript nặng nề. Mở tự động nhận diện định dạng DOCX, XLSX, PPTX, PDF, dàn trang A4 chuẩn xác chống tràn dòng, hỗ trợ công thức Toán học OMML và chỉnh sửa tiện lợi với bàn phím ảo.",
+    mobile_feat_1: "Động cơ Native C# siêu mượt, khởi động tức thì, tiết kiệm pin tối đa",
+    mobile_feat_2: "Căn lề và chia trang A4 chuẩn Word, chống lỗi nhảy trang và trích xuất hình ảnh nhúng",
+    mobile_feat_3: "Bảng tính Calc kẻ ô lưới sắc nét, chèn công thức nhanh SUM, AVERAGE",
+    mobile_feat_4: "Tải trực tiếp tệp cài đặt APK, bảo mật 100% ngoại tuyến, không thu thập dữ liệu",
 
     // Core Highlights Section (Thay thế bảng so sánh, ghi thẳng tên ZenQ Office)
     highlights_section_badge: "TÍNH NĂNG VƯỢT TRỘI",
@@ -163,21 +173,27 @@ const DICTIONARY = {
 
     // Download Section
     dl_section_badge: "TẢI VỀ NGAY",
-    dl_section_title: "Trải Nghiệm ZenQ Office Cho Windows",
-    dl_section_desc: "Tải bản cài đặt chính thức v4.2. Cài đặt nhanh chóng và bắt đầu làm việc hiệu quả ngay hôm nay.",
-    dl_btn_main: "Tải Bộ Cài Đặt (ZenQOffice-Setup.exe)",
-    dl_btn_portable: "Tải Bản Portable (.zip)",
+    dl_section_title: "Tải ZenQ Office Đa Nền Tảng",
+    dl_section_desc: "Trải nghiệm trọn vẹn bộ ứng dụng văn phòng thế hệ mới trên Máy tính Windows và Điện thoại Android. Miễn phí trọn đời, bảo mật ngoại tuyến 100%.",
+    dl_win_title: "ZenQ Office cho Windows",
+    dl_win_desc: "Bộ 4 ứng dụng cốt lõi Writer, Calc, Slides, PDF với giao diện Tab thông minh, thanh Ribbon trực quan và đồ họa Direct2D mượt mà.",
+    dl_btn_win: "Tải Bộ Cài Đặt (Setup.exe)",
+    dl_mobile_title: "ZenQ Mobile cho Android",
+    dl_mobile_desc: "Văn phòng di động thuần C# .NET 10 cho Android. Hiển thị chuẩn A4 chống nhảy trang, trích xuất hình ảnh, kẻ ô Calc và thanh công cụ soạn thảo trực quan.",
+    dl_btn_mobile: "Tải Trực Tiếp (ZenQMobile.apk)",
+    dl_btn_main: "Tải Bộ Cài Đặt (Setup.exe)",
+    dl_btn_portable: "Tải Bản Di Động (.apk)",
     
     dl_meta_ver: "Phiên bản:",
     dl_meta_os: "Hệ điều hành:",
-    dl_meta_os_val: "Windows 10 / 11 (64-bit)",
+    dl_meta_os_val: "Windows 10 / 11 & Android 7.0+",
     dl_meta_formats: "Định dạng:",
     dl_meta_formats_val: "DOCX, XLSX, PPTX, PDF",
     dl_meta_license: "Bản quyền:",
     dl_meta_license_val: "Miễn phí trọn đời",
 
     // Footer
-    footer_desc: "Bộ ứng dụng văn phòng thế hệ mới cho Windows. Tối ưu trải nghiệm, bảo mật ngoại tuyến và miễn phí trọn đời.",
+    footer_desc: "Bộ ứng dụng văn phòng thế hệ mới cho Windows và Android. Tối ưu trải nghiệm, bảo mật ngoại tuyến và miễn phí trọn đời.",
     footer_col_products: "Sản phẩm",
     footer_col_resources: "Tài nguyên",
     footer_col_company: "Tổ chức",
@@ -196,18 +212,19 @@ const DICTIONARY = {
     nav_lang_btn: "Tiếng Việt",
 
     // Hero Section
-    hero_badge: "Official Release v4.2 • Next-Gen Office Suite",
+    hero_badge: "Official Release v5.7 • Cross-Platform Windows & Android Suite",
     hero_title_1: "Modern Office Suite",
-    hero_title_accent: "Crafted for Windows",
-    hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling. 100% offline and seamlessly compatible with international OpenXML standard formats.",
-    hero_cta_download: "Download ZenQ Office for Windows",
+    hero_title_accent: "Crafted for Windows & Mobile",
+    hero_desc: "Enjoy fluid document authoring, powerful spreadsheets, captivating presentations, and secure PDF handling across Windows PC and Android mobile. 100% offline and standard OpenXML compatible.",
+    hero_cta_download: "Download for Windows (EXE)",
+    hero_cta_download_mobile: "Download ZenQ Mobile (APK)",
     hero_cta_explore: "Explore Applications",
-    hero_subtext: "Lifetime Free • 100% Offline with Zero Cloud Requirement • Optimized for Windows 10 & 11",
+    hero_subtext: "Lifetime Free • 100% Offline with Zero Cloud Requirement • Optimized for Windows 10/11 & Android",
 
     // Quick Highlights Bar
-    stat_apps_val: "4 Core Apps",
-    stat_apps_lbl: "Complete Suite",
-    stat_apps_sub: "Writer, Calc, Slides & PDF",
+    stat_apps_val: "5 Apps & Platforms",
+    stat_apps_lbl: "Unified Ecosystem",
+    stat_apps_sub: "Writer, Calc, Slides, PDF & ZenQ Mobile",
 
     stat_compat_val: "100%",
     stat_compat_lbl: "Office Standard Ready",
@@ -229,15 +246,16 @@ const DICTIONARY = {
     mockup_prop_view_lbl: "Page View",
     mockup_prop_view_val: "Standard A4 Layout",
 
-    // Apps Showcase Section (Only 4 Apps: Writer, Calc, Slides, PDF)
+    // Apps Showcase Section (Writer, Calc, Slides, PDF & ZenQ Mobile)
     apps_section_badge: "OFFICE APPLICATIONS",
-    apps_section_title: "Four Essential Apps for Every Workflow",
-    apps_section_desc: "Launch each application independently from Desktop shortcuts or work seamlessly in a unified tabbed interface. Convenient, uncluttered, and efficient.",
+    apps_section_title: "Comprehensive Office Modules for Any Device",
+    apps_section_desc: "ZenQ Office delivers a unified experience on Windows PCs and Android mobile devices. Automatic format detection, distraction-free workflow, and zero tracking.",
     
     app_tab_writer: "ZenQ Writer",
     app_tab_calc: "ZenQ Calc",
     app_tab_slides: "ZenQ Slides",
     app_tab_pdf: "ZenQ PDF",
+    app_tab_mobile: "ZenQ Mobile",
 
     // Writer Details
     writer_title: "ZenQ Writer — Professional Document Publishing",
@@ -271,6 +289,14 @@ const DICTIONARY = {
     pdf_feat_3: "Convenient default PDF reader registration on Windows 10 & 11",
     pdf_feat_4: "100% Local privacy with zero data transmission to external servers",
 
+    // Mobile Details
+    mobile_title: "ZenQ Mobile — High-Performance Native C# Mobile Suite",
+    mobile_desc: "A native office application built with .NET 10 Android, completely free of bloated WebViews or slow JavaScript. Automatically identifies and opens DOCX, XLSX, PPTX, and PDF files, renders standard A4 paginated layouts with no page-overflow errors, supports OMML math equations, and enables comfortable touch editing with virtual keyboard integration.",
+    mobile_feat_1: "Ultra-smooth native C# engine, instant app startup, and minimal battery usage",
+    mobile_feat_2: "Standard Word A4 pagination, prevents layout jump bugs and extracts embedded images",
+    mobile_feat_3: "Crisp Calc spreadsheet grid with quick formula entry (SUM, AVERAGE)",
+    mobile_feat_4: "Direct APK installer download, 100% offline security with zero data tracking",
+
     // Core Highlights Section (Direct ZenQ Office capabilities)
     highlights_section_badge: "CORE ADVANTAGES",
     highlights_section_title: "The Pillars of ZenQ Office",
@@ -295,7 +321,7 @@ const DICTIONARY = {
     
     about_story_title: "The Origin Story",
     about_story_p1: "In the digital era, documents represent knowledge and everyday productivity for students, educators, and professionals. Yet existing suites have grown increasingly complex, tied to constant online connections, and requiring expensive hardware.",
-    about_story_p2: "We established ZenQ Office with a singular focus: Redefine the Windows office experience with modern engineering, smooth workflows, and uncompromised respect for user privacy and document sovereignty.",
+    about_story_p2: "We established ZenQ Office with a singular focus: Redefine the office experience with modern engineering, smooth workflows, and uncompromised respect for user privacy and document sovereignty.",
     
     about_vision_title: "Vision & Mission",
     about_vision_desc: "Deliver high-standard localized office software in Vietnam that provides an independent, secure, and permanently free productivity foundation for education and communities.",
@@ -306,7 +332,7 @@ const DICTIONARY = {
     about_val2_title: "2. Inviolable Privacy",
     about_val2_desc: "Your data belongs exclusively to you on your machine. We never inject telemetry trackers, display ads, or force account registrations.",
     about_val3_title: "3. Elegance & Standards",
-    about_val3_desc: "A clean modern interface adhering to Windows standards with harmonious aesthetics and familiar workflows.",
+    about_val3_desc: "A clean modern interface adhering to platform standards with harmonious aesthetics and familiar workflows.",
 
     // FAQ Section
     faq_section_badge: "FAQ",
@@ -342,21 +368,27 @@ const DICTIONARY = {
 
     // Download Section
     dl_section_badge: "DOWNLOAD NOW",
-    dl_section_title: "Experience ZenQ Office for Windows",
-    dl_section_desc: "Download official release v4.2. Quick setup to start working productively today.",
-    dl_btn_main: "Download Installer (ZenQOffice-Setup.exe)",
-    dl_btn_portable: "Download Portable (.zip)",
+    dl_section_title: "Download ZenQ Office Across Platforms",
+    dl_section_desc: "Experience the next-generation office suite on Windows PC and Android Mobile. Free for lifetime, 100% offline & private.",
+    dl_win_title: "ZenQ Office for Windows",
+    dl_win_desc: "Full 4 core desktop applications (Writer, Calc, Slides, PDF) with smart tabs, intuitive ribbon, and smooth Direct2D graphics.",
+    dl_btn_win: "Download Installer (Setup.exe)",
+    dl_mobile_title: "ZenQ Mobile for Android",
+    dl_mobile_desc: "Native C# .NET 10 mobile office for Android. True A4 pagination, image extraction, Calc spreadsheet grid, and touch formatting toolbar.",
+    dl_btn_mobile: "Direct APK Download (ZenQMobile.apk)",
+    dl_btn_main: "Download Installer (Setup.exe)",
+    dl_btn_portable: "Download Mobile App (.apk)",
     
     dl_meta_ver: "Version:",
     dl_meta_os: "Operating System:",
-    dl_meta_os_val: "Windows 10 / 11 (64-bit)",
+    dl_meta_os_val: "Windows 10 / 11 & Android 7.0+",
     dl_meta_formats: "Supported Formats:",
     dl_meta_formats_val: "DOCX, XLSX, PPTX, PDF",
     dl_meta_license: "License:",
     dl_meta_license_val: "Free for Lifetime",
 
     // Footer
-    footer_desc: "Next-generation office suite for Windows. Modern workflow, 100% offline security, and lifetime free.",
+    footer_desc: "Next-generation office suite for Windows and Android. Modern workflow, 100% offline security, and lifetime free.",
     footer_col_products: "Products",
     footer_col_resources: "Resources",
     footer_col_company: "Organization",
