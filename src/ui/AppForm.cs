@@ -154,6 +154,7 @@ namespace ZenQOffice.UI
             SetModeIcon(mode);
             ApplyWindowAppId();
             PositionAiConfigPanel();
+            EnsureKeyboardFocus();
             Invalidate();
         }
 
@@ -918,6 +919,7 @@ namespace ZenQOffice.UI
                     _aiSidebar.Visible = false;
                 }
             }
+            EnsureKeyboardFocus();
             Invalidate();
         }
 
@@ -1150,6 +1152,13 @@ namespace ZenQOffice.UI
             catch { }
         }
 
+        private const int WM_ACTIVATE = 0x0006;
+        private const int WM_SETFOCUS = 0x0007;
+        private const int WM_KILLFOCUS = 0x0008;
+        private const int WM_MOUSEACTIVATE = 0x0021;
+        private const int MA_ACTIVATE = 1;
+        private const int MA_ACTIVATEANDEAT = 2;
+
         private const int WM_NCCALCSIZE = 0x0083;
         private const int WM_NCHITTEST = 0x0084;
         private const int WM_NCACTIVATE = 0x0086;
@@ -1219,6 +1228,75 @@ namespace ZenQOffice.UI
 
         [DllImport("user32.dll")]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetFocus(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetFocus();
+
+        /// <summary>
+        /// Đảm bảo ứng dụng luôn giành trọn vẹn Win32 Keyboard Focus để gõ chữ tức thì
+        /// mà không cần phải ẩn/hiện hoặc thu nhỏ mở lại cửa sổ.
+        /// </summary>
+        public void EnsureKeyboardFocus()
+        {
+            try
+            {
+                if (this.ActiveControl != null && !(this.ActiveControl is TextBoxBase))
+                {
+                    this.ActiveControl = null;
+                }
+                if (!this.Focused)
+                {
+                    this.Focus();
+                    this.Select();
+                }
+                if (this.IsHandleCreated)
+                {
+                    SetFocus(this.Handle);
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            try
+            {
+                this.Activate();
+                this.BringToFront();
+                EnsureKeyboardFocus();
+                if (this.IsHandleCreated)
+                {
+                    SetForegroundWindow(this.Handle);
+                    SetActiveWindow(this.Handle);
+                    SetFocus(this.Handle);
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            try
+            {
+                if (this.ActiveControl == null || !(this.ActiveControl is TextBoxBase))
+                {
+                    EnsureKeyboardFocus();
+                }
+            }
+            catch { }
+        }
 
         protected override CreateParams CreateParams
         {
@@ -1362,6 +1440,36 @@ namespace ZenQOffice.UI
                     m.Result = IntPtr.Zero;
                     return;
                 }
+            }
+
+            if (m.Msg == WM_MOUSEACTIVATE)
+            {
+                m.Result = (IntPtr)MA_ACTIVATE;
+                EnsureKeyboardFocus();
+                return;
+            }
+
+            if (m.Msg == WM_ACTIVATE)
+            {
+                base.WndProc(ref m);
+                if (m.WParam != IntPtr.Zero)
+                {
+                    if (this.ActiveControl == null || !(this.ActiveControl is TextBoxBase))
+                    {
+                        EnsureKeyboardFocus();
+                    }
+                }
+                return;
+            }
+
+            if (m.Msg == WM_SETFOCUS)
+            {
+                base.WndProc(ref m);
+                if (this.ActiveControl != null && !(this.ActiveControl is TextBoxBase))
+                {
+                    this.ActiveControl = null;
+                }
+                return;
             }
 
             if (m.Msg == WM_NCACTIVATE)
@@ -2789,6 +2897,12 @@ namespace ZenQOffice.UI
             base.OnMouseDown(e);
             WriterFloatingMiniToolbarForm.CloseCurrent();
 
+            // Đảm bảo Form luôn giành trọn vẹn Win32 Keyboard Focus ngay khi nhấp chuột vào bất cứ đâu
+            if (this.ActiveControl == null || !(this.ActiveControl is TextBoxBase))
+            {
+                EnsureKeyboardFocus();
+            }
+
             if (BackstageView != null && BackstageView.IsOpen)
             {
                 int topFillH = (Ribbon != null && !Ribbon.StandaloneMode && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : (Ribbon != null && !Ribbon.StandaloneMode ? 36 : 0);
@@ -3398,6 +3512,7 @@ namespace ZenQOffice.UI
                         Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                     }
                     PositionAiConfigPanel();
+                    EnsureKeyboardFocus();
                     Invalidate();
                     return;
                 }

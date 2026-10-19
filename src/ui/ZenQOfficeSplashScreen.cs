@@ -162,6 +162,7 @@ namespace ZenQOffice.UI
                 if (Opacity <= 0.02)
                 {
                     _animTimer.Stop();
+                    TopMost = false;
                     Hide();
 
                     if (OnSplashFinished != null)
@@ -176,9 +177,14 @@ namespace ZenQOffice.UI
                         }
                         _mainAppForm.Show();
                         _mainAppForm.Activate();
-                        _mainAppForm.Focus();
+                        _mainAppForm.BringToFront();
+                        _mainAppForm.EnsureKeyboardFocus();
                     }
-                    Close();
+                    try
+                    {
+                        if (!IsDisposed) Close();
+                    }
+                    catch { }
                     return;
                 }
             }

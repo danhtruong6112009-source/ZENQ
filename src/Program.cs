@@ -49,6 +49,7 @@ namespace ZenQOffice
                     return;
                 }
 
+
                 if (args != null && args.Length > 0 && args[0].Equals("--test-svg", StringComparison.OrdinalIgnoreCase))
                 {
                     string svgPath = args.Length > 1 ? args[1] : "sample.svg";
@@ -528,7 +529,8 @@ namespace ZenQOffice
 
                 mainForm.Show();
                 mainForm.Activate();
-                mainForm.Focus();
+                mainForm.BringToFront();
+                mainForm.EnsureKeyboardFocus();
                 return;
             }
 
@@ -537,6 +539,19 @@ namespace ZenQOffice
             {
                 try
                 {
+                    try
+                    {
+                        if (_splash != null)
+                        {
+                            _splash.TopMost = false;
+                            _splash.Hide();
+                            _splash.Close();
+                            _splash.Dispose();
+                            _splash = null;
+                        }
+                    }
+                    catch { }
+
                     AppForm mainForm = new AppForm();
                     MainForm = mainForm;
                     mainForm.FormClosed += (s, e) =>
@@ -548,7 +563,8 @@ namespace ZenQOffice
                     // Show the form FIRST so Home tab renders immediately
                     mainForm.Show();
                     mainForm.Activate();
-                    mainForm.Focus();
+                    mainForm.BringToFront();
+                    mainForm.EnsureKeyboardFocus();
 
                     // Defer session restore by 150ms so the form finishes its first paint
                     // before we do any heavy file I/O on the UI thread
@@ -562,6 +578,7 @@ namespace ZenQOffice
                             sessionTimer.Dispose();
                             SessionManager.RestoreSessionIntoApp(mainForm);
                             mainForm.Invalidate();
+                            mainForm.EnsureKeyboardFocus();
                         }
                         catch { }
                     };
