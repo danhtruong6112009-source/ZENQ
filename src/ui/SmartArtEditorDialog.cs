@@ -58,13 +58,14 @@ namespace ZenQOffice.UI
                 Width = 330,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Regular)
             };
-            _cboColorTheme.Items.Add("🟠 Cam & Vàng (Office Warm)");
-            _cboColorTheme.Items.Add("🔵 Xanh Lam Chuẩn (Office Blue)");
             _cboColorTheme.Items.Add("🌈 Đa sắc màu (Colorful Accent)");
+            _cboColorTheme.Items.Add("🟠 Cam & Vàng (Office Warm)");
+            _cboColorTheme.Items.Add("🔵 Xanh Lam & Lục (Colorful Cool)");
+            _cboColorTheme.Items.Add("🔷 Xanh Lam Chuẩn (Office Blue)");
             _cboColorTheme.Items.Add("🟢 Xanh Lục (Emerald Green)");
             _cboColorTheme.Items.Add("🟣 Tím & Hồng (Purple & Magenta)");
             _cboColorTheme.Items.Add("⚫ Đơn sắc (Monochrome Gray)");
-            _cboColorTheme.SelectedIndex = Math.Max(0, Math.Min(5, currentColorPreset));
+            _cboColorTheme.SelectedIndex = Math.Max(0, Math.Min(6, currentColorPreset));
             pnlColor.Controls.Add(lblColor);
             pnlColor.Controls.Add(_cboColorTheme);
             Controls.Add(pnlColor);

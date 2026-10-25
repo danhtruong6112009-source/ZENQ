@@ -153,20 +153,11 @@ namespace ZenQOffice.UI
             else
             {
                 float diff = TargetScrollY - SmoothScrollY;
-                float step = diff * 0.22f;
-                float maxStep = 80f;
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
+                float step = diff * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diff) * Math.Min(Math.Abs(diff), 2.0f);
 
                 float nextSmooth = SmoothScrollY + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                if (nextInt == prevInt)
-                {
-                    nextInt = prevInt + Math.Sign(diff);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diff > 0 && nextInt >= targetInt) || (diff < 0 && nextInt <= targetInt))
+                if (Math.Abs(TargetScrollY - nextSmooth) <= 1.5f)
                 {
                     SmoothScrollY = TargetScrollY;
                 }
@@ -445,6 +436,13 @@ namespace ZenQOffice.UI
             float pw = RightPanelWidth - 40f;
             float curY = 294f + index * 44f;
             return new RectangleF(px, curY, pw, 40f);
+        }
+
+        public RectangleF GetBugReportTabBounds(int width, int scrollY = 0)
+        {
+            float h = (scrollY > 200) ? scrollY : _lastHeight;
+            if (h < 200) h = 750f;
+            return new RectangleF(12f, h - 96f, SidebarWidth - 24f, 38f);
         }
 
         public RectangleF GetSettingsTabBounds(int width, int scrollY = 0)
@@ -1316,6 +1314,11 @@ namespace ZenQOffice.UI
         private void DrawVectorQuestionIcon(Graphics g, float cx, float cy, float size, Color color)
         {
             FluentIconRenderer.DrawGlyph(g, '\uE897', new RectangleF(cx - size / 2f, cy - size / 2f, size, size), color, size * 0.72f);
+        }
+
+        private void DrawVectorFeedbackIcon(Graphics g, float cx, float cy, float size, Color color)
+        {
+            FluentIconRenderer.DrawGlyph(g, '\uED15', new RectangleF(cx - size / 2f, cy - size / 2f, size, size), color, size * 0.72f);
         }
 
         private void DrawVectorGearIcon(Graphics g, float cx, float cy, float size, Color color)
@@ -2233,11 +2236,14 @@ namespace ZenQOffice.UI
             DrawSidebarAppNavItem(g, GetAppNavBounds(4, width, height), "Đồ họa & Ảnh", OfficeAppMode.Photo, HoverSidebarApp == 4);
 
             // 2.4 Settings at bottom
-            float sepY = height - 56f;
+            float sepY = height - 104f;
             using (Pen sepPen = new Pen(Color.FromArgb(234, 236, 240), 1f))
             {
                 g.DrawLine(sepPen, 16f, sepY, SidebarWidth - 16f, sepY);
             }
+            RectangleF bugReportRect = GetBugReportTabBounds(width, height);
+            DrawSidebarNavItem(g, bugReportRect, "Báo lỗi & Góp ý", (gr, ix, iy, isz, icol) => DrawVectorFeedbackIcon(gr, ix + isz / 2f, iy + isz / 2f, isz, icol), false, HoverTabIndex == 4);
+
             RectangleF tab2Rect = GetSettingsTabBounds(width, height);
             DrawSidebarNavItem(g, tab2Rect, "Cài đặt", (gr, ix, iy, isz, icol) => DrawVectorGearIcon(gr, ix + isz / 2f, iy + isz / 2f, isz, icol), ActiveTab == 2, HoverTabIndex == 2);
 
@@ -3327,6 +3333,7 @@ namespace ZenQOffice.UI
             RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
             RectangleF openDocNav = GetOpenDocNavBounds(width, height);
             RectangleF trashTab = GetTrashTabBounds(width, height);
+            RectangleF bugReportTab = GetBugReportTabBounds(width, height);
             RectangleF settingsTab = GetSettingsTabBounds(width, height);
             RectangleF helpRect = GetHelpBtnBounds(width, height);
             RectangleF updateRect = GetUpdateBtnBounds(width, height);
@@ -3334,6 +3341,7 @@ namespace ZenQOffice.UI
             if (myDocsTab.Contains(x, y)) HoverTabIndex = 0;
             else if (openDocNav.Contains(x, y)) { HoverTabIndex = 3; HoverSidebarDoc = true; }
             else if (trashTab.Contains(x, y)) HoverTabIndex = 1;
+            else if (bugReportTab.Contains(x, y)) HoverTabIndex = 4;
             else if (settingsTab.Contains(x, y)) HoverTabIndex = 2;
 
             for (int a = 0; a < 5; a++)
@@ -3571,6 +3579,16 @@ namespace ZenQOffice.UI
                 ScrollY = 0;
                 return null;
             }
+            RectangleF bugReportTab = GetBugReportTabBounds(width, height);
+            if (bugReportTab.Contains(x, y))
+            {
+                using (var dlg = new BugReportDialogForm())
+                {
+                    dlg.ShowDialog();
+                }
+                return null;
+            }
+
             if (settingsTab.Contains(x, y))
             {
                 ActiveTab = 2;
@@ -3882,10 +3900,10 @@ namespace ZenQOffice.UI
                 if (SettingLangEnRect.Contains(x, y)) { AppSettings.Instance.Language = AppLanguage.English; AppSettings.Instance.Save(); return null; }
                 if (SettingCheckUpdateBtnRect.Contains(x, y)) { using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo)) { dlg.ShowDialog(); } return null; }
                 if (SettingHelpBtnRect.Contains(x, y)) { ShowHelpDialog(); return null; }
-                if (SettingShortcutWriterRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Writer", "-writer", "icon\\writer.ico", "Soạn thảo văn bản ZenQ Writer"); DesktopShortcutManager.DeleteShortcut("GenOffice Writer"); return null; }
-                if (SettingShortcutCalcRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Calc", "-calc", "icon\\calc.ico", "Bảng tính ZenQ Calc"); DesktopShortcutManager.DeleteShortcut("GenOffice Calc"); return null; }
-                if (SettingShortcutSlidesRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Slides", "-slides", "icon\\present.ico", "Trình chiếu ZenQ Slides"); DesktopShortcutManager.DeleteShortcut("GenOffice Slides"); return null; }
-                if (SettingShortcutPdfRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ PDF", "-pdf", "icon\\pdf.ico", "Đọc và chỉnh sửa ZenQ PDF"); DesktopShortcutManager.DeleteShortcut("GenOffice PDF"); return null; }
+                if (SettingShortcutWriterRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Writer", "-writer", "icon\\writer.ico", "Soạn thảo văn bản ZenQ Writer"); DesktopShortcutManager.DeleteShortcut("GenOffice Writer"); AppForm.Instance?.Invalidate(); return null; }
+                if (SettingShortcutCalcRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Calc", "-calc", "icon\\calc.ico", "Bảng tính ZenQ Calc"); DesktopShortcutManager.DeleteShortcut("GenOffice Calc"); AppForm.Instance?.Invalidate(); return null; }
+                if (SettingShortcutSlidesRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ Slides", "-slides", "icon\\present.ico", "Trình chiếu ZenQ Slides"); DesktopShortcutManager.DeleteShortcut("GenOffice Slides"); AppForm.Instance?.Invalidate(); return null; }
+                if (SettingShortcutPdfRect.Contains(x, y)) { DesktopShortcutManager.ToggleShortcut("ZenQ PDF", "-pdf", "icon\\pdf.ico", "Đọc và chỉnh sửa ZenQ PDF"); DesktopShortcutManager.DeleteShortcut("GenOffice PDF"); AppForm.Instance?.Invalidate(); return null; }
                 if (SettingAssocWriterRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-word"); return null; }
                 if (SettingAssocCalcRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-calc"); return null; }
                 if (SettingAssocSlidesRect.Contains(x, y)) { FileAssociationManager.ToggleAppAssociation("-slides"); return null; }

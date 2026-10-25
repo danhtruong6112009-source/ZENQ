@@ -835,6 +835,43 @@ namespace GenOffice.Tests
                 // Test mouse wheel scroll up
                 taskPane.HandleMouseWheel(120);
                 Assert.AreEqual(initialScroll, taskPane.ScrollY, "Mouse wheel up must return ScrollY");
+
+                // Test Canva-style Scroll Restoration on Back button
+                taskPane.ScrollY = 320;
+                taskPane.TargetScrollY = 320;
+                if (taskPane.CategorySeeAllBounds.Count > 0)
+                {
+                    Point seeAllPt = new Point(taskPane.CategorySeeAllBounds[0].Item1.X + 2, taskPane.CategorySeeAllBounds[0].Item1.Y + 2);
+                    string act, tid;
+                    bool clicked = taskPane.HandleClick(seeAllPt, out act, out tid);
+                    Assert.IsTrue(clicked, "Clicking SeeAll must be handled");
+                    Assert.AreEqual("ExpandCategory", act);
+                    Assert.IsNotNull(taskPane.ExpandedCategoryKey, "Category must be expanded");
+                    Assert.AreEqual(0, taskPane.ScrollY, "Expanded view starts at scroll 0");
+
+                    // Click Back button
+                    Point backPt = new Point(taskPane.BtnBackBounds.X + 2, taskPane.BtnBackBounds.Y + 2);
+                    bool backClicked = taskPane.HandleClick(backPt, out act, out tid);
+                    Assert.IsTrue(backClicked, "Back button click must be handled");
+                    Assert.IsNull(taskPane.ExpandedCategoryKey, "Must return to home view");
+                    Assert.AreEqual(320, taskPane.ScrollY, "ScrollY must be RESTORED to exact previous position (320) and NOT reset to 0!");
+                }
+
+                // Test Canva-style item usage tracking & recommendations
+                taskPane.RecordItemUsed("fluent_color_Cherry_blossom");
+                // Verify task pane draws without error in expanded featured mode
+                taskPane.ExpandedCategoryKey = "__featured__";
+                taskPane.Draw(g, new Rectangle(0, 0, 360, 600));
+                Assert.IsTrue(taskPane.ItemClickBounds.Count > 0, "Featured view must render items");
+
+                // Verify task pane draws in expanded magic recommendations mode
+                taskPane.ExpandedCategoryKey = "__magic_recommendations__";
+                taskPane.Draw(g, new Rectangle(0, 0, 360, 600));
+                Assert.IsTrue(taskPane.ItemClickBounds.Count > 0, "Magic recommendations must render items");
+
+                // Reset back to home view
+                taskPane.ExpandedCategoryKey = null;
+                taskPane.Draw(g, new Rectangle(0, 0, 360, 600));
             }
 
             // =========================================================================

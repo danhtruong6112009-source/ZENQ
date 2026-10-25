@@ -105,6 +105,7 @@ namespace ZenQOffice.UI
         private const int VERTRES = 10;
 
         private ID2D1RenderTarget _renderTarget;
+        private ID2D1DeviceContext _deviceContext;
         private ID2D1HwndRenderTarget _hwndRenderTarget;
         private ID2D1DCRenderTarget _dcRenderTarget;
         private static ID2D1DCRenderTarget _sharedDcRenderTarget;
@@ -279,7 +280,10 @@ namespace ZenQOffice.UI
                         {
                             _dcRenderTarget.BindDC(_gdiHdc, new Vortice.Mathematics.RectI(0, 0, w, h));
                             _renderTarget = _dcRenderTarget;
+                            _renderTarget.Transform = System.Numerics.Matrix3x2.Identity;
+                            _currentTransform = System.Numerics.Matrix3x2.Identity;
                             try { _gdiInterop = _renderTarget.QueryInterface<ID2D1GdiInteropRenderTarget>(); } catch { }
+                            try { _deviceContext = _renderTarget.QueryInterfaceOrNull<ID2D1DeviceContext>(); } catch { _deviceContext = null; }
                             _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
                             _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Cleartype;
                             _renderTarget.BeginDraw();
@@ -356,6 +360,7 @@ namespace ZenQOffice.UI
                 {
                     _renderTarget = _hwndRenderTarget;
                     try { _gdiInterop = _hwndRenderTarget.QueryInterface<ID2D1GdiInteropRenderTarget>(); } catch { }
+                    try { _deviceContext = _hwndRenderTarget.QueryInterfaceOrNull<ID2D1DeviceContext>(); } catch { _deviceContext = null; }
                     _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
                     _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Cleartype;
                     _renderTarget.BeginDraw();
@@ -504,6 +509,12 @@ namespace ZenQOffice.UI
                 {
                     _isDrawing = false;
                 }
+            }
+
+            if (_deviceContext != null)
+            {
+                try { _deviceContext.Dispose(); } catch { }
+                _deviceContext = null;
             }
 
             if (_gdiInterop != null)
@@ -876,6 +887,7 @@ namespace ZenQOffice.UI
             string famName = font.FontFamily?.Name ?? font.Name;
             string fontName = font.Name ?? famName;
             string key = $"{famName}_{fontName}_{font.Size}_{(int)font.Style}";
+            if (_textFormatCache.Count > 512) _textFormatCache.Clear();
             return _textFormatCache.GetOrAdd(key, _ =>
             {
                 var style = font.Italic ? Vortice.DirectWrite.FontStyle.Italic : Vortice.DirectWrite.FontStyle.Normal;
@@ -1107,7 +1119,7 @@ namespace ZenQOffice.UI
         private static readonly Dictionary<Image, ID2D1Bitmap> _sharedBitmapCache = new Dictionary<Image, ID2D1Bitmap>();
         private static readonly LinkedList<Image> _sharedBitmapLruList = new LinkedList<Image>();
         private static readonly object _sharedBitmapCacheLock = new object();
-        private const int MaxSharedBitmapCacheSize = 256;
+        private const int MaxSharedBitmapCacheSize = 768;
 
         public static void InvalidateBitmapCache(Image image)
         {
@@ -1515,7 +1527,7 @@ namespace ZenQOffice.UI
                 var tf = GetTextFormat(font);
                 if (b != null && tf != null)
                 {
-                    _renderTarget.DrawText(s, tf, new Vortice.Mathematics.Rect(x, y, 10000.0f, 10000.0f), b);
+                    _renderTarget.DrawText(s, tf, new Vortice.Mathematics.Rect(x, y, 10000.0f, 10000.0f), b, DrawTextOptions.NoSnap);
                 }
             }
             else if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawString(s, font, brush, x, y);
@@ -1524,6 +1536,9 @@ namespace ZenQOffice.UI
         public void DrawString(string s, Font font, Brush brush, PointF point) => DrawString(s, font, brush, point.X, point.Y);
 
         public void DrawString(string s, Font font, Brush brush, RectangleF layoutRectangle, StringFormat format)
+            => DrawStringCore(s, font, brush, layoutRectangle, format, false);
+
+        private void DrawStringCore(string s, Font font, Brush brush, RectangleF layoutRectangle, StringFormat format, bool forceNoWrap)
         {
             if (string.IsNullOrEmpty(s)) return;
             if (_renderTarget != null)
@@ -1535,6 +1550,7 @@ namespace ZenQOffice.UI
                     float w = Math.Max(1.0f, layoutRectangle.Width);
                     float h = Math.Max(1.0f, layoutRectangle.Height);
                     using var layout = _dwriteFactory.CreateTextLayout(s, tf, w, h);
+                    if (forceNoWrap) layout.WordWrapping = WordWrapping.NoWrap;
                     if (format != null)
                     {
                         if ((format.FormatFlags & StringFormatFlags.NoWrap) != 0)
@@ -1570,7 +1586,7 @@ namespace ZenQOffice.UI
                             catch { }
                         }
                     }
-                    _renderTarget.DrawTextLayout(new System.Numerics.Vector2(layoutRectangle.X, layoutRectangle.Y), layout, b);
+                    _renderTarget.DrawTextLayout(new System.Numerics.Vector2(layoutRectangle.X, layoutRectangle.Y), layout, b, DrawTextOptions.NoSnap);
                     return;
                 }
             }
@@ -1595,11 +1611,11 @@ namespace ZenQOffice.UI
                 if (format.LineAlignment == StringAlignment.Center) layoutY = y - sz.Height / 2.0f;
                 else if (format.LineAlignment == StringAlignment.Far) layoutY = y - sz.Height;
 
-                DrawString(s, font, brush, new RectangleF(layoutX, layoutY, Math.Max(1.0f, sz.Width + 2.0f), Math.Max(1.0f, sz.Height + 2.0f)), null);
+                DrawStringCore(s, font, brush, new RectangleF(layoutX, layoutY, Math.Max(1.0f, sz.Width + 2.0f), Math.Max(1.0f, sz.Height + 2.0f)), null, true);
             }
             else
             {
-                DrawString(s, font, brush, new RectangleF(x, y, 10000.0f, 10000.0f), null);
+                DrawStringCore(s, font, brush, new RectangleF(x, y, 10000.0f, 10000.0f), null, true);
             }
         }
 
@@ -1658,6 +1674,36 @@ namespace ZenQOffice.UI
         }
 
         // --- Hardware Direct2D Bitmap Acceleration ---
+        private void DrawD2DBitmapInternal(ID2D1Bitmap d2dBmp, Vortice.Mathematics.Rect destRect, float opacity, Vortice.Mathematics.Rect? srcRect = null)
+        {
+            if (_deviceContext != null)
+            {
+                Vortice.Direct2D1.InterpolationMode interpMode = Vortice.Direct2D1.InterpolationMode.HighQualityCubic;
+                if (_interpolationMode == System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor)
+                {
+                    interpMode = Vortice.Direct2D1.InterpolationMode.NearestNeighbor;
+                }
+                else if (_interpolationMode == System.Drawing.Drawing2D.InterpolationMode.Low)
+                {
+                    interpMode = Vortice.Direct2D1.InterpolationMode.Linear;
+                }
+                else
+                {
+                    float srcW = srcRect.HasValue ? srcRect.Value.Width : d2dBmp.Size.Width;
+                    float srcH = srcRect.HasValue ? srcRect.Value.Height : d2dBmp.Size.Height;
+                    bool isUnrotated = Math.Abs(_currentTransform.M12) < 0.0001f && Math.Abs(_currentTransform.M21) < 0.0001f &&
+                                       Math.Abs(_currentTransform.M11 - 1.0f) < 0.001f && Math.Abs(_currentTransform.M22 - 1.0f) < 0.001f;
+                    bool isExactSize = Math.Abs(srcW - destRect.Width) < 0.5f && Math.Abs(srcH - destRect.Height) < 0.5f;
+                    interpMode = (isUnrotated && isExactSize)
+                        ? Vortice.Direct2D1.InterpolationMode.MultiSampleLinear
+                        : Vortice.Direct2D1.InterpolationMode.HighQualityCubic;
+                }
+                _deviceContext.DrawBitmap(d2dBmp, destRect, opacity, interpMode, srcRect, null);
+                return;
+            }
+            _renderTarget.DrawBitmap(d2dBmp, destRect, opacity, BitmapInterpolationMode.Linear, srcRect);
+        }
+
         public void DrawImage(Image image, float x, float y, float opacity = -1.0f)
         {
             if (image == null) return;
@@ -1669,7 +1715,7 @@ namespace ZenQOffice.UI
                     var d2dBmp = GetOrCreateD2DBitmap(image);
                     if (d2dBmp != null)
                     {
-                        _renderTarget.DrawBitmap(d2dBmp, new Vortice.Mathematics.Rect(x, y, image.Width, image.Height), finalOp, BitmapInterpolationMode.Linear, null);
+                        DrawD2DBitmapInternal(d2dBmp, new Vortice.Mathematics.Rect(x, y, image.Width, image.Height), finalOp, null);
                         return;
                     }
                 }
@@ -1692,7 +1738,7 @@ namespace ZenQOffice.UI
                     var d2dBmp = GetOrCreateD2DBitmap(image);
                     if (d2dBmp != null)
                     {
-                        _renderTarget.DrawBitmap(d2dBmp, new Vortice.Mathematics.Rect(x, y, width, height), finalOp, BitmapInterpolationMode.Linear, null);
+                        DrawD2DBitmapInternal(d2dBmp, new Vortice.Mathematics.Rect(x, y, width, height), finalOp, null);
                         return;
                     }
                 }
@@ -1717,11 +1763,10 @@ namespace ZenQOffice.UI
                     var d2dBmp = GetOrCreateD2DBitmap(image);
                     if (d2dBmp != null)
                     {
-                        _renderTarget.DrawBitmap(
+                        DrawD2DBitmapInternal(
                             d2dBmp,
                             new Vortice.Mathematics.Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height),
                             finalOp,
-                            BitmapInterpolationMode.Linear,
                             new Vortice.Mathematics.Rect(srcX, srcY, srcWidth, srcHeight)
                         );
                         return;
@@ -1749,11 +1794,10 @@ namespace ZenQOffice.UI
                     var d2dBmp = GetOrCreateD2DBitmap(image);
                     if (d2dBmp != null)
                     {
-                        _renderTarget.DrawBitmap(
+                        DrawD2DBitmapInternal(
                             d2dBmp,
                             new Vortice.Mathematics.Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height),
                             finalOp,
-                            BitmapInterpolationMode.Linear,
                             new Vortice.Mathematics.Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height)
                         );
                         return;
@@ -1793,11 +1837,10 @@ namespace ZenQOffice.UI
                             ? new Vortice.Mathematics.Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height)
                             : new Vortice.Mathematics.Rect(0, 0, image.Width, image.Height);
 
-                        _renderTarget.DrawBitmap(
+                        DrawD2DBitmapInternal(
                             d2dBmp,
                             new Vortice.Mathematics.Rect(destX, destY, destW, destH),
                             finalOp,
-                            BitmapInterpolationMode.Linear,
                             sRect
                         );
                         return;
@@ -1824,11 +1867,10 @@ namespace ZenQOffice.UI
                     var d2dBmp = GetOrCreateD2DBitmap(image);
                     if (d2dBmp != null)
                     {
-                        _renderTarget.DrawBitmap(
+                        DrawD2DBitmapInternal(
                             d2dBmp,
                             new Vortice.Mathematics.Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height),
                             finalOp,
-                            BitmapInterpolationMode.Linear,
                             new Vortice.Mathematics.Rect(srcX, srcY, srcWidth, srcHeight)
                         );
                         return;

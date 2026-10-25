@@ -89,10 +89,10 @@ namespace ZenQOffice.Core
             },
             new AiSlashCommand
             {
-                Name = "/quiz",
-                Aliases = new[] { "/cauhoi", "/tracnghiem", "/q" },
-                DisplayName = "/quiz [số câu]",
-                Description = "Tự động tạo bộ câu hỏi trắc nghiệm ôn tập kèm đáp án và giải thích từ tài liệu",
+                Name = "/canvas",
+                Aliases = new[] { "/c", "/interactive", "/de", "/quiz", "/cauhoi", "/tracnghiem", "/q" },
+                DisplayName = "/canvas [yêu cầu đề thi/ngữ liệu/bài tập...]",
+                Description = "Tạo không gian tương tác (trắc nghiệm, ngữ liệu đọc hiểu, đúng/sai, điền khuyết, tự luận) trên Canvas",
                 IconGlyph = "/sparkle"
             },
             new AiSlashCommand
@@ -280,15 +280,48 @@ namespace ZenQOffice.Core
                 return true;
             }
 
-            // 7. Lệnh /quiz: Tạo câu hỏi ôn tập
-            if (cmdName == "/quiz" || cmdName == "/cauhoi" || cmdName == "/tracnghiem" || cmdName == "/q")
+            // 7. Lệnh /canvas (thay thế và hợp nhất cả /quiz): Tạo Canvas tương tác chuyên sâu
+            if (cmdName == "/canvas" || cmdName == "/c" || cmdName == "/interactive" || cmdName == "/de" ||
+                cmdName == "/quiz" || cmdName == "/cauhoi" || cmdName == "/tracnghiem" || cmdName == "/q")
             {
                 var sbPrompt = new StringBuilder();
-                sbPrompt.AppendLine("[CHỈ THỊ ĐẶC BIỆT TỪ LỆNH /QUIZ]: Dựa vào nội dung tài liệu này, hãy tạo bộ câu hỏi trắc nghiệm kiểm tra kiến thức:");
-                sbPrompt.AppendLine("- Mỗi câu có 4 phương án A, B, C, D.");
-                sbPrompt.AppendLine("- Có đáp án đúng và lời giải thích chi tiết tại sao đúng.");
-                if (!string.IsNullOrWhiteSpace(args)) sbPrompt.AppendLine("Chi tiết yêu cầu: " + args);
-                else sbPrompt.AppendLine("Số lượng câu hỏi: 5 câu.");
+                sbPrompt.AppendLine("[CHỈ THỊ ĐẶC BIỆT TỪ LỆNH /CANVAS - INTERACTIVE WORKSPACE]:");
+                sbPrompt.AppendLine("Người dùng muốn tạo không gian tương tác (Bài tập, Ngữ liệu đọc hiểu, Trắc nghiệm, Từ vựng, Bài tập thực hành) trực tiếp trên giao diện Canvas.");
+                sbPrompt.AppendLine("Yêu cầu của người dùng: " + (string.IsNullOrWhiteSpace(args) ? "Tạo không gian ôn tập kiến thức 10 mục" : args));
+                sbPrompt.AppendLine();
+                sbPrompt.AppendLine("QUY TẮC BẮT BUỘC ĐỂ CANVAS HOẠT ĐỘNG CHUẨN XÁC:");
+                sbPrompt.AppendLine("1. ĐÚNG CHỦ ĐỀ & ĐÚNG NỘI DUNG (NGHIÊM CẤM TỰ ĐỔI CHỦ ĐỀ):");
+                sbPrompt.AppendLine("   - BẮT BUỘC bám sát 100% chủ đề người dùng yêu cầu (ví dụ: bộ sách, bài học Unit, tác phẩm văn học,...). Tuyệt đối KHÔNG tự ý đổi sang chủ đề khác.");
+                sbPrompt.AppendLine("   - Nếu người dùng yêu cầu 'ngữ liệu' (reading passage / text material), mỗi mục trên Canvas hãy đưa đoạn trích ngữ liệu kèm các câu hỏi hoặc điểm trọng tâm tương ứng để người dùng lựa chọn, phân tích.");
+                sbPrompt.AppendLine("   - Số lượng: TUÂN THỦ THEO YÊU CẦU CỦA NGƯỜI DÙNG. Tuyệt đối KHÔNG tự ý giới hạn ở 20 câu.");
+                sbPrompt.AppendLine("     + Nếu người dùng yêu cầu tạo từ tài liệu đang mở ('từ file word', 'tạo từ tài liệu', 'tất cả câu',...), hãy tạo ĐẦY ĐỦ TẤT CẢ các câu hỏi có trong tài liệu.");
+                sbPrompt.AppendLine("     + Nếu người dùng ghi số lượng (ví dụ '5 câu', '15 câu', '25 câu', '30 câu', '50 câu'...), hãy tạo CHÍNH XÁC số lượng đó.");
+                sbPrompt.AppendLine("   - ĐÁP ÁN ĐÚNG TỪ VĂN BẢN (CỰC KỲ QUAN TRỌNG ĐỂ TRÁNH SAI ĐỀ):");
+                sbPrompt.AppendLine("     + Trong ngữ liệu tài liệu đính kèm, các đáp án đúng đã được hệ thống trích xuất kèm ký hiệu [ĐÁP ÁN ĐÚNG] (do văn bản gốc có chữ màu đỏ, in đậm hoặc highlight).");
+                sbPrompt.AppendLine("     + Khi sinh khối JSON Canvas, BẮT BUỘC đặt correctIndex hoặc correctAnswer đúng chuẩn theo đáp án [ĐÁP ÁN ĐÚNG] này. TUYỆT ĐỐI KHÔNG tự ý chọn đáp án khác làm sai lệch đề thi của giáo viên/người dùng!");
+                sbPrompt.AppendLine("   - Dạng câu hỏi: Phân loại linh hoạt theo yêu cầu (MultipleChoice, TrueFalse, FillBlank, Essay).");
+                sbPrompt.AppendLine("2. BẮT BUỘC trả về khối JSON Canvas hợp lệ nằm trong thẻ ```json:canvas ... ``` theo cấu trúc sau:");
+                sbPrompt.AppendLine("```json:canvas");
+                sbPrompt.AppendLine("{");
+                sbPrompt.AppendLine("  \"title\": \"Tiêu đề đề thi / bài ôn tập / ngữ liệu\",");
+                sbPrompt.AppendLine("  \"description\": \"Mô tả ngắn gọn\",");
+                sbPrompt.AppendLine("  \"questions\": [");
+                sbPrompt.AppendLine("    {");
+                sbPrompt.AppendLine("      \"number\": 1,");
+                sbPrompt.AppendLine("      \"type\": \"MultipleChoice\", // Hoặc \"TrueFalse\", \"FillBlank\", \"Essay\"");
+                sbPrompt.AppendLine("      \"question\": \"Nội dung câu hỏi hoặc đoạn ngữ liệu cần phân tích...\",");
+                sbPrompt.AppendLine("      \"options\": [\"A. ...\", \"B. ...\", \"C. ...\", \"D. ...\"], // Các phương án hoặc các ý ngữ liệu để lựa chọn");
+                sbPrompt.AppendLine("      \"correctIndex\": 0, // 0 = A, 1 = B, 2 = C, 3 = D");
+                sbPrompt.AppendLine("      \"correctAnswer\": \"...\", // Dành cho FillBlank hoặc gợi ý đáp án Essay");
+                sbPrompt.AppendLine("      \"explanation\": \"Lời giải thích chi tiết, dịch nghĩa hoặc phân tích ngữ liệu...\"");
+                sbPrompt.AppendLine("    }");
+                sbPrompt.AppendLine("  ]");
+                sbPrompt.AppendLine("}");
+                sbPrompt.AppendLine("```");
+                sbPrompt.AppendLine("3. ĐẢM BẢO HOÀN THÀNH ĐẦY ĐỦ VÀ ĐÓNG KHỐI JSON:");
+                sbPrompt.AppendLine("   - Khi người dùng yêu cầu số lượng lớn (từ 15 đến 40 câu), hãy viết phần 'explanation' ngắn gọn (1-2 câu súc tích) để đảm bảo toàn bộ số câu hỏi được sinh ra đầy đủ và BẮT BUỘC đóng trọn vẹn khối ```json:canvas ... ```.");
+                sbPrompt.AppendLine("   - Tuyệt đối không dừng giữa chừng khi chưa hoàn thành đủ danh sách câu hỏi.");
+                sbPrompt.AppendLine("Ngoài khối json:canvas, hãy viết 1-2 câu ngắn chào mừng và tóm tắt đề vừa tạo.");
                 promptToSend = sbPrompt.ToString();
                 return true;
             }
@@ -482,7 +515,7 @@ namespace ZenQOffice.Core
 
             if (tab.Mode == OfficeAppMode.Writer && tab.WriterPieceTable != null)
             {
-                return SanitizeAndTrimForTokens(tab.WriterPieceTable.GetText(), 20000);
+                return SanitizeAndTrimForTokens(tab.WriterPieceTable.GetText(), 45000);
             }
             if (tab.Mode == OfficeAppMode.Pdf && tab.PdfData != null)
             {
@@ -663,6 +696,92 @@ namespace ZenQOffice.Core
         /// <summary>
         /// Thu gọn khoảng trắng thừa và cắt gọn thông minh đầu - đuôi để tối ưu token
         /// </summary>
+        public static string ExtractWriterTextWithFormatting(ZenQOffice.UI.WriterView writerView, int maxChars = 45000)
+        {
+            if (writerView == null || writerView.PieceTable == null) return string.Empty;
+            string fullText = writerView.PieceTable.GetText();
+            if (string.IsNullOrEmpty(fullText)) return string.Empty;
+
+            var runs = writerView.FormattedRuns;
+            if (runs == null || runs.Count == 0)
+            {
+                return SanitizeAndTrimForTokens(fullText, maxChars);
+            }
+
+            // Đánh dấu các ký tự có màu đỏ hoặc highlight/gạch chân để nhận diện đáp án đúng
+            bool[] isMarkedCorrect = new bool[fullText.Length];
+            for (int ri = 0; ri < runs.Count; ri++)
+            {
+                var run = runs[ri];
+                if (run.Length <= 0 || run.StartIndex >= fullText.Length) continue;
+
+                bool isRed = (run.Color.R >= 160 && run.Color.R > run.Color.G * 1.4f && run.Color.R > run.Color.B * 1.4f);
+                bool isHl = (run.Highlight != System.Drawing.Color.Transparent && run.Highlight != System.Drawing.Color.Empty && run.Highlight.A > 0);
+                bool isUnder = run.Underline;
+
+                if (isRed || isHl || (isUnder && run.Bold))
+                {
+                    int end = Math.Min(fullText.Length, run.StartIndex + run.Length);
+                    for (int ci = run.StartIndex; ci < end; ci++)
+                    {
+                        isMarkedCorrect[ci] = true;
+                    }
+                }
+            }
+
+            var sb = new StringBuilder();
+            string[] lines = fullText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            int charOffset = 0;
+
+            for (int li = 0; li < lines.Length; li++)
+            {
+                string line = lines[li];
+                int lineStart = charOffset;
+                charOffset += line.Length + 1;
+
+                var optionMatches = Regex.Matches(line, @"(?:^|[\s\t])([A-Da-d][\.\)])\s*");
+                if (optionMatches.Count > 0)
+                {
+                    int lastIdx = 0;
+                    for (int mi = 0; mi < optionMatches.Count; mi++)
+                    {
+                        var match = optionMatches[mi];
+                        int optStartInLine = match.Index;
+                        int optEndInLine = (mi < optionMatches.Count - 1) ? optionMatches[mi + 1].Index : line.Length;
+
+                        bool hasCorrect = false;
+                        int checkStart = Math.Min(lineStart + optStartInLine, fullText.Length - 1);
+                        int checkEnd = Math.Min(lineStart + optEndInLine, fullText.Length);
+                        for (int ci = checkStart; ci < checkEnd; ci++)
+                        {
+                            if (isMarkedCorrect[ci]) { hasCorrect = true; break; }
+                        }
+
+                        sb.Append(line.Substring(lastIdx, optEndInLine - lastIdx));
+                        if (hasCorrect)
+                        {
+                            sb.Append(" [ĐÁP ÁN ĐÚNG]");
+                        }
+                        lastIdx = optEndInLine;
+                    }
+                    if (lastIdx < line.Length)
+                    {
+                        sb.Append(line.Substring(lastIdx));
+                    }
+                    sb.AppendLine();
+                }
+                else
+                {
+                    sb.Append(line);
+                    sb.AppendLine();
+                }
+
+                if (sb.Length > maxChars) break;
+            }
+
+            return SanitizeAndTrimForTokens(sb.ToString(), maxChars);
+        }
+
         public static string SanitizeAndTrimForTokens(string text, int maxChars = 20000)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;

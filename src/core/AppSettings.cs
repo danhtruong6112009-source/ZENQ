@@ -7,8 +7,8 @@ namespace ZenQOffice.Core
 {
     public enum RibbonStyle
     {
-        Island = 0,   // Dạng Đảo (Floating Island Ribbon phong cách hiện đại)
-        Standard = 1  // Tiêu chuẩn (Classic Full-Width Ribbon)
+        Standard = 0,  // Tiêu chuẩn (Classic Full-Width Ribbon chuẩn Microsoft Office)
+        Island = 1     // Dạng Đảo (Floating Island Ribbon phong cách hiện đại)
     }
 
     public enum AppTheme
@@ -64,12 +64,14 @@ namespace ZenQOffice.Core
         public OfficeAppMode DefaultBranchApp { get; set; } = OfficeAppMode.Writer;
         public bool RegisterFileAssociationsOnStartup { get; set; } = false;
         public string LastNotifiedUpdateVersion { get; set; } = "";
+        public string FeedbackWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbwFOUzEf14JkfAqsuYkScjgRpbzD7M3JghMpyZpjm9uL6z3XjLa0pm20XgsnW3L6Man/exec";
+        public string FeedbackUserContact { get; set; } = "";
 
         public event EventHandler SettingsChanged;
 
         public AppSettings()
         {
-            RibbonStyle = RibbonStyle.Island; // Mặc định kiểu Dạng Đảo đẹp mắt theo yêu cầu
+            RibbonStyle = RibbonStyle.Standard; // Mặc định chuẩn Microsoft Office không viền xám
             Theme = AppTheme.Light;
             Language = AppLanguage.Vietnamese;
             AutoSaveEnabled = true;
@@ -215,6 +217,14 @@ namespace ZenQOffice.Core
                 elLastNotif.InnerText = LastNotifiedUpdateVersion ?? "";
                 root.AppendChild(elLastNotif);
 
+                XmlElement elFeedbackUrl = doc.CreateElement("FeedbackWebhookUrl");
+                elFeedbackUrl.InnerText = FeedbackWebhookUrl ?? "";
+                root.AppendChild(elFeedbackUrl);
+
+                XmlElement elFeedbackContact = doc.CreateElement("FeedbackUserContact");
+                elFeedbackContact.InnerText = FeedbackUserContact ?? "";
+                root.AppendChild(elFeedbackContact);
+
                 doc.Save(path);
                 NotifyChanged();
             }
@@ -302,6 +312,12 @@ namespace ZenQOffice.Core
 
                         XmlNode nLastNotif = root.SelectSingleNode("LastNotifiedUpdateVersion");
                         if (nLastNotif != null) { s.LastNotifiedUpdateVersion = nLastNotif.InnerText ?? ""; }
+
+                        XmlNode nFeedbackUrl = root.SelectSingleNode("FeedbackWebhookUrl");
+                        if (nFeedbackUrl != null && !string.IsNullOrWhiteSpace(nFeedbackUrl.InnerText)) { s.FeedbackWebhookUrl = nFeedbackUrl.InnerText; }
+
+                        XmlNode nFeedbackContact = root.SelectSingleNode("FeedbackUserContact");
+                        if (nFeedbackContact != null) { s.FeedbackUserContact = nFeedbackContact.InnerText ?? ""; }
                     }
                 }
             }

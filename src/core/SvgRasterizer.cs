@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -240,6 +241,7 @@ namespace ZenQOffice.Core
 
                 // 4. Kết xuất đồ họa vector theo cây phân cấp chuẩn SVG
                 WpfDrawingVisual dv = new WpfDrawingVisual();
+                System.Windows.Media.RenderOptions.SetBitmapScalingMode(dv, System.Windows.Media.BitmapScalingMode.HighQuality);
                 using (WpfDrawingContext dc = dv.RenderOpen())
                 {
                     double offsetX = -vbX * scale;
@@ -546,12 +548,16 @@ namespace ZenQOffice.Core
                 byte[] dstBytes = new byte[stride * h];
                 Marshal.Copy(srcData.Scan0, srcBytes, 0, srcBytes.Length);
 
-                for (int y = 0; y < h; y++)
+                int tr = targetColor.R;
+                int tg = targetColor.G;
+                int tb = targetColor.B;
+
+                Parallel.For(0, h, y =>
                 {
                     int rowOff = y * stride;
                     for (int x = 0; x < w; x++)
                     {
-                        int px = rowOff + x * 4;
+                        int px = rowOff + (x << 2);
                         byte b = srcBytes[px];
                         byte g = srcBytes[px + 1];
                         byte r = srcBytes[px + 2];
@@ -570,16 +576,16 @@ namespace ZenQOffice.Core
                         float lum = (0.299f * (r / unA) + 0.587f * (g / unA) + 0.114f * (b / unA)) / 255f;
                         float factor = 0.25f + 0.75f * lum;
 
-                        byte outR = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.R * factor * unA)));
-                        byte outG = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.G * factor * unA)));
-                        byte outB = (byte)Math.Max(0, Math.Min(255, (int)(targetColor.B * factor * unA)));
+                        byte outR = (byte)Math.Max(0, Math.Min(255, (int)(tr * factor * unA)));
+                        byte outG = (byte)Math.Max(0, Math.Min(255, (int)(tg * factor * unA)));
+                        byte outB = (byte)Math.Max(0, Math.Min(255, (int)(tb * factor * unA)));
 
                         dstBytes[px] = outB;
                         dstBytes[px + 1] = outG;
                         dstBytes[px + 2] = outR;
                         dstBytes[px + 3] = a;
                     }
-                }
+                });
 
                 Marshal.Copy(dstBytes, 0, dstData.Scan0, dstBytes.Length);
             }
@@ -590,6 +596,806 @@ namespace ZenQOffice.Core
             }
 
             return result;
+        }
+
+        public static List<Color> ExtractDominantColorsFromBitmap(Image img, int maxColors = 6)
+        {
+            var result = new List<Color>();
+            if (img == null) return result;
+
+            try
+            {
+                int sampleW = Math.Min(96, Math.Max(16, img.Width));
+                int sampleH = Math.Min(96, Math.Max(16, img.Height));
+                using (Bitmap bmp = new Bitmap(sampleW, sampleH, PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.InterpolationMode = InterpolationMode.Bilinear;
+                        g.DrawImage(img, 0, 0, sampleW, sampleH);
+                    }
+
+                    BitmapData bData = bmp.LockBits(new Rectangle(0, 0, sampleW, sampleH), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    int total = sampleW * sampleH;
+                    int[] raw = new int[total];
+                    Marshal.Copy(bData.Scan0, raw, 0, total);
+                    bmp.UnlockBits(bData);
+
+                    // Quantize into 16x16x16 bins and accumulate actual R,G,B sums
+                    var bins = new Dictionary<int, (int count, long sumR, long sumG, long sumB)>();
+                    for (int i = 0; i < total; i++)
+                    {
+                        int argb = raw[i];
+                        int a = (argb >> 24) & 0xFF;
+                        if (a < 80) continue; // Ignore transparent or semi-transparent pixels
+
+                        int r = (argb >> 16) & 0xFF;
+                        int g = (argb >> 8) & 0xFF;
+                        int b = argb & 0xFF;
+
+                        int key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+                        if (bins.TryGetValue(key, out var cur))
+                        {
+                            bins[key] = (cur.count + 1, cur.sumR + r, cur.sumG + g, cur.sumB + b);
+                        }
+                        else
+                        {
+                            bins[key] = (1, r, g, b);
+                        }
+                    }
+
+                    var sortedBins = new List<(int count, Color avgColor)>();
+                    foreach (var kvp in bins.Values)
+                    {
+                        if (kvp.count < 3) continue;
+                        Color avg = Color.FromArgb(
+                            (int)(kvp.sumR / kvp.count),
+                            (int)(kvp.sumG / kvp.count),
+                            (int)(kvp.sumB / kvp.count));
+                        sortedBins.Add((kvp.count, avg));
+                    }
+
+                    sortedBins.Sort((a, b) => b.count.CompareTo(a.count));
+
+                    // Merge perceptual neighbors so swatches are visually distinct
+                    foreach (var candidate in sortedBins)
+                    {
+                        bool tooClose = false;
+                        foreach (var existing in result)
+                        {
+                            int dr = candidate.avgColor.R - existing.R;
+                            int dg = candidate.avgColor.G - existing.G;
+                            int db = candidate.avgColor.B - existing.B;
+                            if (dr * dr + dg * dg + db * db < 42 * 42)
+                            {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (!tooClose)
+                        {
+                            result.Add(candidate.avgColor);
+                            if (result.Count >= maxColors) break;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return result;
+        }
+
+        public static List<Color> GetDetectedColorsForShape(ShapeNode shape, int maxColors = 6)
+        {
+            if (shape == null) return new List<Color>();
+            if (shape.CachedDetectedColors != null && shape.CachedDetectedColors.Count > 0)
+            {
+                return shape.CachedDetectedColors;
+            }
+
+            List<Color> colors = new List<Color>();
+            string xml = shape.SvgContent;
+            if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && File.Exists(shape.ImagePath))
+            {
+                try
+                {
+                    xml = File.ReadAllText(shape.ImagePath);
+                    shape.OriginalSvgContent = xml;
+                    shape.SvgContent = xml;
+                }
+                catch { }
+            }
+
+            if (!string.IsNullOrWhiteSpace(xml))
+            {
+                var svgCols = ExtractColorsFromSvg(xml);
+                foreach (var c in svgCols)
+                {
+                    bool dup = false;
+                    foreach (var ex in colors)
+                    {
+                        int dr = c.R - ex.R;
+                        int dg = c.G - ex.G;
+                        int db = c.B - ex.B;
+                        if (dr * dr + dg * dg + db * db < 20 * 20) { dup = true; break; }
+                    }
+                    if (!dup)
+                    {
+                        colors.Add(Color.FromArgb(255, c.R, c.G, c.B));
+                        if (colors.Count >= maxColors) break;
+                    }
+                }
+            }
+
+            if (colors.Count == 0 && shape.CachedImage != null)
+            {
+                colors = ExtractDominantColorsFromBitmap(shape.CachedImage, maxColors);
+            }
+
+            if (colors.Count == 0 && shape.FillColor != 0)
+            {
+                colors.Add(Color.FromArgb(255, Color.FromArgb(shape.FillColor)));
+            }
+
+            shape.CachedDetectedColors = colors;
+            if (shape.OriginalDetectedColors == null || shape.OriginalDetectedColors.Count == 0)
+            {
+                shape.OriginalDetectedColors = new List<Color>(colors);
+            }
+
+            // Always supplement or extract from the raster bitmap ("Màu ảnh") when SVG had <= 1 color
+            Image rasterSource = (Image)shape.OriginalRasterBitmap ?? shape.CachedImage;
+            if (colors.Count <= 1 && rasterSource != null)
+            {
+                var bmpCols = ExtractDominantColorsFromBitmap(rasterSource, maxColors);
+                foreach (var c in bmpCols)
+                {
+                    if (colors.Count >= maxColors) break;
+                    bool dup = false;
+                    foreach (var ex in colors)
+                    {
+                        int dr = c.R - ex.R;
+                        int dg = c.G - ex.G;
+                        int db = c.B - ex.B;
+                        if (dr * dr + dg * dg + db * db < 30 * 30) { dup = true; break; }
+                    }
+                    if (!dup) colsAdd(colors, Color.FromArgb(255, c.R, c.G, c.B));
+                }
+            }
+            return colors;
+        }
+
+        private static void colsAdd(List<Color> list, Color c) => list.Add(c);
+
+        private static Color EvaluateMultiStopColor(List<int> stopColors, float t)
+        {
+            if (stopColors == null || stopColors.Count == 0) return Color.FromArgb(139, 92, 246);
+            if (stopColors.Count == 1) return Color.FromArgb(255, Color.FromArgb(stopColors[0]));
+            t = Math.Max(0f, Math.Min(1f, t));
+            float scaled = t * (stopColors.Count - 1);
+            int idx = (int)Math.Floor(scaled);
+            if (idx >= stopColors.Count - 1) return Color.FromArgb(255, Color.FromArgb(stopColors[stopColors.Count - 1]));
+            float frac = scaled - idx;
+            Color c1 = Color.FromArgb(stopColors[idx]);
+            Color c2 = Color.FromArgb(stopColors[idx + 1]);
+            int r = (int)Math.Round(c1.R + (c2.R - c1.R) * frac);
+            int g = (int)Math.Round(c1.G + (c2.G - c1.G) * frac);
+            int b = (int)Math.Round(c1.B + (c2.B - c1.B) * frac);
+            return Color.FromArgb(255, Math.Max(0, Math.Min(255, r)), Math.Max(0, Math.Min(255, g)), Math.Max(0, Math.Min(255, b)));
+        }
+
+        public static Bitmap ApplyMultiStopGradientToBitmap(Image srcImg, List<int> stopColors, string style, Color? targetClusterColor = null, float tolerance = 82f)
+        {
+            if (srcImg == null || stopColors == null || stopColors.Count == 0) return null;
+            int w = srcImg.Width;
+            int h = srcImg.Height;
+            Bitmap srcBmp = new Bitmap(srcImg);
+            Bitmap dstBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+
+            BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData dData = dstBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int total = w * h;
+                int[] pixels = new int[total];
+                Marshal.Copy(sData.Scan0, pixels, 0, total);
+
+                bool hasCluster = targetClusterColor.HasValue;
+                Color oldC = hasCluster ? targetClusterColor.Value : Color.Black;
+                float tolSq = tolerance * tolerance;
+                float oldLum = hasCluster ? (0.299f * oldC.R + 0.587f * oldC.G + 0.114f * oldC.B) / 255f : 0.5f;
+
+                float invW = 1.0f / Math.Max(1, w - 1);
+                float invH = 1.0f / Math.Max(1, h - 1);
+
+                Parallel.For(0, h, y =>
+                {
+                    int rowOff = y * w;
+                    float ny = y * invH;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int idx = rowOff + x;
+                        int argb = pixels[idx];
+                        int a = (argb >> 24) & 0xFF;
+                        if (a < 5) continue;
+
+                        int r = (argb >> 16) & 0xFF;
+                        int g = (argb >> 8) & 0xFF;
+                        int b = argb & 0xFF;
+
+                        float blend = 1.0f;
+                        if (hasCluster)
+                        {
+                            int dr = r - oldC.R;
+                            int dg = g - oldC.G;
+                            int db = b - oldC.B;
+                            float distSq = dr * dr + dg * dg + db * db;
+                            if (distSq > tolSq) continue;
+                            blend = 1.0f - (float)Math.Sqrt(distSq / tolSq) * 0.25f;
+                        }
+
+                        float nx = x * invW;
+                        float t = nx;
+                        switch (style ?? "Linear90")
+                        {
+                            case "Linear90":
+                                t = nx;
+                                break;
+                            case "Linear180":
+                                t = ny;
+                                break;
+                            case "Linear135":
+                                t = (nx + ny) * 0.5f;
+                                break;
+                            case "Linear45":
+                                t = (nx + (1.0f - ny)) * 0.5f;
+                                break;
+                            case "Radial":
+                            {
+                                float dx = (nx - 0.5f) * 2.0f;
+                                float dy = (ny - 0.5f) * 2.0f;
+                                t = Math.Min(1.0f, (float)Math.Sqrt(dx * dx + dy * dy));
+                                break;
+                            }
+                            case "RadialCorner":
+                            {
+                                float dx = nx;
+                                float dy = ny;
+                                t = Math.Min(1.0f, (float)Math.Sqrt(dx * dx + dy * dy) / 1.4142f);
+                                break;
+                            }
+                            case "Conic":
+                            {
+                                float ang = (float)Math.Atan2(ny - 0.5f, nx - 0.5f);
+                                t = (ang + (float)Math.PI) / (2.0f * (float)Math.PI);
+                                t = 1.0f - Math.Abs(2.0f * t - 1.0f);
+                                break;
+                            }
+                        }
+
+                        Color gradCol = EvaluateMultiStopColor(stopColors, t);
+                        float pxLum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+                        float factor = hasCluster
+                            ? ((oldLum > 0.08f) ? Math.Max(0.65f, Math.Min(1.35f, pxLum / oldLum)) : 1.0f)
+                            : (0.35f + 0.65f * pxLum);
+
+                        int targetR = Math.Max(0, Math.Min(255, (int)(gradCol.R * factor)));
+                        int targetG = Math.Max(0, Math.Min(255, (int)(gradCol.G * factor)));
+                        int targetB = Math.Max(0, Math.Min(255, (int)(gradCol.B * factor)));
+
+                        int outR = (int)(r + (targetR - r) * blend);
+                        int outG = (int)(g + (targetG - g) * blend);
+                        int outB = (int)(b + (targetB - b) * blend);
+
+                        pixels[idx] = (a << 24) | (outR << 16) | (outG << 8) | outB;
+                    }
+                });
+
+                Marshal.Copy(pixels, 0, dData.Scan0, total);
+            }
+            finally
+            {
+                srcBmp.UnlockBits(sData);
+                dstBmp.UnlockBits(dData);
+                srcBmp.Dispose();
+            }
+
+            return dstBmp;
+        }
+
+        public static void ApplyMultiStopGradientToShape(ShapeNode shape, List<int> stopColors, string style, int targetColorIndex = -1)
+        {
+            ApplyMultiStopGradientToShape(shape, stopColors, style, targetColorIndex, isInteractiveDrag: false);
+        }
+
+        public static void ApplyMultiStopGradientToShape(ShapeNode shape, List<int> stopColors, string style, int targetColorIndex, bool isInteractiveDrag)
+        {
+            if (shape == null || stopColors == null || stopColors.Count == 0) return;
+            shape.HasGraphicGradient = true;
+            shape.GraphicGradientStopColors = new List<int>(stopColors);
+            shape.GraphicGradientStyle = style ?? "Linear90";
+
+            if (shape.OriginalRasterBitmap == null && shape.CachedImage != null)
+            {
+                shape.OriginalRasterBitmap = new Bitmap(shape.CachedImage);
+            }
+
+            Bitmap baseBmp = shape.OriginalRasterBitmap ?? (shape.CachedImage != null ? new Bitmap(shape.CachedImage) : null);
+            if (baseBmp == null) return;
+
+            Color? clusterCol = null;
+            if (targetColorIndex >= 0 && shape.OriginalDetectedColors != null && targetColorIndex < shape.OriginalDetectedColors.Count && shape.OriginalDetectedColors.Count > 1)
+            {
+                clusterCol = shape.OriginalDetectedColors[targetColorIndex];
+            }
+            else if (targetColorIndex >= 0 && shape.CachedDetectedColors != null && targetColorIndex < shape.CachedDetectedColors.Count && shape.CachedDetectedColors.Count > 1)
+            {
+                clusterCol = shape.CachedDetectedColors[targetColorIndex];
+            }
+
+            Bitmap gradBmp = ApplyMultiStopGradientToBitmap(baseBmp, stopColors, style, clusterCol, 85f);
+            if (gradBmp != null)
+            {
+                if (clusterCol.HasValue && !isInteractiveDrag)
+                {
+                    shape.OriginalRasterBitmap = new Bitmap(gradBmp);
+                    if (shape.CachedDetectedColors != null && targetColorIndex >= 0 && targetColorIndex < shape.CachedDetectedColors.Count)
+                    {
+                        shape.CachedDetectedColors[targetColorIndex] = Color.FromArgb(255, Color.FromArgb(stopColors[0]));
+                    }
+                }
+                shape.CachedImage = isInteractiveDrag ? gradBmp : ApplyGraphicStyleMatchBitmap(gradBmp, shape.GraphicStyleMatch);
+                shape.InvalidateDisplayCache();
+            }
+        }
+
+        private static int UnusedPlaceholder()
+        {
+            int colors = 0;
+            return colors;
+        }
+
+        public static Bitmap ReplaceColorInBitmap(Image srcImg, Color oldColor, Color newColor, float tolerance = 68f)
+        {
+            if (srcImg == null) return null;
+            int w = srcImg.Width;
+            int h = srcImg.Height;
+            Bitmap srcBmp = new Bitmap(srcImg);
+            Bitmap dstBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+
+            BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData dData = dstBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int total = w * h;
+                int[] pixels = new int[total];
+                Marshal.Copy(sData.Scan0, pixels, 0, total);
+
+                float tolSq = tolerance * tolerance;
+                float oldLum = (0.299f * oldColor.R + 0.587f * oldColor.G + 0.114f * oldColor.B) / 255f;
+
+                Parallel.For(0, h, y =>
+                {
+                    int rowOff = y * w;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = rowOff + x;
+                        int argb = pixels[i];
+                        int a = (argb >> 24) & 0xFF;
+                        if (a < 5) continue;
+
+                        int r = (argb >> 16) & 0xFF;
+                        int g = (argb >> 8) & 0xFF;
+                        int b = argb & 0xFF;
+
+                        int dr = r - oldColor.R;
+                        int dg = g - oldColor.G;
+                        int db = b - oldColor.B;
+                        float distSq = dr * dr + dg * dg + db * db;
+
+                        if (distSq <= tolSq)
+                        {
+                            float blend = 1.0f - (float)Math.Sqrt(distSq / tolSq) * 0.35f;
+                            float pxLum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+                            float lumRatio = (oldLum > 0.08f) ? Math.Max(0.55f, Math.Min(1.45f, pxLum / oldLum)) : 1.0f;
+
+                            int targetR = Math.Max(0, Math.Min(255, (int)(newColor.R * lumRatio)));
+                            int targetG = Math.Max(0, Math.Min(255, (int)(newColor.G * lumRatio)));
+                            int targetB = Math.Max(0, Math.Min(255, (int)(newColor.B * lumRatio)));
+
+                            int outR = (int)(r + (targetR - r) * blend);
+                            int outG = (int)(g + (targetG - g) * blend);
+                            int outB = (int)(b + (targetB - b) * blend);
+
+                            pixels[i] = (a << 24) | (outR << 16) | (outG << 8) | outB;
+                        }
+                    }
+                });
+
+                Marshal.Copy(pixels, 0, dData.Scan0, total);
+            }
+            finally
+            {
+                srcBmp.UnlockBits(sData);
+                dstBmp.UnlockBits(dData);
+                srcBmp.Dispose();
+            }
+
+            return dstBmp;
+        }
+
+        public static void ReplaceGraphicColor(ShapeNode shape, int colorIndex, Color oldColor, Color newColor)
+        {
+            ReplaceGraphicColor(shape, colorIndex, oldColor, newColor, isInteractiveDrag: false);
+        }
+
+        public static void ReplaceGraphicColor(ShapeNode shape, int colorIndex, Color oldColor, Color newColor, bool isInteractiveDrag)
+        {
+            if (shape == null) return;
+
+            if (shape.OriginalRasterBitmap == null && shape.CachedImage != null)
+            {
+                shape.OriginalRasterBitmap = new Bitmap(shape.CachedImage);
+            }
+
+            Color baseColorToReplace = oldColor;
+            if (shape.OriginalDetectedColors != null && colorIndex >= 0 && colorIndex < shape.OriginalDetectedColors.Count)
+            {
+                baseColorToReplace = shape.OriginalDetectedColors[colorIndex];
+            }
+
+            string baseXml = !string.IsNullOrWhiteSpace(shape.OriginalSvgContent) ? shape.OriginalSvgContent : shape.SvgContent;
+            if (string.IsNullOrWhiteSpace(baseXml) && !string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && File.Exists(shape.ImagePath))
+            {
+                try
+                {
+                    baseXml = File.ReadAllText(shape.ImagePath);
+                    shape.OriginalSvgContent = baseXml;
+                }
+                catch { }
+            }
+
+            if (!string.IsNullOrWhiteSpace(baseXml))
+            {
+                string updatedXml = ReplaceColorInSvg(baseXml, baseColorToReplace, newColor);
+                if (updatedXml != baseXml)
+                {
+                    shape.SvgContent = updatedXml;
+                    int targetRes = isInteractiveDrag ? 480 : 1600;
+                    Bitmap sharpBmp = RenderSvgToBitmap(shape.SvgContent, targetRes, targetRes);
+                    if (sharpBmp != null)
+                    {
+                        if (!isInteractiveDrag)
+                        {
+                            shape.OriginalRasterBitmap = new Bitmap(sharpBmp);
+                        }
+                        shape.CachedImage = isInteractiveDrag ? sharpBmp : ApplyGraphicStyleMatchBitmap(sharpBmp, shape.GraphicStyleMatch);
+                        shape.InvalidateDisplayCache();
+                    }
+                }
+                else if (shape.CachedImage != null)
+                {
+                    Bitmap baseBmp = shape.OriginalRasterBitmap ?? new Bitmap(shape.CachedImage);
+                    bool singleCluster = (shape.CachedDetectedColors != null && shape.CachedDetectedColors.Count <= 1);
+                    Bitmap replaced = singleCluster ? ApplySolidColorRecolor(baseBmp, newColor) : ReplaceColorInBitmap(baseBmp, baseColorToReplace, newColor, 84f);
+                    if (replaced != null)
+                    {
+                        if (!isInteractiveDrag)
+                        {
+                            shape.OriginalRasterBitmap = new Bitmap(replaced);
+                        }
+                        shape.CachedImage = isInteractiveDrag ? replaced : ApplyGraphicStyleMatchBitmap(replaced, shape.GraphicStyleMatch);
+                        shape.InvalidateDisplayCache();
+                    }
+                }
+            }
+            else if (shape.CachedImage != null)
+            {
+                Bitmap baseBmp = shape.OriginalRasterBitmap ?? new Bitmap(shape.CachedImage);
+                bool singleCluster = (shape.CachedDetectedColors != null && shape.CachedDetectedColors.Count <= 1);
+                Bitmap replaced = singleCluster ? ApplySolidColorRecolor(baseBmp, newColor) : ReplaceColorInBitmap(baseBmp, baseColorToReplace, newColor, 84f);
+                if (replaced != null)
+                {
+                    if (!isInteractiveDrag)
+                    {
+                        shape.OriginalRasterBitmap = new Bitmap(replaced);
+                    }
+                    shape.CachedImage = isInteractiveDrag ? replaced : ApplyGraphicStyleMatchBitmap(replaced, shape.GraphicStyleMatch);
+                    shape.InvalidateDisplayCache();
+                }
+            }
+
+            if (shape.CachedDetectedColors != null && colorIndex >= 0 && colorIndex < shape.CachedDetectedColors.Count)
+            {
+                shape.CachedDetectedColors[colorIndex] = newColor;
+            }
+        }
+
+        public static Bitmap ApplyGraphicStyleMatchBitmap(Bitmap srcBmp, string styleMatch)
+        {
+            if (srcBmp == null || string.IsNullOrEmpty(styleMatch) || styleMatch == "None")
+                return srcBmp != null ? new Bitmap(srcBmp) : null;
+
+            int w = srcBmp.Width;
+            int h = srcBmp.Height;
+            Bitmap dstBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+
+            BitmapData sData = srcBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData dData = dstBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int total = w * h;
+                int[] src = new int[total];
+                int[] dst = new int[total];
+                Marshal.Copy(sData.Scan0, src, 0, total);
+
+                if (styleMatch == "Sticker") // Sổ dán: Viền trắng die-cut dày quanh chủ thể + đổ bóng nhẹ
+                {
+                    int radius = Math.Max(4, Math.Min(18, Math.Max(w, h) / 42));
+                    int rSq = radius * radius;
+
+                    // 1. Create white die-cut silhouette dilated by radius
+                    for (int y = 0; y < h; y++)
+                    {
+                        int rowOff = y * w;
+                        for (int x = 0; x < w; x++)
+                        {
+                            int idx = rowOff + x;
+                            int a = (src[idx] >> 24) & 0xFF;
+                            if (a > 200)
+                            {
+                                dst[idx] = src[idx];
+                                continue;
+                            }
+
+                            bool nearOpaque = false;
+                            int step = Math.Max(1, radius / 4);
+                            for (int dy = -radius; dy <= radius && !nearOpaque; dy += step)
+                            {
+                                int ny = y + dy;
+                                if (ny < 0 || ny >= h) continue;
+                                int nRow = ny * w;
+                                for (int dx = -radius; dx <= radius; dx += step)
+                                {
+                                    if (dx * dx + dy * dy > rSq) continue;
+                                    int nx = x + dx;
+                                    if (nx < 0 || nx >= w) continue;
+                                    if (((src[nRow + nx] >> 24) & 0xFF) > 90)
+                                    {
+                                        nearOpaque = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (nearOpaque)
+                            {
+                                if (a > 10)
+                                {
+                                    // Alpha blend original pixel over white sticker backing
+                                    float fa = a / 255f;
+                                    int r = (src[idx] >> 16) & 0xFF;
+                                    int g = (src[idx] >> 8) & 0xFF;
+                                    int b = src[idx] & 0xFF;
+                                    int outR = (int)(r * fa + 255 * (1f - fa));
+                                    int outG = (int)(g * fa + 255 * (1f - fa));
+                                    int outB = (int)(b * fa + 255 * (1f - fa));
+                                    dst[idx] = (255 << 24) | (outR << 16) | (outG << 8) | outB;
+                                }
+                                else
+                                {
+                                    dst[idx] = unchecked((int)0xFFFFFFFF);
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (styleMatch == "Engraving") // Khắc (Woodcut / Ink Stamp high contrast + line hatch)
+                {
+                    for (int y = 0; y < h; y++)
+                    {
+                        int rowOff = y * w;
+                        bool hatchLine = (y % 4) < 2;
+                        for (int x = 0; x < w; x++)
+                        {
+                            int idx = rowOff + x;
+                            int argb = src[idx];
+                            int a = (argb >> 24) & 0xFF;
+                            if (a < 15) continue;
+
+                            int r = (argb >> 16) & 0xFF;
+                            int g = (argb >> 8) & 0xFF;
+                            int b = argb & 0xFF;
+                            float lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+
+                            if (lum < 0.38f || (lum < 0.68f && hatchLine && ((x + y) % 3 == 0)))
+                            {
+                                // Deep engraving ink (#1E293B)
+                                dst[idx] = (a << 24) | (30 << 16) | (41 << 8) | 59;
+                            }
+                            else
+                            {
+                                // Warm ivory highlight
+                                dst[idx] = (a << 24) | (248 << 16) | (250 << 8) | 252;
+                            }
+                        }
+                    }
+                }
+                else if (styleMatch == "Sketch") // Nghệ thuật / Nét vẽ (Pop Duotone Art)
+                {
+                    for (int y = 0; y < h; y++)
+                    {
+                        int rowOff = y * w;
+                        for (int x = 0; x < w; x++)
+                        {
+                            int idx = rowOff + x;
+                            int argb = src[idx];
+                            int a = (argb >> 24) & 0xFF;
+                            if (a < 15) continue;
+
+                            int r = (argb >> 16) & 0xFF;
+                            int g = (argb >> 8) & 0xFF;
+                            int b = argb & 0xFF;
+                            float lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+
+                            // Posterize into crisp 3-tone Pop Art (Indigo -> Violet -> Coral Cream)
+                            if (lum < 0.35f)
+                                dst[idx] = (a << 24) | (49 << 16) | (46 << 8) | 129; // Deep Indigo
+                            else if (lum < 0.72f)
+                                dst[idx] = (a << 24) | (139 << 16) | (92 << 8) | 246; // Vibrant Violet
+                            else
+                                dst[idx] = (a << 24) | (254 << 16) | (240 << 8) | 138; // Warm Pop Yellow
+                        }
+                    }
+                }
+                else
+                {
+                    Array.Copy(src, dst, total);
+                }
+
+                Marshal.Copy(dst, 0, dData.Scan0, total);
+            }
+            finally
+            {
+                srcBmp.UnlockBits(sData);
+                dstBmp.UnlockBits(dData);
+            }
+
+            return dstBmp;
+        }
+
+        public static void ApplyStyleMatchToShape(ShapeNode shape, string styleMatch)
+        {
+            if (shape == null) return;
+            shape.GraphicStyleMatch = styleMatch ?? "None";
+
+            if (shape.OriginalRasterBitmap == null && shape.CachedImage != null)
+            {
+                shape.OriginalRasterBitmap = new Bitmap(shape.CachedImage);
+            }
+
+            if (shape.OriginalRasterBitmap != null)
+            {
+                shape.CachedImage = ApplyGraphicStyleMatchBitmap(shape.OriginalRasterBitmap, shape.GraphicStyleMatch);
+                shape.InvalidateDisplayCache();
+            }
+
+            if (shape.GraphicStyleMatch == "Sticker")
+            {
+                shape.HasShadow = true;
+                shape.ShadowColor = 0x1E293B;
+                shape.ShadowBlur = 14f;
+                shape.ShadowOffsetX = 2f;
+                shape.ShadowOffsetY = 4f;
+                shape.ShadowOpacity = 0.32f;
+            }
+            else if (shape.GraphicStyleMatch == "None")
+            {
+                shape.HasShadow = false;
+            }
+            shape.InvalidateShadowCache();
+        }
+
+        public static void ApplyCanvaFilterPreset(ShapeNode shape, string preset)
+        {
+            if (shape == null) return;
+            shape.GraphicFilterPreset = preset ?? "None";
+            switch (shape.GraphicFilterPreset)
+            {
+                case "Soft": // Dịu nhẹ
+                    shape.ImageRecolor = "None";
+                    shape.ImageBrightness = 0.06f;
+                    shape.ImageContrast = 0.88f;
+                    shape.ImageSaturation = 0.82f;
+                    break;
+                case "Vintage": // Cổ điển
+                    shape.ImageRecolor = "Sepia";
+                    shape.ImageBrightness = 0.02f;
+                    shape.ImageContrast = 1.08f;
+                    shape.ImageSaturation = 0.9f;
+                    break;
+                case "Mono": // Đơn sắc
+                    shape.ImageRecolor = "Grayscale";
+                    shape.ImageBrightness = 0.0f;
+                    shape.ImageContrast = 1.15f;
+                    shape.ImageSaturation = 0.0f;
+                    break;
+                case "Vivid": // Nổi bật
+                    shape.ImageRecolor = "None";
+                    shape.ImageBrightness = 0.02f;
+                    shape.ImageContrast = 1.16f;
+                    shape.ImageSaturation = 1.55f;
+                    break;
+                case "Cool": // Lạnh
+                    shape.ImageRecolor = "Blue";
+                    shape.ImageBrightness = 0.02f;
+                    shape.ImageContrast = 1.05f;
+                    shape.ImageSaturation = 1.1f;
+                    break;
+                case "Warm": // Ấm áp
+                    shape.ImageRecolor = "Orange";
+                    shape.ImageBrightness = 0.02f;
+                    shape.ImageContrast = 1.05f;
+                    shape.ImageSaturation = 1.1f;
+                    break;
+                default: // Gốc
+                    shape.GraphicFilterPreset = "None";
+                    shape.ImageRecolor = "None";
+                    shape.ImageBrightness = 0.0f;
+                    shape.ImageContrast = 1.0f;
+                    shape.ImageSaturation = 1.0f;
+                    break;
+            }
+            shape.InvalidateDisplayCache();
+        }
+
+        public static void ResetGraphicToOriginal(ShapeNode shape)
+        {
+            if (shape == null) return;
+            shape.GraphicStyleMatch = "None";
+            ApplyCanvaFilterPreset(shape, "None");
+            shape.HasGradientFill = false;
+            shape.HasShadow = false;
+            shape.StrokeWidth = 0f;
+            shape.CornerRadius = -1f;
+            shape.FillOpacity = 1.0f;
+
+            string orig = shape.OriginalSvgContent;
+            if (string.IsNullOrWhiteSpace(orig) && !string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && File.Exists(shape.ImagePath))
+            {
+                try { orig = File.ReadAllText(shape.ImagePath); } catch { }
+            }
+
+            if (!string.IsNullOrWhiteSpace(orig))
+            {
+                shape.SvgContent = orig;
+                Bitmap bmp = RenderSvgToBitmap(orig, 1600, 1600);
+                if (bmp != null)
+                {
+                    shape.OriginalRasterBitmap = new Bitmap(bmp);
+                    shape.CachedImage = bmp;
+                }
+            }
+            else if (!string.IsNullOrEmpty(shape.ImagePath) && File.Exists(shape.ImagePath))
+            {
+                try
+                {
+                    Image img = Image.FromFile(shape.ImagePath);
+                    shape.OriginalRasterBitmap = new Bitmap(img);
+                    shape.CachedImage = img;
+                }
+                catch { }
+            }
+            else if (shape.OriginalRasterBitmap != null)
+            {
+                shape.CachedImage = new Bitmap(shape.OriginalRasterBitmap);
+            }
+
+            shape.CachedDetectedColors = null;
+            shape.InvalidateDisplayCache();
         }
 
         public static List<ShapeNode> ConvertSvgToShapes(string svgXmlOrPath, float targetX, float targetY, float targetW, float targetH)

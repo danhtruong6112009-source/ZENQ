@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -23,6 +24,7 @@ namespace ZenQOffice.Tests
             Console.WriteLine("===============================================================================\n");
 
             RunTest("DOCX-USER: Diagnostic of sample_doc.docx", TestSampleDocxDiagnostic);
+            RunTest("DOCX-THUVIENHOCLIEU: Test thuvienhoclieu.com document", TestThuvienhoclieuDocx);
             RunTest("DOCX-01: Export & ECMA-376 XML Strict Schema Ordering", TestDocxExportAndXmlValidation);
             RunTest("DOCX-02: Round-Trip Data Fidelity (Save -> Load -> Verify)", TestDocxRoundtripFidelity);
             RunTest("DOCX-03: XML 1.0 Control Character Sanitization (Anti-Corruption)", TestXmlControlCharSanitization);
@@ -966,6 +968,197 @@ namespace ZenQOffice.Tests
                     if (t.Length > 80) t = t.Substring(0, 80) + "...";
                     Console.WriteLine($"  [Pg {pg + 1}] Y={line.ScreenY}: '{t}'");
                 }
+            }
+        }
+        
+        private static void TestThuvienhoclieuDocx()
+        {
+            string docxPath = @"C:\Users\Danh\Downloads\thuvienhoclieu.com-Bai-tap-chuyen-sau-Anh-12-Global-Unit-2-A-Multicultural-World.docx";
+            if (!File.Exists(docxPath)) return;
+
+            // 1. Verify Header & Footer multi-run metadata
+            var testRibbon = new RibbonBar();
+            var testWv = new WriterView();
+            testWv.LoadDocumentFile(docxPath, testRibbon);
+
+            if (testWv.HeaderRuns == null || testWv.HeaderRuns.Count < 2)
+                throw new Exception($"Expected at least 2 HeaderRuns in thuvienhoclieu document, found {testWv.HeaderRuns?.Count ?? 0}");
+            if (!testWv.HeaderRuns.Any(r => r.Text.Contains("thuvienhoclieu")))
+                throw new Exception("HeaderRuns missing 'thuvienhoclieu' run");
+            if (!testWv.HeaderRuns.Any(r => r.Text.Contains(".com")))
+                throw new Exception("HeaderRuns missing '.com' run");
+
+            if (testWv.FooterRuns == null || testWv.FooterRuns.Count < 3)
+                throw new Exception($"Expected at least 3 FooterRuns in thuvienhoclieu document, found {testWv.FooterRuns?.Count ?? 0}");
+            if (!testWv.FooterRuns.Any(r => r.Text.Contains("thuvienhoclieu")))
+                throw new Exception("FooterRuns missing 'thuvienhoclieu' run");
+            if (!testWv.FooterRuns.Any(r => r.Text.Contains("Trang")))
+                throw new Exception("FooterRuns missing 'Trang' run");
+            if (!testWv.FooterRuns.Any(r => r.IsPageNumber || r.Text.Contains("{PAGE}")))
+                throw new Exception("FooterRuns missing PAGE field");
+
+            if (testWv.HeaderAlignment != 1)
+                throw new Exception($"Expected HeaderAlignment == 1 (Center), got {testWv.HeaderAlignment}");
+            if (testWv.DifferentOddEvenPages)
+                throw new Exception("Expected DifferentOddEvenPages == false since settings.xml does not contain evenAndOddHeaders");
+
+            if (testWv.DocumentTables.Count == 0 || testWv.DocumentTables[0].CellMarginLeftPt <= 0)
+                throw new Exception("Table 0 missing parsed w:tblCellMar margins");
+            var tbl0 = testWv.DocumentTables[0];
+            if (Math.Abs(tbl0.CellMarginLeftPt - 0.75f) > 0.01f || Math.Abs(tbl0.CellMarginRightPt - 0.75f) > 0.01f ||
+                Math.Abs(tbl0.CellMarginTopPt - 0.75f) > 0.01f || Math.Abs(tbl0.CellMarginBottomPt - 0.75f) > 0.01f)
+                throw new Exception($"Expected Table 0 cell margins 0.75pt (15 dxa), got Left={tbl0.CellMarginLeftPt}, Right={tbl0.CellMarginRightPt}, Top={tbl0.CellMarginTopPt}, Bottom={tbl0.CellMarginBottomPt}");
+
+            float[] zooms = new float[] { 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.63f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f, 0.95f, 1.0f, 1.10f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 4.0f };
+            foreach (var z in zooms)
+            {
+                var ribbon = new RibbonBar();
+                var wv = new WriterView();
+                wv.LoadDocumentFile(docxPath, ribbon);
+                wv.ZoomLevel = z;
+                using (Bitmap bmp = new Bitmap(1600, 100))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    wv.Draw(g, 1600, 40000, ribbon);
+                }
+
+                int pageHWithGap = (int)(ribbon.PaperHeightInches * 96f * z) + 30;
+                int startPageY = (ribbon.ShowRuler ? 190 : 165) - (int)wv.ScrollY;
+
+                Console.WriteLine($"\n--- Zoom {(int)(z * 100)}% ---");
+                Console.WriteLine($"startPageY={startPageY}, pageH={pageHWithGap - 30}, bottomMargin={ribbon.GetEffectiveBottomMarginInches()*96*z}, topMargin={ribbon.GetEffectiveTopMarginInches()*96*z}");
+                var h0 = wv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 0 && h.ColIndex == 0);
+                Console.WriteLine($"Row 0 Y={h0.CellRect.Y}");
+                if (wv.TableRowHeights.ContainsKey(0))
+                {
+                    Console.WriteLine($"Table 0 RowHeights count={wv.TableRowHeights[0].Count}, total={string.Join(",", wv.TableRowHeights[0].Take(5))}... sum={wv.TableRowHeights[0].Sum()}");
+                }
+                for (int r = 38; r <= 43; r++)
+                {
+                    var hit = wv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == r && h.ColIndex == 0);
+                    int pageIdx = (hit.CellRect.Y - startPageY) / pageHWithGap;
+                    int rH = (wv.TableRowHeights.ContainsKey(0) && r < wv.TableRowHeights[0].Count) ? wv.TableRowHeights[0][r] : -1;
+                    Console.WriteLine($"Row {r} (Text='{hit.CellText}'): Y={hit.CellRect.Y}, H={rH}, Page={pageIdx + 1}");
+                }
+
+                // Strict assertion: rows 0..41 must be on Page 1, rows 42..43 must be on Page 2
+                var hit41 = wv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 41 && h.ColIndex == 0);
+                var hit42 = wv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 42 && h.ColIndex == 0);
+                var hit43 = wv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 43 && h.ColIndex == 0);
+                int p41 = (hit41.CellRect.Y - startPageY) / pageHWithGap + 1;
+                int p42 = (hit42.CellRect.Y - startPageY) / pageHWithGap + 1;
+                int p43 = (hit43.CellRect.Y - startPageY) / pageHWithGap + 1;
+
+                if (p41 != 1) throw new Exception($"Zoom {(int)(z * 100)}%: Expected Row 41 on Page 1, got Page {p41}");
+                if (p42 != 2) throw new Exception($"Zoom {(int)(z * 100)}%: Expected Row 42 on Page 2, got Page {p42}");
+                if (p43 != 2) throw new Exception($"Zoom {(int)(z * 100)}%: Expected Row 43 on Page 2, got Page {p43}");
+
+                // Assert table width matches text margin bounds exactly without overflow
+                if (Math.Abs(z - 1.0f) < 0.01f)
+                {
+                    int expectedTextW = (int)Math.Round((ribbon.PaperWidthInches - ribbon.GetEffectiveLeftMarginInches() - ribbon.GetEffectiveRightMarginInches()) * 96f);
+                    int r0TotalW = wv.TableCellHits.Where(h => h.TableIndex == 0 && h.RowIndex == 0).Sum(h => h.CellRect.Width);
+                    if (Math.Abs(r0TotalW - expectedTextW) > 2)
+                        throw new Exception($"Table width {r0TotalW}px does not align with expected text width {expectedTextW}px");
+                }
+            }
+
+            // Dynamic zoom switching test on the SAME WriterView instance
+            var dynRibbon = new RibbonBar();
+            var dynWv = new WriterView();
+            dynWv.LoadDocumentFile(docxPath, dynRibbon);
+            float[] dynamicSequence = new float[] { 1.0f, 0.50f, 1.25f, 0.40f, 2.0f, 3.0f, 4.0f, 1.0f };
+            foreach (var z in dynamicSequence)
+            {
+                dynWv.ZoomLevel = z;
+                using (Bitmap bmp = new Bitmap(1600, 100))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    dynWv.Draw(g, 1600, 40000, dynRibbon);
+                }
+                int pageHWithGap = (int)(dynRibbon.PaperHeightInches * 96f * z) + 30;
+                int startPageY = (dynRibbon.ShowRuler ? 190 : 165) - (int)dynWv.ScrollY;
+                var hit41 = dynWv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 41 && h.ColIndex == 0);
+                var hit42 = dynWv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 42 && h.ColIndex == 0);
+                var hit43 = dynWv.TableCellHits.Find(h => h.TableIndex == 0 && h.RowIndex == 43 && h.ColIndex == 0);
+                int p41 = (hit41.CellRect.Y - startPageY) / pageHWithGap + 1;
+                int p42 = (hit42.CellRect.Y - startPageY) / pageHWithGap + 1;
+                int p43 = (hit43.CellRect.Y - startPageY) / pageHWithGap + 1;
+                if (p41 != 1) throw new Exception($"Dynamic Zoom {(int)(z * 100)}%: Expected Row 41 on Page 1, got Page {p41}");
+                if (p42 != 2) throw new Exception($"Dynamic Zoom {(int)(z * 100)}%: Expected Row 42 on Page 2, got Page {p42}");
+                if (p43 != 2) throw new Exception($"Dynamic Zoom {(int)(z * 100)}%: Expected Row 43 on Page 2, got Page {p43}");
+            }
+
+            // Round-trip save and reload test: multi-run headers & footers must persist!
+            string tempSavedDocx = Path.Combine(Path.GetTempPath(), "test_thuvienhoclieu_roundtrip.docx");
+            try
+            {
+                if (File.Exists(tempSavedDocx)) File.Delete(tempSavedDocx);
+                testWv.SaveDocumentFile(tempSavedDocx, testRibbon);
+
+                var reloadedRibbon = new RibbonBar();
+                var reloadedWv = new WriterView();
+                reloadedWv.LoadDocumentFile(tempSavedDocx, reloadedRibbon);
+
+                if (reloadedWv.HeaderAlignment != 1)
+                    throw new Exception($"Roundtrip: Expected HeaderAlignment == 1 (Center), got {reloadedWv.HeaderAlignment}");
+                if (reloadedWv.DifferentOddEvenPages)
+                    throw new Exception("Roundtrip: Expected DifferentOddEvenPages == false");
+
+                if (reloadedWv.HeaderRuns == null || reloadedWv.HeaderRuns.Count < 2)
+                    throw new Exception($"Roundtrip: Expected at least 2 HeaderRuns in reloaded document, found {reloadedWv.HeaderRuns?.Count ?? 0}");
+                if (!reloadedWv.HeaderRuns.Any(r => r.Text.Contains("thuvienhoclieu")))
+                    throw new Exception("Roundtrip: HeaderRuns missing 'thuvienhoclieu' run");
+                if (!reloadedWv.HeaderRuns.Any(r => r.Text.Contains(".com")))
+                    throw new Exception("Roundtrip: HeaderRuns missing '.com' run");
+
+                if (reloadedWv.FooterRuns == null || reloadedWv.FooterRuns.Count < 3)
+                    throw new Exception($"Roundtrip: Expected at least 3 FooterRuns in reloaded document, found {reloadedWv.FooterRuns?.Count ?? 0}");
+                if (!reloadedWv.FooterRuns.Any(r => r.Text.Contains("thuvienhoclieu")))
+                    throw new Exception("Roundtrip: FooterRuns missing 'thuvienhoclieu' run");
+                if (!reloadedWv.FooterRuns.Any(r => r.Text.Contains("Trang")))
+                    throw new Exception("Roundtrip: FooterRuns missing 'Trang' run");
+                if (!reloadedWv.FooterRuns.Any(r => r.IsPageNumber || r.Text.Contains("{PAGE}")))
+                    throw new Exception("Roundtrip: FooterRuns missing PAGE field");
+                var pageRun = reloadedWv.FooterRuns.Find(r => r.IsPageNumber || (r.Text != null && r.Text.Contains("{PAGE}")));
+                if (pageRun == null || pageRun.TextColor.R > 50 || pageRun.TextColor.B < 150)
+                    throw new Exception($"Roundtrip: PAGE field color should be blue, got {pageRun?.TextColor}");
+            }
+            finally
+            {
+                if (File.Exists(tempSavedDocx)) try { File.Delete(tempSavedDocx); } catch { }
+            }
+
+            // Test explicit 0pt table cell margin preservation on save & reload
+            string tempZeroMarginDocx = Path.Combine(Path.GetTempPath(), "test_zero_cell_margin.docx");
+            try
+            {
+                var zTable = new ZenQOffice.UI.DocTableObject
+                {
+                    WidthPt = 400,
+                    CellMarginLeftPt = 0f,
+                    CellMarginRightPt = 0f,
+                    CellMarginTopPt = 0f,
+                    CellMarginBottomPt = 0f
+                };
+                var zRow = new ZenQOffice.UI.DocTableRow();
+                zRow.Cells.Add(new ZenQOffice.UI.DocTableCell { Text = "Cell Zero Margin", WidthPt = 400 });
+                zTable.Rows.Add(zRow);
+
+                bool zSaved = DocxHandler.SaveDocxFile(tempZeroMarginDocx, "Before table\r\n| Cell Zero Margin |\r\nAfter table", null, false, 0, null, null, false, null, null, null, null, null, null, null, new List<ZenQOffice.UI.DocTableObject> { zTable });
+                if (!zSaved) throw new Exception("Failed to save docx with 0pt cell margins");
+
+                DocxMetadata zMeta;
+                bool zLoaded = DocxHandler.LoadDocxFile(tempZeroMarginDocx, out zMeta);
+                if (!zLoaded) throw new Exception("Failed to load docx with 0pt cell margins");
+                if (zMeta.Tables == null || zMeta.Tables.Count == 0) throw new Exception("No tables loaded in 0pt cell margin test");
+                var loadedZTable = zMeta.Tables[0];
+                if (loadedZTable.CellMarginLeftPt != 0f || loadedZTable.CellMarginRightPt != 0f || loadedZTable.CellMarginTopPt != 0f || loadedZTable.CellMarginBottomPt != 0f)
+                    throw new Exception($"0pt cell margins were not preserved! Loaded: L={loadedZTable.CellMarginLeftPt}, R={loadedZTable.CellMarginRightPt}, T={loadedZTable.CellMarginTopPt}, B={loadedZTable.CellMarginBottomPt}");
+            }
+            finally
+            {
+                if (File.Exists(tempZeroMarginDocx)) try { File.Delete(tempZeroMarginDocx); } catch { }
             }
         }
     }

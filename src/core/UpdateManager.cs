@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -38,8 +38,8 @@ namespace ZenQOffice.Core
 
     public static class UpdateManager
     {
-        public const string CURRENT_VERSION = "5.7.0";
-        public const string CURRENT_VERSION_TAG = "v5.7";
+        public const string CURRENT_VERSION = "5.8.0";
+        public const string CURRENT_VERSION_TAG = "v5.8";
         public const string GITHUB_OWNER = "danhtruong6112009-source";
         public const string GITHUB_REPO = "ZENQ";
 

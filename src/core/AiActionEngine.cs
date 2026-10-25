@@ -792,10 +792,10 @@ namespace ZenQOffice.Core
                 string l = line.Trim();
                 if (string.IsNullOrEmpty(l) || l.StartsWith("{") || l.StartsWith("}") || l.StartsWith("[GENOFFICE_ACTION")) continue;
 
-                // Explicit indicators: "❌ từ_sai ➔ ✅ từ_đúng", "Từ sai: ... -> Sửa: ...", or bullet with arrow
+                // Explicit indicators: "❌ từ_sai ➔ ✅ từ_đúng", "Từ sai: ... -> Sửa: ...", or explicit error prefixes
                 bool isCorrectionIndicator = l.StartsWith("❌") || l.StartsWith("Lỗi:") || l.StartsWith("Từ sai:") ||
-                                             l.StartsWith("Sai:") || l.Contains("➔") || l.Contains("-->") ||
-                                             ((l.StartsWith("-") || l.StartsWith("•") || l.StartsWith("*")) && (l.Contains("->") || l.Contains("=>")));
+                                             l.StartsWith("Sai:") || l.StartsWith("Typo:") ||
+                                             (l.Contains("➔") && (l.Contains("❌") || l.Contains("Lỗi") || l.Contains("Sai")));
                 if (!isCorrectionIndicator) continue;
 
                 string find = "";

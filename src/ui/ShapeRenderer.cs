@@ -873,7 +873,7 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    SmartArtRenderer.SuppressNodeBodies = hasVectorNodes;
+                    SmartArtRenderer.SuppressNodeBodies = false;
                     try
                     {
                         SmartArtRenderer.DrawSmartArt(g, bounds, shape, zoomLevel);
@@ -892,12 +892,12 @@ namespace ZenQOffice.UI
                         bool isActivelyEditing = shape.IsSelected && shape.IsEditingText && shape.SelectedNodeIndex == ni;
                         bool hasCustomColor = shape.NodeColors != null && shape.NodeColors.ContainsKey(ni);
                         bool isModifiedText = shape.ModifiedNodes != null && shape.ModifiedNodes.Contains(ni);
-                        bool hasCustomShape = shape.NodeShapeTypes != null && shape.NodeShapeTypes.ContainsKey(ni);
+                        bool hasCustomShape = shape.NodeShapeTypes != null && shape.NodeShapeTypes.ContainsKey(ni) && shape.UserCustomizedNodeShapes != null && shape.UserCustomizedNodeShapes.Contains(ni);
                         bool hasCustomOutline = shape.NodeOutlineColors != null && shape.NodeOutlineColors.ContainsKey(ni);
                         bool hasCustomTextColor = shape.NodeTextColors != null && shape.NodeTextColors.ContainsKey(ni);
                         bool hasCustomScale = shape.NodeScaleDeltas != null && shape.NodeScaleDeltas.ContainsKey(ni);
                         bool hasVisualStyle = shape.VisualStylePreset > 0;
-                        bool shouldDrawNode = true;
+                        bool shouldDrawNode = isActivelyEditing || hasCustomShape || hasCustomScale || (shape.NodeOffsetDeltas != null && shape.NodeOffsetDeltas.ContainsKey(ni));
 
                         if (shouldDrawNode)
                         {
@@ -917,11 +917,11 @@ namespace ZenQOffice.UI
                             }
                             else if (shape.SmartArtType != null && shape.SmartArtType.Contains("Radial"))
                             {
-                                sType = (ni == 0) ? "Circle" : "RoundedRectangle";
+                                sType = "Circle";
                             }
                             else if (shape.SmartArtType != null && (shape.SmartArtType.StartsWith("Cycle_") || shape.SmartArtType.Contains("Ring") || shape.SmartArtType.Contains("Nondirectional")))
                             {
-                                sType = "RoundedRectangle";
+                                sType = (shape.SmartArtType.Contains("Ring") || shape.SmartArtType.Contains("Circle") || shape.SmartArtType.Contains("Radial") || shape.SmartArtType.Contains("BasicCycle")) ? "Circle" : "RoundedRectangle";
                             }
 
                             if (shape.AspectRatioLock && (sType == "Oval" || sType == "Circle"))
@@ -959,13 +959,13 @@ namespace ZenQOffice.UI
                             }
                             else if (shape.ResolvedThemePalette != null && shape.ResolvedThemePalette.Length > 0)
                             {
-                                if (shape.StylePresetIndex == 2)
+                                if (shape.StylePresetIndex == 3 || shape.StylePresetIndex == 6)
                                 {
-                                    bgCol = shape.ResolvedThemePalette[ni % shape.ResolvedThemePalette.Length];
+                                    bgCol = shape.ResolvedThemePalette[0];
                                 }
                                 else
                                 {
-                                    bgCol = shape.ResolvedThemePalette[0];
+                                    bgCol = shape.ResolvedThemePalette[ni % shape.ResolvedThemePalette.Length];
                                 }
                             }
                             else
@@ -1607,13 +1607,19 @@ namespace ZenQOffice.UI
                 return;
             }
 
-            // 1. Draw Drop Shadow if enabled
+            // 1. Draw Soft Drop Shadow if enabled ('đen mờ')
             if (shape.HasShadow && shape.WrapMode != 5 && shape.FillColor != Color.Transparent)
             {
-                using (GraphicsPath sPath = CreateShapePath(shape, new Rectangle(bounds.X + 4, bounds.Y + 4, bounds.Width, bounds.Height)))
-                using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+                int[] shAlphas = new int[] { 24, 16, 9, 3 };
+                float[] shOffsets = new float[] { 1.5f, 3.0f, 4.5f, 6.0f };
+                for (int si = 0; si < shAlphas.Length; si++)
                 {
-                    g.FillPath(shadowB, sPath);
+                    int off = (int)Math.Round(shOffsets[si]);
+                    using (GraphicsPath sPath = CreateShapePath(shape, new Rectangle(bounds.X + off, bounds.Y + off, bounds.Width, bounds.Height)))
+                    using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(shAlphas[si], 0, 0, 0)))
+                    {
+                        g.FillPath(shadowB, sPath);
+                    }
                 }
             }
 

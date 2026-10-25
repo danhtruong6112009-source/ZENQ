@@ -35,7 +35,7 @@ namespace ZenQOffice.UI
             int curY = 10;
 
             // 1. Lát Cắt & Hình Học Không Gian (Geometry & Slices)
-            AddSection(scrollPanel, ref curY, "📐 Lát Cắt & Hình Học Chuẩn PowerPoint (Slices & Geometry)", new string[] {
+            AddSection(scrollPanel, ref curY, "📐 Lát Cắt & Hình Học Chuẩn Trình Chiếu (Slices & Geometry)", new string[] {
                 "Facet", "Slice", "Bauhaus", "Ion"
             });
 

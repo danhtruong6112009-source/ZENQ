@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -672,7 +672,7 @@ namespace ZenQOffice.UI
                         break;
 
                     case 10: // Highlight ✏️ ▾
-                        DrawPencilIcon(g, r.X + 5, r.Y + 3, 14);
+                        FluentIconRenderer.DrawGlyph(g, "\uE7E6", new Rectangle(r.X + 4, r.Y + 2, 16, 15), Color.FromArgb(55, 65, 81), 10.5f);
                         Color hlCol = (_ribbon != null && _ribbon.CurrentHighlightColor != Color.Empty && _ribbon.CurrentHighlightColor != Color.Transparent) ? _ribbon.CurrentHighlightColor : Color.Yellow;
                         using (SolidBrush b = new SolidBrush(hlCol)) g.FillRectangle(b, r.X + 4, r.Bottom - 5, 16, 3);
                         DrawArrowDown(g, r.Right - 7, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
@@ -752,7 +752,7 @@ namespace ZenQOffice.UI
             using (Pen p = new Pen(Color.FromArgb(55, 65, 81), 1.2f))
             {
                 Point[] pts = new Point[] { new Point(x + 3, y + size - 4), new Point(x + size - 4, y + 2), new Point(x + size - 2, y + 4), new Point(x + 5, y + size - 2) };
-                g.DrawPolygon(p, pts);
+                FluentIconRenderer.DrawGlyph(g, "\uE7E6", new Rectangle(x, y - 1, size, size), Color.FromArgb(55, 65, 81), 10f);
             }
         }
 

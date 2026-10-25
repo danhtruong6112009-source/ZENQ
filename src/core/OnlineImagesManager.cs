@@ -329,6 +329,36 @@ namespace ZenQOffice.Core
             }
         }
 
+        public static async Task<Bitmap> GetOrDownloadImageAsync(string id, string url, int targetSize = 1600)
+        {
+            try
+            {
+                if (!Directory.Exists(_cacheDir)) Directory.CreateDirectory(_cacheDir);
+
+                string localPath = GetCachedImagePath(id, url);
+                string localSource = FindLocalSourceFile(url);
+                string existingSource = File.Exists(localPath) ? localPath : (File.Exists(localSource) ? localSource : null);
+
+                if (!string.IsNullOrEmpty(existingSource))
+                {
+                    return LoadScaledImage(existingSource, targetSize);
+                }
+
+                byte[] data = await _httpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+                if (data != null && data.Length > 0)
+                {
+                    File.WriteAllBytes(localPath, data);
+                    TriggerImageDownloaded();
+                    return LoadScaledImage(localPath, targetSize);
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static Bitmap GenerateAndSaveThumbnail(string sourcePath, string thumbPath, int targetSize)
         {
             try
@@ -347,17 +377,44 @@ namespace ZenQOffice.Core
                     Bitmap thumb = new Bitmap(tw, th, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                     using (Graphics g = Graphics.FromImage(thumb))
                     {
-                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
-                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
-                        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.None;
-                        g.DrawImage(orig, 0, 0, tw, th);
+                        g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                        using (var wrapAttr = new System.Drawing.Imaging.ImageAttributes())
+                        {
+                            wrapAttr.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
+                            g.DrawImage(orig, new Rectangle(0, 0, tw, th), 0, 0, w, h, GraphicsUnit.Pixel, wrapAttr);
+                        }
                     }
 
                     try
                     {
-                        if (!Directory.Exists(Path.GetDirectoryName(thumbPath)))
-                            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath));
-                        thumb.Save(thumbPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                        string dir = Path.GetDirectoryName(thumbPath);
+                        if (!Directory.Exists(dir))
+                            Directory.CreateDirectory(dir);
+                        var jpegCodec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders();
+                        System.Drawing.Imaging.ImageCodecInfo jpegEncoder = null;
+                        foreach (var c in jpegCodec)
+                        {
+                            if (c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid)
+                            {
+                                jpegEncoder = c;
+                                break;
+                            }
+                        }
+                        if (jpegEncoder != null)
+                        {
+                            using (var ep = new System.Drawing.Imaging.EncoderParameters(1))
+                            {
+                                ep.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 95L);
+                                thumb.Save(thumbPath, jpegEncoder, ep);
+                            }
+                        }
+                        else
+                        {
+                            thumb.Save(thumbPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                        }
                     }
                     catch { }
 

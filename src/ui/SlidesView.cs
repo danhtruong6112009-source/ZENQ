@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -70,11 +70,16 @@ namespace ZenQOffice.UI
             {
                 if (_activeSlideIndex != value)
                 {
+                    if (IsPresenting && _activeSlideIndex >= 0)
+                    {
+                        LastViewedSlideIndex = _activeSlideIndex;
+                    }
                     if (SlideVideoPlayerManager.Instance.ActiveShape != null || SlideVideoPlayerManager.Instance.IsPlaying)
                     {
                         SlideVideoPlayerManager.Instance.Stop();
                     }
                     _playedMediaShapesInPresentation.Clear();
+                    ResetSlideInteractiveState();
                     IsEditingSpeakerNotes = false;
                     IsSelectingSpeakerNotes = false;
                     SpeakerNotesSelectionLength = 0;
@@ -149,6 +154,777 @@ namespace ZenQOffice.UI
         private bool _isHoverThumbScrollBar = false;
         private bool _isHoverThumbScrollBarThumb = false;
         public int SidebarScrollY { get; set; }
+        public int GraphicSidebarTab { get; set; } = 0; // 0 = Chỉnh sửa, 1 = Màu sắc
+        public int GraphicColorSubTab { get; set; } = 0; // 0 = Màu đơn, 1 = Chuyển sắc
+        public int SelectedGraphicColorIndex { get; set; } = 0;
+        public ColorPickerTarget ActiveColorPickerTarget { get; set; } = ColorPickerTarget.GraphicColor;
+        public int SelectedGradientStopIndex { get; set; } = 0;
+        public float CustomHue { get; set; } = 260f;
+        public float CustomSat { get; set; } = 0.75f;
+        public float CustomVal { get; set; } = 0.90f;
+        public float CustomAlpha { get; set; } = 1.0f;
+        public int DraggingColorControlType { get; set; } = 0; // 0=None, 1=2D SV Box, 2=Hue Slider, 3=Alpha Slider, 4=Gradient Stop Position Bar, 5=GraphicEditor Opacity Slider
+        public Rectangle LastSVBoxRect = Rectangle.Empty;
+        public Rectangle LastHueSliderRect = Rectangle.Empty;
+        public Rectangle LastAlphaSliderRect = Rectangle.Empty;
+        public Rectangle LastGradPosBarRect = Rectangle.Empty;
+        public Rectangle LastGraphicOpacitySliderRect = Rectangle.Empty;
+        public int PotentialDragSlideIndex = -1;
+        public Point DragSlideStartMouse = Point.Empty;
+        public Point CurrentDragSlideMouse = Point.Empty;
+        public bool IsDraggingSlideThumbnail = false;
+        public bool IsDraggingBottomSlideThumbnail = false;
+        public int DragTargetSlideInsertIndex = -1;
+        public int EmptyGapInsertAfterSlideIndex = -1;
+        public int LastRenderWindowWidth = 1366;
+        public int LastRenderWindowHeight = 800;
+
+        public static bool IsRasterOrSvgGraphic(ShapeNode shape)
+        {
+            if (shape == null) return false;
+            // A raster image / stock photo (JPG/PNG/BMP) is a Picture, NOT an SVG vector graphic
+            if (shape.Type == ShapeType.Image && !shape.IsSvg && !shape.IsGraphic && (string.IsNullOrEmpty(shape.ImagePath) || !shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (shape.IsSvg && (!string.IsNullOrEmpty(shape.SvgContent) || (!string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))))
+                return true;
+            if (shape.IsGraphic && (shape.CachedImage != null || !string.IsNullOrEmpty(shape.SvgContent) || !string.IsNullOrEmpty(shape.ImagePath)))
+                return true;
+            return false;
+        }
+
+        public void OpenColorPicker(ColorPickerTarget target, int graphicColorIndex = 0, bool isGradient = false)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape != null)
+            {
+                bool isGraphic = IsRasterOrSvgGraphic(shape);
+                if (!isGraphic)
+                {
+                    if (target == ColorPickerTarget.GraphicColor)
+                    {
+                        target = ColorPickerTarget.ShapeFill;
+                    }
+                }
+                else
+                {
+                    if (target == ColorPickerTarget.ShapeFill)
+                    {
+                        target = ColorPickerTarget.GraphicColor;
+                    }
+                }
+            }
+            ActiveColorPickerTarget = target;
+            SelectedGraphicColorIndex = graphicColorIndex;
+            GraphicColorSubTab = isGradient ? 1 : 0;
+            SelectedGradientStopIndex = 0;
+            IsSidebarOpen = true;
+            SidebarPanel = SidebarPanelType.ColorPalettePicker;
+            SidebarScrollY = 0;
+            SyncHSVFromActiveSelection();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void SyncHSVFromActiveSelection()
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null) return;
+            Color col = Color.FromArgb(124, 58, 237);
+            float alpha = 1.0f;
+            bool isGraphic = IsRasterOrSvgGraphic(shape);
+
+            if (GraphicColorSubTab == 1)
+            {
+                List<int> stops = GetActiveGradientStops(shape);
+                if (stops != null && stops.Count > 0)
+                {
+                    int idx = Math.Max(0, Math.Min(stops.Count - 1, SelectedGradientStopIndex));
+                    col = Color.FromArgb(255, Color.FromArgb(stops[idx]));
+                }
+                alpha = Math.Max(0.05f, Math.Min(1.0f, shape.FillOpacity));
+            }
+            else
+            {
+                if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor))
+                {
+                    col = Color.FromArgb(255, Color.FromArgb(shape.FillColor));
+                    alpha = Math.Max(0.05f, Math.Min(1.0f, shape.FillOpacity));
+                }
+                else if (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor)
+                {
+                    var det = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+                    if (det.Count > 0)
+                    {
+                        int idx = Math.Max(0, Math.Min(det.Count - 1, SelectedGraphicColorIndex));
+                        col = det[idx];
+                    }
+                    alpha = Math.Max(0.05f, Math.Min(1.0f, shape.FillOpacity));
+                }
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke)
+                {
+                    col = Color.FromArgb(255, Color.FromArgb(shape.StrokeColor));
+                }
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor)
+                {
+                    col = Color.FromArgb(255, Color.FromArgb(shape.TextColor));
+                }
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+                {
+                    int oc = shape.HasTextOutline ? shape.TextOutlineColor : shape.TextColor;
+                    col = Color.FromArgb(255, Color.FromArgb(oc));
+                }
+            }
+            ColorToHSV(col, out float h, out float s, out float v);
+            CustomHue = h;
+            CustomSat = s;
+            CustomVal = v;
+            CustomAlpha = alpha;
+        }
+
+        public static void ColorToHSV(Color color, out float hue, out float saturation, out float value)
+        {
+            int max = Math.Max(color.R, Math.Max(color.G, color.B));
+            int min = Math.Min(color.R, Math.Min(color.G, color.B));
+            hue = color.GetHue();
+            saturation = (max == 0) ? 0f : 1f - (1f * min / max);
+            value = max / 255f;
+        }
+
+        public static Color ColorFromHSV(float hue, float saturation, float value)
+        {
+            int hi = Convert.ToInt32(Math.Floor(hue / 60.0)) % 6;
+            if (hi < 0) hi += 6;
+            double f = hue / 60.0 - Math.Floor(hue / 60.0);
+            value = Math.Max(0f, Math.Min(1f, value)) * 255f;
+            int v = Convert.ToInt32(value);
+            int p = Convert.ToInt32(value * (1 - saturation));
+            int q = Convert.ToInt32(value * (1 - f * saturation));
+            int t = Convert.ToInt32(value * (1 - (1 - f) * saturation));
+            if (hi == 0) return Color.FromArgb(255, v, t, p);
+            else if (hi == 1) return Color.FromArgb(255, q, v, p);
+            else if (hi == 2) return Color.FromArgb(255, p, v, t);
+            else if (hi == 3) return Color.FromArgb(255, p, q, v);
+            else if (hi == 4) return Color.FromArgb(255, t, p, v);
+            else return Color.FromArgb(255, v, p, q);
+        }
+
+        private List<int> GetActiveGradientStops(ShapeNode shape)
+        {
+            if (shape == null) return new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) };
+            bool isGraphic = IsRasterOrSvgGraphic(shape);
+            if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor))
+            {
+                if (shape.GradientStops == null || shape.GradientStops.Count < 2)
+                {
+                    int c1 = shape.FillColor != 0 ? shape.FillColor : unchecked((int)0xFF6366F1);
+                    int c2 = shape.GradientColor2 != 0 ? shape.GradientColor2 : unchecked((int)0xFFEC4899);
+                    shape.GradientStops = new List<GradientStop> { new GradientStop(c1, 0f), new GradientStop(c2, 1f) };
+                }
+                var list = new List<int>();
+                foreach (var st in shape.GradientStops) list.Add(unchecked((int)0xFF000000) | (st.Color & 0xFFFFFF));
+                return list;
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor)
+            {
+                if (shape.TextGradientStopColors == null || shape.TextGradientStopColors.Count < 2)
+                {
+                    int c1 = shape.TextColor != 0 ? shape.TextColor : unchecked((int)0xFF7C3AED);
+                    shape.TextGradientStopColors = new List<int> { c1, unchecked((int)0xFFEC4899) };
+                    shape.TextGradientStopPositions = new List<float> { 0f, 1f };
+                }
+                return shape.TextGradientStopColors;
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+            {
+                int c1 = shape.HasTextOutline ? shape.TextOutlineColor : (shape.TextColor != 0 ? shape.TextColor : unchecked((int)0xFF000000));
+                return new List<int> { unchecked((int)0xFF000000) | (c1 & 0xFFFFFF), unchecked((int)0xFFEC4899) };
+            }
+            else
+            {
+                if (shape.GraphicGradientStopColors == null || shape.GraphicGradientStopColors.Count < 2)
+                {
+                    shape.GraphicGradientStopColors = new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) };
+                    shape.GraphicGradientStopPositions = new List<float> { 0f, 1f };
+                }
+                return shape.GraphicGradientStopColors;
+            }
+        }
+
+        private List<float> GetActiveGradientPositions(ShapeNode shape, int count)
+        {
+            List<float> pos = null;
+            bool isGraphic = IsRasterOrSvgGraphic(shape);
+            if ((ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor)) && shape.GradientStops != null && shape.GradientStops.Count == count)
+            {
+                pos = new List<float>();
+                foreach (var st in shape.GradientStops) pos.Add(st.Position);
+                return pos;
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor || ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+            {
+                pos = shape.TextGradientStopPositions;
+            }
+            else
+            {
+                pos = shape.GraphicGradientStopPositions;
+            }
+            if (pos == null || pos.Count != count)
+            {
+                pos = new List<float>();
+                for (int i = 0; i < count; i++) pos.Add(count > 1 ? (float)i / (count - 1) : 0f);
+                if (ActiveColorPickerTarget == ColorPickerTarget.TextColor || ActiveColorPickerTarget == ColorPickerTarget.TextStroke) shape.TextGradientStopPositions = pos;
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || !isGraphic)
+                {
+                    if (shape.GradientStops != null && shape.GradientStops.Count == count)
+                    {
+                        for (int i = 0; i < count; i++) shape.GradientStops[i].Position = pos[i];
+                    }
+                }
+                else shape.GraphicGradientStopPositions = pos;
+            }
+            return pos;
+        }
+
+        private string GetActiveGradientStyle(ShapeNode shape)
+        {
+            if (shape == null) return "Linear90";
+            bool isGraphic = IsRasterOrSvgGraphic(shape);
+            if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor))
+            {
+                if (shape.GradientType == GradientType.Radial) return "Radial";
+                if (shape.GradientType == GradientType.Rectangular) return "RadialCorner";
+                if (shape.GradientType == GradientType.Path) return "Conic";
+                float ang = shape.GradientAngle;
+                if (Math.Abs(ang - 90f) < 20f) return "Linear180";
+                if (Math.Abs(ang - 45f) < 25f || Math.Abs(ang - 135f) < 25f) return "Linear135";
+                return "Linear90";
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor || ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+            {
+                return string.IsNullOrEmpty(shape.TextGradientStyle) ? "Linear90" : shape.TextGradientStyle;
+            }
+            return string.IsNullOrEmpty(shape.GraphicGradientStyle) ? "Linear90" : shape.GraphicGradientStyle;
+        }
+
+        private void ApplyActiveSolidColor(ShapeNode shape, Color newC, bool isInteractiveDrag = false)
+        {
+            if (shape == null) return;
+            bool isGraphic = IsRasterOrSvgGraphic(shape);
+
+            if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor))
+            {
+                shape.HasGradientFill = false;
+                shape.FillColor = newC.ToArgb() & 0xFFFFFF;
+                if (shape.FillOpacity <= 0.01f) shape.FillOpacity = 1.0f;
+                if (!isInteractiveDrag) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke)
+            {
+                shape.StrokeColor = newC.ToArgb() & 0xFFFFFF;
+                if (shape.StrokeWidth <= 0f) shape.StrokeWidth = 2f;
+                if (!isInteractiveDrag) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor)
+            {
+                int rgb = newC.ToArgb() & 0xFFFFFF;
+                SetSelectionTextColor(rgb);
+                if (!isInteractiveDrag) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+            {
+                shape.HasTextOutline = true;
+                shape.TextOutlineColor = newC.ToArgb() & 0xFFFFFF;
+                if (shape.TextOutlineWidth <= 0f) shape.TextOutlineWidth = 1.5f;
+                if (!isInteractiveDrag) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+            }
+            else
+            {
+                if (shape.HasGraphicGradient)
+                {
+                    shape.HasGraphicGradient = false;
+                    string origSvg = !string.IsNullOrWhiteSpace(shape.SvgContent) ? shape.SvgContent : shape.OriginalSvgContent;
+                    if (!string.IsNullOrWhiteSpace(origSvg))
+                    {
+                        Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(origSvg, isInteractiveDrag ? 480 : 1600, isInteractiveDrag ? 480 : 1600);
+                        if (sharpBmp != null)
+                        {
+                            if (!isInteractiveDrag) shape.OriginalRasterBitmap = new Bitmap(sharpBmp);
+                            shape.CachedImage = isInteractiveDrag ? sharpBmp : SvgRasterizer.ApplyGraphicStyleMatchBitmap(sharpBmp, shape.GraphicStyleMatch);
+                            shape.CachedDetectedColors = null;
+                        }
+                    }
+                    else if (shape.OriginalRasterBitmap != null)
+                    {
+                        shape.CachedImage = SvgRasterizer.ApplyGraphicStyleMatchBitmap(shape.OriginalRasterBitmap, shape.GraphicStyleMatch);
+                        shape.CachedDetectedColors = null;
+                    }
+                }
+                var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+                if (SelectedGraphicColorIndex >= 0 && SelectedGraphicColorIndex < detectedColors.Count)
+                {
+                    Color baseCol = (shape.OriginalDetectedColors != null && SelectedGraphicColorIndex < shape.OriginalDetectedColors.Count)
+                        ? shape.OriginalDetectedColors[SelectedGraphicColorIndex]
+                        : detectedColors[SelectedGraphicColorIndex];
+                    SvgRasterizer.ReplaceGraphicColor(shape, SelectedGraphicColorIndex, baseCol, newC, isInteractiveDrag);
+                }
+                else if (shape.CachedImage != null)
+                {
+                    Bitmap baseBmp = shape.OriginalRasterBitmap ?? (Bitmap)shape.CachedImage;
+                    shape.CachedImage = SvgRasterizer.ApplySolidColorRecolor(baseBmp, newC);
+                    shape.InvalidateDisplayCache();
+                }
+                if (shape.CachedDetectedColors != null && SelectedGraphicColorIndex >= 0 && SelectedGraphicColorIndex < shape.CachedDetectedColors.Count)
+                {
+                    shape.CachedDetectedColors[SelectedGraphicColorIndex] = newC;
+                }
+            }
+            if (!isInteractiveDrag && ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
+            if (ParentControl != null) ParentControl.Invalidate();
+        }
+
+        private void ApplyCurrentHSVToTarget(bool isInteractiveDrag = false)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null) return;
+            Color curCol = ColorFromHSV(CustomHue, CustomSat, CustomVal);
+            if (GraphicColorSubTab == 1)
+            {
+                List<int> stops = GetActiveGradientStops(shape);
+                List<float> positions = GetActiveGradientPositions(shape, stops.Count);
+                int idx = Math.Max(0, Math.Min(stops.Count - 1, SelectedGradientStopIndex));
+                stops[idx] = curCol.ToArgb();
+                ApplyActiveGradient(shape, stops, positions, GetActiveGradientStyle(shape), isInteractiveDrag);
+            }
+            else
+            {
+                ApplyActiveSolidColor(shape, curCol, isInteractiveDrag);
+            }
+        }
+
+        public void UpdateColorFromInteractiveControl(Point mousePos)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null) return;
+            bool isInteractive = (DraggingColorControlType != 0);
+
+            if (DraggingColorControlType == 1 && LastSVBoxRect.Width > 0 && LastSVBoxRect.Height > 0)
+            {
+                CustomSat = Math.Max(0f, Math.Min(1f, (float)(mousePos.X - LastSVBoxRect.X) / LastSVBoxRect.Width));
+                CustomVal = 1f - Math.Max(0f, Math.Min(1f, (float)(mousePos.Y - LastSVBoxRect.Y) / LastSVBoxRect.Height));
+                ApplyCurrentHSVToTarget(isInteractive);
+            }
+            else if (DraggingColorControlType == 2 && LastHueSliderRect.Width > 0)
+            {
+                CustomHue = Math.Max(0f, Math.Min(359.9f, ((float)(mousePos.X - LastHueSliderRect.X) / LastHueSliderRect.Width) * 360f));
+                ApplyCurrentHSVToTarget(isInteractive);
+            }
+            else if (DraggingColorControlType == 3 && LastAlphaSliderRect.Width > 0)
+            {
+                CustomAlpha = Math.Max(0.05f, Math.Min(1f, (float)(mousePos.X - LastAlphaSliderRect.X) / LastAlphaSliderRect.Width));
+                shape.FillOpacity = CustomAlpha;
+                if (!isInteractive) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+                if (!isInteractive && ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+                if (ParentControl != null) ParentControl.Invalidate();
+            }
+            else if (DraggingColorControlType == 4 && LastGradPosBarRect.Width > 0)
+            {
+                List<int> stops = GetActiveGradientStops(shape);
+                List<float> positions = GetActiveGradientPositions(shape, stops.Count);
+                int idx = Math.Max(0, Math.Min(stops.Count - 1, SelectedGradientStopIndex));
+                float newPos = Math.Max(0f, Math.Min(1f, (float)(mousePos.X - LastGradPosBarRect.X) / LastGradPosBarRect.Width));
+                positions[idx] = newPos;
+                ApplyActiveGradient(shape, stops, positions, GetActiveGradientStyle(shape), isInteractive);
+            }
+            else if (DraggingColorControlType == 5 && LastGraphicOpacitySliderRect.Width > 0)
+            {
+                float frac = Math.Max(0.05f, Math.Min(1.0f, (float)(mousePos.X - (LastGraphicOpacitySliderRect.X + 6)) / Math.Max(1, LastGraphicOpacitySliderRect.Width - 12)));
+                shape.FillOpacity = frac;
+                if (!isInteractive) shape.CachedDetectedColors = null;
+                shape.InvalidateDisplayCache();
+                if (!isInteractive && ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+                if (ParentControl != null) ParentControl.Invalidate();
+            }
+        }
+
+        private void HandleCanvaColorPickerMouseDown(Point mousePos, int panelX, int sidebarY, int rightSidebarW, Control parentControl)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null) return;
+            if (mousePos.Y <= sidebarY + 36) return;
+            int sy = sidebarY + 42 + SidebarScrollY;
+            int curY = sy + 2;
+
+            int subTabW = (rightSidebarW - 24) / 2;
+            Rectangle stSolid = new Rectangle(panelX + 12, curY, subTabW, 26);
+            Rectangle stGrad = new Rectangle(panelX + 12 + subTabW, curY, subTabW, 26);
+            if (stSolid.Contains(mousePos))
+            {
+                SaveUndoState();
+                GraphicColorSubTab = 0;
+                Color curCol = ColorFromHSV(CustomHue, CustomSat, CustomVal);
+                ApplyActiveSolidColor(shape, curCol);
+                SyncHSVFromActiveSelection();
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
+            if (stGrad.Contains(mousePos))
+            {
+                SaveUndoState();
+                GraphicColorSubTab = 1;
+                List<int> stops = GetActiveGradientStops(shape);
+                List<float> positions = GetActiveGradientPositions(shape, stops.Count);
+                ApplyActiveGradient(shape, stops, positions, GetActiveGradientStyle(shape));
+                SyncHSVFromActiveSelection();
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
+            curY += 34;
+
+            // 2D SV Box
+            Rectangle svBox = new Rectangle(panelX + 12, curY, rightSidebarW - 24, 108);
+            LastSVBoxRect = svBox;
+            if (svBox.Contains(mousePos))
+            {
+                SaveUndoState();
+                DraggingColorControlType = 1;
+                UpdateColorFromInteractiveControl(mousePos);
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
+            curY += 116;
+
+            // Hue Slider
+            Rectangle hueHit = new Rectangle(panelX + 8, curY - 4, rightSidebarW - 16, 20);
+            LastHueSliderRect = new Rectangle(panelX + 12, curY, rightSidebarW - 24, 12);
+            if (hueHit.Contains(mousePos))
+            {
+                SaveUndoState();
+                DraggingColorControlType = 2;
+                UpdateColorFromInteractiveControl(mousePos);
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
+            curY += 20;
+
+            // Alpha Slider
+            Rectangle alphaHit = new Rectangle(panelX + 8, curY - 4, rightSidebarW - 16, 20);
+            LastAlphaSliderRect = new Rectangle(panelX + 12, curY, rightSidebarW - 24, 12);
+            if (alphaHit.Contains(mousePos))
+            {
+                SaveUndoState();
+                DraggingColorControlType = 3;
+                UpdateColorFromInteractiveControl(mousePos);
+                if (parentControl != null) parentControl.Invalidate();
+                return;
+            }
+            curY += 20;
+
+            // ColorDialog / Eyedropper Button
+            Rectangle eyeBtn = new Rectangle(panelX + rightSidebarW - 42, curY, 30, 26);
+            Rectangle hexPill = new Rectangle(panelX + 12, curY, rightSidebarW - 62, 26);
+            if (eyeBtn.Contains(mousePos) || hexPill.Contains(mousePos))
+            {
+                using (ColorDialog cd = new ColorDialog())
+                {
+                    cd.FullOpen = true;
+                    cd.Color = ColorFromHSV(CustomHue, CustomSat, CustomVal);
+                    if (cd.ShowDialog() == DialogResult.OK)
+                    {
+                        SaveUndoState();
+                        ColorToHSV(cd.Color, out float h, out float s, out float v);
+                        CustomHue = h; CustomSat = s; CustomVal = v;
+                        ApplyCurrentHSVToTarget();
+                        if (parentControl != null) parentControl.Invalidate();
+                    }
+                }
+                return;
+            }
+            curY += 34;
+
+            if (GraphicColorSubTab == 1)
+            {
+                curY += 20;
+                List<int> stops = GetActiveGradientStops(shape);
+                List<float> positions = GetActiveGradientPositions(shape, stops.Count);
+                Rectangle gradBar = new Rectangle(panelX + 16, curY + 4, rightSidebarW - 32, 16);
+                LastGradPosBarRect = gradBar;
+                Rectangle gradHit = new Rectangle(gradBar.X - 8, gradBar.Y - 6, gradBar.Width + 16, gradBar.Height + 12);
+                if (gradHit.Contains(mousePos))
+                {
+                    SaveUndoState();
+                    float clickFrac = Math.Max(0f, Math.Min(1f, (float)(mousePos.X - gradBar.X) / Math.Max(1, gradBar.Width)));
+                    int bestIdx = 0;
+                    float bestDist = 999f;
+                    for (int i = 0; i < stops.Count; i++)
+                    {
+                        float d = Math.Abs(positions[i] - clickFrac);
+                        if (d < bestDist) { bestDist = d; bestIdx = i; }
+                    }
+                    SelectedGradientStopIndex = bestIdx;
+                    SyncHSVFromActiveSelection();
+                    DraggingColorControlType = 4;
+                    UpdateColorFromInteractiveControl(mousePos);
+                    if (parentControl != null) parentControl.Invalidate();
+                    return;
+                }
+                curY += 28;
+
+                int stopSize = 30;
+                int stopGap = 8;
+                int stopX = panelX + 12;
+                int stopCount = Math.Min(5, stops.Count);
+                for (int i = 0; i < stopCount; i++)
+                {
+                    Rectangle scRect = new Rectangle(stopX + i * (stopSize + stopGap), curY, stopSize, stopSize);
+                    if (scRect.Contains(mousePos))
+                    {
+                        SelectedGradientStopIndex = i;
+                        SyncHSVFromActiveSelection();
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+
+                if (stopCount < 5)
+                {
+                    Rectangle addStopRect = new Rectangle(stopX + stopCount * (stopSize + stopGap), curY, stopSize, stopSize);
+                    if (addStopRect.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        stops.Add(unchecked((int)0xFF38BDF8));
+                        positions.Add(1.0f);
+                        for (int k = 0; k < stops.Count; k++) positions[k] = (float)k / (stops.Count - 1);
+                        SelectedGradientStopIndex = stops.Count - 1;
+                        ApplyActiveGradient(shape, stops, positions, GetActiveGradientStyle(shape));
+                        SyncHSVFromActiveSelection();
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+
+                if (stopCount > 2)
+                {
+                    Rectangle remStopRect = new Rectangle(panelX + rightSidebarW - 38, curY + 3, 24, 24);
+                    if (remStopRect.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        int remIdx = Math.Max(0, Math.Min(stops.Count - 1, SelectedGradientStopIndex));
+                        stops.RemoveAt(remIdx);
+                        positions.RemoveAt(remIdx);
+                        if (SelectedGradientStopIndex >= stops.Count) SelectedGradientStopIndex = stops.Count - 1;
+                        ApplyActiveGradient(shape, stops, positions, GetActiveGradientStyle(shape));
+                        SyncHSVFromActiveSelection();
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+                curY += stopSize + 14;
+
+                curY += 20;
+                string[] gStyles = new string[] { "Linear90", "Linear180", "Linear135", "Radial", "RadialCorner", "Conic" };
+                int gsCols = 6;
+                int gsGap = 6;
+                int gsW = (rightSidebarW - 24 - (gsCols - 1) * gsGap) / gsCols;
+                int gsH = 34;
+                for (int i = 0; i < gStyles.Length; i++)
+                {
+                    Rectangle gsRect = new Rectangle(panelX + 12 + i * (gsW + gsGap), curY, gsW, gsH);
+                    if (gsRect.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        ApplyActiveGradient(shape, stops, positions, gStyles[i]);
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+                curY += gsH + 14;
+
+                curY += 20;
+                int gpCols = 6;
+                int gpGap = 8;
+                int gpSize = (rightSidebarW - 24 - (gpCols - 1) * gpGap) / gpCols;
+                for (int i = 0; i < ColorGradientPresets.Length; i++)
+                {
+                    int r = i / gpCols;
+                    int c = i % gpCols;
+                    Rectangle gRect = new Rectangle(panelX + 12 + c * (gpSize + gpGap), curY + r * (gpSize + gpGap), gpSize, gpSize);
+                    if (gRect.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        GraphicColorSubTab = 1;
+                        var newStops = new List<int>(ColorGradientPresets[i]);
+                        var newPos = new List<float>();
+                        for (int k = 0; k < newStops.Count; k++) newPos.Add((float)k / (newStops.Count - 1));
+                        SelectedGradientStopIndex = 0;
+                        ApplyActiveGradient(shape, newStops, newPos, GetActiveGradientStyle(shape));
+                        SyncHSVFromActiveSelection();
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+            }
+            else // GraphicColorSubTab == 0 (Màu đồng nhất)
+            {
+                bool isGraphic = IsRasterOrSvgGraphic(shape);
+                var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+                if (detectedColors.Count > 0)
+                {
+                    Rectangle resetBtn = new Rectangle(panelX + rightSidebarW - 66, curY - 2, 54, 20);
+                    if (resetBtn.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        if (isGraphic)
+                        {
+                            SvgRasterizer.ResetGraphicToOriginal(shape);
+                        }
+                        else
+                        {
+                            shape.HasGradientFill = false;
+                            shape.FillColor = unchecked((int)0xFF3B82F6);
+                            shape.FillOpacity = 1.0f;
+                            shape.CachedDetectedColors = null;
+                            shape.InvalidateDisplayCache();
+                        }
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                    curY += 22;
+
+                    int swSize = 28;
+                    int swGap = 6;
+                    int swStartX = panelX + 12;
+                    for (int i = 0; i < detectedColors.Count && i < 6; i++)
+                    {
+                        Rectangle swRect = new Rectangle(swStartX + i * (swSize + swGap), curY, swSize, swSize);
+                        if (swRect.Contains(mousePos))
+                        {
+                            SaveUndoState();
+                            if (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor && isGraphic)
+                            {
+                                SelectedGraphicColorIndex = i;
+                                SyncHSVFromActiveSelection();
+                            }
+                            else
+                            {
+                                ApplyActiveSolidColor(shape, detectedColors[i]);
+                                SyncHSVFromActiveSelection();
+                            }
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+                    curY += 36;
+                }
+
+                curY += 20;
+                int scCols = 6;
+                int scGap = 8;
+                int scSize = (rightSidebarW - 24 - (scCols - 1) * scGap) / scCols;
+                for (int i = 0; i < DefaultSolidColors.Length; i++)
+                {
+                    int r = i / scCols;
+                    int c = i % scCols;
+                    Rectangle cRect = new Rectangle(panelX + 12 + c * (scSize + scGap), curY + r * (scSize + scGap), scSize, scSize);
+                    if (cRect.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        ApplyActiveSolidColor(shape, DefaultSolidColors[i]);
+                        SyncHSVFromActiveSelection();
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+                int solidRows = (DefaultSolidColors.Length + scCols - 1) / scCols;
+                curY += solidRows * (scSize + scGap) + 8;
+            }
+        }
+
+        private void ApplyActiveGradient(ShapeNode shape, List<int> stops, List<float> positions, string style, bool isInteractiveDrag = false)
+        {
+            if (shape == null || stops == null || stops.Count < 2) return;
+            if (positions == null || positions.Count != stops.Count)
+            {
+                positions = new List<float>();
+                for (int i = 0; i < stops.Count; i++) positions.Add((float)i / (stops.Count - 1));
+            }
+
+            if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill || ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke)
+            {
+                if (shape.FillOpacity <= 0.01f) shape.FillOpacity = 1.0f;
+                shape.HasGradientFill = true;
+                shape.FillColor = stops[0] & 0xFFFFFF;
+                shape.GradientColor2 = stops[stops.Count - 1] & 0xFFFFFF;
+                shape.GradientStops = new List<GradientStop>();
+                for (int i = 0; i < stops.Count; i++)
+                {
+                    shape.GradientStops.Add(new GradientStop(stops[i] & 0xFFFFFF, Math.Max(0f, Math.Min(1f, positions[i]))));
+                }
+                if (style == "Linear90") { shape.GradientType = GradientType.Linear; shape.GradientAngle = 0f; }
+                else if (style == "Linear180") { shape.GradientType = GradientType.Linear; shape.GradientAngle = 90f; }
+                else if (style == "Linear135") { shape.GradientType = GradientType.Linear; shape.GradientAngle = 45f; }
+                else if (style == "Radial") { shape.GradientType = GradientType.Radial; }
+                else if (style == "RadialCorner") { shape.GradientType = GradientType.Rectangular; }
+                else if (style == "Conic") { shape.GradientType = GradientType.Path; }
+                shape.InvalidateDisplayCache();
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor)
+            {
+                shape.HasTextGradient = true;
+                shape.TextGradientStyle = style ?? "Linear90";
+                shape.TextGradientStopColors = new List<int>(stops);
+                shape.TextGradientStopPositions = new List<float>(positions);
+                float ang = (style == "Linear180") ? 90f : (style == "Linear135" ? 45f : 0f);
+                var gStops = new List<GradientStop>();
+                for (int i = 0; i < stops.Count; i++) gStops.Add(new GradientStop(stops[i] & 0xFFFFFF, Math.Max(0f, Math.Min(1f, positions[i]))));
+
+                if (IsInlineEditing && TextSelectionLength != 0)
+                {
+                    ApplyFormattingToSelection(r => {
+                        r.HasGradient = true;
+                        r.TextColor = stops[0] & 0xFFFFFF;
+                        r.GradientColor2 = stops[stops.Count - 1] & 0xFFFFFF;
+                        r.GradientAngle = ang;
+                        r.GradientStops = gStops.ConvertAll(s => s.Clone());
+                    }, null);
+                }
+                else if (shape.TextRuns != null && shape.TextRuns.Count > 0)
+                {
+                    foreach (var r in shape.TextRuns)
+                    {
+                        r.HasGradient = true;
+                        r.TextColor = stops[0] & 0xFFFFFF;
+                        r.GradientColor2 = stops[stops.Count - 1] & 0xFFFFFF;
+                        r.GradientAngle = ang;
+                        r.GradientStops = gStops.ConvertAll(s => s.Clone());
+                    }
+                }
+                shape.InvalidateDisplayCache();
+            }
+            else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke)
+            {
+                shape.HasTextOutline = true;
+                shape.TextOutlineColor = stops[0] & 0xFFFFFF;
+                if (shape.TextOutlineWidth <= 0f) shape.TextOutlineWidth = 1.5f;
+                shape.InvalidateDisplayCache();
+            }
+            else
+            {
+                shape.GraphicGradientStopColors = new List<int>(stops);
+                shape.GraphicGradientStopPositions = new List<float>(positions);
+                shape.GraphicGradientStyle = style ?? "Linear90";
+                SvgRasterizer.ApplyMultiStopGradientToShape(shape, shape.GraphicGradientStopColors, shape.GraphicGradientStyle, SelectedGraphicColorIndex, isInteractiveDrag);
+            }
+            if (!isInteractiveDrag && ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+        }
 
         // PowerPoint Audio Shape Hover & Floating Playback Bar State
         public ShapeNode HoveredAudioShape { get; set; } = null;
@@ -374,7 +1150,7 @@ namespace ZenQOffice.UI
         public int LastViewedSlideIndex { get; set; }
 
         // Speaker Notes (Ghi chú người thuyết trình) Interactive State
-        public bool IsNotesPaneOpen { get; set; } = true;
+        public bool IsNotesPaneOpen { get; set; } = false;
         public int NotesPaneHeight { get; set; } = 68;
         public bool IsDraggingNotesSplitter { get; set; } = false;
         public bool IsHoverNotesSplitter { get; set; } = false;
@@ -392,9 +1168,9 @@ namespace ZenQOffice.UI
 
         public int GetEffectiveNotesPaneHeight()
         {
-            if (ViewMode == ImpressViewMode.Normal && !IsPresenting && IsNotesPaneOpen)
+            if (ViewMode == ImpressViewMode.Normal && !IsPresenting && IsNotesPaneOpen && NotesPaneHeight >= 25)
             {
-                return Math.Max(40, Math.Min(260, NotesPaneHeight));
+                return Math.Min(260, Math.Max(25, NotesPaneHeight));
             }
             return 0;
         }
@@ -525,13 +1301,15 @@ namespace ZenQOffice.UI
                 if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
             };
             ZenQOffice.Core.OnlineGraphicsManager.OnImageDownloaded += () => {
-                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
+                ReloadPendingImages();
+                if (InvalidateCallback != null) InvalidateCallback();
             };
             ZenQOffice.Core.OnlineImagesManager.OnCatalogUpdated += (cat) => {
                 if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
             };
             ZenQOffice.Core.OnlineImagesManager.OnImageDownloaded += () => {
-                if (IsElementsDrawerOpen && InvalidateCallback != null) InvalidateCallback();
+                ReloadPendingImages();
+                if (InvalidateCallback != null) InvalidateCallback();
             };
 
             IsRemovingBackground = false;
@@ -1770,6 +2548,615 @@ namespace ZenQOffice.UI
         public int ZoomReturnSlideIndex { get; set; } = -1;
         public bool ZoomReturnEnabled { get; set; } = false;
 
+        // ==================== MS PowerPoint 365 Interactive Actions, Triggers & Quiz State ====================
+        private HashSet<string> _completedTriggeredShapeIds = new HashSet<string>();
+        private List<int> _activeTriggeredAnimIndices = new List<int>();
+        public bool IsPlayingTriggeredAnimation { get; set; } = false;
+        public float TriggeredAnimationProgress { get; set; } = 0f;
+        private System.Diagnostics.Stopwatch _triggerAnimStopwatch = new System.Diagnostics.Stopwatch();
+        private HashSet<string> _revealedShapeIds = new HashSet<string>();
+        private Dictionary<string, SlideActionType> _quizAnsweredStates = new Dictionary<string, SlideActionType>();
+        private string _activeQuizFeedbackShapeId = "";
+        private float _quizFeedbackProgress = 0f;
+        private System.Diagnostics.Stopwatch _quizFeedbackStopwatch = new System.Diagnostics.Stopwatch();
+        public ShapeNode HoveredInteractiveShape { get; set; } = null;
+        private ShapeNode _lastHoverActionFiredShape = null;
+
+        public void ResetSlideInteractiveState()
+        {
+            _completedTriggeredShapeIds.Clear();
+            _activeTriggeredAnimIndices.Clear();
+            IsPlayingTriggeredAnimation = false;
+            TriggeredAnimationProgress = 0f;
+            _triggerAnimStopwatch.Stop();
+            _revealedShapeIds.Clear();
+            _quizAnsweredStates.Clear();
+            _activeQuizFeedbackShapeId = "";
+            _quizFeedbackProgress = 0f;
+            _quizFeedbackStopwatch.Stop();
+            HoveredInteractiveShape = null;
+            _lastHoverActionFiredShape = null;
+        }
+
+        public bool IsShapeInteractiveInShow(ShapeNode shape, SlideNode slide)
+        {
+            if (shape == null) return false;
+            if (shape.HasInteractiveAction) return true;
+            if (shape.Type == ShapeType.SlideZoom || shape.Type == ShapeType.SummaryZoom || shape.ZoomTargetSlideIndex >= 0) return true;
+            if (slide != null && slide.Animations != null && !string.IsNullOrEmpty(shape.Id))
+            {
+                for (int i = 0; i < slide.Animations.Count; i++)
+                {
+                    if (slide.Animations[i].TriggerShapeId == shape.Id) return true;
+                }
+            }
+            return false;
+        }
+
+        public bool TryHandleInteractiveShapeClick(ShapeNode shape, Control parentControl)
+        {
+            if (shape == null || ActiveSlide == null) return false;
+            bool handled = false;
+
+            // 1. Play Click Sound if configured
+            if (shape.ClickSound != SlideActionSound.None)
+            {
+                SlideSoundPlayer.Play(shape.ClickSound, shape.ClickCustomSoundPath);
+                handled = true;
+            }
+
+            // 2. Reveal / Toggle target explanation shape if configured
+            if (!string.IsNullOrEmpty(shape.ClickRevealShapeId))
+            {
+                if (_revealedShapeIds.Contains(shape.ClickRevealShapeId))
+                    _revealedShapeIds.Remove(shape.ClickRevealShapeId);
+                else
+                    _revealedShapeIds.Add(shape.ClickRevealShapeId);
+                TriggerAnimationsForShape(shape.Id);
+                handled = true;
+            }
+
+            // 3. Check if any animation on this slide has TriggerShapeId == shape.Id
+            if (TriggerAnimationsForShape(shape.Id))
+            {
+                handled = true;
+            }
+
+            // 4. Execute Mouse Click Action (Slide Link, URL, File, Quiz Correct/Wrong, End Show...)
+            if (shape.ClickActionType != SlideActionType.None)
+            {
+                ExecuteSlideAction(shape.ClickActionType, shape.ClickTargetSlideIndex, shape.ClickTargetUrl, shape.ClickShowAndReturn, shape, parentControl);
+                handled = true;
+            }
+
+            if (handled)
+            {
+                if (parentControl != null) parentControl.Invalidate();
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+            return handled;
+        }
+
+        public bool TriggerAnimationsForShape(string triggerShapeId)
+        {
+            if (string.IsNullOrEmpty(triggerShapeId) || ActiveSlide == null || ActiveSlide.Animations == null) return false;
+            List<int> matched = new List<int>();
+            for (int i = 0; i < ActiveSlide.Animations.Count; i++)
+            {
+                if (ActiveSlide.Animations[i].TriggerShapeId == triggerShapeId)
+                {
+                    matched.Add(i);
+                }
+            }
+            if (matched.Count == 0) return false;
+
+            _activeTriggeredAnimIndices.Clear();
+            _activeTriggeredAnimIndices.AddRange(matched);
+            _completedTriggeredShapeIds.Add(triggerShapeId);
+            IsPlayingTriggeredAnimation = true;
+            TriggeredAnimationProgress = 0f;
+            _triggerAnimStopwatch.Restart();
+
+            for (int i = 0; i < matched.Count; i++)
+            {
+                ShapeAnimation anim = ActiveSlide.Animations[matched[i]];
+                if (anim.AnimationSound != SlideActionSound.None)
+                {
+                    SlideSoundPlayer.Play(anim.AnimationSound);
+                    break;
+                }
+            }
+            return true;
+        }
+
+        public void ExecuteSlideAction(SlideActionType actionType, int targetSlideIdx, string targetUrl, bool showAndReturn, ShapeNode sourceShape, Control parentControl)
+        {
+            if (Presentation == null) return;
+
+            switch (actionType)
+            {
+                case SlideActionType.NextSlide:
+                    {
+                        int nextIdx = ActiveSlideIndex + 1;
+                        while (nextIdx < Presentation.Slides.Count && Presentation.Slides[nextIdx].IsHidden) nextIdx++;
+                        if (nextIdx < Presentation.Slides.Count)
+                        {
+                            int prev = ActiveSlideIndex;
+                            ActiveSlideIndex = nextIdx;
+                            CurrentAnimationStep = 0;
+                            TriggerTransition(prev, ActiveSlideIndex, false);
+                        }
+                        else
+                        {
+                            IsEndSlideShowScreen = true;
+                        }
+                    }
+                    break;
+
+                case SlideActionType.PreviousSlide:
+                    {
+                        int prevIdx = ActiveSlideIndex - 1;
+                        while (prevIdx >= 0 && Presentation.Slides[prevIdx].IsHidden) prevIdx--;
+                        if (prevIdx >= 0)
+                        {
+                            int prev = ActiveSlideIndex;
+                            ActiveSlideIndex = prevIdx;
+                            CurrentAnimationStep = 0;
+                            TriggerTransition(prev, ActiveSlideIndex, true);
+                        }
+                    }
+                    break;
+
+                case SlideActionType.FirstSlide:
+                    if (Presentation.Slides.Count > 0 && ActiveSlideIndex != 0)
+                    {
+                        int prev = ActiveSlideIndex;
+                        ActiveSlideIndex = 0;
+                        CurrentAnimationStep = 0;
+                        TriggerTransition(prev, 0, true);
+                    }
+                    break;
+
+                case SlideActionType.LastSlide:
+                    if (Presentation.Slides.Count > 0)
+                    {
+                        int lastIdx = Presentation.Slides.Count - 1;
+                        if (ActiveSlideIndex != lastIdx)
+                        {
+                            int prev = ActiveSlideIndex;
+                            ActiveSlideIndex = lastIdx;
+                            CurrentAnimationStep = 0;
+                            TriggerTransition(prev, lastIdx, false);
+                        }
+                    }
+                    break;
+
+                case SlideActionType.LastSlideViewed:
+                    if (LastViewedSlideIndex >= 0 && LastViewedSlideIndex < Presentation.Slides.Count && LastViewedSlideIndex != ActiveSlideIndex)
+                    {
+                        int target = LastViewedSlideIndex;
+                        int prev = ActiveSlideIndex;
+                        ActiveSlideIndex = target;
+                        CurrentAnimationStep = 0;
+                        TriggerTransition(prev, target, false);
+                    }
+                    break;
+
+                case SlideActionType.EndShow:
+                    StopPresenting();
+                    break;
+
+                case SlideActionType.SpecificSlide:
+                    if (targetSlideIdx >= 0 && targetSlideIdx < Presentation.Slides.Count)
+                    {
+                        if (showAndReturn)
+                        {
+                            ZoomReturnSlideIndex = ActiveSlideIndex;
+                            ZoomReturnEnabled = true;
+                        }
+                        int prev = ActiveSlideIndex;
+                        ActiveSlideIndex = targetSlideIdx;
+                        CurrentAnimationStep = 0;
+                        TriggerTransition(prev, targetSlideIdx, targetSlideIdx < prev);
+                    }
+                    break;
+
+                case SlideActionType.Url:
+                case SlideActionType.OtherFile:
+                case SlideActionType.RunProgram:
+                    if (!string.IsNullOrEmpty(targetUrl))
+                    {
+                        try
+                        {
+                            string u = targetUrl.Trim();
+                            if (actionType == SlideActionType.Url &&
+                                !u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                !u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) &&
+                                !System.IO.File.Exists(u))
+                            {
+                                u = "https://" + u;
+                            }
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(u) { UseShellExecute = true });
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Không thể mở liên kết hoặc tệp:\n" + targetUrl + "\n\nChi tiết: " + ex.Message,
+                                "Lỗi Liên kết", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                    break;
+
+                case SlideActionType.QuizCorrect:
+                case SlideActionType.QuizWrong:
+                    if (sourceShape != null)
+                    {
+                        _quizAnsweredStates[sourceShape.Id] = actionType;
+                        _activeQuizFeedbackShapeId = sourceShape.Id;
+                        _quizFeedbackProgress = 0f;
+                        _quizFeedbackStopwatch.Restart();
+                        if (sourceShape.ClickSound == SlideActionSound.None)
+                        {
+                            SlideSoundPlayer.Play(actionType == SlideActionType.QuizCorrect ? SlideActionSound.Chime : SlideActionSound.Buzzer);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        public void DrawInteractiveFeedbackOverlay(D2DGraphics g, int slideX, int slideY, float scale, ShapeNode shape)
+        {
+            if (shape == null || !IsPresenting) return;
+
+            float sx = slideX + shape.Transform.X * scale;
+            float sy = slideY + shape.Transform.Y * scale;
+            float sw = shape.Transform.Width * scale;
+            float sh = shape.Transform.Height * scale;
+            if (sw <= 2f || sh <= 2f) return;
+
+            // 1. Hover Highlight & ScreenTip
+            if (HoveredInteractiveShape == shape)
+            {
+                if (shape.HoverHighlight || shape.ClickHighlight || shape.ClickActionType != SlideActionType.None)
+                {
+                    using (Pen glowPen = new Pen(Color.FromArgb(190, 59, 130, 246), Math.Max(2f, 3f * scale)))
+                    using (SolidBrush hoverFill = new SolidBrush(Color.FromArgb(24, 59, 130, 246)))
+                    {
+                        g.FillRectangle(hoverFill, sx - 2, sy - 2, sw + 4, sh + 4);
+                        g.DrawRectangle(glowPen, sx - 2, sy - 2, sw + 4, sh + 4);
+                    }
+                }
+            }
+
+            // 2. Quiz Correct / Wrong Answer State Overlay (Giống 100% Trắc nghiệm tương tác MS365)
+            SlideActionType quizState;
+            if (_quizAnsweredStates.TryGetValue(shape.Id, out quizState))
+            {
+                bool isCorrect = (quizState == SlideActionType.QuizCorrect);
+                Color badgeColor = isCorrect ? Color.FromArgb(22, 163, 74) : Color.FromArgb(220, 38, 38);
+                Color tintColor = isCorrect ? Color.FromArgb(48, 34, 197, 94) : Color.FromArgb(48, 239, 68, 68);
+
+                using (SolidBrush tintBrush = new SolidBrush(tintColor))
+                using (Pen borderPen = new Pen(badgeColor, Math.Max(2.5f, 3.5f * scale)))
+                {
+                    g.FillRectangle(tintBrush, sx, sy, sw, sh);
+                    g.DrawRectangle(borderPen, sx, sy, sw, sh);
+                }
+
+                float badgeSize = Math.Max(22f, Math.Min(38f, Math.Min(sw, sh) * 0.55f));
+                float bx = sx + sw - badgeSize - Math.Max(6f, 8f * scale);
+                float by = sy + (sh - badgeSize) / 2f;
+                RectangleF badgeRect = new RectangleF(bx, by, badgeSize, badgeSize);
+
+                using (SolidBrush badgeBg = new SolidBrush(badgeColor))
+                using (Pen whitePen = new Pen(Color.White, 2f))
+                using (Font badgeFont = new Font("Segoe UI", Math.Max(9f, badgeSize * 0.48f), FontStyle.Bold))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.FillEllipse(badgeBg, badgeRect);
+                    g.DrawEllipse(whitePen, badgeRect);
+                    g.DrawString(isCorrect ? "✓" : "✕", badgeFont, Brushes.White, badgeRect, sf);
+                }
+            }
+
+            // 3. ScreenTip Tooltip when hovering
+            if (HoveredInteractiveShape == shape && !string.IsNullOrEmpty(shape.HyperlinkScreenTip))
+            {
+                using (Font tipFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                {
+                    string tip = shape.HyperlinkScreenTip;
+                    float tipW = Math.Max(90f, tip.Length * 7.2f + 20f);
+                    float tipH = 26f;
+                    float tx = Math.Max(8f, sx + (sw - tipW) / 2f);
+                    float ty = Math.Max(8f, sy - tipH - 6f);
+                    RectangleF tipRect = new RectangleF(tx, ty, tipW, tipH);
+                    using (SolidBrush tipBg = new SolidBrush(Color.FromArgb(235, 30, 41, 59)))
+                    using (Pen tipBorder = new Pen(Color.FromArgb(100, 148, 163, 184), 1f))
+                    using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    {
+                        g.FillRectangle(tipBg, tipRect);
+                        g.DrawRectangle(tipBorder, tipRect.X, tipRect.Y, tipRect.Width, tipRect.Height);
+                        g.DrawString(tip, tipFont, Brushes.White, tipRect, sf);
+                    }
+                }
+            }
+        }
+
+        public void OpenHyperlinkDialog(Control parentControl)
+        {
+            if (ActiveSlide == null) return;
+            ShapeNode selShape = SelectedShape;
+            string curText = (selShape != null && !string.IsNullOrEmpty(selShape.Text)) ? selShape.Text : "";
+            string curUrl = (selShape != null && !string.IsNullOrEmpty(selShape.ClickTargetUrl)) ? selShape.ClickTargetUrl : "";
+
+            using (InsertHyperlinkForm dlg = new InsertHyperlinkForm(Presentation, ActiveSlideIndex, selShape, curText, curUrl))
+            {
+                if (dlg.ShowDialog(parentControl) == DialogResult.OK)
+                {
+                    SaveUndoState();
+                    if (dlg.RemoveLinkRequested)
+                    {
+                        if (selShape != null)
+                        {
+                            selShape.ClickActionType = SlideActionType.None;
+                            selShape.ClickTargetSlideIndex = -1;
+                            selShape.ClickTargetUrl = "";
+                            selShape.HyperlinkScreenTip = "";
+                            selShape.ClickShowAndReturn = false;
+                            selShape.ClickSound = SlideActionSound.None;
+                            selShape.ClickRevealShapeId = "";
+                            selShape.Underline = false;
+                        }
+                    }
+                    else
+                    {
+                        ShapeNode targetShape = selShape;
+                        if (targetShape == null)
+                        {
+                            string disp = !string.IsNullOrEmpty(dlg.DisplayText) ? dlg.DisplayText : "Liên kết Slide";
+                            float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+                            float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+                            float w = Math.Max(260f, disp.Length * 13f + 44f);
+                            float h = 52f;
+                            targetShape = new ShapeNode
+                            {
+                                Name = "Nút Liên kết: " + disp,
+                                Type = ShapeType.RoundedRectangle,
+                                CornerRadius = 10f,
+                                Transform = new Transform2D((canvasW - w) / 2f, (canvasH - h) / 2f, w, h),
+                                Text = disp,
+                                FontSize = 18f,
+                                Bold = true,
+                                TextColor = 0xFFFFFF,
+                                FillColor = 0x2563EB,
+                                StrokeColor = 0x1D4ED8,
+                                StrokeWidth = 1.5f,
+                                Alignment = TextAlignment.Center
+                            };
+                            ActiveSlide.AddShape(targetShape);
+                            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                            SelectedShapeIndices.Clear();
+                            SelectedShapeIndices.Add(SelectedShapeIndex);
+                        }
+                        else if (!string.IsNullOrEmpty(dlg.DisplayText) && targetShape.Text != dlg.DisplayText)
+                        {
+                            targetShape.Text = dlg.DisplayText;
+                        }
+
+                        targetShape.ClickActionType = dlg.SelectedActionType;
+                        targetShape.ClickTargetSlideIndex = dlg.TargetSlideIndex;
+                        targetShape.ClickTargetUrl = dlg.TargetUrl;
+                        targetShape.HyperlinkScreenTip = dlg.ScreenTip;
+                        targetShape.ClickShowAndReturn = dlg.ShowAndReturn;
+                        targetShape.ClickSound = dlg.SelectedSound;
+                        targetShape.ClickHighlight = true;
+
+                        if (targetShape.Type == ShapeType.TextBox)
+                        {
+                            targetShape.TextColor = 0x2563EB;
+                            targetShape.Underline = true;
+                        }
+                    }
+
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+            }
+        }
+
+        public void OpenActionSettingsDialog(Control parentControl)
+        {
+            if (ActiveSlide == null) return;
+            ShapeNode selShape = SelectedShape;
+            if (selShape == null)
+            {
+                float canvasW = (Presentation != null) ? Presentation.CanvasWidth : 1920f;
+                float canvasH = (Presentation != null) ? Presentation.CanvasHeight : 1080f;
+                SaveUndoState();
+                selShape = new ShapeNode
+                {
+                    Name = "Nút Hành động (Action Button)",
+                    Type = ShapeType.RoundedRectangle,
+                    CornerRadius = 12f,
+                    Transform = new Transform2D((canvasW - 240f) / 2f, (canvasH - 56f) / 2f, 240f, 56f),
+                    Text = "Tiếp theo ▶",
+                    FontSize = 18f,
+                    Bold = true,
+                    TextColor = 0xFFFFFF,
+                    FillColor = 0xD24726,
+                    StrokeColor = 0xB83B1D,
+                    StrokeWidth = 1.5f,
+                    Alignment = TextAlignment.Center,
+                    ClickActionType = SlideActionType.NextSlide,
+                    ClickHighlight = true
+                };
+                ActiveSlide.AddShape(selShape);
+                SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+                SelectedShapeIndices.Clear();
+                SelectedShapeIndices.Add(SelectedShapeIndex);
+            }
+
+            using (SlideActionSettingsDialog dlg = new SlideActionSettingsDialog(Presentation, ActiveSlideIndex, selShape))
+            {
+                if (dlg.ShowDialog(parentControl) == DialogResult.OK)
+                {
+                    SaveUndoState();
+                    dlg.ApplyToShape(selShape);
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                    if (parentControl != null) parentControl.Invalidate();
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+            }
+        }
+
+        public void InsertInteractiveQuizTemplate()
+        {
+            if (ActiveSlide == null) return;
+            SaveUndoState();
+
+            float cw = (Presentation != null) ? Presentation.CanvasWidth : 960f;
+            float ch = (Presentation != null) ? Presentation.CanvasHeight : 540f;
+
+            // 1. Khung câu hỏi trắc nghiệm
+            ShapeNode questionBox = new ShapeNode
+            {
+                Name = "Câu hỏi Trắc nghiệm",
+                Type = ShapeType.RoundedRectangle,
+                CornerRadius = 14f,
+                Transform = new Transform2D(cw * 0.08f, ch * 0.08f, cw * 0.84f, ch * 0.20f),
+                FillColor = 0x1E293B,
+                StrokeColor = 0x334155,
+                StrokeWidth = 2f,
+                Text = "CÂU HỎI: Thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam là thành phố nào?",
+                FontSize = 22f,
+                Bold = true,
+                TextColor = 0xFFFFFF,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(questionBox);
+
+            // 2. Khung Giải thích đáp án (Ẩn ban đầu, hiện ra khi bấm đáp án đúng hoặc Trigger)
+            ShapeNode explainBox = new ShapeNode
+            {
+                Name = "Giải thích Đáp án",
+                Type = ShapeType.RoundedRectangle,
+                CornerRadius = 12f,
+                Transform = new Transform2D(cw * 0.08f, ch * 0.76f, cw * 0.62f, ch * 0.15f),
+                FillColor = 0xECFDF5,
+                StrokeColor = 0x10B981,
+                StrokeWidth = 2f,
+                Text = "🎉 Chính xác! Hà Nội là thủ đô ngàn năm văn hiến của Việt Nam.",
+                FontSize = 16f,
+                Bold = true,
+                TextColor = 0x065F46,
+                Alignment = TextAlignment.Center
+            };
+            ActiveSlide.AddShape(explainBox);
+
+            // 3. Nút Chuyển câu tiếp theo (Liên kết sang Slide tiếp theo)
+            ShapeNode nextSlideBtn = new ShapeNode
+            {
+                Name = "Nút Câu tiếp theo",
+                Type = ShapeType.RoundedRectangle,
+                CornerRadius = 12f,
+                Transform = new Transform2D(cw * 0.72f, ch * 0.76f, cw * 0.20f, ch * 0.15f),
+                FillColor = 0x2563EB,
+                StrokeColor = 0x1D4ED8,
+                StrokeWidth = 2f,
+                Text = "Câu tiếp theo ▶",
+                FontSize = 16f,
+                Bold = true,
+                TextColor = 0xFFFFFF,
+                Alignment = TextAlignment.Center,
+                ClickActionType = SlideActionType.NextSlide,
+                ClickSound = SlideActionSound.Click,
+                ClickHighlight = true,
+                HyperlinkScreenTip = "Chuyển sang trang chiếu tiếp theo"
+            };
+            ActiveSlide.AddShape(nextSlideBtn);
+
+            // 4. Bốn phương án A, B, C, D với hiệu ứng Đúng/Sai + Trigger
+            string[] labels = new string[]
+            {
+                "A. Thành phố Hồ Chí Minh",
+                "B. Thủ đô Hà Nội",
+                "C. Thành phố Đà Nẵng",
+                "D. Cố đô Huế"
+            };
+            bool[] isCorrect = new bool[] { false, true, false, false };
+
+            float optW = cw * 0.40f;
+            float optH = ch * 0.16f;
+            float startX1 = cw * 0.08f;
+            float startX2 = cw * 0.52f;
+            float startY1 = ch * 0.34f;
+            float startY2 = ch * 0.54f;
+
+            for (int i = 0; i < 4; i++)
+            {
+                float ox = (i % 2 == 0) ? startX1 : startX2;
+                float oy = (i < 2) ? startY1 : startY2;
+                bool correct = isCorrect[i];
+
+                ShapeNode optShape = new ShapeNode
+                {
+                    Name = "Phương án " + (char)('A' + i),
+                    Type = ShapeType.RoundedRectangle,
+                    CornerRadius = 12f,
+                    Transform = new Transform2D(ox, oy, optW, optH),
+                    FillColor = 0xFFFFFF,
+                    StrokeColor = 0xCBD5E1,
+                    StrokeWidth = 2f,
+                    Text = labels[i],
+                    FontSize = 18f,
+                    Bold = true,
+                    TextColor = 0x1E293B,
+                    Alignment = TextAlignment.Left,
+                    ClickActionType = correct ? SlideActionType.QuizCorrect : SlideActionType.QuizWrong,
+                    ClickSound = correct ? SlideActionSound.Chime : SlideActionSound.Buzzer,
+                    ClickHighlight = true,
+                    ClickRevealShapeId = correct ? explainBox.Id : "",
+                    HyperlinkScreenTip = "Nhấp để chọn " + labels[i]
+                };
+                ActiveSlide.AddShape(optShape);
+
+                if (correct)
+                {
+                    ActiveSlide.Animations.Add(new ShapeAnimation
+                    {
+                        ShapeId = explainBox.Id,
+                        Type = AnimationType.ZoomIn,
+                        Trigger = AnimationTrigger.OnClick,
+                        Duration = 0.45f,
+                        TriggerShapeId = optShape.Id,
+                        AnimationSound = SlideActionSound.Chime
+                    });
+                }
+            }
+
+            SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
+            SelectedShapeIndices.Clear();
+            SelectedShapeIndices.Add(SelectedShapeIndex);
+            ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void SetSelectedAnimationTriggerShape(string triggerShapeId)
+        {
+            ShapeAnimation anim = SelectedAnimation;
+            if (anim != null)
+            {
+                anim.TriggerShapeId = triggerShapeId ?? "";
+                if (!string.IsNullOrEmpty(anim.TriggerShapeId))
+                {
+                    anim.Trigger = AnimationTrigger.OnClick;
+                }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
+        }
+
         public void TriggerZoomNavigation(int targetIndex, bool returnToSlide)
         {
             if (Presentation == null || targetIndex < 0 || targetIndex >= Presentation.Slides.Count) return;
@@ -2159,6 +3546,11 @@ namespace ZenQOffice.UI
         private int _cachedTransFromIdx = -1;
         private int _cachedTransToIdx = -1;
         private Size _cachedTransSize = Size.Empty;
+        private Size _currentTransitionViewportSize = Size.Empty;
+        private Bitmap _cachedPresenterNextSlideBmp = null;
+        private int _cachedPresenterNextSlideIdx = -1;
+        private Size _cachedPresenterNextSlideSize = Size.Empty;
+
         public void ClearTransitionCache()
         {
             if (_cachedTransBmpA != null)
@@ -2173,24 +3565,44 @@ namespace ZenQOffice.UI
                 try { _cachedTransBmpB.Dispose(); } catch { }
                 _cachedTransBmpB = null;
             }
+            if (_cachedPresenterNextSlideBmp != null)
+            {
+                try { D2DGraphics.InvalidateBitmapCache(_cachedPresenterNextSlideBmp); } catch { }
+                try { _cachedPresenterNextSlideBmp.Dispose(); } catch { }
+                _cachedPresenterNextSlideBmp = null;
+            }
             _cachedTransFromIdx = -1;
             _cachedTransToIdx = -1;
             _cachedTransSize = Size.Empty;
+            _cachedPresenterNextSlideIdx = -1;
+            _cachedPresenterNextSlideSize = Size.Empty;
         }
 
         private void EnsureTransitionCache(Rectangle rect, SlideNode fromSlide, SlideNode toSlide, float scale)
         {
-            if (rect.Width <= 0 || rect.Height <= 0) return;
             if (_cachedTransBmpA != null && _cachedTransBmpB != null &&
                 _cachedTransFromIdx == TransitionFromSlideIndex &&
-                _cachedTransToIdx == TransitionToSlideIndex &&
-                _cachedTransSize == rect.Size)
+                _cachedTransToIdx == TransitionToSlideIndex)
             {
                 return;
             }
 
+            int bakeW = (Presentation != null && Presentation.CanvasWidth > 0) ? (int)Math.Round(Presentation.CanvasWidth) : 1920;
+            int bakeH = (Presentation != null && Presentation.CanvasHeight > 0) ? (int)Math.Round(Presentation.CanvasHeight) : 1080;
+            if (bakeW <= 0) bakeW = 1920;
+            if (bakeH <= 0) bakeH = 1080;
+
+            // Nếu đang ở chế độ xem trước nhỏ trên canvas soạn thảo, dùng kích thước khung xem trước để nhanh tức thì
+            if (!IsPresenting && rect.Width > 0 && rect.Height > 0 && rect.Width < bakeW)
+            {
+                bakeW = rect.Width;
+                bakeH = rect.Height;
+            }
+
+            float bakeScale = (Presentation != null && Presentation.CanvasWidth > 0) ? ((float)bakeW / Presentation.CanvasWidth) : 1.0f;
+
             ClearTransitionCache();
-            _cachedTransSize = rect.Size;
+            _cachedTransSize = new Size(bakeW, bakeH);
             _cachedTransFromIdx = TransitionFromSlideIndex;
             _cachedTransToIdx = TransitionToSlideIndex;
 
@@ -2199,26 +3611,21 @@ namespace ZenQOffice.UI
                 _isBuildingTransitionCache = true;
 
                 // 1. Bake fromSlide
-                _cachedTransBmpA = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                _cachedTransBmpA = new Bitmap(bakeW, bakeH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using (Graphics gA = Graphics.FromImage(_cachedTransBmpA))
-                using (D2DGraphics d2dA = new D2DGraphics(gA, rect.Width, rect.Height))
+                using (D2DGraphics d2dA = new D2DGraphics(gA, bakeW, bakeH))
                 {
-                    Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
-                    DrawSlideFull(d2dA, originRect, fromSlide, scale, 1.0f, true);
+                    Rectangle originRect = new Rectangle(0, 0, bakeW, bakeH);
+                    DrawSlideFull(d2dA, originRect, fromSlide, bakeScale, 1.0f, true);
                 }
 
                 // 2. Bake toSlide
-                _cachedTransBmpB = new Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                _cachedTransBmpB = new Bitmap(bakeW, bakeH, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using (Graphics gB = Graphics.FromImage(_cachedTransBmpB))
-                using (D2DGraphics d2dB = new D2DGraphics(gB, rect.Width, rect.Height))
+                using (D2DGraphics d2dB = new D2DGraphics(gB, bakeW, bakeH))
                 {
-                    Rectangle originRect = new Rectangle(0, 0, rect.Width, rect.Height);
-                    DrawSlideFull(d2dB, originRect, toSlide, scale, 1.0f, false);
-                }
-                if (IsTransitioning)
-                {
-                    _transitionStopwatch.Restart();
-                    TransitionProgress = 0.0f;
+                    Rectangle originRect = new Rectangle(0, 0, bakeW, bakeH);
+                    DrawSlideFull(d2dB, originRect, toSlide, bakeScale, 1.0f, false);
                 }
             }
             catch (Exception ex)
@@ -2235,65 +3642,8 @@ namespace ZenQOffice.UI
         private static void DrawCachedSlideBitmap(D2DGraphics g, RectangleF targetRect, Bitmap bmp, float opacity)
         {
             if (bmp == null || opacity <= 0.005f || targetRect.Width <= 0 || targetRect.Height <= 0) return;
-
-            int ix = (int)Math.Round(targetRect.X);
-            int iy = (int)Math.Round(targetRect.Y);
-            int iw = (int)Math.Round(targetRect.Width);
-            int ih = (int)Math.Round(targetRect.Height);
-
-            bool isIntegerPos = Math.Abs(targetRect.X - ix) < 0.05f && Math.Abs(targetRect.Y - iy) < 0.05f;
-
-            // 1:1 pixel-exact BitBlt khi kích thước tương đương và tọa độ nguyên: triệt tiêu hoàn toàn mờ bicubic và giật subpixel
-            if (isIntegerPos && Math.Abs(iw - bmp.Width) <= 1 && Math.Abs(ih - bmp.Height) <= 1)
-            {
-                InterpolationMode prevInterp = g.InterpolationMode;
-                PixelOffsetMode prevOffset = g.PixelOffsetMode;
-                g.InterpolationMode = InterpolationMode.NearestNeighbor;
-                // Giữ nguyên g.PixelOffsetMode (PixelOffsetMode.Half) - tuyệt đối không gán PixelOffsetMode.None
-                // vì sẽ làm lệch tọa độ -0.5px so với khi kết thúc chuyển cảnh dẫn đến giật hình!
-
-                if (opacity >= 0.995f)
-                {
-                    g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel);
-                }
-                else
-                {
-                    using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
-                    {
-                        System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix
-                        {
-                            Matrix33 = Math.Max(0f, Math.Min(1.0f, opacity))
-                        };
-                        ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                        g.DrawImage(bmp, new Rectangle(ix, iy, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, ia, opacity);
-                    }
-                }
-
-                g.InterpolationMode = prevInterp;
-                g.PixelOffsetMode = prevOffset;
-                return;
-            }
-
-            if (opacity >= 0.995f)
-            {
-                g.DrawImage(bmp, targetRect.X, targetRect.Y, targetRect.Width, targetRect.Height);
-                return;
-            }
-
-            using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
-            {
-                System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix
-                {
-                    Matrix33 = Math.Max(0f, Math.Min(1.0f, opacity))
-                };
-                ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                PointF[] destPoints = new PointF[] {
-                    new PointF(targetRect.X, targetRect.Y),
-                    new PointF(targetRect.Right, targetRect.Y),
-                    new PointF(targetRect.X, targetRect.Bottom)
-                };
-                g.DrawImage(bmp, destPoints, new RectangleF(0, 0, bmp.Width, bmp.Height), GraphicsUnit.Pixel, ia, opacity);
-            }
+            float clampedOp = Math.Max(0f, Math.Min(1.0f, opacity));
+            g.DrawImage(bmp, targetRect.X, targetRect.Y, targetRect.Width, targetRect.Height, clampedOp);
         }
 
         public void ClearMorphTextureCache()
@@ -2374,6 +3724,19 @@ namespace ZenQOffice.UI
                 IsTransitioning = true;
                 IsPreviewingTransition = isPreview;
                 TransitionProgress = 0.0f;
+
+                // Pre-bake transition textures before OnPaint starts so D2DGraphics can use _sharedDcRenderTarget
+                // and _sharedBitmapCache with zero nested-DC contention, and start the stopwatch right after baking!
+                if (IsPresenting && toSlide.Transition != TransitionType.Morph)
+                {
+                    SlideNode fromSlide = (TransitionFromSlideIndex >= 0 && TransitionFromSlideIndex < Presentation.Slides.Count && TransitionFromSlideIndex != TransitionToSlideIndex)
+                        ? Presentation.Slides[TransitionFromSlideIndex]
+                        : new SlideNode { BgColor = toSlide.BgColor, IsGradientBg = toSlide.IsGradientBg, BgColor2 = toSlide.BgColor2 };
+                    int bakeW = (Presentation != null && Presentation.CanvasWidth > 0) ? (int)Math.Round(Presentation.CanvasWidth) : 1920;
+                    int bakeH = (Presentation != null && Presentation.CanvasHeight > 0) ? (int)Math.Round(Presentation.CanvasHeight) : 1080;
+                    EnsureTransitionCache(new Rectangle(0, 0, bakeW, bakeH), fromSlide, toSlide, 1.0f);
+                }
+
                 _transitionStopwatch.Restart();
             }
             else
@@ -2605,7 +3968,14 @@ namespace ZenQOffice.UI
                 float dur = (a.Duration > 0.05f) ? a.Duration : 0.5f;
                 durations[i] = dur;
 
-                if (a.Trigger == AnimationTrigger.OnClick || (i == 0 && a.Trigger != AnimationTrigger.WithPrevious && a.Trigger != AnimationTrigger.AfterPrevious))
+                if (!string.IsNullOrEmpty(a.TriggerShapeId))
+                {
+                    stepIndices[i] = -1;
+                    startOffsets[i] = a.Delay;
+                    continue;
+                }
+
+                if (a.Trigger == AnimationTrigger.OnClick || (currentStep == 0 && a.Trigger != AnimationTrigger.WithPrevious && a.Trigger != AnimationTrigger.AfterPrevious))
                 {
                     currentStep++;
                     stepIndices[i] = currentStep;
@@ -2853,6 +4223,62 @@ namespace ZenQOffice.UI
                 }
             }
 
+            // 2b. Update Interactive Triggered Animations (Trigger -> On Click of Shape)
+            if (IsPresenting && IsPlayingTriggeredAnimation && ActiveSlide != null && _activeTriggeredAnimIndices.Count > 0)
+            {
+                if (!_triggerAnimStopwatch.IsRunning) _triggerAnimStopwatch.Restart();
+                float maxTrigDur = 0.45f;
+                for (int i = 0; i < _activeTriggeredAnimIndices.Count; i++)
+                {
+                    int aIdx = _activeTriggeredAnimIndices[i];
+                    if (aIdx >= 0 && aIdx < ActiveSlide.Animations.Count)
+                    {
+                        float d = ActiveSlide.Animations[aIdx].Delay + Math.Max(0.1f, ActiveSlide.Animations[aIdx].Duration);
+                        if (d > maxTrigDur) maxTrigDur = d;
+                    }
+                }
+                float elapsedTrig = (float)_triggerAnimStopwatch.Elapsed.TotalSeconds;
+                float pTrig = elapsedTrig / maxTrigDur;
+                if (pTrig >= 1.0f)
+                {
+                    if (TriggeredAnimationProgress < 1.0f)
+                    {
+                        TriggeredAnimationProgress = 1.0f;
+                        needRedraw = true;
+                    }
+                    else
+                    {
+                        IsPlayingTriggeredAnimation = false;
+                        _triggerAnimStopwatch.Stop();
+                        needRedraw = true;
+                    }
+                }
+                else
+                {
+                    TriggeredAnimationProgress = pTrig;
+                    needRedraw = true;
+                }
+            }
+
+            // 2c. Update Interactive Quiz Answer Feedback Animation (Shake on Wrong / Pulse on Correct)
+            if (IsPresenting && !string.IsNullOrEmpty(_activeQuizFeedbackShapeId))
+            {
+                if (!_quizFeedbackStopwatch.IsRunning) _quizFeedbackStopwatch.Restart();
+                float pQuiz = (float)_quizFeedbackStopwatch.Elapsed.TotalSeconds / 0.55f;
+                if (pQuiz >= 1.0f)
+                {
+                    _activeQuizFeedbackShapeId = "";
+                    _quizFeedbackProgress = 0f;
+                    _quizFeedbackStopwatch.Stop();
+                    needRedraw = true;
+                }
+                else
+                {
+                    _quizFeedbackProgress = pQuiz;
+                    needRedraw = true;
+                }
+            }
+
             // 3. Update Background Removal AI Laser Scan Animation (Hiệu ứng quét sáng Laser đa lớp chuyên nghiệp)
             if (IsScanningActive)
             {
@@ -2931,6 +4357,8 @@ namespace ZenQOffice.UI
             float t = (type == TransitionType.Morph)
                 ? EaseInOutCubic(progress)  // Morph needs zero-velocity start/end to hide frame-timing jitter
                 : SmoothEase(progress);
+
+            _currentTransitionViewportSize = rect.Size;
 
             if (type != TransitionType.Morph)
             {
@@ -4563,7 +5991,11 @@ namespace ZenQOffice.UI
             {
                 shape.Alignment = shape.TextRuns[0].ParaAlignment.Value;
             }
-            if (shape.Type != ShapeType.TextBox && string.IsNullOrEmpty(shape.Text))
+            if (shape.Type == ShapeType.TextBox && string.IsNullOrEmpty(shape.Text))
+            {
+                shape.VerticalAlignment = VerticalTextAlignment.Top;
+            }
+            else if (shape.Type != ShapeType.TextBox && string.IsNullOrEmpty(shape.Text))
             {
                 if (shape.Alignment != TextAlignment.Left && shape.Alignment != TextAlignment.Right && shape.Alignment != TextAlignment.Justify)
                 {
@@ -4587,30 +6019,80 @@ namespace ZenQOffice.UI
         {
             if (EditingShape == null) return;
             EditingShape.Text = EditingTextBuffer ?? "";
-            if (EditingShape.TextRuns != null && EditingShape.TextRuns.Count > 0)
+            // Synchronize TextRuns without destroying multi-run rich text formatting!
+            EnsureTextRunsSynchronized(EditingShape, EditingShape.Text);
+
+            // MS PowerPoint dynamic TextBox auto-size behavior:
+            // - Single-clicked TextBox (AutoFitWidth = true): expands width as user types, clamped to slide edge
+            // - Dragged/resized TextBox (AutoFitWidth = false): fixed width, wraps text downward and expands height
+            if (EditingShape.Type == ShapeType.TextBox)
             {
-                SlideTextRun proto = EditingShape.TextRuns[0];
-                EditingShape.TextRuns.Clear();
-                if (!string.IsNullOrEmpty(EditingShape.Text))
+                try
                 {
-                    EditingShape.TextRuns.Add(new SlideTextRun(EditingShape.Text, EditingShape.TextColor, EditingShape.FontSize, EditingShape.Bold, EditingShape.FontName)
+                    FontStyle editFs = FontStyle.Regular;
+                    if (EditingShape.Bold) editFs |= FontStyle.Bold;
+                    if (EditingShape.Italic) editFs |= FontStyle.Italic;
+                    if (EditingShape.Underline) editFs |= FontStyle.Underline;
+                    if (EditingShape.Strikethrough) editFs |= FontStyle.Strikeout;
+
+                    float fSize = Math.Max(8.0f, EditingShape.FontSize);
+                    using (Font font = SlideFontManager.CreateFont(EditingShape.FontName, fSize, editFs, GraphicsUnit.Pixel))
+                    using (D2DGraphics g = new D2DGraphics())
                     {
-                        Italic = EditingShape.Italic,
-                        Underline = EditingShape.Underline,
-                        Strikethrough = EditingShape.Strikethrough,
-                        HasGradient = proto.HasGradient,
-                        GradientColor2 = proto.GradientColor2,
-                        GradientAngle = proto.GradientAngle,
-                        GradientStops = proto.GradientStops != null ? new List<GradientStop>(proto.GradientStops) : null,
-                        HasHighlight = EditingShape.HasHighlight,
-                        HighlightColor = EditingShape.HighlightColor,
-                        ParaLineSpacing = proto.ParaLineSpacing,
-                        ParaSpaceBefore = proto.ParaSpaceBefore,
-                        ParaSpaceAfter = proto.ParaSpaceAfter,
-                        ParaAlignment = EditingShape.Alignment
-                    });
+                        float lineH = Math.Max(fSize * 1.25f, font.Height);
+                        float padX = (EditingShape.MarginLeft ?? 6.0f) + (EditingShape.MarginRight ?? 6.0f) + 6.0f;
+                        float padY = (EditingShape.MarginTop ?? 4.0f) + (EditingShape.MarginBottom ?? 4.0f) + 4.0f;
+
+                        if (EditingShape.AutoFitWidth)
+                        {
+                            string raw = (EditingShape.Text ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
+                            string[] paras = raw.Split('\n');
+                            float maxLineW = 0f;
+                            using (StringFormat sf = new StringFormat(StringFormat.GenericTypographic))
+                            {
+                                sf.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
+                                foreach (string p in paras)
+                                {
+                                    float w = string.IsNullOrEmpty(p) ? 0f : g.MeasureString(p, font, PointF.Empty, sf).Width;
+                                    if (w > maxLineW) maxLineW = w;
+                                }
+                            }
+                            float desiredW = Math.Max(22f, maxLineW + padX);
+                            float maxAllowedW = (Presentation != null) ? Math.Max(80f, Presentation.CanvasWidth - EditingShape.Transform.X - 20f) : 1800f;
+                            if (desiredW >= maxAllowedW)
+                            {
+                                EditingShape.Transform.Width = maxAllowedW;
+                                EditingShape.AutoFitWidth = false;
+                            }
+                            else
+                            {
+                                EditingShape.Transform.Width = desiredW;
+                            }
+
+                            int lineCount = Math.Max(1, paras.Length);
+                            if (!EditingShape.AutoFitWidth)
+                            {
+                                var vLines = GetVisualWrappedLines(g, EditingShape.Text, font, Math.Max(20f, EditingShape.Transform.Width - padX));
+                                lineCount = Math.Max(1, vLines.Count);
+                            }
+                            EditingShape.Transform.Height = Math.Max(lineH + padY, lineCount * lineH + padY);
+                        }
+                        else
+                        {
+                            float availW = Math.Max(20f, EditingShape.Transform.Width - (EditingShape.MarginLeft ?? 6.0f) - (EditingShape.MarginRight ?? 6.0f));
+                            var vLines = GetVisualWrappedLines(g, EditingShape.Text, font, availW);
+                            int lineCount = Math.Max(1, vLines.Count);
+                            float reqH = lineCount * lineH + padY;
+                            if (EditingShape.AutoFitHeight || reqH > EditingShape.Transform.Height)
+                            {
+                                EditingShape.Transform.Height = Math.Max(EditingShape.Transform.Height, reqH);
+                            }
+                        }
+                    }
                 }
+                catch { }
             }
+
             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
         }
 
@@ -4634,6 +6116,587 @@ namespace ZenQOffice.UI
 
             EndTableInlineEditing();
         }
+
+        #region Rich Text Selection & Multi-Run Formatting
+        public class VisualLineRunSegment
+        {
+            public string Text { get; set; }
+            public Font Font { get; set; }
+            public Color Color { get; set; }
+            public float Width { get; set; }
+            public bool HasHighlight { get; set; }
+            public Color HighlightColor { get; set; }
+            public bool HasGradient { get; set; }
+            public Color GradientColor2 { get; set; }
+            public float GradientAngle { get; set; }
+            public List<GradientStop> GradientStops { get; set; }
+        }
+
+        public static void EnsureTextRunsSynchronized(ShapeNode shape, string fullText)
+        {
+            if (shape == null) return;
+            fullText = fullText ?? "";
+
+            if (string.IsNullOrEmpty(fullText))
+            {
+                if (shape.TextRuns != null) shape.TextRuns.Clear();
+                return;
+            }
+
+            if (shape.TextRuns == null || shape.TextRuns.Count == 0)
+            {
+                shape.TextRuns = new List<SlideTextRun>
+                {
+                    new SlideTextRun(fullText, shape.TextColor, shape.FontSize, shape.Bold, shape.FontName)
+                    {
+                        Italic = shape.Italic,
+                        Underline = shape.Underline,
+                        Strikethrough = shape.Strikethrough,
+                        HasHighlight = shape.HasHighlight,
+                        HighlightColor = shape.HighlightColor,
+                        ParaAlignment = shape.Alignment,
+                        ParaLineSpacing = shape.LineSpacing
+                    }
+                };
+                return;
+            }
+
+            int totalRunLen = 0;
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            for (int i = 0; i < shape.TextRuns.Count; i++)
+            {
+                string t = shape.TextRuns[i].Text ?? "";
+                totalRunLen += t.Length;
+                sb.Append(t);
+            }
+
+            if (totalRunLen == fullText.Length && sb.ToString() == fullText)
+            {
+                return; // 100% in sync
+            }
+
+            if (shape.TextRuns.Count == 1)
+            {
+                shape.TextRuns[0].Text = fullText;
+                return;
+            }
+
+            // Multi-run text modified: Reconcile by finding common prefix and suffix
+            string oldText = sb.ToString();
+            int prefixLen = 0;
+            while (prefixLen < oldText.Length && prefixLen < fullText.Length && oldText[prefixLen] == fullText[prefixLen])
+            {
+                prefixLen++;
+            }
+
+            int suffixLen = 0;
+            while (suffixLen < (oldText.Length - prefixLen) && suffixLen < (fullText.Length - prefixLen) &&
+                   oldText[oldText.Length - 1 - suffixLen] == fullText[fullText.Length - 1 - suffixLen])
+            {
+                suffixLen++;
+            }
+
+            int oldEditEnd = oldText.Length - suffixLen;
+            string newMiddle = fullText.Substring(prefixLen, fullText.Length - suffixLen - prefixLen);
+
+            SplitRunAtCharIndex(shape.TextRuns, prefixLen);
+            SplitRunAtCharIndex(shape.TextRuns, oldEditEnd);
+
+            int runPos = 0;
+            int firstMiddleIdx = -1;
+            int removeCount = 0;
+
+            for (int i = 0; i < shape.TextRuns.Count; i++)
+            {
+                int rLen = (shape.TextRuns[i].Text ?? "").Length;
+                int rEnd = runPos + rLen;
+
+                if (rEnd > prefixLen && runPos < oldEditEnd)
+                {
+                    if (firstMiddleIdx < 0) firstMiddleIdx = i;
+                    removeCount++;
+                }
+                runPos = rEnd;
+            }
+
+            if (firstMiddleIdx >= 0 && removeCount > 0)
+            {
+                SlideTextRun proto = shape.TextRuns[firstMiddleIdx];
+                shape.TextRuns.RemoveRange(firstMiddleIdx, removeCount);
+                if (!string.IsNullOrEmpty(newMiddle))
+                {
+                    SlideTextRun insertedRun = CloneRun(proto, newMiddle);
+                    shape.TextRuns.Insert(firstMiddleIdx, insertedRun);
+                }
+            }
+            else
+            {
+                int insertIdx = shape.TextRuns.Count;
+                int acc = 0;
+                for (int i = 0; i < shape.TextRuns.Count; i++)
+                {
+                    int rLen = (shape.TextRuns[i].Text ?? "").Length;
+                    if (prefixLen <= acc + rLen)
+                    {
+                        insertIdx = i;
+                        break;
+                    }
+                    acc += rLen;
+                }
+                SlideTextRun proto = (insertIdx < shape.TextRuns.Count) ? shape.TextRuns[insertIdx] : (shape.TextRuns.Count > 0 ? shape.TextRuns[shape.TextRuns.Count - 1] : null);
+                if (!string.IsNullOrEmpty(newMiddle))
+                {
+                    SlideTextRun insRun = (proto != null) ? CloneRun(proto, newMiddle) : new SlideTextRun(newMiddle, shape.TextColor, shape.FontSize, shape.Bold, shape.FontName);
+                    shape.TextRuns.Insert(insertIdx, insRun);
+                }
+            }
+
+            for (int i = shape.TextRuns.Count - 1; i >= 0; i--)
+            {
+                if (string.IsNullOrEmpty(shape.TextRuns[i].Text))
+                {
+                    shape.TextRuns.RemoveAt(i);
+                }
+            }
+        }
+
+        public void ApplyFormattingToSelection(Action<SlideTextRun> formatAction, Action<ShapeNode> fallbackWholeShapeAction)
+        {
+            if (formatAction == null) return;
+            SaveUndoState();
+
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            if (targetShape == null) return;
+
+            string fullText = (IsInlineEditing && EditingShape == targetShape) ? (EditingTextBuffer ?? "") : (targetShape.Text ?? "");
+
+            int sLen = Math.Abs(TextSelectionLength);
+            if (IsInlineEditing && sLen > 0 && !string.IsNullOrEmpty(fullText))
+            {
+                int selStart = Math.Max(0, Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                int selEnd = Math.Min(fullText.Length, Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+
+                if (selEnd > selStart)
+                {
+                    EnsureTextRunsSynchronized(targetShape, fullText);
+                    SplitAndFormatRuns(targetShape, selStart, selEnd, formatAction);
+                    targetShape.InvalidateDisplayCache();
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+            }
+
+            if (fallbackWholeShapeAction != null)
+            {
+                fallbackWholeShapeAction(targetShape);
+            }
+            if (targetShape.TextRuns != null && targetShape.TextRuns.Count > 0)
+            {
+                foreach (var run in targetShape.TextRuns)
+                {
+                    formatAction(run);
+                }
+            }
+            targetShape.InvalidateDisplayCache();
+            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        private static void SplitAndFormatRuns(ShapeNode shape, int selStart, int selEnd, Action<SlideTextRun> formatAction)
+        {
+            if (shape.TextRuns == null || shape.TextRuns.Count == 0) return;
+
+            SplitRunAtCharIndex(shape.TextRuns, selStart);
+            SplitRunAtCharIndex(shape.TextRuns, selEnd);
+
+            int charAcc = 0;
+            for (int i = 0; i < shape.TextRuns.Count; i++)
+            {
+                SlideTextRun r = shape.TextRuns[i];
+                int rLen = (r.Text ?? "").Length;
+                int rStart = charAcc;
+                int rEnd = charAcc + rLen;
+
+                if (rStart >= selStart && rEnd <= selEnd && rLen > 0)
+                {
+                    formatAction(r);
+                }
+                charAcc += rLen;
+            }
+
+            MergeAdjacentRuns(shape.TextRuns);
+        }
+
+        private static void SplitRunAtCharIndex(List<SlideTextRun> runs, int splitIdx)
+        {
+            if (runs == null || splitIdx <= 0) return;
+
+            int charAcc = 0;
+            for (int i = 0; i < runs.Count; i++)
+            {
+                SlideTextRun r = runs[i];
+                int rLen = (r.Text ?? "").Length;
+                int rStart = charAcc;
+                int rEnd = charAcc + rLen;
+
+                if (splitIdx > rStart && splitIdx < rEnd)
+                {
+                    int offset = splitIdx - rStart;
+                    string t1 = r.Text.Substring(0, offset);
+                    string t2 = r.Text.Substring(offset);
+
+                    r.Text = t1;
+                    SlideTextRun secondRun = CloneRun(r, t2);
+                    runs.Insert(i + 1, secondRun);
+                    return;
+                }
+                charAcc += rLen;
+            }
+        }
+
+        private static SlideTextRun CloneRun(SlideTextRun src, string text)
+        {
+            return new SlideTextRun(text, src.TextColor, src.FontSize, src.Bold, src.FontName)
+            {
+                Italic = src.Italic,
+                Underline = src.Underline,
+                Strikethrough = src.Strikethrough,
+                HasHighlight = src.HasHighlight,
+                HighlightColor = src.HighlightColor,
+                HasGradient = src.HasGradient,
+                GradientColor2 = src.GradientColor2,
+                GradientAngle = src.GradientAngle,
+                GradientStops = (src.GradientStops != null) ? new List<GradientStop>(src.GradientStops) : null,
+                ParaLineSpacing = src.ParaLineSpacing,
+                ParaSpaceBefore = src.ParaSpaceBefore,
+                ParaSpaceAfter = src.ParaSpaceAfter,
+                ParaAlignment = src.ParaAlignment
+            };
+        }
+
+        private static void MergeAdjacentRuns(List<SlideTextRun> runs)
+        {
+            if (runs == null || runs.Count <= 1) return;
+
+            for (int i = runs.Count - 2; i >= 0; i--)
+            {
+                SlideTextRun a = runs[i];
+                SlideTextRun b = runs[i + 1];
+
+                if (AreRunsFormatEqual(a, b))
+                {
+                    a.Text = (a.Text ?? "") + (b.Text ?? "");
+                    runs.RemoveAt(i + 1);
+                }
+            }
+        }
+
+        private static bool AreRunsFormatEqual(SlideTextRun a, SlideTextRun b)
+        {
+            if (a == null || b == null) return false;
+            return a.TextColor == b.TextColor &&
+                   Math.Abs(a.FontSize - b.FontSize) < 0.01f &&
+                   a.Bold == b.Bold &&
+                   a.Italic == b.Italic &&
+                   a.Underline == b.Underline &&
+                   a.Strikethrough == b.Strikethrough &&
+                   string.Equals(a.FontName, b.FontName, StringComparison.OrdinalIgnoreCase) &&
+                   a.HasHighlight == b.HasHighlight &&
+                   a.HighlightColor == b.HighlightColor &&
+                   a.HasGradient == b.HasGradient &&
+                   a.GradientColor2 == b.GradientColor2 &&
+                   Math.Abs(a.GradientAngle - b.GradientAngle) < 0.01f &&
+                   a.ParaAlignment == b.ParaAlignment &&
+                   a.ParaLineSpacing == b.ParaLineSpacing &&
+                   a.ParaSpaceBefore == b.ParaSpaceBefore &&
+                   a.ParaSpaceAfter == b.ParaSpaceAfter;
+        }
+
+        public void ToggleSelectionBold()
+        {
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            if (targetShape == null) return;
+            string fullText = (IsInlineEditing && EditingShape == targetShape) ? (EditingTextBuffer ?? "") : (targetShape.Text ?? "");
+            int sLen = Math.Abs(TextSelectionLength);
+            if (IsInlineEditing && sLen > 0 && !string.IsNullOrEmpty(fullText))
+            {
+                int selStart = Math.Max(0, Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                int selEnd = Math.Min(fullText.Length, Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                EnsureTextRunsSynchronized(targetShape, fullText);
+                bool anyNotBold = false;
+                int acc = 0;
+                foreach (var r in targetShape.TextRuns)
+                {
+                    int rLen = (r.Text ?? "").Length;
+                    if (acc + rLen > selStart && acc < selEnd && !r.Bold) anyNotBold = true;
+                    acc += rLen;
+                }
+                bool newBold = anyNotBold;
+                ApplyFormattingToSelection(r => r.Bold = newBold, s => s.Bold = newBold);
+            }
+            else
+            {
+                bool newBold = !targetShape.Bold;
+                ApplyFormattingToSelection(r => r.Bold = newBold, s => s.Bold = newBold);
+            }
+        }
+
+        public void ToggleSelectionItalic()
+        {
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            if (targetShape == null) return;
+            string fullText = (IsInlineEditing && EditingShape == targetShape) ? (EditingTextBuffer ?? "") : (targetShape.Text ?? "");
+            int sLen = Math.Abs(TextSelectionLength);
+            if (IsInlineEditing && sLen > 0 && !string.IsNullOrEmpty(fullText))
+            {
+                int selStart = Math.Max(0, Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                int selEnd = Math.Min(fullText.Length, Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                EnsureTextRunsSynchronized(targetShape, fullText);
+                bool anyNotItalic = false;
+                int acc = 0;
+                foreach (var r in targetShape.TextRuns)
+                {
+                    int rLen = (r.Text ?? "").Length;
+                    if (acc + rLen > selStart && acc < selEnd && !r.Italic) anyNotItalic = true;
+                    acc += rLen;
+                }
+                bool newItalic = anyNotItalic;
+                ApplyFormattingToSelection(r => r.Italic = newItalic, s => s.Italic = newItalic);
+            }
+            else
+            {
+                bool newItalic = !targetShape.Italic;
+                ApplyFormattingToSelection(r => r.Italic = newItalic, s => s.Italic = newItalic);
+            }
+        }
+
+        public void ToggleSelectionUnderline()
+        {
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            if (targetShape == null) return;
+            string fullText = (IsInlineEditing && EditingShape == targetShape) ? (EditingTextBuffer ?? "") : (targetShape.Text ?? "");
+            int sLen = Math.Abs(TextSelectionLength);
+            if (IsInlineEditing && sLen > 0 && !string.IsNullOrEmpty(fullText))
+            {
+                int selStart = Math.Max(0, Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                int selEnd = Math.Min(fullText.Length, Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                EnsureTextRunsSynchronized(targetShape, fullText);
+                bool anyNotUnderline = false;
+                int acc = 0;
+                foreach (var r in targetShape.TextRuns)
+                {
+                    int rLen = (r.Text ?? "").Length;
+                    if (acc + rLen > selStart && acc < selEnd && !r.Underline) anyNotUnderline = true;
+                    acc += rLen;
+                }
+                bool newUnderline = anyNotUnderline;
+                ApplyFormattingToSelection(r => r.Underline = newUnderline, s => s.Underline = newUnderline);
+            }
+            else
+            {
+                bool newUnderline = !targetShape.Underline;
+                ApplyFormattingToSelection(r => r.Underline = newUnderline, s => s.Underline = newUnderline);
+            }
+        }
+
+        public void ToggleSelectionStrikethrough()
+        {
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            if (targetShape == null) return;
+            string fullText = (IsInlineEditing && EditingShape == targetShape) ? (EditingTextBuffer ?? "") : (targetShape.Text ?? "");
+            int sLen = Math.Abs(TextSelectionLength);
+            if (IsInlineEditing && sLen > 0 && !string.IsNullOrEmpty(fullText))
+            {
+                int selStart = Math.Max(0, Math.Min(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                int selEnd = Math.Min(fullText.Length, Math.Max(TextSelectionStart, TextSelectionStart + TextSelectionLength));
+                EnsureTextRunsSynchronized(targetShape, fullText);
+                bool anyNotStrike = false;
+                int acc = 0;
+                foreach (var r in targetShape.TextRuns)
+                {
+                    int rLen = (r.Text ?? "").Length;
+                    if (acc + rLen > selStart && acc < selEnd && !r.Strikethrough) anyNotStrike = true;
+                    acc += rLen;
+                }
+                bool newStrike = anyNotStrike;
+                ApplyFormattingToSelection(r => r.Strikethrough = newStrike, s => s.Strikethrough = newStrike);
+            }
+            else
+            {
+                bool newStrike = !targetShape.Strikethrough;
+                ApplyFormattingToSelection(r => r.Strikethrough = newStrike, s => s.Strikethrough = newStrike);
+            }
+        }
+
+        public void SetSelectionTextColor(int colorArgb)
+        {
+            int rgb = colorArgb & 0xFFFFFF;
+            ApplyFormattingToSelection(
+                r => { r.HasGradient = false; r.TextColor = rgb; },
+                s => { s.HasTextGradient = false; s.TextColor = rgb; }
+            );
+        }
+
+        public void SetSelectionHighlightColor(int colorArgb, bool hasHighlight)
+        {
+            int rgb = colorArgb & 0xFFFFFF;
+            ApplyFormattingToSelection(
+                r => { r.HasHighlight = hasHighlight; r.HighlightColor = hasHighlight ? rgb : 0; },
+                s => { s.HasHighlight = hasHighlight; s.HighlightColor = hasHighlight ? rgb : 0; }
+            );
+        }
+
+        public void SetSelectionFontSize(float fontSize)
+        {
+            float sz = Math.Max(8f, Math.Min(96f, fontSize));
+            ApplyFormattingToSelection(
+                r => r.FontSize = sz,
+                s => s.FontSize = sz
+            );
+        }
+
+        public void AdjustSelectionFontSize(float delta)
+        {
+            ApplyFormattingToSelection(
+                r => r.FontSize = Math.Max(8f, Math.Min(96f, r.FontSize + delta)),
+                s => s.FontSize = Math.Max(8f, Math.Min(96f, s.FontSize + delta))
+            );
+        }
+
+        public void SetSelectionFontName(string fontName)
+        {
+            if (string.IsNullOrEmpty(fontName)) return;
+            ApplyFormattingToSelection(
+                r => r.FontName = fontName,
+                s => s.FontName = fontName
+            );
+        }
+
+        public void ClearSelectionFormatting()
+        {
+            ShapeNode targetShape = (IsInlineEditing && EditingShape != null) ? EditingShape : SelectedShape;
+            int defaultColor = (targetShape != null && targetShape.Type == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF;
+            ApplyFormattingToSelection(r => {
+                r.FontSize = 18f;
+                r.Bold = false;
+                r.Italic = false;
+                r.Underline = false;
+                r.Strikethrough = false;
+                r.HasGradient = false;
+                r.HasHighlight = false;
+                r.HighlightColor = 0;
+                r.TextColor = defaultColor;
+            }, s => {
+                s.FontSize = 18f;
+                s.Bold = false;
+                s.Italic = false;
+                s.Underline = false;
+                s.Strikethrough = false;
+                s.HasTextShadow = false;
+                s.TextColor = defaultColor;
+                s.HasHighlight = false;
+                s.HighlightColor = 0;
+                s.CharacterSpacing = 0f;
+            });
+        }
+
+        public List<VisualLineRunSegment> GetVisualLineRunSegments(D2DGraphics g, ShapeNode shape, string fullText, int lineStart, int lineLength, float scale, Font defaultFont, Color defaultColor)
+        {
+            List<VisualLineRunSegment> segments = new List<VisualLineRunSegment>();
+            if (string.IsNullOrEmpty(fullText) || lineLength <= 0) return segments;
+
+            int lineEnd = lineStart + lineLength;
+
+            if (shape == null || shape.TextRuns == null || shape.TextRuns.Count == 0)
+            {
+                string t = fullText.Substring(lineStart, lineLength);
+                float w = g.MeasureString(t, defaultFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                segments.Add(new VisualLineRunSegment
+                {
+                    Text = t,
+                    Font = defaultFont,
+                    Color = defaultColor,
+                    Width = w
+                });
+                return segments;
+            }
+
+            int runCharAcc = 0;
+            for (int i = 0; i < shape.TextRuns.Count; i++)
+            {
+                SlideTextRun r = shape.TextRuns[i];
+                int rLen = (r.Text ?? "").Length;
+                int rStart = runCharAcc;
+                int rEnd = runCharAcc + rLen;
+
+                int s0 = Math.Max(lineStart, rStart);
+                int s1 = Math.Min(lineEnd, rEnd);
+
+                if (s1 > s0)
+                {
+                    string segText = fullText.Substring(s0, s1 - s0);
+
+                    float rFontSize = Math.Max(1.0f, (r.FontSize > 0 ? r.FontSize : shape.FontSize) * scale);
+                    FontStyle rFs = FontStyle.Regular;
+                    if (r.Bold) rFs |= FontStyle.Bold;
+                    if (r.Italic) rFs |= FontStyle.Italic;
+                    if (r.Underline) rFs |= FontStyle.Underline;
+                    if (r.Strikethrough) rFs |= FontStyle.Strikeout;
+
+                    string rFontName = !string.IsNullOrEmpty(r.FontName) ? r.FontName : shape.FontName;
+                    Font segFont = SlideFontManager.CreateFont(rFontName, rFontSize, rFs, GraphicsUnit.Pixel);
+
+                    Color segCol = Color.FromArgb(defaultColor.A, Color.FromArgb(r.TextColor & 0xFFFFFF));
+                    Color segCol2 = Color.FromArgb(defaultColor.A, Color.FromArgb(r.GradientColor2 & 0xFFFFFF));
+                    Color segHl = Color.FromArgb(defaultColor.A, Color.FromArgb(r.HighlightColor & 0xFFFFFF));
+
+                    float segW = g.MeasureString(segText, segFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+
+                    segments.Add(new VisualLineRunSegment
+                    {
+                        Text = segText,
+                        Font = segFont,
+                        Color = segCol,
+                        Width = segW,
+                        HasHighlight = r.HasHighlight,
+                        HighlightColor = segHl,
+                        HasGradient = r.HasGradient,
+                        GradientColor2 = segCol2,
+                        GradientAngle = r.GradientAngle,
+                        GradientStops = r.GradientStops
+                    });
+                }
+
+                runCharAcc += rLen;
+            }
+
+            if (segments.Count == 0 && lineLength > 0)
+            {
+                string t = fullText.Substring(lineStart, lineLength);
+                float w = g.MeasureString(t, defaultFont, PointF.Empty, StringFormat.GenericTypographic).Width;
+                segments.Add(new VisualLineRunSegment
+                {
+                    Text = t,
+                    Font = defaultFont,
+                    Color = defaultColor,
+                    Width = w
+                });
+            }
+
+            return segments;
+        }
+
+        public float MeasureSegmentsWidth(D2DGraphics g, ShapeNode shape, string fullText, int start, int length, float scale, Font defaultFont)
+        {
+            if (string.IsNullOrEmpty(fullText) || length <= 0) return 0f;
+            var segs = GetVisualLineRunSegments(g, shape, fullText, start, length, scale, defaultFont, Color.Black);
+            float w = 0f;
+            foreach (var s in segs) w += s.Width;
+            return w;
+        }
+        #endregion
+
 
         public void StartTableInlineEditing(ShapeNode shape, int r, int c)
         {
@@ -5332,6 +7395,7 @@ namespace ZenQOffice.UI
             PresentationPausedElapsed = TimeSpan.Zero;
             IsPresentationTimerPaused = false;
             _playedMediaShapesInPresentation.Clear();
+            ResetSlideInteractiveState();
             SlideVideoPlayerManager.Instance.Stop();
 
             if (RequestStartSlideShow != null)
@@ -5397,6 +7461,7 @@ namespace ZenQOffice.UI
             CurrentStroke.Clear();
             AnnotationPenMode = false;
             LaserPointerMode = false;
+            ResetSlideInteractiveState();
             SlideVideoPlayerManager.Instance.Stop();
 
             if (RequestStopSlideShow != null)
@@ -5919,7 +7984,14 @@ namespace ZenQOffice.UI
         {
             if (ParentControl == null) return;
 
-            bool shouldBeVisible = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && !IsElementsDrawerCollapsed && ShapeTaskPane != null && !IsPresenting;
+            bool isBackstageOpen = false;
+            if (ParentControl is AppForm af)
+            {
+                if (af.BackstageView != null && af.BackstageView.IsOpen) isBackstageOpen = true;
+                if (af.Ribbon != null && af.Ribbon.CurrentMode != OfficeAppMode.Slides) isBackstageOpen = true;
+            }
+
+            bool shouldBeVisible = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && !IsElementsDrawerCollapsed && ShapeTaskPane != null && !IsPresenting && !isBackstageOpen;
 
             if (!shouldBeVisible)
             {
@@ -5953,7 +8025,11 @@ namespace ZenQOffice.UI
                 {
                     if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.Enter)
                     {
-                        if (e.KeyCode == Keys.Escape) _shapeSearchBox.Text = "";
+                        if (e.KeyCode == Keys.Escape)
+                        {
+                            _shapeSearchBox.Text = "";
+                            if (ShapeTaskPane != null) ShapeTaskPane.SearchText = "";
+                        }
                         if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
                         e.Handled = true;
                     }
@@ -6060,6 +8136,16 @@ namespace ZenQOffice.UI
                 using (Pen drwBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 {
                     g.DrawLine(drwBorder, totalW - 1, contentY, totalW - 1, contentY + totalH);
+                }
+
+                // Authentic soft elevation shadow casting to the right over workspace ('đen mờ')
+                int[] drawerShadowAlphas = new int[] { 14, 9, 5, 2 };
+                for (int s = 0; s < drawerShadowAlphas.Length; s++)
+                {
+                    using (Pen sp = new Pen(Color.FromArgb(drawerShadowAlphas[s], 0, 0, 0), 1f))
+                    {
+                        g.DrawLine(sp, totalW + s, contentY, totalW + s, contentY + totalH);
+                    }
                 }
 
                 // 2. Header Bar (Light Office Header, 44px)
@@ -6246,6 +8332,22 @@ namespace ZenQOffice.UI
                     FluentIconRenderer.DrawGlyph(g, '\uE9D2', iBox4, Color.FromArgb(124, 58, 237), 22f);
                     g.DrawString("Biểu đồ infographic", secFont, titleB, c4.X + 54, c4.Y + 10);
                     g.DrawString("Chèn biểu đồ cột minh họa số liệu", itemFont, descB, c4.X + 54, c4.Y + 30);
+                    curY += 64;
+
+                    // App Card 3: Kho biểu tượng & Icon Vector
+                    Rectangle c5 = new Rectangle(leftX + 12, curY, drawerW - 24, 56);
+                    DrawerItemBounds.Add(c5);
+                    DrawerItemActions.Add("app:icons");
+                    using (GraphicsPath cPath = CreateRoundedRectPath(new RectangleF(c5.X, c5.Y, c5.Width, c5.Height), 6f))
+                    {
+                        g.FillPath(cardBg, cPath);
+                        g.DrawPath(cardBorder, cPath);
+                    }
+                    Rectangle iBox5 = new Rectangle(c5.X + 8, c5.Y + 8, 40, 40);
+                    g.FillRectangle(iconBoxBg, iBox5);
+                    FluentIconRenderer.DrawGlyph(g, '\uED58', iBox5, Color.FromArgb(234, 88, 12), 22f);
+                    g.DrawString("Kho biểu tượng (Icons)", secFont, titleB, c5.X + 54, c5.Y + 10);
+                    g.DrawString("Chèn biểu tượng Fluent & icon vector đa dạng", itemFont, descB, c5.X + 54, c5.Y + 30);
                 }
             }
             else if (ElementsDrawerSelectedTab == 2) // Font chữ nội bộ
@@ -6585,6 +8687,18 @@ namespace ZenQOffice.UI
 
                 for (int i = 0; i < Presentation.Slides.Count; i++)
                 {
+                    if (IsDraggingSlideThumbnail && IsDraggingBottomSlideThumbnail && DragTargetSlideInsertIndex == i)
+                    {
+                        int insX = curX - 5;
+                        using (Pen insPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                        using (SolidBrush insDot = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                        {
+                            g.DrawLine(insPen, insX, cardY - 3, insX, cardY + cardH + 3);
+                            g.FillEllipse(insDot, insX - 3, cardY - 5, 6, 6);
+                            g.FillEllipse(insDot, insX - 3, cardY + cardH - 1, 6, 6);
+                        }
+                    }
+
                     Rectangle cRect = new Rectangle(curX, cardY, cardW, cardH);
                     BottomSlideThumbBounds.Add(cRect);
 
@@ -6603,6 +8717,14 @@ namespace ZenQOffice.UI
                         if (s.ThumbnailCache != null)
                         {
                             g.DrawImage(s.ThumbnailCache, cRect);
+                        }
+
+                        if (IsDraggingSlideThumbnail && IsDraggingBottomSlideThumbnail && PotentialDragSlideIndex == i)
+                        {
+                            using (SolidBrush dragDim = new SolidBrush(Color.FromArgb(110, 255, 255, 255)))
+                            {
+                                g.FillRectangle(dragDim, cRect);
+                            }
                         }
 
                         // Viền lựa chọn: 2px xanh dương cho trang đang chọn, 1px xám cho trang khác
@@ -6634,6 +8756,18 @@ namespace ZenQOffice.UI
                     curX += cardW + 10;
                 }
 
+                if (IsDraggingSlideThumbnail && IsDraggingBottomSlideThumbnail && DragTargetSlideInsertIndex >= Presentation.Slides.Count)
+                {
+                    int insX = curX - 5;
+                    using (Pen insPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                    using (SolidBrush insDot = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                    {
+                        g.DrawLine(insPen, insX, cardY - 3, insX, cardY + cardH + 3);
+                        g.FillEllipse(insDot, insX - 3, cardY - 5, 6, 6);
+                        g.FillEllipse(insDot, insX - 3, cardY + cardH - 1, 6, 6);
+                    }
+                }
+
                 // Nút '+ Thêm trang' Office Style (được clip sạch sẽ bên trong viewport)
                 Rectangle addRect = new Rectangle(curX, cardY, 46, cardH);
                 BtnBottomAddSlideBounds = addRect;
@@ -6647,6 +8781,32 @@ namespace ZenQOffice.UI
                         g.DrawRectangle(addPen, addRect);
                         g.DrawString("+", plusFont, addTxt, new RectangleF(addRect.X, addRect.Y + 2, addRect.Width, 20), sfCenter);
                         g.DrawString("Thêm", addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
+                    }
+                }
+
+                if (IsDraggingSlideThumbnail && IsDraggingBottomSlideThumbnail && PotentialDragSlideIndex >= 0 && PotentialDragSlideIndex < Presentation.Slides.Count)
+                {
+                    SlideNode dragSlide = Presentation.Slides[PotentialDragSlideIndex];
+                    EnsureSlideThumbnail(dragSlide);
+                    int ghostX = Math.Max(viewportX + 2, Math.Min(viewportX + viewportW - cardW - 2, CurrentDragSlideMouse.X - cardW / 2));
+                    Rectangle ghostRect = new Rectangle(ghostX, cardY - 2, cardW, cardH);
+                    using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                    {
+                        g.FillRectangle(shadowBr, ghostRect.X + 2, ghostRect.Y + 3, ghostRect.Width, ghostRect.Height);
+                    }
+                    using (SolidBrush ghostBg = new SolidBrush(Color.FromArgb(230, 255, 255, 255)))
+                    {
+                        g.FillRectangle(ghostBg, ghostRect);
+                    }
+                    if (dragSlide.ThumbnailCache != null)
+                    {
+                        g.DrawImage(dragSlide.ThumbnailCache, ghostRect);
+                    }
+                    using (SolidBrush ghostOverlay = new SolidBrush(Color.FromArgb(45, 255, 255, 255)))
+                    using (Pen ghostPen = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
+                    {
+                        g.FillRectangle(ghostOverlay, ghostRect);
+                        g.DrawRectangle(ghostPen, ghostRect);
                     }
                 }
 
@@ -6705,11 +8865,21 @@ namespace ZenQOffice.UI
             }
         }
 
-        public bool HandleElementsDrawerClick(Point mousePos, int leftSidebarW, int contentY, int totalH, Control parentControl)
+        public bool HandleElementsDrawerClick(Point mousePos, int leftSidebarW, int contentY, int totalH, Control parentControl, MouseButtons buttons = MouseButtons.Left)
         {
             // Nếu đang mở Tab 1 (Thành phần & Hình dạng), ủy quyền xử lý click cho WPF Shape Task Pane
             if (ElementsDrawerSelectedTab == 1 && ShapeTaskPane != null)
             {
+                if (buttons == MouseButtons.Right)
+                {
+                    string rAction, rTargetId;
+                    if (ShapeTaskPane.HandleRightClick(mousePos, out rAction, out rTargetId))
+                    {
+                        if (parentControl != null) parentControl.Invalidate();
+                        return true;
+                    }
+                }
+
                 if (ShapeTaskPane.SearchBoxBounds.Contains(mousePos))
                 {
                     if (_shapeSearchBox != null && _shapeSearchBox.Visible)
@@ -6737,9 +8907,25 @@ namespace ZenQOffice.UI
                         IsElementsDrawerCollapsed = !IsElementsDrawerCollapsed;
                         ZoomToFit();
                     }
+                    else if (action == "ClearSearch")
+                    {
+                        if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                        if (ShapeTaskPane != null) ShapeTaskPane.SearchText = "";
+                        if (parentControl != null) parentControl.Invalidate();
+                        return true;
+                    }
                     else if (action == "SwitchMode")
                     {
                         if (_shapeSearchBox != null) _shapeSearchBox.Text = "";
+                        if (parentControl != null) parentControl.Invalidate();
+                        return true;
+                    }
+                    else if (action == "Refresh")
+                    {
+                        if (string.IsNullOrEmpty(ShapeTaskPane.SearchText) && _shapeSearchBox != null)
+                        {
+                            _shapeSearchBox.Text = "";
+                        }
                         if (parentControl != null) parentControl.Invalidate();
                         return true;
                     }
@@ -6782,6 +8968,82 @@ namespace ZenQOffice.UI
             return true;
         }
 
+        public void SyncShapeTaskPaneRecommendation(ShapeNode shape)
+        {
+            if (ShapeTaskPane == null) return;
+            if (shape == null)
+            {
+                ShapeTaskPane.ClearActiveRecommendation();
+                return;
+            }
+
+            ShapePresetItem preset = null;
+            if (!string.IsNullOrEmpty(shape.PresetId))
+            {
+                preset = WpfShapeLibrary.FindPreset(shape.PresetId);
+            }
+
+            if (preset == null && !string.IsNullOrEmpty(shape.ImagePath))
+            {
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(shape.ImagePath);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    preset = WpfShapeLibrary.FindPreset(fileName);
+                }
+
+                if (preset == null)
+                {
+                    string lowerPath = shape.ImagePath.ToLowerInvariant();
+                    string matchedCat = null;
+                    if (lowerPath.Contains("vietnam") || lowerPath.Contains("pride")) matchedCat = "Online_vietnam_pride";
+                    else if (lowerPath.Contains("gold_luxury")) matchedCat = "Online_gold_luxury";
+                    else if (lowerPath.Contains("golden_foliage")) matchedCat = "Online_golden_foliage";
+                    else if (lowerPath.Contains("silk_fabrics") || lowerPath.Contains("silk")) matchedCat = "Online_silk_fabrics";
+                    else if (lowerPath.Contains("modern_gradients") || lowerPath.Contains("gradient")) matchedCat = "Online_modern_gradients";
+                    else if (lowerPath.Contains("grass_bushes") || lowerPath.Contains("bush") || lowerPath.Contains("grass")) matchedCat = "Online_grass_bushes";
+
+                    if (!string.IsNullOrEmpty(matchedCat))
+                    {
+                        preset = new ShapePresetItem
+                        {
+                            Id = shape.Id ?? Guid.NewGuid().ToString("N"),
+                            Name = shape.Name ?? "Graphic",
+                            Category = matchedCat,
+                            IsOnlineImage = true
+                        };
+                    }
+                }
+            }
+
+            if (preset == null)
+            {
+                string presetId = null;
+                switch (shape.Type)
+                {
+                    case ShapeType.Rectangle: presetId = "rect_standard"; break;
+                    case ShapeType.RoundedRectangle: presetId = "rect_round_md"; break;
+                    case ShapeType.Ellipse: presetId = "ellipse_circle"; break;
+                    case ShapeType.Triangle: presetId = "triangle"; break;
+                    case ShapeType.Diamond: presetId = "diamond"; break;
+                    case ShapeType.Star: presetId = "star_5"; break;
+                    case ShapeType.Line: presetId = "line_solid"; break;
+                }
+                if (!string.IsNullOrEmpty(presetId))
+                {
+                    preset = WpfShapeLibrary.FindPreset(presetId);
+                }
+            }
+
+            if (preset != null)
+            {
+                ShapeTaskPane.TriggerRecommendationFor(preset);
+            }
+            else
+            {
+                ShapeTaskPane.ClearActiveRecommendation();
+            }
+        }
+
         public void InsertShapeFromPreset(string presetId)
         {
             if (ActiveSlide == null) return;
@@ -6793,6 +9055,18 @@ namespace ZenQOffice.UI
             {
                 string localPath = ZenQOffice.Core.OnlineImagesManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
                 Bitmap bmp = ZenQOffice.Core.OnlineImagesManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl, 1920);
+                if (bmp == null)
+                {
+                    try
+                    {
+                        var dlTask = ZenQOffice.Core.OnlineImagesManager.GetOrDownloadImageAsync(preset.Id, preset.ImageUrl, 1920);
+                        if (dlTask.Wait(2500) && dlTask.Result != null)
+                        {
+                            bmp = dlTask.Result;
+                        }
+                    }
+                    catch { }
+                }
 
                 float imgW = 480f;
                 float imgH = 320f;
@@ -6815,6 +9089,7 @@ namespace ZenQOffice.UI
                 ShapeNode imgShape = new ShapeNode
                 {
                     Id = Guid.NewGuid().ToString("N"),
+                    PresetId = preset.Id,
                     Name = !string.IsNullOrEmpty(preset.Name) ? preset.Name : "Hình ảnh Stock 4K",
                     Type = ShapeType.Image,
                     IsSvg = false,
@@ -6834,6 +9109,11 @@ namespace ZenQOffice.UI
                 SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
                 SelectedShapeIndices.Clear();
                 SelectedShapeIndices.Add(SelectedShapeIndex);
+                if (SidebarPanel == SidebarPanelType.ColorPalettePicker && IsSidebarOpen)
+                {
+                    ActiveColorPickerTarget = ColorPickerTarget.GraphicColor;
+                    SyncHSVFromActiveSelection();
+                }
                 if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
@@ -6843,6 +9123,18 @@ namespace ZenQOffice.UI
             {
                 string localPath = ZenQOffice.Core.OnlineGraphicsManager.GetCachedImagePath(preset.Id, preset.ImageUrl);
                 Bitmap bmp = ZenQOffice.Core.OnlineGraphicsManager.GetCachedOrDownloadImage(preset.Id, preset.ImageUrl, 1600);
+                if (bmp == null)
+                {
+                    try
+                    {
+                        var dlTask = ZenQOffice.Core.OnlineGraphicsManager.GetOrDownloadImageAsync(preset.Id, preset.ImageUrl);
+                        if (dlTask.Wait(2500) && dlTask.Result != null)
+                        {
+                            bmp = dlTask.Result;
+                        }
+                    }
+                    catch { }
+                }
                 if (bmp == null && localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(localPath))
                 {
                     try
@@ -6873,6 +9165,7 @@ namespace ZenQOffice.UI
                 ShapeNode imgShape = new ShapeNode
                 {
                     Id = Guid.NewGuid().ToString("N"),
+                    PresetId = preset.Id,
                     Name = !string.IsNullOrEmpty(preset.Name) ? preset.Name : "Minh họa Vector",
                     Type = ShapeType.Image,
                     IsSvg = localPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase),
@@ -6890,6 +9183,11 @@ namespace ZenQOffice.UI
                 SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
                 SelectedShapeIndices.Clear();
                 SelectedShapeIndices.Add(SelectedShapeIndex);
+                if (SidebarPanel == SidebarPanelType.ColorPalettePicker && IsSidebarOpen)
+                {
+                    ActiveColorPickerTarget = ColorPickerTarget.GraphicColor;
+                    SyncHSVFromActiveSelection();
+                }
                 if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
@@ -6902,6 +9200,7 @@ namespace ZenQOffice.UI
 
             ShapeNode shape = new ShapeNode
             {
+                PresetId = presetId,
                 Type = ShapeType.CustomPath,
                 CustomPath = preset.CreatePath(w, h),
                 PathWidth = w,
@@ -6946,6 +9245,11 @@ namespace ZenQOffice.UI
             SelectedShapeIndex = ActiveSlide.Shapes.Count - 1;
             SelectedShapeIndices.Clear();
             SelectedShapeIndices.Add(SelectedShapeIndex);
+            if (SidebarPanel == SidebarPanelType.ColorPalettePicker && IsSidebarOpen)
+            {
+                ActiveColorPickerTarget = ColorPickerTarget.ShapeFill;
+                SyncHSVFromActiveSelection();
+            }
             if (ParentControl != null && ParentControl.CanFocus) ParentControl.Focus();
             if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
@@ -6973,6 +9277,10 @@ namespace ZenQOffice.UI
             else if (action == "app:chart")
             {
                 InsertPresetVectorIcon("Chart");
+            }
+            else if (action == "app:icons")
+            {
+                OpenGraphicsDrawer();
             }
             else if (action == "font:import")
             {
@@ -7040,10 +9348,10 @@ namespace ZenQOffice.UI
             if (parentControl != null) parentControl.Invalidate();
         }
 
-        public bool HandleBottomThumbnailStripClick(Point mousePos, int canvasX, int bottomY, int canvasW, int bottomH, Control parentControl)
+        public bool HandleBottomThumbnailStripClick(Point mousePos, int canvasX, int bottomY, int canvasW, int bottomH, Control parentControl, MouseButtons buttons = MouseButtons.Left)
         {
             // 0. Drag hoặc click thanh cuộn nhỏ ở dưới
-            if (!BottomThumbScrollBarThumbRect.IsEmpty && BottomThumbScrollBarThumbRect.Contains(mousePos))
+            if (buttons == MouseButtons.Left && !BottomThumbScrollBarThumbRect.IsEmpty && BottomThumbScrollBarThumbRect.Contains(mousePos))
             {
                 IsDraggingBottomThumbScrollBar = true;
                 _bottomThumbScrollDragStartMouseX = mousePos.X;
@@ -7052,7 +9360,7 @@ namespace ZenQOffice.UI
                 TargetBottomThumbScrollX = BottomThumbScrollX;
                 return true;
             }
-            if (!BottomThumbScrollBarTrackRect.IsEmpty && BottomThumbScrollBarTrackRect.Contains(mousePos))
+            if (buttons == MouseButtons.Left && !BottomThumbScrollBarTrackRect.IsEmpty && BottomThumbScrollBarTrackRect.Contains(mousePos))
             {
                 int totalBottomWidth = (Presentation != null ? Presentation.Slides.Count : 0) * (86 + 10) + 60;
                 int trackW = BottomThumbScrollBarTrackRect.Width;
@@ -7071,27 +9379,106 @@ namespace ZenQOffice.UI
             Rectangle cardsViewport = new Rectangle(viewportX, bottomY, viewportW, bottomH);
 
             // 1. Nút '+ Thêm trang'
-            if (!BtnBottomAddSlideBounds.IsEmpty && cardsViewport.Contains(mousePos) && BtnBottomAddSlideBounds.Contains(mousePos))
+            if (buttons == MouseButtons.Left && !BtnBottomAddSlideBounds.IsEmpty && cardsViewport.Contains(mousePos) && BtnBottomAddSlideBounds.Contains(mousePos))
             {
+                EmptyGapInsertAfterSlideIndex = -1;
                 AddSlide();
                 if (parentControl != null) parentControl.Invalidate();
                 return true;
             }
 
-            // 2. Click chọn thẻ slide
+            // 2. Click chọn thẻ slide (Trái hoặc Phải)
             for (int i = 0; i < BottomSlideThumbBounds.Count; i++)
             {
                 if (cardsViewport.Contains(mousePos) && BottomSlideThumbBounds[i].Contains(mousePos) && Presentation != null && i < Presentation.Slides.Count)
                 {
+                    EmptyGapInsertAfterSlideIndex = -1;
                     ActiveSlideIndex = i;
                     SelectedShapeIndex = -1;
                     SelectedShapeIndices.Clear();
+                    if (buttons == MouseButtons.Right)
+                    {
+                        ShowThumbnailContextMenu(parentControl, mousePos, i);
+                        return true;
+                    }
+                    else if (buttons == MouseButtons.Left)
+                    {
+                        PotentialDragSlideIndex = i;
+                        DragSlideStartMouse = mousePos;
+                        CurrentDragSlideMouse = mousePos;
+                        IsDraggingSlideThumbnail = false;
+                        IsDraggingBottomSlideThumbnail = true;
+                        DragTargetSlideInsertIndex = i;
+                    }
+                    if (parentControl != null) parentControl.Invalidate();
+                    return true;
+                }
+            }
+
+            // 3. Click vào khoảng trống giữa các thẻ hoặc bên phải thẻ cuối cùng
+            if (cardsViewport.Contains(mousePos) && Presentation != null)
+            {
+                int insertAfterIdx = Presentation.Slides.Count - 1;
+                for (int i = 0; i < BottomSlideThumbBounds.Count && i < Presentation.Slides.Count; i++)
+                {
+                    int midX = BottomSlideThumbBounds[i].X + BottomSlideThumbBounds[i].Width / 2;
+                    if (mousePos.X < midX)
+                    {
+                        insertAfterIdx = i - 1;
+                        break;
+                    }
+                }
+                if (buttons == MouseButtons.Right)
+                {
+                    ShowEmptyThumbnailPaneContextMenu(parentControl, mousePos, insertAfterIdx);
+                    return true;
+                }
+                else
+                {
+                    EmptyGapInsertAfterSlideIndex = insertAfterIdx;
                     if (parentControl != null) parentControl.Invalidate();
                     return true;
                 }
             }
 
             return true;
+        }
+
+        public void ReloadPendingImages()
+        {
+            if (Presentation == null || Presentation.Slides == null) return;
+            bool anyReloaded = false;
+            foreach (var slide in Presentation.Slides)
+            {
+                if (slide == null || slide.Shapes == null) continue;
+                foreach (var shape in slide.Shapes)
+                {
+                    if (shape == null) continue;
+                    if (shape.CachedImage == null && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                    {
+                        try
+                        {
+                            if (shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                            {
+                                shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(shape.ImagePath, 1600, 1600);
+                            }
+                            else
+                            {
+                                shape.CachedImage = Image.FromFile(shape.ImagePath);
+                            }
+                            if (shape.CachedImage != null)
+                            {
+                                if (shape.OriginalWidth <= 0) shape.OriginalWidth = shape.CachedImage.Width;
+                                if (shape.OriginalHeight <= 0) shape.OriginalHeight = shape.CachedImage.Height;
+                                slide.IsThumbnailDirty = true;
+                                anyReloaded = true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            if (anyReloaded && InvalidateCallback != null) InvalidateCallback();
         }
 
         public void InsertPresetVectorIcon(string iconId)
@@ -7370,9 +9757,11 @@ namespace ZenQOffice.UI
         public void Draw(D2DGraphics g, int width, int height)
         {
             LastViewportWidth = width;
+            LastRenderWindowWidth = width;
+            LastRenderWindowHeight = height;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.Bilinear;
-            g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
             if (IsPresenting)
@@ -7384,6 +9773,13 @@ namespace ZenQOffice.UI
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             Rectangle centerViewportRect = new Rectangle(canvasX, contentY, canvasW, contentH);
+
+            // Pre-fill the entire workspace canvas background cleanly to prevent any black lines or unpainted regions (especially in Island mode)
+            Color wsBg = (ViewMode == ImpressViewMode.ReadingView) ? Color.FromArgb(32, 32, 32) : Color.FromArgb(240, 240, 240);
+            using (SolidBrush wsBrush = new SolidBrush(wsBg))
+            {
+                g.FillRectangle(wsBrush, 0, contentY, width, Math.Max(0, height - contentY));
+            }
 
             // 1. Draw Center Viewport with Clipping
             GraphicsState origState = g.Save();
@@ -7423,14 +9819,23 @@ namespace ZenQOffice.UI
             // 2. Draw Left Pane OR Elements Drawer ON TOP
             try
             {
-                if (IsElementsDrawerOpen)
+                if (IsElementsDrawerOpen && !IsElementsDrawerCollapsed && ElementsDrawerSelectedTab == 1)
                 {
                     DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
                     DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
                 }
-                else if (leftSidebarW > 0)
+                else
                 {
-                    DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+                    HideSearchBox();
+                    if (IsElementsDrawerOpen)
+                    {
+                        DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
+                        DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
+                    }
+                    else if (leftSidebarW > 0)
+                    {
+                        DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+                    }
                 }
             }
             catch (Exception ex)
@@ -7444,7 +9849,7 @@ namespace ZenQOffice.UI
                 int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
                 if (rightSidebarW > 0)
                 {
-                    DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, contentH);
+                    DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, height - contentY - 26);
                 }
             }
             catch (Exception ex)
@@ -7530,6 +9935,22 @@ namespace ZenQOffice.UI
                 using (Pen borderPen = new Pen(borderCol, 1.0f))
                 {
                     g.DrawRectangle(borderPen, slideRect);
+                }
+
+                // Authentic MS PowerPoint soft paper drop shadow around slide canvas ('đen mờ')
+                if (ViewMode != ImpressViewMode.ReadingView)
+                {
+                    int[] slideShadowAlphas = new int[] { 26, 18, 12, 7, 3, 1 };
+                    for (int s = 0; s < slideShadowAlphas.Length; s++)
+                    {
+                        using (SolidBrush shBrush = new SolidBrush(Color.FromArgb(slideShadowAlphas[s], 0, 0, 0)))
+                        {
+                            // Right shadow edge
+                            g.FillRectangle(shBrush, slideRect.Right + s, slideRect.Top + 3 + s, 1, slideRect.Height - 1);
+                            // Bottom shadow edge
+                            g.FillRectangle(shBrush, slideRect.Left + 3 + s, slideRect.Bottom + s, slideRect.Width + s, 1);
+                        }
+                    }
                 }
 
                 // 2. Render Shapes: In Normal view, shapes bleed freely onto the pasteboard canvas like PowerPoint.
@@ -7758,6 +10179,18 @@ namespace ZenQOffice.UI
                     Color.FromArgb(148, 163, 184),
                     Color.FromArgb(210, 71, 38),
                     "Nhấp để thêm ghi chú");
+            }
+            else if (IsHoverNotesSplitter || IsDraggingNotesSplitter)
+            {
+                using (Pen splitPen = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
+                {
+                    g.DrawLine(splitPen, x, y + stageH - 1, x + w, y + stageH - 1);
+                }
+                Rectangle pillRect = new Rectangle(x + w / 2 - 18, y + stageH - 3, 36, 3);
+                using (SolidBrush pillBrush = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    FillRoundedPill(g, pillBrush, pillRect);
+                }
             }
 
             // Render Chroma Key Eyedropper Loupe on Top
@@ -8139,38 +10572,78 @@ namespace ZenQOffice.UI
         {
             bool animating = false;
 
-            // 1. Left Thumbnail Pane (ThumbScrollY) - Hiệu ứng cuộn siêu nhẹ, êm mượt chuẩn MS Office PowerPoint
+            if (IsDraggingSlideThumbnail && PotentialDragSlideIndex >= 0)
+            {
+                int w = Math.Max(800, LastRenderWindowWidth);
+                int h = Math.Max(600, LastRenderWindowHeight);
+                int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+                GetEffectiveLayoutMetrics(w, h, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
+
+                if (IsDraggingBottomSlideThumbnail)
+                {
+                    int viewportX = canvasX + 16;
+                    int viewportW = Math.Max(50, canvasW - 16 - 120);
+                    int totalBottomWidth = (Presentation != null ? Presentation.Slides.Count : 0) * (86 + 10) + 60;
+                    int maxScroll = Math.Max(0, totalBottomWidth - viewportW);
+                    if (CurrentDragSlideMouse.X < viewportX + 26 && TargetBottomThumbScrollX > 0)
+                    {
+                        TargetBottomThumbScrollX = Math.Max(0, TargetBottomThumbScrollX - 10);
+                        UpdateDragSlideTargetFromMouse(CurrentDragSlideMouse, w, h);
+                        animating = true;
+                    }
+                    else if (CurrentDragSlideMouse.X > viewportX + viewportW - 26 && TargetBottomThumbScrollX < maxScroll)
+                    {
+                        TargetBottomThumbScrollX = Math.Min(maxScroll, TargetBottomThumbScrollX + 10);
+                        UpdateDragSlideTargetFromMouse(CurrentDragSlideMouse, w, h);
+                        animating = true;
+                    }
+                }
+                else
+                {
+                    bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                    int islandMarginTop = 3;
+                    int islandMarginBtm = 8;
+                    int viewTop = (isIsland ? (contentY + islandMarginTop) : contentY) + 44;
+                    int paneH = isIsland ? (contentH - islandMarginTop - islandMarginBtm) : contentH;
+                    int viewH = Math.Max(10, paneH - 48);
+                    int maxScroll = GetMaxThumbScrollY();
+                    if (CurrentDragSlideMouse.Y < viewTop + 20 && TargetThumbScrollY > 0)
+                    {
+                        TargetThumbScrollY = Math.Max(0, TargetThumbScrollY - 10);
+                        UpdateDragSlideTargetFromMouse(CurrentDragSlideMouse, w, h);
+                        animating = true;
+                    }
+                    else if (CurrentDragSlideMouse.Y > viewTop + viewH - 20 && TargetThumbScrollY < maxScroll)
+                    {
+                        TargetThumbScrollY = Math.Min(maxScroll, TargetThumbScrollY + 10);
+                        UpdateDragSlideTargetFromMouse(CurrentDragSlideMouse, w, h);
+                        animating = true;
+                    }
+                }
+            }
+
+            // 1. Left Thumbnail Pane (ThumbScrollY) - Nội suy êm 55ms, cắt đuôi dừng gọn không trôi
             int maxThumbScroll = GetMaxThumbScrollY();
             TargetThumbScrollY = Math.Max(0, Math.Min(maxThumbScroll, (float)Math.Round(TargetThumbScrollY)));
             int prevThumbInt = (int)Math.Round(SmoothThumbScrollY);
             int targetThumbInt = (int)TargetThumbScrollY;
+            float diffThumb = TargetThumbScrollY - SmoothThumbScrollY;
 
-            if (prevThumbInt == targetThumbInt)
+            if (Math.Abs(diffThumb) <= 1.5f || prevThumbInt == targetThumbInt)
             {
                 if (SmoothThumbScrollY != TargetThumbScrollY || ThumbScrollY != targetThumbInt)
                 {
                     SmoothThumbScrollY = TargetThumbScrollY;
                     ThumbScrollY = targetThumbInt;
+                    animating = true;
                 }
             }
             else
             {
-                float diffThumb = TargetThumbScrollY - SmoothThumbScrollY;
-                float step = diffThumb * 0.24f; // Damping siêu nhẹ êm ái
-                float maxStep = 60f; // Giới hạn tốc độ không bị giật dồn dập
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+                float step = diffThumb * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffThumb) * Math.Min(Math.Abs(diffThumb), 2.0f);
                 float nextSmooth = SmoothThumbScrollY + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                // Luôn tiến tối thiểu 1 pixel mỗi frame, triệt tiêu 100% hiện tượng dừng 1 rồi 0 rồi 1
-                if (nextInt == prevThumbInt)
-                {
-                    nextInt = prevThumbInt + Math.Sign(diffThumb);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diffThumb > 0 && nextInt >= targetThumbInt) || (diffThumb < 0 && nextInt <= targetThumbInt))
+                if (Math.Abs(TargetThumbScrollY - nextSmooth) <= 1.5f)
                 {
                     SmoothThumbScrollY = TargetThumbScrollY;
                     ThumbScrollY = targetThumbInt;
@@ -8178,7 +10651,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     SmoothThumbScrollY = Math.Max(0, Math.Min(maxThumbScroll, nextSmooth));
-                    ThumbScrollY = nextInt;
+                    ThumbScrollY = (int)Math.Round(SmoothThumbScrollY);
                 }
                 animating = true;
             }
@@ -8187,32 +10660,23 @@ namespace ZenQOffice.UI
             TargetBottomThumbScrollX = (float)Math.Round(TargetBottomThumbScrollX);
             int prevBottomInt = (int)Math.Round(SmoothBottomThumbScrollX);
             int targetBottomInt = (int)TargetBottomThumbScrollX;
+            float diffBottom = TargetBottomThumbScrollX - SmoothBottomThumbScrollX;
 
-            if (prevBottomInt == targetBottomInt)
+            if (Math.Abs(diffBottom) <= 1.5f || prevBottomInt == targetBottomInt)
             {
                 if (SmoothBottomThumbScrollX != TargetBottomThumbScrollX || BottomThumbScrollX != targetBottomInt)
                 {
                     SmoothBottomThumbScrollX = TargetBottomThumbScrollX;
                     BottomThumbScrollX = targetBottomInt;
+                    animating = true;
                 }
             }
             else
             {
-                float diffBottom = TargetBottomThumbScrollX - SmoothBottomThumbScrollX;
-                float step = diffBottom * 0.24f;
-                float maxStep = 60f;
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+                float step = diffBottom * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffBottom) * Math.Min(Math.Abs(diffBottom), 2.0f);
                 float nextSmooth = SmoothBottomThumbScrollX + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                if (nextInt == prevBottomInt)
-                {
-                    nextInt = prevBottomInt + Math.Sign(diffBottom);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diffBottom > 0 && nextInt >= targetBottomInt) || (diffBottom < 0 && nextInt <= targetBottomInt))
+                if (Math.Abs(TargetBottomThumbScrollX - nextSmooth) <= 1.5f)
                 {
                     SmoothBottomThumbScrollX = TargetBottomThumbScrollX;
                     BottomThumbScrollX = targetBottomInt;
@@ -8220,7 +10684,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     SmoothBottomThumbScrollX = nextSmooth;
-                    BottomThumbScrollX = nextInt;
+                    BottomThumbScrollX = (int)Math.Round(SmoothBottomThumbScrollX);
                 }
                 animating = true;
             }
@@ -8229,32 +10693,23 @@ namespace ZenQOffice.UI
             TargetCanvasScrollY = (float)Math.Round(TargetCanvasScrollY);
             int prevCanvasYInt = (int)Math.Round(SmoothCanvasScrollY);
             int targetCanvasYInt = (int)TargetCanvasScrollY;
+            float diffCanvasY = TargetCanvasScrollY - SmoothCanvasScrollY;
 
-            if (prevCanvasYInt == targetCanvasYInt)
+            if (Math.Abs(diffCanvasY) <= 1.5f || prevCanvasYInt == targetCanvasYInt)
             {
                 if (SmoothCanvasScrollY != TargetCanvasScrollY || CanvasScrollY != targetCanvasYInt)
                 {
                     SmoothCanvasScrollY = TargetCanvasScrollY;
                     CanvasScrollY = targetCanvasYInt;
+                    animating = true;
                 }
             }
             else
             {
-                float diffCanvasY = TargetCanvasScrollY - SmoothCanvasScrollY;
-                float step = diffCanvasY * 0.25f;
-                float maxStep = 80f;
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+                float step = diffCanvasY * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffCanvasY) * Math.Min(Math.Abs(diffCanvasY), 2.0f);
                 float nextSmooth = SmoothCanvasScrollY + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                if (nextInt == prevCanvasYInt)
-                {
-                    nextInt = prevCanvasYInt + Math.Sign(diffCanvasY);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diffCanvasY > 0 && nextInt >= targetCanvasYInt) || (diffCanvasY < 0 && nextInt <= targetCanvasYInt))
+                if (Math.Abs(TargetCanvasScrollY - nextSmooth) <= 1.5f)
                 {
                     SmoothCanvasScrollY = TargetCanvasScrollY;
                     CanvasScrollY = targetCanvasYInt;
@@ -8262,7 +10717,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     SmoothCanvasScrollY = nextSmooth;
-                    CanvasScrollY = nextInt;
+                    CanvasScrollY = (int)Math.Round(SmoothCanvasScrollY);
                 }
                 animating = true;
             }
@@ -8271,32 +10726,23 @@ namespace ZenQOffice.UI
             TargetCanvasScrollX = (float)Math.Round(TargetCanvasScrollX);
             int prevCanvasXInt = (int)Math.Round(SmoothCanvasScrollX);
             int targetCanvasXInt = (int)TargetCanvasScrollX;
+            float diffCanvasX = TargetCanvasScrollX - SmoothCanvasScrollX;
 
-            if (prevCanvasXInt == targetCanvasXInt)
+            if (Math.Abs(diffCanvasX) <= 1.5f || prevCanvasXInt == targetCanvasXInt)
             {
                 if (SmoothCanvasScrollX != TargetCanvasScrollX || CanvasScrollX != targetCanvasXInt)
                 {
                     SmoothCanvasScrollX = TargetCanvasScrollX;
                     CanvasScrollX = targetCanvasXInt;
+                    animating = true;
                 }
             }
             else
             {
-                float diffCanvasX = TargetCanvasScrollX - SmoothCanvasScrollX;
-                float step = diffCanvasX * 0.25f;
-                float maxStep = 80f;
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+                float step = diffCanvasX * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffCanvasX) * Math.Min(Math.Abs(diffCanvasX), 2.0f);
                 float nextSmooth = SmoothCanvasScrollX + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                if (nextInt == prevCanvasXInt)
-                {
-                    nextInt = prevCanvasXInt + Math.Sign(diffCanvasX);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diffCanvasX > 0 && nextInt >= targetCanvasXInt) || (diffCanvasX < 0 && nextInt <= targetCanvasXInt))
+                if (Math.Abs(TargetCanvasScrollX - nextSmooth) <= 1.5f)
                 {
                     SmoothCanvasScrollX = TargetCanvasScrollX;
                     CanvasScrollX = targetCanvasXInt;
@@ -8304,7 +10750,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     SmoothCanvasScrollX = nextSmooth;
-                    CanvasScrollX = nextInt;
+                    CanvasScrollX = (int)Math.Round(SmoothCanvasScrollX);
                 }
                 animating = true;
             }
@@ -8313,32 +10759,23 @@ namespace ZenQOffice.UI
             TargetElementsScrollY = (float)Math.Round(TargetElementsScrollY);
             int prevElemInt = (int)Math.Round(SmoothElementsScrollY);
             int targetElemInt = (int)TargetElementsScrollY;
+            float diffElem = TargetElementsScrollY - SmoothElementsScrollY;
 
-            if (prevElemInt == targetElemInt)
+            if (Math.Abs(diffElem) <= 1.5f || prevElemInt == targetElemInt)
             {
                 if (SmoothElementsScrollY != TargetElementsScrollY || ElementsScrollY != targetElemInt)
                 {
                     SmoothElementsScrollY = TargetElementsScrollY;
                     ElementsScrollY = targetElemInt;
+                    animating = true;
                 }
             }
             else
             {
-                float diffElem = TargetElementsScrollY - SmoothElementsScrollY;
-                float step = diffElem * 0.25f;
-                float maxStep = 80f;
-                if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+                float step = diffElem * 0.45f;
+                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffElem) * Math.Min(Math.Abs(diffElem), 2.0f);
                 float nextSmooth = SmoothElementsScrollY + step;
-                int nextInt = (int)Math.Round(nextSmooth);
-
-                if (nextInt == prevElemInt)
-                {
-                    nextInt = prevElemInt + Math.Sign(diffElem);
-                    nextSmooth = nextInt;
-                }
-
-                if ((diffElem > 0 && nextInt >= targetElemInt) || (diffElem < 0 && nextInt <= targetElemInt))
+                if (Math.Abs(TargetElementsScrollY - nextSmooth) <= 1.5f)
                 {
                     SmoothElementsScrollY = TargetElementsScrollY;
                     ElementsScrollY = targetElemInt;
@@ -8346,7 +10783,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     SmoothElementsScrollY = nextSmooth;
-                    ElementsScrollY = nextInt;
+                    ElementsScrollY = (int)Math.Round(SmoothElementsScrollY);
                 }
                 animating = true;
             }
@@ -8376,19 +10813,25 @@ namespace ZenQOffice.UI
                 // Fill behind island panel with workspace background so margins are seamless
                 using (SolidBrush wsBrush = new SolidBrush(Color.FromArgb(240, 240, 240)))
                 {
-                    g.FillRectangle(wsBrush, 0, y, sidebarW, h);
+                    g.FillRectangle(wsBrush, 0, y, sidebarW + islandMarginX, h);
                 }
 
-                // Island Card: Fluent 2 drop shadows for authentic floating card elevation
-                using (GraphicsPath sp1 = CreateRoundedRectPath(new RectangleF(paneRect.X, paneRect.Y + 1.5f, paneRect.Width, paneRect.Height), 8f))
-                using (SolidBrush sb1 = new SolidBrush(Color.FromArgb(8, 0, 0, 0)))
+                // Island Card: Fluent 2 subtle concentric drop shadows ("bo theo góc")
+                float[] spOffsetsY = new float[] { 0.8f, 1.5f, 2.4f, 3.4f };
+                float[] spExpands = new float[] { 0.4f, 0.8f, 1.4f, 2.0f };
+                int[] spAlphas = new int[] { 5, 4, 3, 2 };
+                for (int si = 0; si < spOffsetsY.Length; si++)
                 {
-                    g.FillPath(sb1, sp1);
-                }
-                using (GraphicsPath sp2 = CreateRoundedRectPath(new RectangleF(paneRect.X, paneRect.Y + 3.5f, paneRect.Width, paneRect.Height), 9f))
-                using (SolidBrush sb2 = new SolidBrush(Color.FromArgb(12, 0, 0, 0)))
-                {
-                    g.FillPath(sb2, sp2);
+                    RectangleF sRect = new RectangleF(
+                        paneRect.X - spExpands[si],
+                        paneRect.Y + spOffsetsY[si],
+                        paneRect.Width + spExpands[si] * 2f,
+                        paneRect.Height);
+                    using (GraphicsPath sp = CreateRoundedRectPath(sRect, 8f + spExpands[si]))
+                    using (SolidBrush sb = new SolidBrush(Color.FromArgb(spAlphas[si], 0, 0, 0)))
+                    {
+                        g.FillPath(sb, sp);
+                    }
                 }
 
                 // Island Card Surface (Pure White with subtle border)
@@ -8471,12 +10914,24 @@ namespace ZenQOffice.UI
                         continue;
                     }
 
+                    if (IsDraggingSlideThumbnail && !IsDraggingBottomSlideThumbnail && DragTargetSlideInsertIndex == i)
+                    {
+                        int insY = thumbY - 7;
+                        using (Pen insPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                        using (SolidBrush insDot = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                        {
+                            g.DrawLine(insPen, actualThumbX - 4, insY, actualThumbX + thumbW + 4, insY);
+                            g.FillEllipse(insDot, actualThumbX - 7, insY - 3, 6, 6);
+                            g.FillEllipse(insDot, actualThumbX + thumbW + 1, insY - 3, 6, 6);
+                        }
+                    }
+
                     Rectangle frameRect = new Rectangle(actualThumbX, thumbY, thumbW, thumbH);
 
                     if (thumbY + thumbH >= viewTop - 10 && thumbY <= viewTop + viewH + 20)
                     {
                         // Slide number badge
-                        Brush numBrush = (i == ActiveSlideIndex) ? new SolidBrush(Color.FromArgb(210, 71, 38)) : Brushes.Gray;
+                        Brush numBrush = (i == ActiveSlideIndex && EmptyGapInsertAfterSlideIndex == -1) ? new SolidBrush(Color.FromArgb(210, 71, 38)) : Brushes.Gray;
                         g.DrawString((i + 1).ToString(), numFont, numBrush, paneRect.X + 8, thumbY + thumbH / 2 - 8);
 
                         // Hidden Slide Number Slashed Box (chuẩn PowerPoint)
@@ -8506,9 +10961,18 @@ namespace ZenQOffice.UI
                             g.DrawImage(s.ThumbnailCache, frameRect);
                         }
 
+                        if (IsDraggingSlideThumbnail && !IsDraggingBottomSlideThumbnail && PotentialDragSlideIndex == i)
+                        {
+                            using (SolidBrush dragDim = new SolidBrush(Color.FromArgb(110, 255, 255, 255)))
+                            {
+                                g.FillRectangle(dragDim, frameRect);
+                            }
+                        }
+
                         // Active PowerPoint Orange Border (drawn ON TOP to frame content cleanly)
-                        Color frameCol = (i == ActiveSlideIndex) ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
-                        using (Pen framePen = new Pen(frameCol, (i == ActiveSlideIndex) ? 2.5f : 1.0f))
+                        bool isActiveBorder = (i == ActiveSlideIndex && EmptyGapInsertAfterSlideIndex == -1);
+                        Color frameCol = isActiveBorder ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
+                        using (Pen framePen = new Pen(frameCol, isActiveBorder ? 2.5f : 1.0f))
                         {
                             g.DrawRectangle(framePen, frameRect);
                         }
@@ -8527,7 +10991,54 @@ namespace ZenQOffice.UI
                         }
                     }
 
+                    if (!IsDraggingSlideThumbnail && EmptyGapInsertAfterSlideIndex == i)
+                    {
+                        int gapLineY = thumbY + thumbH + 7;
+                        using (Pen gapPen = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
+                        {
+                            g.DrawLine(gapPen, actualThumbX, gapLineY, actualThumbX + thumbW, gapLineY);
+                        }
+                    }
+
                     thumbY += thumbH + 14;
+                }
+
+                if (IsDraggingSlideThumbnail && !IsDraggingBottomSlideThumbnail && DragTargetSlideInsertIndex >= Presentation.Slides.Count)
+                {
+                    int insY = thumbY - 7;
+                    using (Pen insPen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                    using (SolidBrush insDot = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                    {
+                        g.DrawLine(insPen, actualThumbX - 4, insY, actualThumbX + thumbW + 4, insY);
+                        g.FillEllipse(insDot, actualThumbX - 7, insY - 3, 6, 6);
+                        g.FillEllipse(insDot, actualThumbX + thumbW + 1, insY - 3, 6, 6);
+                    }
+                }
+
+                if (IsDraggingSlideThumbnail && !IsDraggingBottomSlideThumbnail && PotentialDragSlideIndex >= 0 && PotentialDragSlideIndex < Presentation.Slides.Count)
+                {
+                    SlideNode dragSlide = Presentation.Slides[PotentialDragSlideIndex];
+                    EnsureSlideThumbnail(dragSlide);
+                    int ghostY = Math.Max(viewTop + 2, Math.Min(viewTop + viewH - thumbH - 2, CurrentDragSlideMouse.Y - thumbH / 2));
+                    Rectangle ghostRect = new Rectangle(actualThumbX + 4, ghostY, thumbW, thumbH);
+                    using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                    {
+                        g.FillRectangle(shadowBr, ghostRect.X + 3, ghostRect.Y + 4, ghostRect.Width, ghostRect.Height);
+                    }
+                    using (SolidBrush ghostBg = new SolidBrush(Color.FromArgb(230, 255, 255, 255)))
+                    {
+                        g.FillRectangle(ghostBg, ghostRect);
+                    }
+                    if (dragSlide.ThumbnailCache != null)
+                    {
+                        g.DrawImage(dragSlide.ThumbnailCache, ghostRect);
+                    }
+                    using (SolidBrush ghostOverlay = new SolidBrush(Color.FromArgb(45, 255, 255, 255)))
+                    using (Pen ghostPen = new Pen(Color.FromArgb(210, 71, 38), 2.0f))
+                    {
+                        g.FillRectangle(ghostOverlay, ghostRect);
+                        g.DrawRectangle(ghostPen, ghostRect);
+                    }
                 }
             }
 
@@ -8715,6 +11226,16 @@ namespace ZenQOffice.UI
                 g.DrawLine(borderPen, x, y, x, y + h);
             }
 
+            // Authentic soft elevation shadow casting to the left over workspace ('đen mờ')
+            int[] rightShadowAlphas = new int[] { 14, 9, 5, 2 };
+            for (int s = 0; s < rightShadowAlphas.Length; s++)
+            {
+                using (Pen sp = new Pen(Color.FromArgb(rightShadowAlphas[s], 0, 0, 0), 1f))
+                {
+                    g.DrawLine(sp, x - 1 - s, y, x - 1 - s, y + h);
+                }
+            }
+
             // Microsoft PowerPoint Task Pane Header:
             string paneTitle = "Khung Hoạt Họa";
             if (SidebarPanel == SidebarPanelType.Properties) paneTitle = "Định Dạng Hình Dạng";
@@ -8723,6 +11244,18 @@ namespace ZenQOffice.UI
             else if (SidebarPanel == SidebarPanelType.FormatBackground) paneTitle = "Format Background";
             else if (SidebarPanel == SidebarPanelType.SelectionPane) paneTitle = "Lựa chọn (Selection)";
             else if (SidebarPanel == SidebarPanelType.Designer) paneTitle = "✨ Ý Tưởng Thiết Kế (Designer)";
+            else if (SidebarPanel == SidebarPanelType.GraphicEditor) paneTitle = "Chỉnh sửa";
+            else if (SidebarPanel == SidebarPanelType.ColorPalettePicker)
+            {
+                ShapeNode sel = SelectedShape;
+                bool isGraphic = IsRasterOrSvgGraphic(sel);
+                if (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor) paneTitle = isGraphic ? "Màu đồ họa" : "Màu hình dạng";
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill) paneTitle = "Màu hình dạng";
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke) paneTitle = "Màu viền";
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor) paneTitle = "Màu chữ";
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke) paneTitle = "Màu viền chữ";
+                else paneTitle = "Màu sắc";
+            }
 
             Rectangle headerRect = new Rectangle(x, y, w, 36);
             using (SolidBrush headerBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
@@ -8747,6 +11280,9 @@ namespace ZenQOffice.UI
             }
 
             int panelY = y + 42 + SidebarScrollY;
+
+            GraphicsState sidebarClipState = g.Save();
+            g.IntersectClip(new Rectangle(x, y + 37, w, Math.Max(1, h - 37)));
 
             using (Font titleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
             using (Font labelFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
@@ -8781,6 +11317,697 @@ namespace ZenQOffice.UI
                     case SidebarPanelType.Designer:
                         DrawDesignerPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
                         break;
+
+                    case SidebarPanelType.GraphicEditor:
+                        DrawGraphicEditorPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+                    case SidebarPanelType.ColorPalettePicker:
+                        DrawColorPickerPaneContent(g, x, panelY, w, h - 42, titleFont, labelFont, boldFont);
+                        break;
+                }
+            }
+            g.Restore(sidebarClipState);
+        }
+
+        private static readonly int[][] ColorGradientPresets = new int[][]
+        {
+            new int[] { unchecked((int)0xFF000000), unchecked((int)0xFF737373) },
+            new int[] { unchecked((int)0xFF334155), unchecked((int)0xFFD97706) },
+            new int[] { unchecked((int)0xFFEF4444), unchecked((int)0xFFF472B6) },
+            new int[] { unchecked((int)0xFFEC4899), unchecked((int)0xFFFDE047) },
+            new int[] { unchecked((int)0xFFA855F7), unchecked((int)0xFFFB7185) },
+            new int[] { unchecked((int)0xFF7C3AED), unchecked((int)0xFFEC4899), unchecked((int)0xFFFBBF24) },
+            new int[] { unchecked((int)0xFF4F46E5), unchecked((int)0xFFC084FC) },
+            new int[] { unchecked((int)0xFF1E3A8A), unchecked((int)0xFFEC4899) },
+            new int[] { unchecked((int)0xFF2563EB), unchecked((int)0xFF22D3EE) },
+            new int[] { unchecked((int)0xFF0EA5E9), unchecked((int)0xFFA7F3D0) },
+            new int[] { unchecked((int)0xFF06B6D4), unchecked((int)0xFF3B82F6), unchecked((int)0xFF8B5CF6) },
+            new int[] { unchecked((int)0xFF38BDF8), unchecked((int)0xFF818CF8), unchecked((int)0xFFF472B6) },
+            new int[] { unchecked((int)0xFF059669), unchecked((int)0xFFA3E635) },
+            new int[] { unchecked((int)0xFF10B981), unchecked((int)0xFFFEF08A) },
+            new int[] { unchecked((int)0xFF14B8A6), unchecked((int)0xFFF43F5E) },
+            new int[] { unchecked((int)0xFFFDE047), unchecked((int)0xFF4ADE80), unchecked((int)0xFF06B6D4) },
+            new int[] { unchecked((int)0xFFFFEDD5), unchecked((int)0xFFFDA4AF) },
+            new int[] { unchecked((int)0xFFFEF08A), unchecked((int)0xFFF472B6), unchecked((int)0xFF60A5FA) }
+        };
+
+        private static readonly Color[] DefaultSolidColors = new Color[]
+        {
+            Color.FromArgb(0, 0, 0), Color.FromArgb(82, 82, 91), Color.FromArgb(115, 115, 115), Color.FromArgb(163, 163, 163), Color.FromArgb(212, 212, 216), Color.FromArgb(255, 255, 255),
+            Color.FromArgb(239, 68, 68), Color.FromArgb(248, 113, 113), Color.FromArgb(244, 114, 182), Color.FromArgb(232, 121, 249), Color.FromArgb(168, 85, 247), Color.FromArgb(124, 58, 237),
+            Color.FromArgb(13, 148, 136), Color.FromArgb(6, 182, 212), Color.FromArgb(56, 189, 248), Color.FromArgb(59, 130, 246), Color.FromArgb(79, 70, 229), Color.FromArgb(30, 58, 138),
+            Color.FromArgb(22, 163, 74), Color.FromArgb(74, 222, 128), Color.FromArgb(163, 230, 53), Color.FromArgb(250, 204, 21), Color.FromArgb(251, 146, 60), Color.FromArgb(234, 88, 12)
+        };
+
+        private void DrawColorPickerPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null)
+            {
+                g.DrawString("Chọn một đối tượng trên slide để đổi màu hoặc gradient.", labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
+                return;
+            }
+
+            Color fluentPurple = Color.FromArgb(124, 58, 237);
+            Color darkText = Color.FromArgb(15, 23, 42);
+            Color mutedText = Color.FromArgb(100, 116, 139);
+            Color borderGray = Color.FromArgb(226, 232, 240);
+
+            using (Font secFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font subFont = new Font("Segoe UI", 7.8f, FontStyle.Regular))
+            using (SolidBrush darkB = new SolidBrush(darkText))
+            using (SolidBrush mutedB = new SolidBrush(mutedText))
+            using (SolidBrush purpleB = new SolidBrush(fluentPurple))
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                int curY = panelY + 2;
+                DrawColorAndGradientPane(g, x, ref curY, w, shape, secFont, subFont, labelFont, boldFont, titleFont, darkB, mutedB, purpleB, fluentPurple, borderGray, sfCenter);
+            }
+        }
+
+        private void DrawColorAndGradientPane(D2DGraphics g, int x, ref int curY, int w, ShapeNode shape, Font secFont, Font subFont, Font labelFont, Font boldFont, Font titleFont, Brush darkB, Brush mutedB, Brush purpleB, Color fluentPurple, Color borderGray, StringFormat sfCenter)
+        {
+            var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+            if (SelectedGraphicColorIndex >= detectedColors.Count) SelectedGraphicColorIndex = 0;
+
+            int subTabW = (w - 24) / 2;
+            Rectangle stSolid = new Rectangle(x + 12, curY, subTabW, 26);
+            Rectangle stGrad = new Rectangle(x + 12 + subTabW, curY, subTabW, 26);
+            g.DrawString("Màu đồng nhất", GraphicColorSubTab == 0 ? secFont : labelFont, GraphicColorSubTab == 0 ? purpleB : mutedB, stSolid, sfCenter);
+            g.DrawString("Màu gradient", GraphicColorSubTab == 1 ? secFont : labelFont, GraphicColorSubTab == 1 ? purpleB : mutedB, stGrad, sfCenter);
+            using (Pen baseLine = new Pen(borderGray, 1.5f))
+                g.DrawLine(baseLine, x + 12, curY + 26, x + w - 12, curY + 26);
+            using (Pen actLine = new Pen(fluentPurple, 2.5f))
+            {
+                Rectangle uRect = (GraphicColorSubTab == 0) ? stSolid : stGrad;
+                g.DrawLine(actLine, uRect.X + 6, curY + 26, uRect.Right - 6, curY + 26);
+            }
+            curY += 34;
+
+            // Interactive 2D Saturation/Value Box
+            Rectangle svBox = new Rectangle(x + 12, curY, w - 24, 108);
+            LastSVBoxRect = svBox;
+            Color pureHue = ColorFromHSV(CustomHue, 1f, 1f);
+            using (GraphicsPath svPath = CreateRoundedRectPath(svBox, 8))
+            {
+                using (LinearGradientBrush hBrush = new LinearGradientBrush(svBox, Color.White, pureHue, LinearGradientMode.Horizontal))
+                {
+                    g.FillPath(hBrush, svPath);
+                }
+                using (LinearGradientBrush vBrush = new LinearGradientBrush(svBox, Color.FromArgb(0, 0, 0, 0), Color.FromArgb(255, 0, 0, 0), LinearGradientMode.Vertical))
+                {
+                    g.FillPath(vBrush, svPath);
+                }
+                using (Pen bPen = new Pen(borderGray, 1f))
+                {
+                    g.DrawPath(bPen, svPath);
+                }
+            }
+            int svCx = svBox.X + (int)(Math.Max(0f, Math.Min(1f, CustomSat)) * svBox.Width);
+            int svCy = svBox.Y + (int)((1f - Math.Max(0f, Math.Min(1f, CustomVal))) * svBox.Height);
+            Color curPickedColor = ColorFromHSV(CustomHue, CustomSat, CustomVal);
+            using (SolidBrush pb = new SolidBrush(curPickedColor))
+                g.FillEllipse(pb, svCx - 7, svCy - 7, 14, 14);
+            using (Pen wp = new Pen(Color.White, 2.2f))
+                g.DrawEllipse(wp, svCx - 7, svCy - 7, 14, 14);
+            using (Pen dp = new Pen(Color.FromArgb(80, 0, 0, 0), 1f))
+                g.DrawEllipse(dp, svCx - 8, svCy - 8, 16, 16);
+            curY += 116;
+
+            // Rainbow Hue Slider
+            Rectangle hueBar = new Rectangle(x + 12, curY, w - 24, 12);
+            LastHueSliderRect = hueBar;
+            using (GraphicsPath hp = CreateRoundedRectPath(hueBar, 6))
+            using (LinearGradientBrush rBrush = new LinearGradientBrush(hueBar, Color.Red, Color.Red, LinearGradientMode.Horizontal))
+            {
+                ColorBlend cb = new ColorBlend(7);
+                cb.Positions = new float[] { 0f, 1f / 6f, 2f / 6f, 3f / 6f, 4f / 6f, 5f / 6f, 1f };
+                cb.Colors = new Color[] { Color.Red, Color.Yellow, Color.Lime, Color.Cyan, Color.Blue, Color.Magenta, Color.Red };
+                rBrush.InterpolationColors = cb;
+                g.FillPath(rBrush, hp);
+            }
+            int hueThumbX = hueBar.X + (int)((Math.Max(0f, Math.Min(360f, CustomHue)) / 360f) * hueBar.Width);
+            using (SolidBrush hb = new SolidBrush(pureHue))
+                g.FillEllipse(hb, hueThumbX - 7, hueBar.Y - 2, 16, 16);
+            using (Pen wp = new Pen(Color.White, 2.2f))
+                g.DrawEllipse(wp, hueThumbX - 7, hueBar.Y - 2, 16, 16);
+            using (Pen dp = new Pen(Color.FromArgb(90, 0, 0, 0), 1f))
+                g.DrawEllipse(dp, hueThumbX - 7, hueBar.Y - 2, 16, 16);
+            curY += 20;
+
+            // Opacity/Alpha Slider
+            Rectangle alphaBar = new Rectangle(x + 12, curY, w - 24, 12);
+            LastAlphaSliderRect = alphaBar;
+            using (GraphicsPath ap = CreateRoundedRectPath(alphaBar, 6))
+            {
+                using (SolidBrush cbBg = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                    g.FillPath(cbBg, ap);
+                using (LinearGradientBrush aBrush = new LinearGradientBrush(alphaBar, Color.FromArgb(15, curPickedColor), Color.FromArgb(255, curPickedColor), LinearGradientMode.Horizontal))
+                {
+                    g.FillPath(aBrush, ap);
+                }
+                using (Pen bPen = new Pen(borderGray, 1f))
+                    g.DrawPath(bPen, ap);
+            }
+            int alphaThumbX = alphaBar.X + (int)(Math.Max(0.05f, Math.Min(1f, CustomAlpha)) * alphaBar.Width);
+            using (SolidBrush ab = new SolidBrush(curPickedColor))
+                g.FillEllipse(ab, alphaThumbX - 7, alphaBar.Y - 2, 16, 16);
+            using (Pen wp = new Pen(Color.White, 2.2f))
+                g.DrawEllipse(wp, alphaThumbX - 7, alphaBar.Y - 2, 16, 16);
+            using (Pen dp = new Pen(Color.FromArgb(90, 0, 0, 0), 1f))
+                g.DrawEllipse(dp, alphaThumbX - 7, alphaBar.Y - 2, 16, 16);
+            curY += 20;
+
+            // Hex Pill + Alpha % + ColorDialog button
+            Rectangle hexPill = new Rectangle(x + 12, curY, w - 62, 26);
+            using (GraphicsPath hpp = CreateRoundedRectPath(hexPill, 6))
+            using (SolidBrush hpBg = new SolidBrush(Color.White))
+            using (Pen hpPen = new Pen(borderGray, 1.2f))
+            {
+                g.FillPath(hpBg, hpp);
+                g.DrawPath(hpPen, hpp);
+                using (SolidBrush swB = new SolidBrush(curPickedColor))
+                    g.FillEllipse(swB, hexPill.X + 6, hexPill.Y + 5, 16, 16);
+                string hexStr = string.Format("#{0:X2}{1:X2}{2:X2}", curPickedColor.R, curPickedColor.G, curPickedColor.B);
+                g.DrawString(hexStr, boldFont, darkB, hexPill.X + 28, hexPill.Y + 5);
+                g.DrawLine(hpPen, hexPill.Right - 48, hexPill.Y + 4, hexPill.Right - 48, hexPill.Bottom - 4);
+                int pct = (int)Math.Round(CustomAlpha * 100f);
+                g.DrawString(pct + "%", subFont, mutedB, new Rectangle(hexPill.Right - 46, hexPill.Y, 44, 26), sfCenter);
+            }
+            Rectangle eyeBtn = new Rectangle(x + w - 42, curY, 30, 26);
+            using (GraphicsPath ep = CreateRoundedRectPath(eyeBtn, 6))
+            using (SolidBrush eBg = new SolidBrush(Color.White))
+            using (Pen ePen = new Pen(borderGray, 1.2f))
+            {
+                g.FillPath(eBg, ep);
+                g.DrawPath(ePen, ep);
+                FluentIconRenderer.DrawGlyph(g, "\uEF3C", eyeBtn, Color.FromArgb(51, 65, 85), 11f);
+            }
+            curY += 34;
+
+            if (GraphicColorSubTab == 1)
+            {
+                g.DrawString("Màu chuyển sắc (Kéo điểm màu để chỉnh vị trí)", secFont, darkB, x + 12, curY);
+                curY += 20;
+
+                List<int> stops = GetActiveGradientStops(shape);
+                List<float> positions = GetActiveGradientPositions(shape, stops.Count);
+                if (SelectedGradientStopIndex >= stops.Count) SelectedGradientStopIndex = 0;
+
+                Rectangle gradBar = new Rectangle(x + 16, curY + 4, w - 32, 16);
+                LastGradPosBarRect = gradBar;
+                using (GraphicsPath gbp = CreateRoundedRectPath(gradBar, 8))
+                {
+                    Color cStart = Color.FromArgb(255, Color.FromArgb(stops[0]));
+                    Color cEnd = Color.FromArgb(255, Color.FromArgb(stops[stops.Count - 1]));
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(gradBar, cStart, cEnd, LinearGradientMode.Horizontal))
+                    {
+                        if (stops.Count >= 2)
+                        {
+                            var pairs = new List<KeyValuePair<float, Color>>();
+                            for (int k = 0; k < stops.Count; k++)
+                                pairs.Add(new KeyValuePair<float, Color>(Math.Max(0f, Math.Min(1f, positions[k])), Color.FromArgb(255, Color.FromArgb(stops[k]))));
+                            pairs.Sort((a, b) => a.Key.CompareTo(b.Key));
+                            ColorBlend cb = new ColorBlend(pairs.Count + 2);
+                            cb.Positions[0] = 0f;
+                            cb.Colors[0] = pairs[0].Value;
+                            for (int k = 0; k < pairs.Count; k++)
+                            {
+                                cb.Positions[k + 1] = pairs[k].Key;
+                                cb.Colors[k + 1] = pairs[k].Value;
+                            }
+                            cb.Positions[pairs.Count + 1] = 1f;
+                            cb.Colors[pairs.Count + 1] = pairs[pairs.Count - 1].Value;
+                            lgb.InterpolationColors = cb;
+                        }
+                        g.FillPath(lgb, gbp);
+                    }
+                    using (Pen bp = new Pen(borderGray, 1f))
+                        g.DrawPath(bp, gbp);
+                }
+
+                for (int i = 0; i < stops.Count; i++)
+                {
+                    float pos = Math.Max(0f, Math.Min(1f, positions[i]));
+                    int kx = gradBar.X + (int)(pos * gradBar.Width);
+                    int ky = gradBar.Y + gradBar.Height / 2;
+                    bool isSelStop = (i == SelectedGradientStopIndex);
+                    Color sc = Color.FromArgb(255, Color.FromArgb(stops[i]));
+                    int rKnob = isSelStop ? 9 : 7;
+                    using (SolidBrush sb = new SolidBrush(sc))
+                        g.FillEllipse(sb, kx - rKnob, ky - rKnob, rKnob * 2, rKnob * 2);
+                    using (Pen wp = new Pen(Color.White, 2f))
+                        g.DrawEllipse(wp, kx - rKnob, ky - rKnob, rKnob * 2, rKnob * 2);
+                    using (Pen sp = new Pen(isSelStop ? fluentPurple : Color.FromArgb(100, 116, 139), isSelStop ? 2.2f : 1.2f))
+                        g.DrawEllipse(sp, kx - rKnob - 1, ky - rKnob - 1, rKnob * 2 + 2, rKnob * 2 + 2);
+                }
+                curY += 28;
+
+                int stopSize = 30;
+                int stopGap = 8;
+                int stopX = x + 12;
+                int stopCount = Math.Min(5, stops.Count);
+                for (int i = 0; i < stopCount; i++)
+                {
+                    Rectangle scRect = new Rectangle(stopX + i * (stopSize + stopGap), curY, stopSize, stopSize);
+                    Color sc = Color.FromArgb(255, Color.FromArgb(stops[i]));
+                    bool isSelStop = (i == SelectedGradientStopIndex);
+                    using (SolidBrush sb = new SolidBrush(sc))
+                        g.FillEllipse(sb, scRect);
+                    using (Pen sp = new Pen(isSelStop ? fluentPurple : borderGray, isSelStop ? 2.4f : 1.2f))
+                        g.DrawEllipse(sp, scRect);
+                    if (isSelStop)
+                    {
+                        using (Pen wp = new Pen(Color.White, 1.5f))
+                            g.DrawEllipse(wp, scRect.X + 2, scRect.Y + 2, scRect.Width - 4, scRect.Height - 4);
+                    }
+                }
+
+                if (stopCount < 5)
+                {
+                    Rectangle addStopRect = new Rectangle(stopX + stopCount * (stopSize + stopGap), curY, stopSize, stopSize);
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    using (Pen ap = new Pen(borderGray, 1.4f))
+                    {
+                        g.FillEllipse(ab, addStopRect);
+                        g.DrawEllipse(ap, addStopRect);
+                        g.DrawString("+", titleFont, darkB, addStopRect, sfCenter);
+                    }
+                }
+
+                if (stopCount > 2)
+                {
+                    Rectangle remStopRect = new Rectangle(x + w - 38, curY + 3, 24, 24);
+                    using (SolidBrush rb = new SolidBrush(Color.FromArgb(254, 226, 226)))
+                    {
+                        g.FillEllipse(rb, remStopRect);
+                        g.DrawString("−", boldFont, Brushes.Crimson, remStopRect, sfCenter);
+                    }
+                }
+                curY += stopSize + 14;
+
+                g.DrawString("Kiểu dáng", secFont, darkB, x + 12, curY);
+                curY += 20;
+
+                string[] gStyles = new string[] { "Linear90", "Linear180", "Linear135", "Radial", "RadialCorner", "Conic" };
+                int gsCols = 6;
+                int gsGap = 6;
+                int gsW = (w - 24 - (gsCols - 1) * gsGap) / gsCols;
+                int gsH = 34;
+                Color cFirst = Color.FromArgb(255, Color.FromArgb(stops[0]));
+                Color cLast = Color.FromArgb(255, Color.FromArgb(stops[stops.Count - 1]));
+                string activeStyle = GetActiveGradientStyle(shape);
+
+                for (int i = 0; i < gStyles.Length; i++)
+                {
+                    Rectangle gsRect = new Rectangle(x + 12 + i * (gsW + gsGap), curY, gsW, gsH);
+                    bool isGSel = string.Equals(activeStyle, gStyles[i], StringComparison.OrdinalIgnoreCase);
+                    float ang = (i == 0) ? 0f : (i == 1 ? 90f : (i == 2 ? 45f : (i == 3 ? 135f : (i == 4 ? 225f : 315f))));
+                    using (GraphicsPath gp = CreateRoundedRectPath(gsRect, 6))
+                    {
+                        using (LinearGradientBrush lgb = new LinearGradientBrush(gsRect, cFirst, cLast, ang))
+                        {
+                            g.FillPath(lgb, gp);
+                        }
+                        using (Pen gPen = new Pen(isGSel ? fluentPurple : borderGray, isGSel ? 2.2f : 1.0f))
+                        {
+                            g.DrawPath(gPen, gp);
+                        }
+                    }
+                }
+                curY += gsH + 14;
+
+                g.DrawString("Màu gradient mặc định", secFont, darkB, x + 12, curY);
+                curY += 20;
+
+                int gpCols = 6;
+                int gpGap = 8;
+                int gpSize = (w - 24 - (gpCols - 1) * gpGap) / gpCols;
+                for (int i = 0; i < ColorGradientPresets.Length; i++)
+                {
+                    int r = i / gpCols;
+                    int c = i % gpCols;
+                    Rectangle gRect = new Rectangle(x + 12 + c * (gpSize + gpGap), curY + r * (gpSize + gpGap), gpSize, gpSize);
+                    int[] pStops = ColorGradientPresets[i];
+                    Color c1 = Color.FromArgb(255, Color.FromArgb(pStops[0]));
+                    Color c2 = Color.FromArgb(255, Color.FromArgb(pStops[pStops.Length - 1]));
+                    using (GraphicsPath gp = new GraphicsPath())
+                    {
+                        gp.AddEllipse(gRect);
+                        using (LinearGradientBrush lgb = new LinearGradientBrush(gRect, c1, c2, 45f))
+                        {
+                            if (pStops.Length >= 3)
+                            {
+                                ColorBlend cb = new ColorBlend(pStops.Length);
+                                for (int k = 0; k < pStops.Length; k++)
+                                {
+                                    cb.Colors[k] = Color.FromArgb(255, Color.FromArgb(pStops[k]));
+                                    cb.Positions[k] = (float)k / (pStops.Length - 1);
+                                }
+                                lgb.InterpolationColors = cb;
+                            }
+                            g.FillPath(lgb, gp);
+                        }
+                        using (Pen p = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
+                            g.DrawEllipse(p, gRect);
+                    }
+                }
+            }
+            else // GraphicColorSubTab == 0 (Màu đồng nhất)
+            {
+                bool isGraphic = IsRasterOrSvgGraphic(shape);
+                if (detectedColors.Count > 0)
+                {
+                    string secTitle = isGraphic ? "🎨 Màu trong đồ họa" : "🎨 Màu trong hình";
+                    g.DrawString(secTitle, secFont, darkB, x + 12, curY);
+                    Rectangle resetBtn = new Rectangle(x + w - 66, curY - 2, 54, 20);
+                    using (GraphicsPath rp = CreateRoundedRectPath(resetBtn, 4))
+                    using (SolidBrush rBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                    using (Pen rPen = new Pen(borderGray, 1f))
+                    {
+                        g.FillPath(rBg, rp);
+                        g.DrawPath(rPen, rp);
+                        g.DrawString("Đặt lại", subFont, mutedB, resetBtn, sfCenter);
+                    }
+                    curY += 22;
+
+                    int swSize = 28;
+                    int swGap = 6;
+                    int swStartX = x + 12;
+                    for (int i = 0; i < detectedColors.Count && i < 6; i++)
+                    {
+                        Rectangle swRect = new Rectangle(swStartX + i * (swSize + swGap), curY, swSize, swSize);
+                        using (SolidBrush sb = new SolidBrush(detectedColors[i]))
+                            g.FillEllipse(sb, swRect);
+                        bool isSlotSel = (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor && i == SelectedGraphicColorIndex);
+                        using (Pen sp = new Pen(isSlotSel ? fluentPurple : Color.FromArgb(203, 213, 225), isSlotSel ? 2.4f : 1.2f))
+                            g.DrawEllipse(sp, swRect);
+                    }
+                    curY += 36;
+                }
+
+                g.DrawString("Màu đồng nhất mặc định", secFont, darkB, x + 12, curY);
+                curY += 20;
+
+                int scCols = 6;
+                int scGap = 8;
+                int scSize = (w - 24 - (scCols - 1) * scGap) / scCols;
+                for (int i = 0; i < DefaultSolidColors.Length; i++)
+                {
+                    int r = i / scCols;
+                    int c = i % scCols;
+                    Rectangle cRect = new Rectangle(x + 12 + c * (scSize + scGap), curY + r * (scSize + scGap), scSize, scSize);
+                    using (SolidBrush cb = new SolidBrush(DefaultSolidColors[i]))
+                        g.FillEllipse(cb, cRect);
+                    using (Pen cp = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
+                        g.DrawEllipse(cp, cRect);
+                }
+                int solidRows = (DefaultSolidColors.Length + scCols - 1) / scCols;
+                curY += solidRows * (scSize + scGap) + 8;
+            }
+        }
+
+        private void DrawGraphicEditorPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
+        {
+            ShapeNode shape = SelectedShape;
+            if (shape == null)
+            {
+                g.DrawString("Chọn một đồ họa hoặc hình ảnh trên slide để chỉnh sửa.", labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
+                return;
+            }
+
+            Color fluentPurple = Color.FromArgb(124, 58, 237);
+            Color darkText = Color.FromArgb(15, 23, 42);
+            Color mutedText = Color.FromArgb(100, 116, 139);
+            Color borderGray = Color.FromArgb(226, 232, 240);
+
+            using (Font secFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font subFont = new Font("Segoe UI", 7.8f, FontStyle.Regular))
+            using (SolidBrush darkB = new SolidBrush(darkText))
+            using (SolidBrush mutedB = new SolidBrush(mutedText))
+            using (SolidBrush purpleB = new SolidBrush(fluentPurple))
+            using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                int curY = panelY + 2;
+
+                if (GraphicSidebarTab == 999)
+                {
+                    DrawColorAndGradientPane(g, x, ref curY, w, shape, secFont, subFont, labelFont, boldFont, titleFont, darkB, mutedB, purpleB, fluentPurple, borderGray, sfCenter);
+                    return;
+                }
+
+                // ==================== 1. MÀU TRONG ĐỒ HỌA (Detected Colors) ====================
+                g.DrawString("Khớp định dạng", secFont, darkB, x + 12, curY);
+                Rectangle resetBtn = new Rectangle(x + w - 66, curY - 2, 54, 20);
+                using (GraphicsPath rp = CreateRoundedRectPath(resetBtn, 4))
+                using (SolidBrush rBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                using (Pen rPen = new Pen(borderGray, 1f))
+                {
+                    g.FillPath(rBg, rp);
+                    g.DrawPath(rPen, rp);
+                    g.DrawString("Đặt lại", subFont, mutedB, resetBtn, sfCenter);
+                }
+                curY += 24;
+
+                var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+                if (false)
+                {
+                int swatchSize = 28;
+                int swatchGap = 8;
+                int swStartX = x + 12;
+
+                for (int i = 0; i < detectedColors.Count && i < 6; i++)
+                {
+                    Rectangle swRect = new Rectangle(swStartX + i * (swatchSize + swatchGap), curY, swatchSize, swatchSize);
+                    using (SolidBrush sb = new SolidBrush(detectedColors[i]))
+                    {
+                        g.FillEllipse(sb, swRect);
+                    }
+                    using (Pen sp = new Pen(Color.FromArgb(203, 213, 225), 1.2f))
+                    {
+                        g.DrawEllipse(sp, swRect);
+                    }
+                }
+
+                // Custom theme/blend color picker button (+)
+                int plusX = swStartX + Math.Min(6, detectedColors.Count) * (swatchSize + swatchGap);
+                if (plusX + swatchSize <= x + w - 10)
+                {
+                    Rectangle plusRect = new Rectangle(plusX, curY, swatchSize, swatchSize);
+                    using (SolidBrush pb = new SolidBrush(Color.FromArgb(243, 232, 255)))
+                    using (Pen pp = new Pen(fluentPurple, 1.2f))
+                    {
+                        g.FillEllipse(pb, plusRect);
+                        g.DrawEllipse(pp, plusRect);
+                        g.DrawString("+", boldFont, purpleB, plusRect, sfCenter);
+                    }
+                }
+                curY += swatchSize + 16;
+                }
+
+                // ==================== 2. KHỚP ĐỊNH DẠNG (Graphic Style Match) ====================
+                g.DrawString("Khớp định dạng", secFont, darkB, x + 12, curY);
+                curY += 22;
+
+                string[] styleIds = new string[] { "None", "Sticker", "Engraving", "Sketch" };
+                string[] styleNames = new string[] { "Không có", "Sổ dán", "Khắc", "Nghệ thuật" };
+                int smCols = 4;
+                int smGap = 8;
+                int smCardW = (w - 24 - (smCols - 1) * smGap) / smCols;
+                int smCardH = 58;
+
+                for (int i = 0; i < styleIds.Length; i++)
+                {
+                    int cx = x + 12 + i * (smCardW + smGap);
+                    Rectangle cardRect = new Rectangle(cx, curY, smCardW, smCardH);
+                    bool isSel = string.Equals(shape.GraphicStyleMatch ?? "None", styleIds[i], StringComparison.OrdinalIgnoreCase);
+
+                    using (GraphicsPath cp = CreateRoundedRectPath(cardRect, 8))
+                    using (SolidBrush cBg = new SolidBrush(isSel ? Color.FromArgb(245, 243, 255) : Color.FromArgb(241, 245, 249)))
+                    using (Pen cPen = new Pen(isSel ? fluentPurple : borderGray, isSel ? 2.0f : 1.0f))
+                    {
+                        g.FillPath(cBg, cp);
+                        g.DrawPath(cPen, cp);
+                    }
+
+                    // Visual Illustration inside each Style Match card (matching modern graphic style)
+                    int icX = cardRect.X + cardRect.Width / 2;
+                    int icY = cardRect.Y + cardRect.Height / 2;
+                    if (i == 0) // Không có (Slash circle icon)
+                    {
+                        using (Pen np = new Pen(Color.FromArgb(100, 116, 139), 1.8f))
+                        {
+                            g.DrawEllipse(np, icX - 11, icY - 11, 22, 22);
+                            g.DrawLine(np, icX - 7, icY + 7, icX + 7, icY - 7);
+                        }
+                    }
+                    else if (i == 1) // Sổ dán (Sticker: White die-cut outline + colorful badge)
+                    {
+                        using (SolidBrush sh = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                            g.FillEllipse(sh, icX - 13, icY - 11, 28, 26);
+                        using (SolidBrush wb = new SolidBrush(Color.White))
+                            g.FillEllipse(wb, icX - 14, icY - 13, 28, 26);
+                        using (SolidBrush fb = new SolidBrush(Color.FromArgb(249, 115, 22)))
+                            g.FillEllipse(fb, icX - 10, icY - 9, 20, 18);
+                        using (SolidBrush leaf = new SolidBrush(Color.FromArgb(34, 197, 94)))
+                            g.FillEllipse(leaf, icX - 3, icY - 13, 8, 5);
+                    }
+                    else if (i == 2) // Khắc (Engraving: High-contrast ink hatch)
+                    {
+                        using (SolidBrush ib = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                            g.FillEllipse(ib, icX - 11, icY - 11, 22, 22);
+                        using (Pen hp = new Pen(Color.FromArgb(241, 245, 249), 1.2f))
+                        {
+                            g.DrawLine(hp, icX - 8, icY - 4, icX + 8, icY - 4);
+                            g.DrawLine(hp, icX - 9, icY, icX + 9, icY);
+                            g.DrawLine(hp, icX - 8, icY + 4, icX + 8, icY + 4);
+                        }
+                    }
+                    else if (i == 3) // Nghệ thuật (Sketch / Pop duotone)
+                    {
+                        using (SolidBrush b1 = new SolidBrush(Color.FromArgb(139, 92, 246)))
+                            g.FillEllipse(b1, icX - 11, icY - 11, 22, 22);
+                        using (SolidBrush b2 = new SolidBrush(Color.FromArgb(250, 204, 21)))
+                            g.FillPie(b2, icX - 11, icY - 11, 22, 22, -45, 180);
+                        using (Pen op = new Pen(Color.FromArgb(49, 46, 129), 1.5f))
+                            g.DrawEllipse(op, icX - 11, icY - 11, 22, 22);
+                    }
+
+                    g.DrawString(styleNames[i], subFont, isSel ? purpleB : darkB, new RectangleF(cardRect.X - 4, cardRect.Bottom + 3, cardRect.Width + 8, 16), sfCenter);
+                }
+                curY += smCardH + 26;
+
+                // ==================== 3. BỘ LỌC (Graphic Filters) ====================
+                g.DrawString("Bộ lọc", secFont, darkB, x + 12, curY);
+                curY += 22;
+
+                string[] filterIds = new string[] { "None", "Soft", "Vintage", "Mono", "Vivid", "Cool" };
+                string[] filterNames = new string[] { "Không có", "Dịu nhẹ", "Vintage", "Mono", "Nổi bật", "Lạnh" };
+                Color[][] filterSwatches = new Color[][] {
+                    new Color[] { Color.FromArgb(241, 245, 249), Color.FromArgb(100, 116, 139) },
+                    new Color[] { Color.FromArgb(254, 243, 199), Color.FromArgb(244, 114, 182) },
+                    new Color[] { Color.FromArgb(217, 119, 6), Color.FromArgb(120, 53, 15) },
+                    new Color[] { Color.FromArgb(148, 163, 184), Color.FromArgb(30, 41, 59) },
+                    new Color[] { Color.FromArgb(59, 130, 246), Color.FromArgb(236, 72, 153) },
+                    new Color[] { Color.FromArgb(56, 189, 248), Color.FromArgb(30, 64, 175) }
+                };
+
+                int fCols = 3;
+                int fGap = 10;
+                int fCardW = (w - 24 - (fCols - 1) * fGap) / fCols;
+                int fCardH = 54;
+
+                for (int i = 0; i < filterIds.Length; i++)
+                {
+                    int r = i / fCols;
+                    int c = i % fCols;
+                    int cx = x + 12 + c * (fCardW + fGap);
+                    int cy = curY + r * (fCardH + 22);
+                    Rectangle fRect = new Rectangle(cx, cy, fCardW, fCardH);
+                    bool isSel = string.Equals(shape.GraphicFilterPreset ?? "None", filterIds[i], StringComparison.OrdinalIgnoreCase);
+
+                    using (GraphicsPath fp = CreateRoundedRectPath(fRect, 8))
+                    {
+                        if (i == 0)
+                        {
+                            using (SolidBrush fBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                                g.FillPath(fBg, fp);
+                            int icX = fRect.X + fRect.Width / 2;
+                            int icY = fRect.Y + fRect.Height / 2;
+                            using (Pen np = new Pen(Color.FromArgb(100, 116, 139), 1.8f))
+                            {
+                                g.DrawEllipse(np, icX - 10, icY - 10, 20, 20);
+                                g.DrawLine(np, icX - 6, icY + 6, icX + 6, icY - 6);
+                            }
+                        }
+                        else
+                        {
+                            using (LinearGradientBrush lgb = new LinearGradientBrush(fRect, filterSwatches[i][0], filterSwatches[i][1], 45f))
+                            {
+                                g.FillPath(lgb, fp);
+                            }
+                            // Draw mini landscape silhouette inside filter card with smooth silhouette
+                            using (SolidBrush sunB = new SolidBrush(Color.FromArgb(210, 255, 255, 255)))
+                                g.FillEllipse(sunB, fRect.X + 12, fRect.Y + 10, 10, 10);
+                            using (SolidBrush hillB = new SolidBrush(Color.FromArgb(95, 15, 23, 42)))
+                            {
+                                PointF[] hill = new PointF[] {
+                                    new PointF(fRect.X + 4, fRect.Bottom - 4),
+                                    new PointF(fRect.X + fRect.Width * 0.42f, fRect.Y + 26),
+                                    new PointF(fRect.X + fRect.Width * 0.72f, fRect.Y + 34),
+                                    new PointF(fRect.Right - 4, fRect.Y + 22),
+                                    new PointF(fRect.Right - 4, fRect.Bottom - 4)
+                                };
+                                g.FillPolygon(hillB, hill);
+                            }
+                        }
+
+                        using (Pen fPen = new Pen(isSel ? fluentPurple : borderGray, isSel ? 2.2f : 1.0f))
+                        {
+                            g.DrawPath(fPen, fp);
+                        }
+                    }
+
+                    g.DrawString(filterNames[i], subFont, isSel ? purpleB : darkB, new RectangleF(fRect.X - 4, fRect.Bottom + 3, fRect.Width + 8, 16), sfCenter);
+                }
+                curY += 2 * (fCardH + 22) + 8;
+
+                // ==================== 4. ĐỘ TRONG SUỐT & BO GÓC (Transparency & Rounding) ====================
+                g.DrawString("Độ trong suốt & Bo góc", secFont, darkB, x + 12, curY);
+                curY += 22;
+
+                // Opacity Row
+                int opPct = (int)Math.Round(Math.Max(0f, Math.Min(1f, shape.FillOpacity)) * 100f);
+                g.DrawString("Độ hiển thị:", labelFont, darkB, x + 12, curY + 2);
+                int sliderX = x + 90;
+                int sliderW = w - 148;
+                Rectangle trackRect = new Rectangle(sliderX, curY + 8, sliderW, 6);
+                using (SolidBrush tb = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                    FillRoundedPill(g, tb, trackRect);
+                int fillW = Math.Max(4, (int)(sliderW * (opPct / 100f)));
+                using (SolidBrush fb = new SolidBrush(fluentPurple))
+                    FillRoundedPill(g, fb, new Rectangle(sliderX, curY + 8, fillW, 6));
+                int thumbX = sliderX + fillW - 7;
+                using (SolidBrush kb = new SolidBrush(Color.White))
+                using (Pen kp = new Pen(fluentPurple, 2f))
+                {
+                    g.FillEllipse(kb, thumbX, curY + 4, 14, 14);
+                    g.DrawEllipse(kp, thumbX, curY + 4, 14, 14);
+                }
+                g.DrawString(opPct + "%", boldFont, darkB, x + w - 50, curY + 2);
+                curY += 28;
+
+                // Corner Rounding Pills (0px, 8px, 16px, 32px, Tròn)
+                g.DrawString("Bo góc:", labelFont, darkB, x + 12, curY + 4);
+                float[] radii = new float[] { 0f, 8f, 16f, 32f, 200f };
+                string[] rLabels = new string[] { "0", "8", "16", "32", "Tròn" };
+                int rBtnX = x + 70;
+                int rBtnW = (w - 82 - 4 * 4) / 5;
+                float curR = Math.Max(0f, shape.CornerRadius);
+                for (int i = 0; i < radii.Length; i++)
+                {
+                    Rectangle rb = new Rectangle(rBtnX + i * (rBtnW + 4), curY, rBtnW, 24);
+                    bool rSel = (i == 0 && shape.CornerRadius <= 0f) || (i > 0 && Math.Abs(curR - radii[i]) < 2f);
+                    using (GraphicsPath rp = CreateRoundedRectPath(rb, 5))
+                    using (SolidBrush rBg = new SolidBrush(rSel ? Color.FromArgb(245, 243, 255) : Color.White))
+                    using (Pen rPen = new Pen(rSel ? fluentPurple : borderGray, rSel ? 1.5f : 1f))
+                    {
+                        g.FillPath(rBg, rp);
+                        g.DrawPath(rPen, rp);
+                        g.DrawString(rLabels[i], subFont, rSel ? purpleB : darkB, rb, sfCenter);
+                    }
+                }
+                curY += 34;
+
+                // Convert to Shapes button at bottom
+                Rectangle convBtn = new Rectangle(x + 12, curY, w - 24, 30);
+                using (GraphicsPath cp = CreateRoundedRectPath(convBtn, 6))
+                using (SolidBrush cBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen cPen = new Pen(borderGray, 1f))
+                {
+                    g.FillPath(cBg, cp);
+                    g.DrawPath(cPen, cp);
+                    g.DrawString("✨ Rã đồ họa thành các Hình khối Vector", boldFont, darkB, convBtn, sfCenter);
                 }
             }
         }
@@ -9017,7 +12244,12 @@ namespace ZenQOffice.UI
                 }
 
                 // Click Step Indicator
-                if (anim.Trigger == AnimationTrigger.OnClick || i == 0)
+                bool isShapeTriggered = !string.IsNullOrEmpty(anim.TriggerShapeId);
+                if (isShapeTriggered)
+                {
+                    g.DrawString("⚡", boldFont, Brushes.DarkOrange, animBox.X + 6, animBox.Y + 7);
+                }
+                else if (anim.Trigger == AnimationTrigger.OnClick || stepNumber == 0)
                 {
                     stepNumber++;
                     g.DrawString(stepNumber.ToString(), boldFont, Brushes.DarkSlateGray, animBox.X + 8, animBox.Y + 7);
@@ -9032,7 +12264,7 @@ namespace ZenQOffice.UI
                 }
 
                 // Trigger icon
-                string trigIcon = (anim.Trigger == AnimationTrigger.OnClick) ? "🖱️" : ((anim.Trigger == AnimationTrigger.WithPrevious) ? "⏱️" : "⏳");
+                string trigIcon = isShapeTriggered ? "🎯" : ((anim.Trigger == AnimationTrigger.OnClick) ? "🖱️" : ((anim.Trigger == AnimationTrigger.WithPrevious) ? "⏱️" : "⏳"));
                 g.DrawString(trigIcon, labelFont, Brushes.Black, animBox.X + 24, animBox.Y + 8);
 
                 // Shape name & animation type
@@ -9113,6 +12345,32 @@ namespace ZenQOffice.UI
             menu.Items.Add(miClick);
             menu.Items.Add(miWith);
             menu.Items.Add(miAfter);
+
+            // 1b. Trigger On Click Of Specific Shape (Kích hoạt khi nhấp vào vật thể)
+            ToolStripMenuItem miTrigShape = new ToolStripMenuItem("⚡ Kích hoạt khi nhấp vào (Trigger On Click of) ▸");
+            ToolStripMenuItem miNoTrigShape = new ToolStripMenuItem("Không dùng Trigger riêng (Theo trình tự Slide)", null, (s, e) => {
+                anim.TriggerShapeId = "";
+                if (parentControl != null) parentControl.Invalidate();
+            }) { Checked = string.IsNullOrEmpty(anim.TriggerShapeId) };
+            miTrigShape.DropDownItems.Add(miNoTrigShape);
+            miTrigShape.DropDownItems.Add(new ToolStripSeparator());
+
+            for (int sIdx = 0; sIdx < slide.Shapes.Count; sIdx++)
+            {
+                ShapeNode cand = slide.Shapes[sIdx];
+                if (cand == null) continue;
+                string candId = cand.Id;
+                string candLabel = !string.IsNullOrEmpty(cand.Text)
+                    ? (cand.Text.Length > 28 ? cand.Text.Substring(0, 28) + "..." : cand.Text)
+                    : (!string.IsNullOrEmpty(cand.Name) ? cand.Name : ("Hình " + (sIdx + 1) + " (" + cand.Type + ")"));
+                ToolStripMenuItem miCand = new ToolStripMenuItem("🎯 " + candLabel, null, (s, e) => {
+                    anim.TriggerShapeId = candId;
+                    anim.Trigger = AnimationTrigger.OnClick;
+                    if (parentControl != null) parentControl.Invalidate();
+                }) { Checked = (anim.TriggerShapeId == candId) };
+                miTrigShape.DropDownItems.Add(miCand);
+            }
+            menu.Items.Add(miTrigShape);
             menu.Items.Add(new ToolStripSeparator());
 
             // 2. Duration Presets
@@ -10561,13 +13819,58 @@ namespace ZenQOffice.UI
             activeAnim = null;
             activeAnimProgress = 0f;
 
-            if (shape == null || slide == null || slide.Animations == null || slide.Animations.Count == 0) return;
-
-            // Video và Audio luôn hiển thị khung hình / biểu tượng cái loa ngay từ đầu, không bị ẩn bởi hiệu ứng Entrance
-            if (shape.Type == ShapeType.Video || shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.VideoPath) || !string.IsNullOrEmpty(shape.AudioPath)) return;
+            if (shape == null || slide == null) return;
 
             // Trong chế độ soạn thảo bình thường (khi không xem trước và không trình chiếu), luôn hiển thị mọi vật phẩm
             if (!isPresenting && !isPlayingPreview) return;
+
+            // Hiệu ứng rung / nảy phản hồi Đáp án Trắc nghiệm (Interactive Quiz Feedback) khi đang trình chiếu
+            if (isPresenting && !string.IsNullOrEmpty(_activeQuizFeedbackShapeId) && _activeQuizFeedbackShapeId == shape.Id)
+            {
+                SlideActionType qType;
+                if (_quizAnsweredStates.TryGetValue(shape.Id, out qType))
+                {
+                    float qp = _quizFeedbackProgress;
+                    if (qType == SlideActionType.QuizWrong)
+                    {
+                        // Hiệu ứng lắc ngang (Shake) báo hiệu đáp án Sai
+                        float damp = 1.0f - qp;
+                        offsetX = (float)(Math.Sin(qp * Math.PI * 6.0) * 14.0 * damp);
+                    }
+                    else if (qType == SlideActionType.QuizCorrect)
+                    {
+                        // Hiệu ứng phóng nhẹ (Pulse) báo hiệu đáp án Đúng
+                        float pulse = (float)(Math.Sin(qp * Math.PI) * 0.06);
+                        scaleX = 1.0f + pulse;
+                        scaleY = 1.0f + pulse;
+                    }
+                }
+            }
+
+            // Kiểm tra nếu hình này được cấu hình ẩn ban đầu để hiện ra khi nhấn nút (ClickRevealShapeId)
+            if (isPresenting && !string.IsNullOrEmpty(shape.Id) && slide.Shapes != null)
+            {
+                bool isRevealTarget = false;
+                for (int i = 0; i < slide.Shapes.Count; i++)
+                {
+                    if (slide.Shapes[i] != null && slide.Shapes[i].ClickRevealShapeId == shape.Id)
+                    {
+                        isRevealTarget = true;
+                        break;
+                    }
+                }
+                if (isRevealTarget && !_revealedShapeIds.Contains(shape.Id))
+                {
+                    isVisible = false;
+                    opacityMul = 0f;
+                    return;
+                }
+            }
+
+            if (slide.Animations == null || slide.Animations.Count == 0) return;
+
+            // Video và Audio luôn hiển thị khung hình / biểu tượng cái loa ngay từ đầu, không bị ẩn bởi hiệu ứng Entrance
+            if (shape.Type == ShapeType.Video || shape.Type == ShapeType.Audio || !string.IsNullOrEmpty(shape.VideoPath) || !string.IsNullOrEmpty(shape.AudioPath)) return;
 
             List<int> shapeAnimIndices = new List<int>();
             for (int i = 0; i < slide.Animations.Count; i++)
@@ -10656,6 +13959,51 @@ namespace ZenQOffice.UI
                 {
                     int aIdx = shapeAnimIndices[i];
                     ShapeAnimation a = slide.Animations[aIdx];
+                    if (!string.IsNullOrEmpty(a.TriggerShapeId))
+                    {
+                        bool trigFired = _completedTriggeredShapeIds.Contains(a.TriggerShapeId);
+                        bool trigPlaying = IsPlayingTriggeredAnimation && _activeTriggeredAnimIndices.Contains(aIdx);
+                        if (a.IsEntrance)
+                        {
+                            if (!trigFired)
+                            {
+                                isVisible = false;
+                                opacityMul = 0f;
+                                return;
+                            }
+                            else if (trigPlaying)
+                            {
+                                activeAnim = a;
+                                activeAnimProgress = TriggeredAnimationProgress;
+                                EvaluateAnimationEffect(activeAnim, TriggeredAnimationProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                                return;
+                            }
+                        }
+                        else if (a.IsExit)
+                        {
+                            if (trigPlaying)
+                            {
+                                activeAnim = a;
+                                activeAnimProgress = TriggeredAnimationProgress;
+                                EvaluateAnimationEffect(activeAnim, TriggeredAnimationProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                                return;
+                            }
+                            else if (trigFired)
+                            {
+                                isVisible = false;
+                                opacityMul = 0f;
+                                return;
+                            }
+                        }
+                        else if (trigPlaying)
+                        {
+                            activeAnim = a;
+                            activeAnimProgress = TriggeredAnimationProgress;
+                            EvaluateAnimationEffect(activeAnim, TriggeredAnimationProgress, out isVisible, out offsetX, out offsetY, out scaleX, out scaleY, out rotDelta, out opacityMul);
+                            return;
+                        }
+                        continue;
+                    }
                     int step = (aIdx < stepIndices.Length) ? stepIndices[aIdx] : 0;
                     if (firstEntranceStep < 0 && a.IsEntrance) { firstEntranceStep = step; firstEntranceAnimIdx = aIdx; }
                     if (firstExitStep < 0 && a.IsExit) { firstExitStep = step; firstExitAnimIdx = aIdx; }
@@ -15222,25 +18570,22 @@ namespace ZenQOffice.UI
 
                     bool hasFillRect = (Math.Abs(shape.FillRectLeft) > 0.0001f || Math.Abs(shape.FillRectTop) > 0.0001f || Math.Abs(shape.FillRectRight) > 0.0001f || Math.Abs(shape.FillRectBottom) > 0.0001f);
 
-                    // High-performance display rendering:
-                    // Direct2D GPU acceleration handles textures with hardware texture filtering instantly (0.01ms).
-                    // CPU downsampling is ONLY needed if hardware acceleration is unavailable (pure GDI+ fallback).
+                    // Pre-filtered 4K HighQualityBicubic display cache:
+                    // Generates an exact 1:1 screen-pixel bitmap using multi-tap Bicubic + TileFlipXY edge anti-fringing,
+                    // then feeds it to Direct2D at 1:1 resolution for razor-sharp 4K quality and 120 FPS zero-lag dragging/scrolling.
                     Image imageToDraw = shape.CachedImage;
                     RectangleF drawSrcRect = srcRect;
 
-                    if (!g.IsDirectXActive)
+                    bool isResizingThisShape = IsResizingShape && (shape == SelectedShape || (SelectedShapeIndices != null && ActiveSlide != null && SelectedShapeIndices.Contains(ActiveSlide.Shapes.IndexOf(shape))));
+                    bool isScaledImage = (Math.Abs(shape.CachedImage.Width - bw) > 4 || Math.Abs(shape.CachedImage.Height - bh) > 4 || cropL > 0.001f || cropT > 0.001f || cropR > 0.001f || cropB > 0.001f);
+
+                    if (!hasFillRect && !IsCropping && bw >= 16 && bh >= 16 && bw <= 2560 && bh <= 2560)
                     {
-                        bool isLargeImage = (shape.CachedImage.Width > bw * 1.5f || shape.CachedImage.Height > bh * 1.5f);
-                        if (shape.DisplayCachedImage != null && !hasFillRect && !IsCropping)
-                        {
-                            imageToDraw = shape.DisplayCachedImage;
-                            drawSrcRect = new RectangleF(0, 0, shape.DisplayCachedW, shape.DisplayCachedH);
-                        }
-                        else if (isLargeImage && !hasFillRect && !IsCropping && bw > 100 && bh > 100)
+                        if (!isResizingThisShape && isScaledImage)
                         {
                             if (shape.DisplayCachedImage == null ||
-                                Math.Abs(shape.DisplayCachedW - bw) > 64 ||
-                                Math.Abs(shape.DisplayCachedH - bh) > 64 ||
+                                Math.Abs(shape.DisplayCachedW - bw) > 2 ||
+                                Math.Abs(shape.DisplayCachedH - bh) > 2 ||
                                 Math.Abs(shape.DisplayCachedCropL - cropL) > 0.001f ||
                                 Math.Abs(shape.DisplayCachedCropT - cropT) > 0.001f ||
                                 Math.Abs(shape.DisplayCachedCropR - cropR) > 0.001f ||
@@ -15252,15 +18597,21 @@ namespace ZenQOffice.UI
                                     Bitmap dispBmp = new Bitmap(bw, bh, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                                     using (Graphics gDisp = Graphics.FromImage(dispBmp))
                                     {
-                                        gDisp.SmoothingMode = SmoothingMode.AntiAlias;
-                                        gDisp.InterpolationMode = InterpolationMode.Bilinear;
-                                        gDisp.PixelOffsetMode = PixelOffsetMode.Half;
-                                        PointF[] dispDest = new PointF[] {
-                                            new PointF(0, 0),
-                                            new PointF(bw, 0),
-                                            new PointF(0, bh)
-                                        };
-                                        gDisp.DrawImage(shape.CachedImage, dispDest, srcRect, GraphicsUnit.Pixel);
+                                        gDisp.CompositingQuality = CompositingQuality.HighQuality;
+                                        gDisp.SmoothingMode = SmoothingMode.HighQuality;
+                                        gDisp.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                        gDisp.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                                        using (var wrapAttr = new System.Drawing.Imaging.ImageAttributes())
+                                        {
+                                            wrapAttr.SetWrapMode(WrapMode.TileFlipXY);
+                                            gDisp.DrawImage(
+                                                shape.CachedImage,
+                                                new Rectangle(0, 0, bw, bh),
+                                                srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height,
+                                                GraphicsUnit.Pixel,
+                                                wrapAttr
+                                            );
+                                        }
                                     }
                                     shape.DisplayCachedImage = dispBmp;
                                     shape.DisplayCachedW = bw;
@@ -15272,12 +18623,12 @@ namespace ZenQOffice.UI
                                 }
                                 catch { }
                             }
+                        }
 
-                            if (shape.DisplayCachedImage != null)
-                            {
-                                imageToDraw = shape.DisplayCachedImage;
-                                drawSrcRect = new RectangleF(0, 0, bw, bh);
-                            }
+                        if (shape.DisplayCachedImage != null && !isResizingThisShape)
+                        {
+                            imageToDraw = shape.DisplayCachedImage;
+                            drawSrcRect = new RectangleF(0, 0, shape.DisplayCachedW, shape.DisplayCachedH);
                         }
                     }
 
@@ -15351,7 +18702,20 @@ namespace ZenQOffice.UI
                         }
                         else if (!string.IsNullOrEmpty(shape.CropShapeType) && shape.CropShapeType != "Rectangle")
                         {
-                            customCropPath = CreateCropShapePath(shape.CropShapeType, 0, 0, baseW, baseH);
+                            if (shape.CropShapeType == "RoundedRectangle" && shape.CornerRadius > 0f)
+                            {
+                                float rPx = Math.Min(Math.Min(baseW, baseH) / 2f, shape.CornerRadius * scale);
+                                customCropPath = CreateRoundedRectPath(new Rectangle(0, 0, Math.Max(1, (int)baseW), Math.Max(1, (int)baseH)), Math.Max(1, (int)rPx));
+                            }
+                            else
+                            {
+                                customCropPath = CreateCropShapePath(shape.CropShapeType, 0, 0, baseW, baseH);
+                            }
+                        }
+                        else if (shape.CornerRadius > 0f)
+                        {
+                            float rPx = Math.Min(Math.Min(baseW, baseH) / 2f, shape.CornerRadius * scale);
+                            customCropPath = CreateRoundedRectPath(new Rectangle(0, 0, Math.Max(1, (int)baseW), Math.Max(1, (int)baseH)), Math.Max(1, (int)rPx));
                         }
                         else if (shape.Type != ShapeType.Image && shape.Type != ShapeType.TextBox && shape.Type != ShapeType.Rectangle)
                         {
@@ -15838,23 +19202,10 @@ namespace ZenQOffice.UI
             // Render Text
             bool isEditingThis = isSelected && IsInlineEditing && EditingShape == shape;
             string dispText = isEditingThis ? EditingTextBuffer : shape.Text;
-            if (string.IsNullOrEmpty(dispText) && isSelected)
-            {
-                dispText = (shape.Type == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : "";
-            }
 
             if (!string.IsNullOrEmpty(dispText) || isEditingThis)
             {
                 RectangleF textBounds = GetShapeTextBounds(shape, baseW, baseH, scale);
-
-                // If editing, draw subtle inner dashed boundary
-                if (isEditingThis)
-                {
-                    using (Pen editBoxPen = new Pen(Color.FromArgb(160, 59, 130, 246), 1.0f) { DashStyle = DashStyle.Dash })
-                    {
-                        g.DrawRectangle(editBoxPen, textBounds.X, textBounds.Y, textBounds.Width, textBounds.Height);
-                    }
-                }
 
                 float calculatedFontSize = Math.Max(1.0f, shape.FontSize * scale);
                 FontStyle editFs = FontStyle.Regular;
@@ -15893,14 +19244,11 @@ namespace ZenQOffice.UI
                                         int subStart = Math.Max(0, selStart - lineStart);
                                         int subEnd = Math.Min(vl.Length, selEnd - lineStart);
 
-                                        string pre = vl.Text.Substring(0, Math.Min(subStart, vl.Text.Length));
-                                        string selTxt = vl.Text.Substring(subStart, Math.Min(subEnd - subStart, vl.Text.Length - subStart));
+                                        float preW = MeasureSegmentsWidth(g, shape, dispText, lineStart, subStart, scale, font);
+                                        float selW = MeasureSegmentsWidth(g, shape, dispText, lineStart + subStart, subEnd - subStart, scale, font);
 
-                                        float preW = g.MeasureString(pre, font, PointF.Empty, StringFormat.GenericTypographic).Width;
-                                        float selW = g.MeasureString(selTxt, font, PointF.Empty, StringFormat.GenericTypographic).Width;
-
+                                        float lineWidth = MeasureSegmentsWidth(g, shape, dispText, lineStart, vl.Length, scale, font);
                                         float curX;
-                                        float lineWidth = g.MeasureString(vl.Text.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
                                         if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
                                             curX = textBounds.X;
                                         else if (effAlign == TextAlignment.Right)
@@ -15917,23 +19265,58 @@ namespace ZenQOffice.UI
 
                         if (!string.IsNullOrEmpty(dispText) && textAlpha > 0)
                         {
-                            using (SolidBrush txtBrush = new SolidBrush(txtCol))
+                            for (int li = 0; li < visualLines.Count; li++)
                             {
-                                for (int li = 0; li < visualLines.Count; li++)
-                                {
-                                    string lineText = visualLines[li].Text;
-                                    if (string.IsNullOrEmpty(lineText)) continue;
-                                    float lineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
-                                    float curX;
-                                    if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
-                                        curX = textBounds.X;
-                                    else if (effAlign == TextAlignment.Right)
-                                        curX = textBounds.Right - lineWidth;
-                                    else
-                                        curX = textBounds.X + (textBounds.Width - lineWidth) / 2f;
+                                VisualTextLine vl = visualLines[li];
+                                if (string.IsNullOrEmpty(vl.Text)) continue;
 
-                                    float curY = drawStartY + li * lineHeight;
-                                    g.DrawString(lineText.TrimEnd(), font, txtBrush, curX, curY, StringFormat.GenericTypographic);
+                                var segments = GetVisualLineRunSegments(g, shape, dispText, vl.StartCharIndex, vl.Length, scale, font, txtCol);
+                                float totalLineW = 0f;
+                                foreach (var seg in segments) totalLineW += seg.Width;
+
+                                float curX;
+                                if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
+                                    curX = textBounds.X;
+                                else if (effAlign == TextAlignment.Right)
+                                    curX = textBounds.Right - totalLineW;
+                                else
+                                    curX = textBounds.X + (textBounds.Width - totalLineW) / 2f;
+
+                                float curY = drawStartY + li * lineHeight;
+
+                                foreach (var seg in segments)
+                                {
+                                    if (seg.HasHighlight && (seg.HighlightColor.ToArgb() & 0xFFFFFF) != 0)
+                                    {
+                                        using (SolidBrush hlB = new SolidBrush(seg.HighlightColor))
+                                        {
+                                            g.FillRectangle(hlB, curX, curY, seg.Width, lineHeight);
+                                        }
+                                    }
+
+                                    if (seg.HasGradient && seg.GradientStops != null && seg.GradientStops.Count >= 2)
+                                    {
+                                        RectangleF segR = new RectangleF(curX, curY, Math.Max(1f, seg.Width), lineHeight);
+                                        using (LinearGradientBrush lgb = new LinearGradientBrush(segR, seg.Color, seg.GradientColor2, seg.GradientAngle))
+                                        {
+                                            ColorBlend cb = new ColorBlend(seg.GradientStops.Count);
+                                            for (int k = 0; k < seg.GradientStops.Count; k++)
+                                            {
+                                                cb.Colors[k] = Color.FromArgb(seg.GradientStops[k].Color);
+                                                cb.Positions[k] = seg.GradientStops[k].Position;
+                                            }
+                                            lgb.InterpolationColors = cb;
+                                            g.DrawString(seg.Text, seg.Font, lgb, curX, curY, StringFormat.GenericTypographic);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        using (SolidBrush txtB = new SolidBrush(seg.Color))
+                                        {
+                                            g.DrawString(seg.Text, seg.Font, txtB, curX, curY, StringFormat.GenericTypographic);
+                                        }
+                                    }
+                                    curX += seg.Width;
                                 }
                             }
                         }
@@ -15954,11 +19337,12 @@ namespace ZenQOffice.UI
                             }
                         }
 
-                        string cLineText = (curLineIdx < visualLines.Count) ? visualLines[curLineIdx].Text : "";
-                        string beforeCaret = cLineText.Substring(0, Math.Min(colInLine, cLineText.Length));
+                        int cvlStart = (curLineIdx < visualLines.Count) ? visualLines[curLineIdx].StartCharIndex : 0;
+                        int cvlLen = (curLineIdx < visualLines.Count) ? visualLines[curLineIdx].Length : 0;
+                        int colLen = Math.Min(colInLine, cvlLen);
 
-                        float cLineWidth = g.MeasureString(cLineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
-                        float beforeWidth = g.MeasureString(beforeCaret, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                        float cLineWidth = MeasureSegmentsWidth(g, shape, dispText, cvlStart, cvlLen, scale, font);
+                        float beforeWidth = MeasureSegmentsWidth(g, shape, dispText, cvlStart, colLen, scale, font);
 
                         float lineStartX;
                         if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
@@ -16119,9 +19503,27 @@ namespace ZenQOffice.UI
                                 }
                                 else
                                 {
-                                    bool useRichRuns = (shape.TextRuns != null && (shape.TextRuns.Count > 1 || (shape.TextRuns.Count == 1 && (shape.TextRuns[0].HasGradient || shape.TextRuns[0].HasHighlight || shape.TextRuns[0].ParaLineSpacing.HasValue || shape.TextRuns[0].ParaSpaceBefore.HasValue || shape.TextRuns[0].ParaSpaceAfter.HasValue)))) || shape.Alignment == TextAlignment.Justify || Math.Abs(shape.LineSpacing - 1.2f) > 0.01f || (dispText != null && dispText.Contains('\n'));
+                                    bool useRichRuns = shape.HasTextGradient || (shape.TextRuns != null && (shape.TextRuns.Count > 1 || (shape.TextRuns.Count == 1 && (shape.TextRuns[0].HasGradient || shape.TextRuns[0].HasHighlight || shape.TextRuns[0].ParaLineSpacing.HasValue || shape.TextRuns[0].ParaSpaceBefore.HasValue || shape.TextRuns[0].ParaSpaceAfter.HasValue)))) || shape.Alignment == TextAlignment.Justify || Math.Abs(shape.LineSpacing - 1.2f) > 0.01f || (dispText != null && dispText.Contains('\n'));
                                     if (useRichRuns)
                                     {
+                                        if (shape.HasTextGradient && shape.TextGradientStopColors != null && shape.TextGradientStopColors.Count >= 2 && (shape.TextRuns == null || shape.TextRuns.Count == 0 || !shape.TextRuns[0].HasGradient))
+                                        {
+                                            float ang = (shape.TextGradientStyle == "Linear180") ? 90f : (shape.TextGradientStyle == "Linear135" ? 45f : 0f);
+                                            var gStops = new List<GradientStop>();
+                                            for (int k = 0; k < shape.TextGradientStopColors.Count; k++)
+                                            {
+                                                float pos = (shape.TextGradientStopPositions != null && k < shape.TextGradientStopPositions.Count) ? shape.TextGradientStopPositions[k] : (float)k / (shape.TextGradientStopColors.Count - 1);
+                                                gStops.Add(new GradientStop(shape.TextGradientStopColors[k], pos));
+                                            }
+                                            if (shape.TextRuns == null || shape.TextRuns.Count == 0)
+                                            {
+                                                shape.TextRuns = new List<SlideTextRun> { new SlideTextRun(shape.Text ?? "", shape.TextColor, shape.FontSize, shape.Bold, shape.FontName) { Italic = shape.Italic, Underline = shape.Underline, Strikethrough = shape.Strikethrough } };
+                                            }
+                                            if (shape.TextRuns != null)
+                                            {
+                                                foreach (var r in shape.TextRuns) { r.HasGradient = true; r.TextColor = shape.TextGradientStopColors[0]; r.GradientColor2 = shape.TextGradientStopColors[shape.TextGradientStopColors.Count - 1]; r.GradientAngle = ang; r.GradientStops = gStops; }
+                                            }
+                                        }
                                         DrawShapeTextRuns(g, shape, textBounds, scale, opacityMultiplier);
                                     }
                                     else
@@ -16353,6 +19755,80 @@ namespace ZenQOffice.UI
                     isFirstLineOfPara = true;
                     currentLine = new VisualRunLine { IsFirstLineOfPara = true };
                     curLineW = 0f;
+                    continue;
+                }
+
+                if (!tok.IsNewline && !tok.IsSpace && tok.Width > maxW && !string.IsNullOrEmpty(tok.Text))
+                {
+                    if (currentLine.Tokens.Count > 0)
+                    {
+                        lines.Add(currentLine);
+                        isFirstLineOfPara = false;
+                        currentLine = new VisualRunLine { IsFirstLineOfPara = false };
+                        curLineW = 0f;
+                    }
+
+                    string fullWord = tok.Text;
+                    int charPos = 0;
+                    while (charPos < fullWord.Length)
+                    {
+                        int fitLen = 1;
+                        float lastFitW = 0f;
+                        for (int l = 1; l <= fullWord.Length - charPos; l++)
+                        {
+                            string testSub = fullWord.Substring(charPos, l);
+                            float testW = g.MeasureString(testSub, tok.Font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                            if (testW <= maxW)
+                            {
+                                fitLen = l;
+                                lastFitW = testW;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+
+                        string chunkStr = fullWord.Substring(charPos, fitLen);
+                        float chunkW = lastFitW > 0f ? lastFitW : g.MeasureString(chunkStr, tok.Font, PointF.Empty, StringFormat.GenericTypographic).Width;
+
+                        ShapeTextToken chunkTok = new ShapeTextToken
+                        {
+                            Text = chunkStr,
+                            Color = tok.Color,
+                            Font = tok.Font,
+                            Width = chunkW,
+                            IsSpace = false,
+                            IsNewline = false,
+                            HasHighlight = tok.HasHighlight,
+                            HighlightColor = tok.HighlightColor,
+                            HasGradient = tok.HasGradient,
+                            GradientColor2 = tok.GradientColor2,
+                            GradientAngle = tok.GradientAngle,
+                            GradientStops = tok.GradientStops,
+                            ParaLineSpacing = tok.ParaLineSpacing,
+                            ParaSpaceBefore = tok.ParaSpaceBefore,
+                            ParaSpaceAfter = tok.ParaSpaceAfter,
+                            ParaAlignment = tok.ParaAlignment
+                        };
+
+                        if (!currentLine.LineSpacing.HasValue) currentLine.LineSpacing = chunkTok.ParaLineSpacing;
+                        if (!currentLine.SpaceBefore.HasValue) currentLine.SpaceBefore = chunkTok.ParaSpaceBefore;
+                        if (!currentLine.SpaceAfter.HasValue) currentLine.SpaceAfter = chunkTok.ParaSpaceAfter;
+                        if (!currentLine.Alignment.HasValue) currentLine.Alignment = chunkTok.ParaAlignment;
+
+                        currentLine.Tokens.Add(chunkTok);
+                        curLineW += chunkW;
+                        charPos += fitLen;
+
+                        if (charPos < fullWord.Length)
+                        {
+                            lines.Add(currentLine);
+                            isFirstLineOfPara = false;
+                            currentLine = new VisualRunLine { IsFirstLineOfPara = false };
+                            curLineW = 0f;
+                        }
+                    }
                     continue;
                 }
 
@@ -17265,9 +20741,7 @@ namespace ZenQOffice.UI
         public static bool CanShapeRoundCorners(ShapeNode shape)
         {
             if (shape == null) return false;
-            if (shape.Type == ShapeType.Image || !string.IsNullOrEmpty(shape.ImagePath) || shape.CachedImage != null) return false;
-            if (shape.Type == ShapeType.CustomPath || shape.Type == ShapeType.Table || shape.Type == ShapeType.Chart || shape.Type == ShapeType.Video || shape.Type == ShapeType.Line || shape.Type == ShapeType.Ellipse) return false;
-            return (shape.Type == ShapeType.RoundedRectangle || shape.Type == ShapeType.Rectangle || shape.Type == ShapeType.TextBox);
+            return shape.Type == ShapeType.Rectangle || shape.Type == ShapeType.RoundedRectangle || shape.Type == ShapeType.TextBox || shape.Type == ShapeType.Image || shape.Type == ShapeType.Video || shape.Type == ShapeType.Hexagon || shape.Type == ShapeType.Triangle || shape.Type == ShapeType.Diamond || shape.Type == ShapeType.Star;
         }
 
         private void DrawSelectedShapeHandles(D2DGraphics g, float sx, float sy, float sw, float sh, float rotation, ShapeNode shape = null)
@@ -17287,13 +20761,19 @@ namespace ZenQOffice.UI
                 g.TranslateTransform(-center.X, -center.Y);
             }
 
-            // 1. Draw dashed selection rectangle (Rotated with the shape)
-            using (Pen boxPen = new Pen(Color.FromArgb(0, 120, 215), 1.4f) { DashStyle = DashStyle.Dash })
+            bool isEditingTarget = IsInlineEditing && EditingShape == targetShape;
+
+            // 1. Subtle MS Office grey selection frame (dashed when typing, solid when selected)
+            using (Pen boxPen = new Pen(Color.FromArgb(156, 163, 175), 1.0f))
             {
+                if (isEditingTarget)
+                {
+                    boxPen.DashStyle = DashStyle.Dash;
+                }
                 g.DrawRectangle(boxPen, sx, sy, sw, sh);
             }
 
-            // 2. Draw 8 Resize Handles (Small white squares with blue borders)
+            // 2. Draw 8 Resize Handles (Refined MS Office circular white handles with subtle grey border)
             PointF[] localHandles = new PointF[]
             {
                 new PointF(sx, sy),                  // 0: Top-Left
@@ -17306,73 +20786,65 @@ namespace ZenQOffice.UI
                 new PointF(sx, sy + sh / 2f)           // 7: Left-Center
             };
 
-            for (int i = 0; i < localHandles.Length; i++)
+            bool isNarrowBox = (sw < 38f);
+            bool isShortBox = (sh < 38f);
+            using (Pen hPen = new Pen(Color.FromArgb(136, 142, 150), 1.15f))
             {
-                PointF h = localHandles[i];
-                RectangleF hRect = new RectangleF(h.X - 4.5f, h.Y - 4.5f, 9f, 9f);
-                g.FillRectangle(Brushes.White, hRect);
-                using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+                for (int i = 0; i < localHandles.Length; i++)
                 {
-                    g.DrawRectangle(hPen, hRect.X, hRect.Y, hRect.Width, hRect.Height);
+                    if (isNarrowBox && (i == 1 || i == 5)) continue;
+                    if (isShortBox && (i == 3 || i == 7)) continue;
+
+                    PointF h = localHandles[i];
+                    RectangleF hRect = new RectangleF(h.X - 4.0f, h.Y - 4.0f, 8.0f, 8.0f);
+                    g.FillEllipse(Brushes.White, hRect);
+                    g.DrawEllipse(hPen, hRect.X, hRect.Y, hRect.Width, hRect.Height);
                 }
             }
 
-            // 3. Draw Connecting Stem to Rotation Knob
+            // 3. Top Rotation Handle (MS PowerPoint subtle grey circular arrow above top-center)
             PointF topCenter = localHandles[1];
-            PointF rotHandle = new PointF(topCenter.X, topCenter.Y - 24f);
-            using (Pen stemPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+            PointF rotHandle = new PointF(topCenter.X, topCenter.Y - 22f);
+            if (!isNarrowBox)
             {
-                g.DrawLine(stemPen, topCenter.X, topCenter.Y, rotHandle.X, rotHandle.Y);
+                using (Pen stemPen = new Pen(Color.FromArgb(156, 163, 175), 1.0f))
+                {
+                    g.DrawLine(stemPen, topCenter.X, topCenter.Y - 4.0f, rotHandle.X, rotHandle.Y + 8.0f);
+                }
             }
 
-            // 4. Draw Circular Rotation Arrow Knob (Windows 11 Fluent Rotate Icon)
-            RectangleF rotCircle = new RectangleF(rotHandle.X - 10f, rotHandle.Y - 10f, 20f, 20f);
-            using (SolidBrush whiteBg = new SolidBrush(Color.White))
-            using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
+            // Draw clean circular rotation arrow (MS Office style)
+            using (Pen rotPen = new Pen(Color.FromArgb(120, 126, 135), 1.45f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush rotHeadB = new SolidBrush(Color.FromArgb(120, 126, 135)))
             {
-                g.FillEllipse(whiteBg, rotCircle);
-                g.DrawEllipse(borderPen, rotCircle);
-
-                RectangleF iconRect = new RectangleF(rotHandle.X - 6.5f, rotHandle.Y - 6.5f, 13f, 13f);
-                FluentIconRenderer.DrawGlyph(g, '\uE7AD', iconRect, Color.FromArgb(30, 41, 59), 11f);
+                RectangleF arcR = new RectangleF(rotHandle.X - 6.5f, rotHandle.Y - 6.5f, 13.0f, 13.0f);
+                g.DrawArc(rotPen, arcR, -55f, 290f);
+                // Arrowhead at top-right of arc
+                PointF tip = new PointF(rotHandle.X + 4.8f, rotHandle.Y - 4.2f);
+                g.FillPolygon(rotHeadB, new PointF[]
+                {
+                    new PointF(tip.X + 1.5f, tip.Y + 2.2f),
+                    new PointF(tip.X - 3.2f, tip.Y + 1.4f),
+                    new PointF(tip.X - 0.4f, tip.Y - 2.8f)
+                });
             }
 
-            // 5. Draw Corner Rounding Handle at Top-Right (Icon bo góc bên phải góc trên của hình vuông/chữ nhật)
-            PointF unrotatedCornerH = PointF.Empty;
-            if (CanShapeRoundCorners(targetShape))
+            // 4. Bottom 4-way Move Handle (✥) for narrow / auto-width TextBoxes (exact MS PowerPoint single-click TextBox look)
+            if (targetShape != null && targetShape.Type == ShapeType.TextBox && (targetShape.AutoFitWidth || sw < 90f))
             {
-                PointF topRight = localHandles[2];
-                float cornerHandleX = (sw < 50f) ? (topRight.X + (50f - sw) * 0.7f) : topRight.X;
-                float cornerHandleY = topRight.Y - 24f;
-                unrotatedCornerH = new PointF(cornerHandleX, cornerHandleY);
-
-                // Connecting Stem to Corner Rounding Knob
-                using (Pen cornerStemPen = new Pen(Color.FromArgb(217, 119, 6), 1.2f))
+                PointF botCenter = localHandles[5];
+                PointF moveCenter = new PointF(botCenter.X, botCenter.Y + 20f);
+                float arm = 6.5f;
+                using (Pen mvPen = new Pen(Color.FromArgb(120, 126, 135), 1.35f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (SolidBrush mvHeadB = new SolidBrush(Color.FromArgb(120, 126, 135)))
                 {
-                    g.DrawLine(cornerStemPen, topRight.X, topRight.Y, cornerHandleX, cornerHandleY);
-                }
+                    g.DrawLine(mvPen, moveCenter.X - arm, moveCenter.Y, moveCenter.X + arm, moveCenter.Y);
+                    g.DrawLine(mvPen, moveCenter.X, moveCenter.Y - arm, moveCenter.X, moveCenter.Y + arm);
 
-                // Circular Badge for Corner Rounding Knob (20x20 circle, white background with amber border & drop shadow)
-                RectangleF cornerCircle = new RectangleF(cornerHandleX - 10f, cornerHandleY - 10f, 20f, 20f);
-                using (SolidBrush shadowBg = new SolidBrush(Color.FromArgb(35, 0, 0, 0)))
-                {
-                    g.FillEllipse(shadowBg, cornerCircle.X + 1f, cornerCircle.Y + 1.5f, cornerCircle.Width, cornerCircle.Height);
-                }
-                using (SolidBrush whiteBg = new SolidBrush(Color.White))
-                using (Pen borderPen = new Pen(Color.FromArgb(217, 119, 6), 1.4f))
-                using (Pen refPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { DashStyle = DashStyle.Dot })
-                using (Pen arcPen = new Pen(Color.FromArgb(217, 119, 6), 2.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                {
-                    g.FillEllipse(whiteBg, cornerCircle);
-                    g.DrawEllipse(borderPen, cornerCircle);
-
-                    // Square corner reference: dotted L shape (outside guide)
-                    g.DrawLine(refPen, cornerHandleX - 4.5f, cornerHandleY + 4f, cornerHandleX - 4.5f, cornerHandleY - 4.5f);
-                    g.DrawLine(refPen, cornerHandleX - 4.5f, cornerHandleY - 4.5f, cornerHandleX + 4f, cornerHandleY - 4.5f);
-
-                    // Rounded corner arc (inside curve)
-                    RectangleF arcRect = new RectangleF(cornerHandleX - 4.5f, cornerHandleY - 4.5f, 10f, 10f);
-                    g.DrawArc(arcPen, arcRect, 180, 90);
+                    g.FillPolygon(mvHeadB, new PointF[] { new PointF(moveCenter.X - arm - 2.2f, moveCenter.Y), new PointF(moveCenter.X - arm + 1.2f, moveCenter.Y - 2.3f), new PointF(moveCenter.X - arm + 1.2f, moveCenter.Y + 2.3f) });
+                    g.FillPolygon(mvHeadB, new PointF[] { new PointF(moveCenter.X + arm + 2.2f, moveCenter.Y), new PointF(moveCenter.X + arm - 1.2f, moveCenter.Y - 2.3f), new PointF(moveCenter.X + arm - 1.2f, moveCenter.Y + 2.3f) });
+                    g.FillPolygon(mvHeadB, new PointF[] { new PointF(moveCenter.X, moveCenter.Y - arm - 2.2f), new PointF(moveCenter.X - 2.3f, moveCenter.Y - arm + 1.2f), new PointF(moveCenter.X + 2.3f, moveCenter.Y - arm + 1.2f) });
+                    g.FillPolygon(mvHeadB, new PointF[] { new PointF(moveCenter.X, moveCenter.Y + arm + 2.2f), new PointF(moveCenter.X - 2.3f, moveCenter.Y + arm - 1.2f), new PointF(moveCenter.X + 2.3f, moveCenter.Y + arm - 1.2f) });
                 }
             }
 
@@ -17416,11 +20888,6 @@ namespace ZenQOffice.UI
                 DrawRotationDegreeBadge(g, center, rotation, rotHandle);
             }
 
-            // 8. Corner Radius Tooltip Badge (Hiển thị số pixel bo góc thời gian thực)
-            if (IsAdjustingCornerRadius && targetShape != null && !unrotatedCornerH.IsEmpty)
-            {
-                DrawCornerRadiusBadge(g, center, rotation, unrotatedCornerH, targetShape.GetEffectiveCornerRadius());
-            }
         }
 
         private void DrawCornerRadiusBadge(D2DGraphics g, PointF center, float rotation, PointF unrotatedCornerH, float radiusPx)
@@ -17806,7 +21273,7 @@ namespace ZenQOffice.UI
                 VisualTextLine vLine = visualLines[lineIdx];
                 string lineText = vLine.Text ?? "";
 
-                float cLineWidth = g.MeasureString(lineText.TrimEnd(), font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                float cLineWidth = MeasureSegmentsWidth(g, shape, text, vLine.StartCharIndex, vLine.Length, scale, font);
                 var effAlign = (shape.TextRuns != null && shape.TextRuns.Count > 0 && shape.TextRuns[0].ParaAlignment.HasValue) ? shape.TextRuns[0].ParaAlignment.Value : shape.Alignment;
                 float lineStartX;
                 if (effAlign == TextAlignment.Left || effAlign == TextAlignment.Justify)
@@ -17831,8 +21298,7 @@ namespace ZenQOffice.UI
                 float bestDist = float.MaxValue;
                 for (int c = 0; c <= lineText.Length; c++)
                 {
-                    string sub = lineText.Substring(0, c);
-                    float subW = g.MeasureString(sub, font, PointF.Empty, StringFormat.GenericTypographic).Width;
+                    float subW = MeasureSegmentsWidth(g, shape, text, vLine.StartCharIndex, c, scale, font);
                     float dist = Math.Abs(subW - clickRelToLineX);
                     if (dist < bestDist)
                     {
@@ -17853,7 +21319,7 @@ namespace ZenQOffice.UI
             {
                 case ShapeType.Rectangle:
                 case ShapeType.TextBox:
-                    if (type == ShapeType.Rectangle && cornerRadius > 0.5f)
+                    if ((type == ShapeType.Rectangle || type == ShapeType.TextBox) && cornerRadius > 0.5f)
                     {
                         float maxR = Math.Min(w, h) / 2f;
                         float r = Math.Min(maxR, cornerRadius);
@@ -19739,9 +23205,80 @@ namespace ZenQOffice.UI
 
             menu.Items.Add(new ToolStripSeparator());
 
-            // 7. Hyperlink & Search & Alt Text
-            ToolStripMenuItem miLink = new ToolStripMenuItem("Liên kết (Hyperlink)...", CreateLinkIcon(), (s, e) => {
+            // 7. Hyperlink, Action Settings & Interactive Quiz Trigger
+            ToolStripMenuItem miLink = new ToolStripMenuItem("Liên kết & Nhảy Slide (Hyperlink - Ctrl+K)...", CreateLinkIcon(), (s, e) => {
+                OpenHyperlinkDialog(parentControl);
             });
+            ToolStripMenuItem miActionSettings = new ToolStripMenuItem("⚡ Cài đặt Hành động & Âm thanh (Action Settings)...", null, (s, e) => {
+                OpenActionSettingsDialog(parentControl);
+            });
+            ToolStripMenuItem miQuickQuiz = new ToolStripMenuItem("🎯 Gán Trắc nghiệm & Liên kết nhanh ▸");
+            miQuickQuiz.DropDownItems.Add("✅ Đặt làm Đáp án ĐÚNG (Hiệu ứng Xanh + Chuông Chime)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.QuizCorrect;
+                shape.ClickSound = SlideActionSound.Chime;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miQuickQuiz.DropDownItems.Add("❌ Đặt làm Đáp án SAI (Hiệu ứng Rung Đỏ + Còi Buzzer)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.QuizWrong;
+                shape.ClickSound = SlideActionSound.Buzzer;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miQuickQuiz.DropDownItems.Add(new ToolStripSeparator());
+            miQuickQuiz.DropDownItems.Add("▶ Nút chuyển tới Trang chiếu tiếp theo (Next Slide)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.NextSlide;
+                shape.ClickSound = SlideActionSound.Click;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miQuickQuiz.DropDownItems.Add("◀ Nút quay lại Trang chiếu trước đó (Previous Slide)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.PreviousSlide;
+                shape.ClickSound = SlideActionSound.Click;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miQuickQuiz.DropDownItems.Add("🏠 Nút về Trang chiếu đầu tiên (First Slide)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.FirstSlide;
+                shape.ClickSound = SlideActionSound.Click;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            miQuickQuiz.DropDownItems.Add("⏹ Nút Kết thúc trình chiếu (End Show)", null, (s, e) => {
+                SaveUndoState();
+                shape.ClickActionType = SlideActionType.EndShow;
+                shape.ClickSound = SlideActionSound.Click;
+                shape.ClickHighlight = true;
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (parentControl != null) parentControl.Invalidate();
+            });
+            if (shape.HasInteractiveAction)
+            {
+                miQuickQuiz.DropDownItems.Add(new ToolStripSeparator());
+                miQuickQuiz.DropDownItems.Add("🗑 Xóa Liên kết / Hành động trên hình này", null, (s, e) => {
+                    SaveUndoState();
+                    shape.ClickActionType = SlideActionType.None;
+                    shape.ClickTargetSlideIndex = -1;
+                    shape.ClickTargetUrl = "";
+                    shape.ClickSound = SlideActionSound.None;
+                    shape.ClickRevealShapeId = "";
+                    shape.HoverActionType = SlideActionType.None;
+                    shape.HoverSound = SlideActionSound.None;
+                    if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                    if (parentControl != null) parentControl.Invalidate();
+                });
+            }
+
             ToolStripMenuItem miSavePic = new ToolStripMenuItem("Lưu dưới dạng Hình ảnh...", CreateSavePicIcon(), (s, e) => {
                 SaveShapeAsPicture(shape);
             });
@@ -19762,6 +23299,8 @@ namespace ZenQOffice.UI
             });
 
             menu.Items.Add(miLink);
+            menu.Items.Add(miActionSettings);
+            menu.Items.Add(miQuickQuiz);
             menu.Items.Add(miSavePic);
             menu.Items.Add(miSizePos);
             menu.Items.Add(miFormatShape);
@@ -19772,13 +23311,229 @@ namespace ZenQOffice.UI
 
         private SlideNode _slidesClipboardSlide = null;
 
+        public static Image CreatePasteHeaderClipboardIcon()
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (Pen boardPen = new Pen(Color.FromArgb(180, 130, 70), 1.2f))
+                using (SolidBrush boardFill = new SolidBrush(Color.FromArgb(238, 198, 135)))
+                {
+                    g.FillRectangle(boardFill, 2, 2, 10, 12);
+                    g.DrawRectangle(boardPen, 2, 2, 10, 12);
+                }
+                using (SolidBrush clipBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.FillRectangle(clipBrush, 5, 1, 4, 2);
+                }
+                using (SolidBrush pageFill = new SolidBrush(Color.White))
+                using (Pen pagePen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+                {
+                    g.FillRectangle(pageFill, 6, 5, 8, 9);
+                    g.DrawRectangle(pagePen, 6, 5, 8, 9);
+                    g.DrawLine(pagePen, 8, 8, 12, 8);
+                    g.DrawLine(pagePen, 8, 11, 12, 11);
+                }
+            }
+            return bmp;
+        }
+
+        private void AddPowerPointPasteOptionsToMenu(ContextMenuStrip menu, bool canPaste, Action onPasteTheme, Action onPastePicture)
+        {
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):", CreatePasteHeaderClipboardIcon());
+            miPasteHeader.Enabled = false;
+            menu.Items.Add(miPasteHeader);
+
+            Panel pasteRow = new Panel();
+            pasteRow.Size = new Size(190, 32);
+            pasteRow.BackColor = Color.Transparent;
+            pasteRow.Margin = new Padding(28, 2, 4, 4);
+
+            int hoverBtn = -1;
+            Rectangle btn0Rect = new Rectangle(2, 2, 28, 28);
+            Rectangle btn1Rect = new Rectangle(36, 2, 28, 28);
+            ToolTip tip = new ToolTip();
+
+            pasteRow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                for (int b = 0; b < 2; b++)
+                {
+                    Rectangle r = (b == 0) ? btn0Rect : btn1Rect;
+                    bool isHov = (hoverBtn == b) && canPaste;
+                    using (SolidBrush bg = new SolidBrush(isHov ? Color.FromArgb(226, 232, 240) : Color.FromArgb(248, 250, 252)))
+                    using (Pen border = new Pen(isHov ? Color.FromArgb(148, 163, 184) : Color.FromArgb(215, 222, 232), 1f))
+                    {
+                        e.Graphics.FillRectangle(bg, r);
+                        e.Graphics.DrawRectangle(border, r);
+                    }
+
+                    int ox = r.X + 5;
+                    int oy = r.Y + 4;
+                    Color clipCol = canPaste ? Color.FromArgb(217, 119, 6) : Color.FromArgb(180, 188, 198);
+                    using (Pen cp = new Pen(clipCol, 1.2f))
+                    using (SolidBrush cb = new SolidBrush(clipCol))
+                    {
+                        e.Graphics.DrawRectangle(cp, ox + 1, oy + 3, 10, 12);
+                        e.Graphics.FillRectangle(cb, ox + 4, oy + 1, 4, 3);
+                    }
+                    if (b == 0)
+                    {
+                        Color badgeCol = canPaste ? Color.FromArgb(210, 71, 38) : Color.FromArgb(165, 175, 188);
+                        using (SolidBrush wBg = new SolidBrush(Color.White))
+                        using (Pen bp = new Pen(badgeCol, 1.2f))
+                        using (Font f = new Font("Segoe UI", 6.5f, FontStyle.Bold))
+                        using (SolidBrush tb = new SolidBrush(badgeCol))
+                        {
+                            e.Graphics.FillRectangle(wBg, ox + 7, oy + 8, 10, 10);
+                            e.Graphics.DrawRectangle(bp, ox + 7, oy + 8, 10, 10);
+                            e.Graphics.DrawString("A", f, tb, ox + 8, oy + 7);
+                        }
+                    }
+                    else
+                    {
+                        Color badgeCol = canPaste ? Color.FromArgb(37, 99, 235) : Color.FromArgb(165, 175, 188);
+                        using (SolidBrush wBg = new SolidBrush(Color.White))
+                        using (Pen bp = new Pen(badgeCol, 1.2f))
+                        using (SolidBrush sb = new SolidBrush(badgeCol))
+                        {
+                            e.Graphics.FillRectangle(wBg, ox + 7, oy + 8, 10, 10);
+                            e.Graphics.DrawRectangle(bp, ox + 7, oy + 8, 10, 10);
+                            e.Graphics.FillEllipse(sb, ox + 9, oy + 10, 3, 3);
+                            Point[] mtn = new Point[] { new Point(ox + 8, oy + 17), new Point(ox + 12, oy + 13), new Point(ox + 16, oy + 17) };
+                            e.Graphics.DrawLines(bp, mtn);
+                        }
+                    }
+                }
+            };
+
+            pasteRow.MouseMove += (s, e) =>
+            {
+                int newHov = -1;
+                if (btn0Rect.Contains(e.Location)) newHov = 0;
+                else if (btn1Rect.Contains(e.Location)) newHov = 1;
+                if (newHov != hoverBtn)
+                {
+                    hoverBtn = newHov;
+                    pasteRow.Cursor = (hoverBtn >= 0 && canPaste) ? Cursors.Hand : Cursors.Default;
+                    if (hoverBtn == 0) tip.SetToolTip(pasteRow, "Dùng Giao diện Đích (Use Destination Theme)");
+                    else if (hoverBtn == 1) tip.SetToolTip(pasteRow, "Hình ảnh (Picture)");
+                    else tip.SetToolTip(pasteRow, "");
+                    pasteRow.Invalidate();
+                }
+            };
+
+            pasteRow.MouseLeave += (s, e) =>
+            {
+                if (hoverBtn != -1)
+                {
+                    hoverBtn = -1;
+                    pasteRow.Cursor = Cursors.Default;
+                    pasteRow.Invalidate();
+                }
+            };
+
+            pasteRow.MouseUp += (s, e) =>
+            {
+                if (!canPaste || e.Button != MouseButtons.Left) return;
+                if (btn0Rect.Contains(e.Location))
+                {
+                    menu.Close();
+                    if (onPasteTheme != null) onPasteTheme();
+                }
+                else if (btn1Rect.Contains(e.Location))
+                {
+                    menu.Close();
+                    if (onPastePicture != null) onPastePicture();
+                }
+            };
+
+            ToolStripControlHost pasteHost = new ToolStripControlHost(pasteRow);
+            pasteHost.Margin = new Padding(26, 0, 2, 2);
+            pasteHost.AutoSize = false;
+            pasteHost.Size = new Size(190, 32);
+            menu.Items.Add(pasteHost);
+        }
+
+        public void ShowEmptyThumbnailPaneContextMenu(Control parentControl, Point screenPos, int insertAfterSlideIndex)
+        {
+            if (Presentation == null) return;
+            if (insertAfterSlideIndex < -1) insertAfterSlideIndex = -1;
+            if (insertAfterSlideIndex >= Presentation.Slides.Count) insertAfterSlideIndex = Presentation.Slides.Count - 1;
+            EmptyGapInsertAfterSlideIndex = insertAfterSlideIndex;
+            if (parentControl != null) parentControl.Invalidate();
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = true;
+
+            bool canPaste = (_slidesClipboardSlide != null || Clipboard.ContainsImage());
+            AddPowerPointPasteOptionsToMenu(menu, canPaste, () =>
+            {
+                EmptyGapInsertAfterSlideIndex = -1;
+                if (_slidesClipboardSlide != null)
+                {
+                    SaveUndoState();
+                    PasteSlide(insertAfterSlideIndex);
+                }
+                else if (Clipboard.ContainsImage())
+                {
+                    SaveUndoState();
+                    InsertNewSlideAfter(insertAfterSlideIndex);
+                    Paste();
+                }
+                if (parentControl != null) parentControl.Invalidate();
+            }, () =>
+            {
+                EmptyGapInsertAfterSlideIndex = -1;
+                SaveUndoState();
+                if (_slidesClipboardSlide != null)
+                {
+                    PasteSlide(insertAfterSlideIndex);
+                }
+                else if (Clipboard.ContainsImage())
+                {
+                    InsertNewSlideAfter(insertAfterSlideIndex);
+                    Paste();
+                }
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem miNewSlide = new ToolStripMenuItem("Trang chiếu Mới (New Slide)", CreateNewSlideMenuIcon(), (s, e) =>
+            {
+                EmptyGapInsertAfterSlideIndex = -1;
+                SaveUndoState();
+                InsertNewSlideAfter(insertAfterSlideIndex);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            ToolStripMenuItem miAddSection = new ToolStripMenuItem("Thêm Phần (Add Section)", CreateAddSectionMenuIcon(), (s, e) =>
+            {
+                EmptyGapInsertAfterSlideIndex = -1;
+                int targetSecIdx = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, insertAfterSlideIndex + 1));
+                AddSection(parentControl, targetSecIdx);
+                if (parentControl != null) parentControl.Invalidate();
+            });
+
+            menu.Items.Add(miNewSlide);
+            menu.Items.Add(miAddSection);
+
+            menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
         public void ShowThumbnailContextMenu(Control parentControl, Point screenPos, int slideIndex)
         {
             if (Presentation == null || Presentation.Slides.Count == 0) return;
+            EmptyGapInsertAfterSlideIndex = -1;
             if (slideIndex < 0) slideIndex = 0;
             if (slideIndex >= Presentation.Slides.Count) slideIndex = Presentation.Slides.Count - 1;
             SlideNode targetSlide = Presentation.Slides[slideIndex];
             ActiveSlideIndex = slideIndex;
+            if (parentControl != null) parentControl.Invalidate();
 
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9f);
@@ -19786,45 +23541,47 @@ namespace ZenQOffice.UI
 
             // 1. Cut / Copy / Paste Options
             ToolStripMenuItem miCut = new ToolStripMenuItem("Cắt (Cut)", CreateCutIcon(), (s, e) => {
+                SaveUndoState();
                 CutSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miCopy = new ToolStripMenuItem("Chép (Copy)", CreateCopyIcon(), (s, e) => {
+            ToolStripMenuItem miCopy = new ToolStripMenuItem("Sao chép (Copy)", CreateCopyIcon(), (s, e) => {
                 CopySlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
             menu.Items.Add(miCut);
             menu.Items.Add(miCopy);
 
-            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
-            miPasteHeader.Enabled = false;
-            menu.Items.Add(miPasteHeader);
-
-            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", CreatePasteOptionIcon(0), (s, e) => {
-                PasteSlide(slideIndex);
+            bool canPaste = (_slidesClipboardSlide != null || Clipboard.ContainsImage());
+            AddPowerPointPasteOptionsToMenu(menu, canPaste, () =>
+            {
+                SaveUndoState();
+                if (_slidesClipboardSlide != null) PasteSlide(slideIndex);
+                else if (Clipboard.ContainsImage()) Paste();
+                if (parentControl != null) parentControl.Invalidate();
+            }, () =>
+            {
+                SaveUndoState();
+                if (_slidesClipboardSlide != null) PasteSlide(slideIndex);
+                else if (Clipboard.ContainsImage()) Paste();
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", CreatePasteOptionIcon(1), (s, e) => {
-                PasteSlide(slideIndex);
-                if (parentControl != null) parentControl.Invalidate();
-            });
-            miPasteTheme.Enabled = (_slidesClipboardSlide != null);
-            miPastePic.Enabled = (_slidesClipboardSlide != null);
-            menu.Items.Add(miPasteTheme);
-            menu.Items.Add(miPastePic);
 
             menu.Items.Add(new ToolStripSeparator());
 
             // 2. New Slide, Duplicate Slide, Delete Slide, Add Section
             ToolStripMenuItem miNewSlide = new ToolStripMenuItem("Trang chiếu Mới (New Slide)", CreateNewSlideMenuIcon(), (s, e) => {
+                SaveUndoState();
                 InsertNewSlideAfter(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
             ToolStripMenuItem miDupSlide = new ToolStripMenuItem("Nhân bản Trang chiếu (Duplicate Slide)", CreateDupSlideMenuIcon(), (s, e) => {
+                SaveUndoState();
                 DuplicateSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
             ToolStripMenuItem miDelSlide = new ToolStripMenuItem("Xóa Trang chiếu (Delete Slide)", CreateDeleteSlideMenuIcon(), (s, e) => {
+                SaveUndoState();
                 DeleteSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -19856,6 +23613,7 @@ namespace ZenQOffice.UI
             {
                 SlideLayoutType lType = layouts[i];
                 ToolStripMenuItem subItem = new ToolStripMenuItem(layoutNames[i], CreateLayoutThumbIcon(lType), (EventHandler)((s, e) => {
+                    SaveUndoState();
                     targetSlide.Layout = lType;
                     ApplySlideLayoutTemplate(targetSlide, lType);
                     if (parentControl != null) parentControl.Invalidate();
@@ -19867,6 +23625,7 @@ namespace ZenQOffice.UI
 
             // 4. Reset Slide
             ToolStripMenuItem miReset = new ToolStripMenuItem("Đặt lại Trang chiếu (Reset Slide)", CreateResetSlideIcon(), (s, e) => {
+                SaveUndoState();
                 ResetSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -19896,7 +23655,119 @@ namespace ZenQOffice.UI
             if (targetSlide.IsHidden) miHide.Checked = true;
             menu.Items.Add(miHide);
 
+            menu.Items.Add(new ToolStripSeparator());
+
+            // 8. New Comment
+            ToolStripMenuItem miNewComment = new ToolStripMenuItem("Bình luận mới (New Comment)", CreateNewCommentMenuIcon(), (s, e) => {
+                using (NewCommentDialogForm dlg = new NewCommentDialogForm())
+                {
+                    if (dlg.ShowDialog(parentControl) == DialogResult.OK && !string.IsNullOrWhiteSpace(dlg.CommentText))
+                    {
+                        SaveUndoState();
+                        string commentEntry = "[Bình luận]: " + dlg.CommentText.Trim();
+                        if (string.IsNullOrWhiteSpace(targetSlide.SpeakerNotes))
+                            targetSlide.SpeakerNotes = commentEntry;
+                        else
+                            targetSlide.SpeakerNotes += "\n" + commentEntry;
+                        IsEditingSpeakerNotes = true;
+                        SpeakerNotesCaretIndex = targetSlide.SpeakerNotes.Length;
+                        SpeakerNotesSelectionStart = SpeakerNotesCaretIndex;
+                        SpeakerNotesSelectionLength = 0;
+                        if (parentControl != null) parentControl.Invalidate();
+                    }
+                }
+            });
+            menu.Items.Add(miNewComment);
+
             menu.Show(parentControl != null ? parentControl.PointToScreen(screenPos) : screenPos);
+        }
+
+        public void MoveSlideToInsertIndex(int sourceIndex, int insertIndex)
+        {
+            if (Presentation == null || Presentation.Slides == null) return;
+            int count = Presentation.Slides.Count;
+            if (sourceIndex < 0 || sourceIndex >= count) return;
+            insertIndex = Math.Max(0, Math.Min(count, insertIndex));
+            if (insertIndex == sourceIndex || insertIndex == sourceIndex + 1) return;
+
+            SaveUndoState();
+            SlideNode movingSlide = Presentation.Slides[sourceIndex];
+            Presentation.Slides.RemoveAt(sourceIndex);
+            if (insertIndex > sourceIndex) insertIndex--;
+            insertIndex = Math.Max(0, Math.Min(Presentation.Slides.Count, insertIndex));
+            Presentation.Slides.Insert(insertIndex, movingSlide);
+            ActiveSlideIndex = insertIndex;
+            EmptyGapInsertAfterSlideIndex = -1;
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
+
+        public void UpdateDragSlideTargetFromMouse(Point mousePos, int width, int height)
+        {
+            if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0) return;
+            CurrentDragSlideMouse = mousePos;
+
+            int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+            GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
+
+            if (IsDraggingBottomSlideThumbnail)
+            {
+                int cardH = 48;
+                float slideAspect = (Presentation != null && Presentation.CanvasHeight > 0)
+                    ? ((float)Presentation.CanvasWidth / (float)Presentation.CanvasHeight)
+                    : (16.0f / 9.0f);
+                if (slideAspect <= 0.01f) slideAspect = 16.0f / 9.0f;
+                int cardW = Math.Max(24, Math.Min(96, (int)Math.Round(cardH * slideAspect)));
+                int curX = canvasX + 16 - BottomThumbScrollX;
+
+                int targetIdx = Presentation.Slides.Count;
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    int midX = curX + cardW / 2;
+                    if (mousePos.X < midX)
+                    {
+                        targetIdx = i;
+                        break;
+                    }
+                    curX += cardW + 10;
+                }
+                DragTargetSlideInsertIndex = targetIdx;
+            }
+            else
+            {
+                bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                int islandMarginX = 10;
+                int islandMarginTop = 3;
+                int islandMarginBtm = 8;
+                Rectangle paneRect = isIsland
+                    ? new Rectangle(islandMarginX, contentY + islandMarginTop, leftSidebarW - islandMarginX, contentH - islandMarginTop - islandMarginBtm)
+                    : new Rectangle(0, contentY, leftSidebarW, contentH);
+
+                int thumbX, thumbW, thumbH;
+                GetThumbnailMetrics(paneRect.Width, out thumbX, out thumbW, out thumbH);
+                int curY = paneRect.Y + 44 + 10 - ThumbScrollY;
+                bool currentCollapsed = false;
+                int targetIdx = Presentation.Slides.Count;
+
+                for (int i = 0; i < Presentation.Slides.Count; i++)
+                {
+                    SlideNode s = Presentation.Slides[i];
+                    if (s.IsSectionHeader || (i == 0 && HasAnySections() && string.IsNullOrEmpty(s.SectionName)))
+                    {
+                        currentCollapsed = s.IsSectionCollapsed;
+                        curY += 24;
+                    }
+                    if (currentCollapsed) continue;
+
+                    int midY = curY + thumbH / 2;
+                    if (mousePos.Y < midY)
+                    {
+                        targetIdx = i;
+                        break;
+                    }
+                    curY += thumbH + 14;
+                }
+                DragTargetSlideInsertIndex = targetIdx;
+            }
         }
 
         public static string PromptRenameSection(IWin32Window owner, string currentName = "Untitled Section")
@@ -21495,6 +25366,7 @@ namespace ZenQOffice.UI
                                 try
                                 {
                                     DrawShape(g, slideX, slideY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                    DrawInteractiveFeedbackOverlay(g, slideX, slideY, scale, shape);
                                 }
                                 catch { }
                             }
@@ -21923,6 +25795,7 @@ namespace ZenQOffice.UI
                                 try
                                 {
                                     DrawShape(g, curX, curY, scale, shape, false, opMul, offX, offY, scX, scY, rDelta, activeAnim, activeP);
+                                    DrawInteractiveFeedbackOverlay(g, curX, curY, scale, shape);
                                 }
                                 catch { }
                             }
@@ -21975,27 +25848,79 @@ namespace ZenQOffice.UI
             int nextY = mainY + 26 + (nextMaxH - nextHActual) / 2;
 
             Rectangle nextRect = new Rectangle(nextX, nextY, nextW, nextHActual);
-            if (ActiveSlideIndex + 1 < Presentation.Slides.Count)
+            int nextSlideIdx = ActiveSlideIndex + 1;
+            if (nextSlideIdx < Presentation.Slides.Count)
             {
-                SlideNode nextSlide = Presentation.Slides[ActiveSlideIndex + 1];
-                GraphicsState gsNextClip = g.Save();
-                g.IntersectClip(nextRect);
-                try
+                SlideNode nextSlide = Presentation.Slides[nextSlideIdx];
+                if (_cachedPresenterNextSlideBmp == null ||
+                    _cachedPresenterNextSlideIdx != nextSlideIdx ||
+                    _cachedPresenterNextSlideSize != nextRect.Size)
                 {
-                    DrawSlideBackground(g, nextRect, nextSlide);
-                    float nextScale = (float)nextW / Presentation.CanvasWidth;
-                    foreach (ShapeNode shape in nextSlide.Shapes)
+                    if (_cachedPresenterNextSlideBmp != null)
+                    {
+                        try { D2DGraphics.InvalidateBitmapCache(_cachedPresenterNextSlideBmp); } catch { }
+                        try { _cachedPresenterNextSlideBmp.Dispose(); } catch { }
+                        _cachedPresenterNextSlideBmp = null;
+                    }
+                    if (nextRect.Width > 0 && nextRect.Height > 0)
                     {
                         try
                         {
-                            DrawShape(g, nextX, nextY, nextScale, shape, false);
+                            _cachedPresenterNextSlideBmp = new Bitmap(nextRect.Width, nextRect.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                            _cachedPresenterNextSlideIdx = nextSlideIdx;
+                            _cachedPresenterNextSlideSize = nextRect.Size;
+                            using (Graphics gNext = Graphics.FromImage(_cachedPresenterNextSlideBmp))
+                            using (D2DGraphics d2dNext = new D2DGraphics(gNext, nextRect.Width, nextRect.Height))
+                            {
+                                Rectangle originNext = new Rectangle(0, 0, nextRect.Width, nextRect.Height);
+                                DrawSlideBackground(d2dNext, originNext, nextSlide);
+                                float nextScale = (float)nextW / Presentation.CanvasWidth;
+                                foreach (ShapeNode shape in nextSlide.Shapes)
+                                {
+                                    try
+                                    {
+                                        DrawShape(d2dNext, 0, 0, nextScale, shape, false);
+                                    }
+                                    catch { }
+                                }
+                            }
                         }
-                        catch { }
+                        catch
+                        {
+                            if (_cachedPresenterNextSlideBmp != null)
+                            {
+                                try { _cachedPresenterNextSlideBmp.Dispose(); } catch { }
+                                _cachedPresenterNextSlideBmp = null;
+                            }
+                        }
                     }
                 }
-                finally
+
+                if (_cachedPresenterNextSlideBmp != null)
                 {
-                    g.Restore(gsNextClip);
+                    g.DrawImage(_cachedPresenterNextSlideBmp, nextRect.X, nextRect.Y, nextRect.Width, nextRect.Height, 1.0f);
+                }
+                else
+                {
+                    GraphicsState gsNextClip = g.Save();
+                    g.IntersectClip(nextRect);
+                    try
+                    {
+                        DrawSlideBackground(g, nextRect, nextSlide);
+                        float nextScale = (float)nextW / Presentation.CanvasWidth;
+                        foreach (ShapeNode shape in nextSlide.Shapes)
+                        {
+                            try
+                            {
+                                DrawShape(g, nextX, nextY, nextScale, shape, false);
+                            }
+                            catch { }
+                        }
+                    }
+                    finally
+                    {
+                        g.Restore(gsNextClip);
+                    }
                 }
                 g.DrawRectangle(Pens.Gray, nextRect);
             }
@@ -22168,7 +26093,7 @@ namespace ZenQOffice.UI
         public void ShowPresentationHelp()
         {
             MessageBox.Show(
-                "PHÍM TẮT TRÌNH CHIẾU POWERPOINT:\n\n" +
+                "PHÍM TẮT TRÌNH CHIẾU SLIDES:\n\n" +
                 "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Phải/Lên, Space, Enter, PageDown\n" +
                 "• Lùi slide / bước trước đó: Mũi tên Trái/Xuống, Backspace, PageUp\n" +
                 "• Bút vẽ (Pen): Phím P hoặc Ctrl+P\n" +
@@ -22180,7 +26105,7 @@ namespace ZenQOffice.UI
                 "• Xem danh sách tất cả slide (Grid): Nút Grid góc dưới trái\n" +
                 "• Thu phóng slide (Zoom): Nút Kính lúp góc dưới trái\n" +
                 "• Chế độ Diễn giả (Presenter View): Alt+F5\n" +
-                "• Menu chuột phải: Chứa đầy đủ các tùy chọn như PowerPoint\n" +
+                "• Menu chuột phải: Chứa đầy đủ các tùy chọn trình chiếu\n" +
                 "• Kết thúc trình chiếu: Phím Escape (Esc)",
                 "Trợ giúp Trình chiếu ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -22602,10 +26527,12 @@ namespace ZenQOffice.UI
             Bitmap cachedBmp = isFromSlide ? _cachedTransBmpA : _cachedTransBmpB;
             if (cachedBmp != null)
             {
-                float sx = Math.Max(0, Math.Min(cachedBmp.Width - 1, srcRect.X));
-                float sy = Math.Max(0, Math.Min(cachedBmp.Height - 1, srcRect.Y));
-                float sw = Math.Max(1, Math.Min(cachedBmp.Width - sx, srcRect.Width));
-                float sh = Math.Max(1, Math.Min(cachedBmp.Height - sy, srcRect.Height));
+                float scaleX = (_currentTransitionViewportSize.Width > 0) ? ((float)cachedBmp.Width / _currentTransitionViewportSize.Width) : 1.0f;
+                float scaleY = (_currentTransitionViewportSize.Height > 0) ? ((float)cachedBmp.Height / _currentTransitionViewportSize.Height) : 1.0f;
+                float sx = Math.Max(0, Math.Min(cachedBmp.Width - 1, srcRect.X * scaleX));
+                float sy = Math.Max(0, Math.Min(cachedBmp.Height - 1, srcRect.Y * scaleY));
+                float sw = Math.Max(1, Math.Min(cachedBmp.Width - sx, srcRect.Width * scaleX));
+                float sh = Math.Max(1, Math.Min(cachedBmp.Height - sy, srcRect.Height * scaleY));
                 RectangleF safeSrc = new RectangleF(sx, sy, sw, sh);
 
                 g.DrawImage(cachedBmp, destRect, safeSrc, GraphicsUnit.Pixel, opacity);
@@ -25791,6 +29718,11 @@ namespace ZenQOffice.UI
                                                 break;
                                             }
                                         }
+                                        else if (TryHandleInteractiveShapeClick(shape, parentControl))
+                                        {
+                                            clickedMedia = true;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -26055,6 +29987,11 @@ namespace ZenQOffice.UI
                                         break;
                                     }
                                 }
+                                else if (TryHandleInteractiveShapeClick(shape, parentControl))
+                                {
+                                    clickedVideo = true; // prevent slide advance
+                                    break;
+                                }
                             }
                         }
                     }
@@ -26087,7 +30024,7 @@ namespace ZenQOffice.UI
                 // 1. Click in Elements Rail & Drawer (X <= leftSidebarW)
                 if (mousePos.X <= leftSidebarW && mousePos.Y >= contentY && mousePos.Y <= height - 26)
                 {
-                    if (HandleElementsDrawerClick(mousePos, leftSidebarW, contentY, height - contentY - 26, parentControl))
+                    if (HandleElementsDrawerClick(mousePos, leftSidebarW, contentY, height - contentY - 26, parentControl, buttons))
                         return;
                 }
 
@@ -26103,7 +30040,7 @@ namespace ZenQOffice.UI
                 // 3. Click in Bottom Horizontal Filmstrip
                 if (bottomThumbH > 0 && mousePos.Y >= height - 26 - bottomThumbH && mousePos.Y <= height - 26 && mousePos.X >= canvasX)
                 {
-                    if (HandleBottomThumbnailStripClick(mousePos, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH, parentControl))
+                    if (HandleBottomThumbnailStripClick(mousePos, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH, parentControl, buttons))
                         return;
                 }
             }
@@ -26124,19 +30061,21 @@ namespace ZenQOffice.UI
                     IsDrawingActive = false;
 
                 // 1. Buttons "+ Slide Mới" & "Nhân Bản"
-                if (!BtnAddSlideBounds.IsEmpty && BtnAddSlideBounds.Contains(mousePos))
+                if (buttons == MouseButtons.Left && !BtnAddSlideBounds.IsEmpty && BtnAddSlideBounds.Contains(mousePos))
                 {
+                    EmptyGapInsertAfterSlideIndex = -1;
                     AddSlide();
                     return;
                 }
-                if (!BtnDupSlideBounds.IsEmpty && BtnDupSlideBounds.Contains(mousePos))
+                if (buttons == MouseButtons.Left && !BtnDupSlideBounds.IsEmpty && BtnDupSlideBounds.Contains(mousePos))
                 {
+                    EmptyGapInsertAfterSlideIndex = -1;
                     DuplicateActiveSlide();
                     return;
                 }
 
                 // 2. Fast Scrollbar Thumb click (start drag)
-                if (!ThumbScrollBarThumbRect.IsEmpty && ThumbScrollBarThumbRect.Contains(mousePos))
+                if (buttons == MouseButtons.Left && !ThumbScrollBarThumbRect.IsEmpty && ThumbScrollBarThumbRect.Contains(mousePos))
                 {
                     _isDraggingThumbScrollBar = true;
                     _thumbScrollDragStartMouseY = mousePos.Y;
@@ -26148,7 +30087,7 @@ namespace ZenQOffice.UI
                 }
 
                 // 3. Fast Scrollbar Track click (jump)
-                if (!ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos))
+                if (buttons == MouseButtons.Left && !ThumbScrollBarTrackRect.IsEmpty && ThumbScrollBarTrackRect.Contains(mousePos))
                 {
                     int trackH = ThumbScrollBarTrackRect.Height;
                     int thumbBarH = ThumbScrollBarThumbRect.Height;
@@ -26175,6 +30114,7 @@ namespace ZenQOffice.UI
                 GetThumbnailMetrics(paneRect.Width, out thumbX, out thumbW, out thumbH);
                 int curY = paneRect.Y + 44 + 10 - ThumbScrollY;
                 bool currentCollapsed = false;
+                int lastVisibleSlideIdx = -1;
 
                 for (int i = 0; i < Presentation.Slides.Count; i++)
                 {
@@ -26184,6 +30124,7 @@ namespace ZenQOffice.UI
                         Rectangle secRect = new Rectangle(paneRect.X + 6, curY, paneRect.Width - 10, 24);
                         if (secRect.Contains(mousePos))
                         {
+                            EmptyGapInsertAfterSlideIndex = -1;
                             if (buttons == MouseButtons.Right)
                             {
                                 ShowSectionContextMenu(parentControl, mousePos, i);
@@ -26208,11 +30149,26 @@ namespace ZenQOffice.UI
 
                     if (currentCollapsed) continue;
 
-                    int rowTop = (i == 0) ? curY : (curY - 8);
-                    int rowBottom = (i == Presentation.Slides.Count - 1) ? (curY + thumbH + 14) : (curY + thumbH + 6);
-
-                    if (mousePos.Y >= rowTop && mousePos.Y < rowBottom)
+                    // Kiểm tra nếu click vào khe hở phía trên thumbnail đầu tiên (hoặc giữa 2 slide)
+                    if (mousePos.Y >= curY - 14 && mousePos.Y < curY)
                     {
+                        int gapInsertAfter = lastVisibleSlideIdx;
+                        EmptyGapInsertAfterSlideIndex = gapInsertAfter;
+                        if (buttons == MouseButtons.Right)
+                        {
+                            ShowEmptyThumbnailPaneContextMenu(parentControl, mousePos, gapInsertAfter);
+                        }
+                        else if (parentControl != null)
+                        {
+                            parentControl.Invalidate();
+                        }
+                        return;
+                    }
+
+                    // Click trực tiếp vào bên trong thẻ Thumbnail của Slide i
+                    if (mousePos.Y >= curY && mousePos.Y <= curY + thumbH)
+                    {
+                        EmptyGapInsertAfterSlideIndex = -1;
                         if (buttons == MouseButtons.Right)
                         {
                             ShowThumbnailContextMenu(parentControl, mousePos, i);
@@ -26228,6 +30184,16 @@ namespace ZenQOffice.UI
                             CanvasScrollX = 0;
                             CanvasScrollY = 0;
 
+                            if (buttons == MouseButtons.Left)
+                            {
+                                PotentialDragSlideIndex = i;
+                                DragSlideStartMouse = mousePos;
+                                CurrentDragSlideMouse = mousePos;
+                                IsDraggingSlideThumbnail = false;
+                                IsDraggingBottomSlideThumbnail = false;
+                                DragTargetSlideInsertIndex = i;
+                            }
+
                             // Khi chua trinh chieu thi khong cho chay hieu ung vi se lag
                             if (IsPresenting && prevIdx != i && ActiveSlide != null && ActiveSlide.Transition != TransitionType.None)
                             {
@@ -26238,12 +30204,20 @@ namespace ZenQOffice.UI
                         }
                     }
 
+                    lastVisibleSlideIdx = i;
                     curY += thumbH + 14;
                 }
 
+                // Click vào vùng trống bên dưới cùng của danh sách trang chiếu
+                int finalInsertAfter = (lastVisibleSlideIdx >= 0) ? lastVisibleSlideIdx : (Presentation.Slides.Count - 1);
+                EmptyGapInsertAfterSlideIndex = finalInsertAfter;
                 if (buttons == MouseButtons.Right)
                 {
-                    ShowThumbnailContextMenu(parentControl, mousePos, Math.Max(0, Presentation.Slides.Count - 1));
+                    ShowEmptyThumbnailPaneContextMenu(parentControl, mousePos, finalInsertAfter);
+                }
+                else if (parentControl != null)
+                {
+                    parentControl.Invalidate();
                 }
                 return;
             }
@@ -26901,6 +30875,221 @@ namespace ZenQOffice.UI
                         }
                     }
                 }
+                else if (SidebarPanel == SidebarPanelType.GraphicEditor && SelectedShape != null)
+                {
+                    ShapeNode shape = SelectedShape;
+                    int sy = sidebarY + 42 + SidebarScrollY;
+                    int curY = sy + 2;
+
+                    // 1. Reset button
+                    Rectangle resetBtn = new Rectangle(panelX + rightSidebarW - 66, curY - 2, 54, 20);
+                    if (resetBtn.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        SvgRasterizer.ResetGraphicToOriginal(shape);
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                    curY += 24;
+
+                    // Swatches
+                    var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
+                    if (false)
+                {
+                int swatchSize = 28;
+                    int swatchGap = 8;
+                    int swStartX = panelX + 12;
+                    for (int i = 0; i < detectedColors.Count && i < 6; i++)
+                    {
+                        Rectangle swRect = new Rectangle(swStartX + i * (swatchSize + swatchGap), curY, swatchSize, swatchSize);
+                        if (swRect.Contains(mousePos))
+                        {
+                            int capturedIdx = i;
+                            Color oldC = detectedColors[i];
+                            Point screenPt = parentControl != null ? parentControl.PointToScreen(new Point(swRect.Left, swRect.Bottom + 4)) : Cursor.Position;
+                            ColorPaletteForm colDlg = new ColorPaletteForm(screenPt, oldC, false);
+                            colDlg.OnColorSelected += (newC) =>
+                            {
+                                SaveUndoState();
+                                SvgRasterizer.ReplaceGraphicColor(shape, capturedIdx, oldC, newC);
+                                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                                if (parentControl != null) parentControl.Invalidate();
+                            };
+                            colDlg.Show();
+                            return;
+                        }
+                    }
+
+                    // Plus (+) custom color button
+                    int plusX = swStartX + Math.Min(6, detectedColors.Count) * (swatchSize + swatchGap);
+                    Rectangle plusRect = new Rectangle(plusX, curY, swatchSize, swatchSize);
+                    if (plusRect.Contains(mousePos))
+                    {
+                        Color baseC = detectedColors.Count > 0 ? detectedColors[0] : Color.FromArgb(124, 58, 237);
+                        Point screenPt = parentControl != null ? parentControl.PointToScreen(new Point(plusRect.Left, plusRect.Bottom + 4)) : Cursor.Position;
+                        ColorPaletteForm colDlg = new ColorPaletteForm(screenPt, baseC, false);
+                        colDlg.OnColorSelected += (newC) =>
+                        {
+                            SaveUndoState();
+                            if (detectedColors.Count > 0)
+                            {
+                                SvgRasterizer.ReplaceGraphicColor(shape, 0, detectedColors[0], newC);
+                            }
+                            else if (shape.CachedImage != null)
+                            {
+                                shape.CachedImage = SvgRasterizer.ApplySolidColorRecolor((Bitmap)shape.CachedImage, newC);
+                                shape.InvalidateDisplayCache();
+                            }
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                            if (parentControl != null) parentControl.Invalidate();
+                        };
+                        colDlg.Show();
+                        return;
+                    }
+                    curY += swatchSize + 16;
+                }
+
+                    // 2. Khớp định dạng (Style Match)
+                    curY += 22;
+                    string[] styleIds = new string[] { "None", "Sticker", "Engraving", "Sketch" };
+                    curY -= 22;
+                    int smCols = 4;
+                    int smGap = 8;
+                    int smCardW = (rightSidebarW - 24 - (smCols - 1) * smGap) / smCols;
+                    int smCardH = 58;
+                    for (int i = 0; i < styleIds.Length; i++)
+                    {
+                        int cx = panelX + 12 + i * (smCardW + smGap);
+                        Rectangle cardRect = new Rectangle(cx, curY, smCardW, smCardH + 18);
+                        if (cardRect.Contains(mousePos))
+                        {
+                            SaveUndoState();
+                            SvgRasterizer.ApplyStyleMatchToShape(shape, styleIds[i]);
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+                    curY += smCardH + 26;
+
+                    // 3. Bộ lọc (Filters)
+                    curY += 22;
+                    string[] filterIds = new string[] { "None", "Soft", "Vintage", "Mono", "Vivid", "Cool" };
+                    int fCols = 3;
+                    int fGap = 10;
+                    int fCardW = (rightSidebarW - 24 - (fCols - 1) * fGap) / fCols;
+                    int fCardH = 54;
+                    for (int i = 0; i < filterIds.Length; i++)
+                    {
+                        int r = i / fCols;
+                        int c = i % fCols;
+                        int cx = panelX + 12 + c * (fCardW + fGap);
+                        int cy = curY + r * (fCardH + 22);
+                        Rectangle fRect = new Rectangle(cx, cy, fCardW, fCardH + 18);
+                        if (fRect.Contains(mousePos))
+                        {
+                            SaveUndoState();
+                            SvgRasterizer.ApplyCanvaFilterPreset(shape, filterIds[i]);
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+                    curY += 2 * (fCardH + 22) + 8;
+
+                    // 4. Độ trong suốt & Bo góc
+                    curY += 22;
+                    int sliderX = panelX + 90;
+                    int sliderW = rightSidebarW - 148;
+                    Rectangle sliderHit = new Rectangle(sliderX - 6, curY, sliderW + 12, 24);
+                    if (sliderHit.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        DraggingColorControlType = 5;
+                        float frac = Math.Max(0.05f, Math.Min(1.0f, (float)(mousePos.X - sliderX) / Math.Max(1, sliderW)));
+                        shape.FillOpacity = frac;
+                        shape.InvalidateDisplayCache();
+                        if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                    curY += 28;
+
+                    // Corner rounding pills
+                    float[] radii = new float[] { 0f, 8f, 16f, 32f, 200f };
+                    int rBtnX = panelX + 70;
+                    int rBtnW = (rightSidebarW - 82 - 4 * 4) / 5;
+                    for (int i = 0; i < radii.Length; i++)
+                    {
+                        Rectangle rb = new Rectangle(rBtnX + i * (rBtnW + 4), curY, rBtnW, 24);
+                        if (rb.Contains(mousePos))
+                        {
+                            SaveUndoState();
+                            shape.CornerRadius = radii[i];
+                            if (radii[i] <= 0f) shape.CropShapeType = "Rectangle";
+                            else if (radii[i] >= 180f) shape.CropShapeType = "Oval";
+                            else shape.CropShapeType = "RoundedRectangle";
+                            shape.InvalidateDisplayCache();
+                            if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                            if (parentControl != null) parentControl.Invalidate();
+                            return;
+                        }
+                    }
+                    curY += 34;
+
+                    // Convert to Shapes button
+                    Rectangle convBtn = new Rectangle(panelX + 12, curY, rightSidebarW - 24, 30);
+                    if (convBtn.Contains(mousePos))
+                    {
+                        SaveUndoState();
+                        string xml = shape.SvgContent;
+                        if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
+                        {
+                            try { xml = System.IO.File.ReadAllText(shape.ImagePath); } catch { }
+                        }
+                        var newShapes = SvgRasterizer.ConvertSvgToShapes(xml, shape.Transform.X, shape.Transform.Y, shape.Transform.Width, shape.Transform.Height);
+                        if (newShapes != null && newShapes.Count > 0 && ActiveSlide != null)
+                        {
+                            int idx = ActiveSlide.Shapes.IndexOf(shape);
+                            if (idx >= 0)
+                            {
+                                ActiveSlide.Shapes.RemoveAt(idx);
+                                ActiveSlide.Shapes.InsertRange(idx, newShapes);
+                                SelectedShapeIndex = idx;
+                                ActiveSlide.IsThumbnailDirty = true;
+                            }
+                        }
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
+                else if (SidebarPanel == SidebarPanelType.ColorPalettePicker && SelectedShape != null)
+                {
+                    HandleCanvaColorPickerMouseDown(mousePos, panelX, sidebarY, rightSidebarW, parentControl);
+                    return;
+                }
+                if (false)
+                {
+                    if (false)
+                    {
+                        var newShapes = (List<ShapeNode>)null;
+                        var shape = SelectedShape;
+                        if (newShapes != null && newShapes.Count > 0 && ActiveSlide != null)
+                        {
+                            int idx = ActiveSlide.Shapes.IndexOf(shape);
+                            if (idx >= 0)
+                            {
+                                ActiveSlide.Shapes.RemoveAt(idx);
+                                ActiveSlide.Shapes.InsertRange(idx, newShapes);
+                                SelectedShapeIndex = idx;
+                                ActiveSlide.IsThumbnailDirty = true;
+                            }
+                        }
+                        if (parentControl != null) parentControl.Invalidate();
+                        return;
+                    }
+                }
                 return;
             }
 
@@ -26960,6 +31149,18 @@ namespace ZenQOffice.UI
                         IsSelectingSpeakerNotes = (buttons == MouseButtons.Left);
                         if (parentControl != null) parentControl.Invalidate();
                         if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                }
+                else if (notesPaneH == 0 && mousePos.X >= canvasX && mousePos.X <= canvasX + canvasW)
+                {
+                    // Khi ghi chú đang ẩn: Người dùng có thể bấm/kéo từ mép đáy canvas để mở rộng ghi chú lên
+                    if (buttons == MouseButtons.Left && mousePos.Y >= contentY + contentH - 4 && mousePos.Y <= contentY + contentH + 2)
+                    {
+                        IsDraggingNotesSplitter = true;
+                        NotesSplitterDragStartMouseY = mousePos.Y;
+                        NotesSplitterDragStartHeight = 0;
+                        if (parentControl != null) parentControl.Invalidate();
                         return;
                     }
                 }
@@ -27410,8 +31611,26 @@ namespace ZenQOffice.UI
                             }
                         }
 
-                        // Corner rounding knob (Icon bo góc)
-                        if (CanShapeRoundCorners(shape))
+                        // Bottom 4-way Move Handle (✥) for narrow / auto-width TextBox
+                        if (shape.Type == ShapeType.TextBox && (shape.AutoFitWidth || sw < 90))
+                        {
+                            PointF centerPt = new PointF(sx + sw / 2f, sy + sh / 2f);
+                            PointF movePt = RotatePoint(new PointF(sx + sw / 2f, sy + sh + 20f), centerPt, shape.Transform.Rotation);
+                            float dMx = mousePos.X - movePt.X;
+                            float dMy = mousePos.Y - movePt.Y;
+                            if (buttons == MouseButtons.Left && dMx * dMx + dMy * dMy <= 144f)
+                            {
+                                SaveUndoState();
+                                IsDraggingShape = true;
+                                DragStartMouse = mousePos;
+                                DragStartTransform = shape.Transform.Clone();
+                                DragStartTransforms.Clear();
+                                return;
+                            }
+                        }
+
+                        // Corner rounding knob moved to Shape Format Bo góc popover
+                        if (false && CanShapeRoundCorners(shape))
                         {
                             PointF crH = GetRotatedCornerRadiusHandle(sx, sy, sw, sh, shape.Transform.Rotation);
                             float dCrX = mousePos.X - crH.X;
@@ -27645,6 +31864,28 @@ namespace ZenQOffice.UI
                         _pendingDeselectOnMouseUp = false;
                     }
 
+                    if (SelectedShapeIndices != null && SelectedShapeIndices.Count == 1 && hitShape != null)
+                    {
+                        SyncShapeTaskPaneRecommendation(hitShape);
+                    }
+                    else
+                    {
+                                }
+
+                    if (SidebarPanel == SidebarPanelType.ColorPalettePicker && IsSidebarOpen && hitShape != null)
+                    {
+                        bool isGraphic = IsRasterOrSvgGraphic(hitShape);
+                        if (!isGraphic && ActiveColorPickerTarget == ColorPickerTarget.GraphicColor)
+                        {
+                            ActiveColorPickerTarget = ColorPickerTarget.ShapeFill;
+                        }
+                        else if (isGraphic && ActiveColorPickerTarget == ColorPickerTarget.ShapeFill)
+                        {
+                            ActiveColorPickerTarget = ColorPickerTarget.GraphicColor;
+                        }
+                        SyncHSVFromActiveSelection();
+                    }
+
                     if (hitShape.Type == ShapeType.Table && (SelectedShapeIndices == null || SelectedShapeIndices.Count <= 1))
                     {
                         int sx = slideX + (int)(hitShape.Transform.X * scale);
@@ -27795,7 +32036,7 @@ namespace ZenQOffice.UI
                         SelectedShapeIndex = -1;
                         SelectedShapeIndices.Clear();
                         _rubberbandInitialSelection.Clear();
-                    }
+                                }
                     else
                     {
                         _rubberbandInitialSelection = new HashSet<int>(SelectedShapeIndices);
@@ -28056,10 +32297,30 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
-                        StartInlineEditing(shape);
-                        CaretIndex = GetTextCharIndexFromPoint(mousePos, shape, slideX, slideY, scale);
-                        TextSelectionStart = CaretIndex;
-                        TextSelectionLength = 0;
+                        if (IsInlineEditing && EditingShape == shape)
+                        {
+                            // Double-click while already editing text: Select the word under caret!
+                            if (!string.IsNullOrEmpty(EditingTextBuffer) && CaretIndex >= 0 && CaretIndex <= EditingTextBuffer.Length)
+                            {
+                                int wStart = Math.Max(0, Math.Min(CaretIndex, EditingTextBuffer.Length));
+                                while (wStart > 0 && !char.IsWhiteSpace(EditingTextBuffer[wStart - 1])) wStart--;
+                                int wEnd = Math.Max(0, Math.Min(CaretIndex, EditingTextBuffer.Length));
+                                while (wEnd < EditingTextBuffer.Length && !char.IsWhiteSpace(EditingTextBuffer[wEnd])) wEnd++;
+                                if (wEnd > wStart)
+                                {
+                                    TextSelectionStart = wStart;
+                                    TextSelectionLength = wEnd - wStart;
+                                    CaretIndex = wEnd;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            StartInlineEditing(shape);
+                            CaretIndex = GetTextCharIndexFromPoint(mousePos, shape, slideX, slideY, scale);
+                            TextSelectionStart = CaretIndex;
+                            TextSelectionLength = 0;
+                        }
                         if (parentControl != null) parentControl.Invalidate();
                     }
                     break;
@@ -28071,10 +32332,46 @@ namespace ZenQOffice.UI
         {
             CurrentMouseCanvasPos = mousePos;
 
+            if (DraggingColorControlType != 0)
+            {
+                UpdateColorFromInteractiveControl(mousePos);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
+            if (DraggingBgSliderType > 0 && ActiveSlide != null)
+            {
+                int rightSidebarW_bg = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
+                int trackX = width - rightSidebarW_bg + 115;
+                int trackW = 65;
+                float frac = Math.Max(0.0f, Math.Min(1.0f, (float)(mousePos.X - trackX) / trackW));
+                GradientStop activeStop = (ActiveSlide.BgGradientStops != null && ActiveSlide.SelectedGradientStopIndex >= 0 && ActiveSlide.SelectedGradientStopIndex < ActiveSlide.BgGradientStops.Count)
+                    ? ActiveSlide.BgGradientStops[ActiveSlide.SelectedGradientStopIndex] : null;
+
+                if (DraggingBgSliderType == 1) // Transparency
+                {
+                    if (ActiveSlide.BgFillType == BackgroundFillType.Gradient && activeStop != null)
+                        activeStop.Transparency = frac;
+                    else
+                        ActiveSlide.BgTransparency = frac;
+                }
+                else if (DraggingBgSliderType == 2 && activeStop != null) // Position
+                {
+                    activeStop.Position = frac;
+                }
+                else if (DraggingBgSliderType == 3 && activeStop != null) // Brightness (-1 to +1)
+                {
+                    activeStop.Brightness = (frac * 2.0f) - 1.0f;
+                }
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
             if (IsPresenting)
             {
                 LastPresenterMouseMovePos = mousePos;
                 LastPresenterMouseMoveTime = DateTime.Now;
+                int prevHoverToolbarBtn = HoverToolbarButtonIndex;
                 HoverToolbarButtonIndex = GetHoverToolbarButtonAt(mousePos, height);
 
                 if (LaserPointerMode)
@@ -28239,6 +32536,8 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
+                            ShapeNode prevHoverInteractive = HoveredInteractiveShape;
+                            HoveredInteractiveShape = null;
                             for (int i = ActiveSlide.Shapes.Count - 1; i >= 0; i--)
                             {
                                 ShapeNode s = ActiveSlide.Shapes[i];
@@ -28267,7 +32566,33 @@ namespace ZenQOffice.UI
                                         isOverMedia = true;
                                         break;
                                     }
+                                    else if (IsShapeInteractiveInShow(s, ActiveSlide))
+                                    {
+                                        HoveredInteractiveShape = s;
+                                        isOverMedia = true;
+                                        if (_lastHoverActionFiredShape != s)
+                                        {
+                                            _lastHoverActionFiredShape = s;
+                                            if (s.HoverSound != SlideActionSound.None)
+                                            {
+                                                SlideSoundPlayer.Play(s.HoverSound, s.HoverCustomSoundPath);
+                                            }
+                                            if (s.HoverActionType != SlideActionType.None)
+                                            {
+                                                ExecuteSlideAction(s.HoverActionType, s.HoverTargetSlideIndex, s.HoverTargetUrl, s.HoverShowAndReturn, s, null);
+                                            }
+                                        }
+                                        break;
+                                    }
                                 }
+                            }
+                            if (HoveredInteractiveShape == null)
+                            {
+                                _lastHoverActionFiredShape = null;
+                            }
+                            if (prevHoverInteractive != HoveredInteractiveShape && InvalidateCallback != null)
+                            {
+                                InvalidateCallback();
                             }
                         }
 
@@ -28299,14 +32624,15 @@ namespace ZenQOffice.UI
                     Cursor.Current = Cursors.Default;
                 }
 
-                if (prevHoveredVideo != HoveredVideoShape || prevHoveredAudio != HoveredAudioShape ||
+                if (LaserPointerMode ||
+                    (AnnotationPenMode && CurrentStroke.Count > 0) ||
+                    prevHoverToolbarBtn != HoverToolbarButtonIndex ||
+                    prevHoveredVideo != HoveredVideoShape || prevHoveredAudio != HoveredAudioShape ||
                     prevHoveredVideoBtn != HoveredVideoButton || prevHoveredVideoScrub != IsHoveringVideoScrubber ||
                     prevHoveredAudioBtn != HoveredAudioButton || prevHoveredAudioScrub != IsHoveringAudioScrubber)
                 {
                     if (InvalidateCallback != null) InvalidateCallback();
                 }
-
-                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -28415,10 +32741,93 @@ namespace ZenQOffice.UI
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
 
+            // Dragging Slide Thumbnail to Reorder (Vertical or Horizontal)
+            if (PotentialDragSlideIndex >= 0)
+            {
+                if ((Control.MouseButtons & MouseButtons.Left) == MouseButtons.None)
+                {
+                    if (IsDraggingSlideThumbnail && DragTargetSlideInsertIndex >= 0)
+                    {
+                        MoveSlideToInsertIndex(PotentialDragSlideIndex, DragTargetSlideInsertIndex);
+                    }
+                    PotentialDragSlideIndex = -1;
+                    IsDraggingSlideThumbnail = false;
+                    IsDraggingBottomSlideThumbnail = false;
+                    DragTargetSlideInsertIndex = -1;
+                    if (InvalidateCallback != null) InvalidateCallback();
+                }
+                else
+                {
+                    int dx = mousePos.X - DragSlideStartMouse.X;
+                    int dy = mousePos.Y - DragSlideStartMouse.Y;
+                    // Kéo nhẹ thì không kéo thumbnail: chỉ kích hoạt khi di chuyển >= 10px
+                    if (!IsDraggingSlideThumbnail && (Math.Abs(dx) >= 10 || Math.Abs(dy) >= 10))
+                    {
+                        IsDraggingSlideThumbnail = true;
+                        EmptyGapInsertAfterSlideIndex = -1;
+                    }
+
+                    if (IsDraggingSlideThumbnail)
+                    {
+                        UpdateDragSlideTargetFromMouse(mousePos, width, height);
+
+                        // Tự động cuộn khi đưa chuột sâu vào mép trên/dưới (dọc) hoặc trái/phải (ngang)
+                        if (IsDraggingBottomSlideThumbnail)
+                        {
+                            int viewportX = canvasX + 16;
+                            int viewportW = Math.Max(50, canvasW - 16 - 120);
+                            int totalBottomWidth = (Presentation != null ? Presentation.Slides.Count : 0) * (86 + 10) + 60;
+                            int maxScroll = Math.Max(0, totalBottomWidth - viewportW);
+                            if (mousePos.X < viewportX + 26)
+                            {
+                                TargetBottomThumbScrollX = Math.Max(0, TargetBottomThumbScrollX - 14);
+                            }
+                            else if (mousePos.X > viewportX + viewportW - 26)
+                            {
+                                TargetBottomThumbScrollX = Math.Min(maxScroll, TargetBottomThumbScrollX + 14);
+                            }
+                        }
+                        else
+                        {
+                            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+                            int islandMarginTop = 3;
+                            int islandMarginBtm = 8;
+                            int viewTop = (isIsland ? (contentY + islandMarginTop) : contentY) + 44;
+                            int paneH = isIsland ? (contentH - islandMarginTop - islandMarginBtm) : contentH;
+                            int viewH = Math.Max(10, paneH - 48);
+                            int maxScroll = GetMaxThumbScrollY();
+                            if (mousePos.Y < viewTop + 20)
+                            {
+                                TargetThumbScrollY = Math.Max(0, TargetThumbScrollY - 12);
+                            }
+                            else if (mousePos.Y > viewTop + viewH - 20)
+                            {
+                                TargetThumbScrollY = Math.Min(maxScroll, TargetThumbScrollY + 12);
+                            }
+                        }
+
+                        Cursor.Current = Cursors.SizeAll;
+                        if (InvalidateCallback != null) InvalidateCallback();
+                        return;
+                    }
+                    return;
+                }
+            }
+
             if (IsDraggingNotesSplitter)
             {
                 int deltaY = NotesSplitterDragStartMouseY - mousePos.Y;
-                NotesPaneHeight = Math.Max(42, Math.Min(Math.Max(140, contentH / 2), NotesSplitterDragStartHeight + deltaY));
+                int targetH = NotesSplitterDragStartHeight + deltaY;
+                if (targetH < 25)
+                {
+                    IsNotesPaneOpen = false;
+                    IsEditingSpeakerNotes = false;
+                }
+                else
+                {
+                    IsNotesPaneOpen = true;
+                    NotesPaneHeight = Math.Min(Math.Max(140, contentH / 2), targetH);
+                }
                 Cursor.Current = Cursors.SizeNS;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
@@ -28435,10 +32844,17 @@ namespace ZenQOffice.UI
 
             int effNotesH = GetEffectiveNotesPaneHeight();
             bool prevHoverNotesSplitter = IsHoverNotesSplitter;
-            if (effNotesH > 0 && mousePos.X >= canvasX && mousePos.X <= canvasX + canvasW)
+            if (mousePos.X >= canvasX && mousePos.X <= canvasX + canvasW)
             {
-                int notesTopY = contentY + Math.Max(80, contentH - effNotesH);
-                IsHoverNotesSplitter = (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4);
+                if (effNotesH > 0)
+                {
+                    int notesTopY = contentY + Math.Max(80, contentH - effNotesH);
+                    IsHoverNotesSplitter = (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4);
+                }
+                else
+                {
+                    IsHoverNotesSplitter = (mousePos.Y >= contentY + contentH - 4 && mousePos.Y <= contentY + contentH + 2);
+                }
             }
             else
             {
@@ -28676,6 +33092,12 @@ namespace ZenQOffice.UI
                 return;
             }
 
+            if (DraggingColorControlType != 0)
+            {
+                UpdateColorFromInteractiveControl(mousePos);
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
             if (IsDraggingHScrollBar)
             {
                 int minScrollX, maxScrollX, minScrollY, maxScrollY;
@@ -28947,7 +33369,6 @@ namespace ZenQOffice.UI
                         CurrentDrawingMotionPoints.Add(newPt);
                     }
                 }
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -28962,7 +33383,6 @@ namespace ZenQOffice.UI
                 DraggingMotionAnim.EndOffsetX = mouseSlideX - scx;
                 DraggingMotionAnim.EndOffsetY = mouseSlideY - scy;
                 DraggingMotionAnim.HasCustomEndOffset = true;
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -28991,6 +33411,7 @@ namespace ZenQOffice.UI
                 }
 
                 shape.Transform.Rotation = snappedAngle;
+                if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
 
@@ -29087,7 +33508,6 @@ namespace ZenQOffice.UI
                     shape.Type = ShapeType.Rectangle;
                 }
 
-                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
                 return;
             }
@@ -29277,6 +33697,11 @@ namespace ZenQOffice.UI
                 shape.Transform.Y = newCG_Y - newH / 2f;
                 shape.Transform.Width = newW;
                 shape.Transform.Height = newH;
+                if (shape.Type == ShapeType.TextBox)
+                {
+                    shape.AutoFitWidth = false;
+                    shape.VerticalAlignment = VerticalTextAlignment.Top;
+                }
 
                 if (SlideVideoPlayerManager.Instance.ActiveShape == shape)
                 {
@@ -29834,6 +34259,10 @@ namespace ZenQOffice.UI
 
         public Cursor GetCursorForPosition(Point mousePos, int width, int height)
         {
+            if (IsDraggingSlideThumbnail)
+            {
+                return Cursors.SizeAll;
+            }
             int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
             GetEffectiveLayoutMetrics(width, height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
             int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
@@ -29848,16 +34277,26 @@ namespace ZenQOffice.UI
             // 1.1 Khi rê chuột lên Khung Ghi chú người thuyết trình (Speaker Notes Pane) hoặc thanh phân cách Splitter
             int effNotesH = GetEffectiveNotesPaneHeight();
             int stageH = Math.Max(80, contentH - effNotesH);
-            if (effNotesH > 0 && mousePos.X >= canvasX && mousePos.X < canvasX + canvasW)
+            if (mousePos.X >= canvasX && mousePos.X < canvasX + canvasW)
             {
-                int notesTopY = contentY + stageH;
-                if (IsDraggingNotesSplitter || (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4))
+                if (effNotesH > 0)
                 {
-                    return Cursors.SizeNS;
+                    int notesTopY = contentY + stageH;
+                    if (IsDraggingNotesSplitter || (mousePos.Y >= notesTopY - 4 && mousePos.Y <= notesTopY + 4))
+                    {
+                        return Cursors.SizeNS;
+                    }
+                    if (mousePos.Y > notesTopY + 4 && mousePos.Y <= contentY + contentH)
+                    {
+                        return Cursors.IBeam;
+                    }
                 }
-                if (mousePos.Y > notesTopY + 4 && mousePos.Y <= contentY + contentH)
+                else
                 {
-                    return Cursors.IBeam;
+                    if (IsDraggingNotesSplitter || (mousePos.Y >= contentY + contentH - 4 && mousePos.Y <= contentY + contentH + 2))
+                    {
+                        return Cursors.SizeNS;
+                    }
                 }
             }
             if (ViewMode == ImpressViewMode.Notes && !LastNotesTextRect.IsEmpty && LastNotesTextRect.Contains(mousePos))
@@ -30104,6 +34543,21 @@ namespace ZenQOffice.UI
                 IsDraggingVideoScrubber = false;
             }
 
+            if (PotentialDragSlideIndex >= 0)
+            {
+                if (IsDraggingSlideThumbnail && DragTargetSlideInsertIndex >= 0)
+                {
+                    MoveSlideToInsertIndex(PotentialDragSlideIndex, DragTargetSlideInsertIndex);
+                }
+                PotentialDragSlideIndex = -1;
+                IsDraggingSlideThumbnail = false;
+                IsDraggingBottomSlideThumbnail = false;
+                DragTargetSlideInsertIndex = -1;
+                Cursor.Current = Cursors.Default;
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
+
             if (ShapeTaskPane != null && ShapeTaskPane.IsDraggingScrollbar)
             {
                 ShapeTaskPane.HandleMouseUp(mousePos);
@@ -30138,6 +34592,12 @@ namespace ZenQOffice.UI
             }
             if (IsDraggingNotesSplitter)
             {
+                if (!IsNotesPaneOpen || NotesPaneHeight < 30)
+                {
+                    IsNotesPaneOpen = false;
+                    NotesPaneHeight = 68;
+                    IsEditingSpeakerNotes = false;
+                }
                 IsDraggingNotesSplitter = false;
                 if (InvalidateCallback != null) InvalidateCallback();
             }
@@ -30310,19 +34770,30 @@ namespace ZenQOffice.UI
                     ? (w1 > 4 || h1 > 4)
                     : (w1 > 6 && h1 > 6);
 
+                bool wasSingleClick = !canCreateShape;
                 float canvasXPos = 0f, canvasYPos = 0f, canvasWPos = 0f, canvasHPos = 0f;
                 if (!canCreateShape && ActiveSlide != null)
                 {
-                    // Single-click insert: insert standard shape at clicked position
                     canCreateShape = true;
-                    float defW = (PendingShapeType == ShapeType.Line) ? 180f : 240f;
-                    float defH = (PendingShapeType == ShapeType.Line) ? 0f : 140f;
                     float clickCanvasX = (ShapeDrawStart.X - slideX) / scale;
                     float clickCanvasY = (ShapeDrawStart.Y - slideY) / scale;
-                    canvasXPos = clickCanvasX - defW / 2f;
-                    canvasYPos = clickCanvasY - defH / 2f;
-                    canvasWPos = defW;
-                    canvasHPos = defH;
+                    if (PendingShapeType == ShapeType.TextBox)
+                    {
+                        // MS PowerPoint single-click TextBox: narrow initial frame at click point, expands width as user types
+                        canvasXPos = clickCanvasX;
+                        canvasYPos = clickCanvasY - 16f;
+                        canvasWPos = 22f;
+                        canvasHPos = 34f;
+                    }
+                    else
+                    {
+                        float defW = (PendingShapeType == ShapeType.Line) ? 180f : 240f;
+                        float defH = (PendingShapeType == ShapeType.Line) ? 0f : 140f;
+                        canvasXPos = clickCanvasX - defW / 2f;
+                        canvasYPos = clickCanvasY - defH / 2f;
+                        canvasWPos = defW;
+                        canvasHPos = defH;
+                    }
                 }
                 else if (canCreateShape && ActiveSlide != null)
                 {
@@ -30330,6 +34801,11 @@ namespace ZenQOffice.UI
                     canvasYPos = (y1 - slideY) / scale;
                     canvasWPos = Math.Max(0f, w1 / scale);
                     canvasHPos = Math.Max(0f, h1 / scale);
+                    if (PendingShapeType == ShapeType.TextBox)
+                    {
+                        canvasWPos = Math.Max(36f, canvasWPos);
+                        canvasHPos = Math.Max(34f, canvasHPos);
+                    }
                 }
 
                 if (canCreateShape && ActiveSlide != null)
@@ -30343,9 +34819,11 @@ namespace ZenQOffice.UI
                         FillColor = (PendingShapeType == ShapeType.TextBox || PendingShapeType == ShapeType.Line) ? 0x00FFFFFF : 0x4472C4,
                         StrokeColor = (PendingShapeType == ShapeType.Line) ? 0x4472C4 : 0x00FFFFFF,
                         StrokeWidth = (PendingShapeType == ShapeType.Line) ? 1.5f : 0.0f,
-                        Text = (PendingShapeType == ShapeType.TextBox) ? "Nhấp để thêm văn bản" : "",
+                        Text = "",
+                        AutoFitWidth = (PendingShapeType == ShapeType.TextBox && wasSingleClick),
+                        AutoFitHeight = true,
                         Alignment = (PendingShapeType == ShapeType.TextBox) ? TextAlignment.Left : TextAlignment.Center,
-                        VerticalAlignment = VerticalTextAlignment.Middle,
+                        VerticalAlignment = (PendingShapeType == ShapeType.TextBox) ? VerticalTextAlignment.Top : VerticalTextAlignment.Middle,
                         TextColor = (PendingShapeType == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF
                     };
 
@@ -30404,13 +34882,35 @@ namespace ZenQOffice.UI
             {
                 IsRubberbandSelecting = false;
                 _rubberbandInitialSelection.Clear();
+                if (SelectedShapeIndices != null && SelectedShapeIndices.Count == 1 && SelectedShapeIndex >= 0 && ActiveSlide != null && SelectedShapeIndex < ActiveSlide.Shapes.Count)
+                {
+                    SyncShapeTaskPaneRecommendation(ActiveSlide.Shapes[SelectedShapeIndex]);
+                }
+                else
+                {
+                        }
                 if (InvalidateCallback != null) InvalidateCallback();
             }
             if (DragStartTransforms != null) DragStartTransforms.Clear();
 
             if (IsDraggingShape || IsResizingShape || IsRotatingShape || IsAdjustingCornerRadius)
             {
+                if (IsResizingShape)
+                {
+                    SelectedShape?.InvalidateDisplayCache();
+                    if (SelectedShapeIndices != null && ActiveSlide != null)
+                    {
+                        foreach (int idx in SelectedShapeIndices)
+                        {
+                            if (idx >= 0 && idx < ActiveSlide.Shapes.Count)
+                            {
+                                ActiveSlide.Shapes[idx]?.InvalidateDisplayCache();
+                            }
+                        }
+                    }
+                }
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
             }
             IsDraggingBottomThumbScrollBar = false;
             SmoothBottomThumbScrollX = BottomThumbScrollX;
@@ -30428,7 +34928,46 @@ namespace ZenQOffice.UI
             IsRotatingShape = false;
             IsAdjustingCornerRadius = false;
             IsDraggingGradientStop = false;
+            if (DraggingColorControlType != 0)
+            {
+                int prevControlType = DraggingColorControlType;
+                DraggingColorControlType = 0;
+                ShapeNode selShape = SelectedShape;
+                if (selShape != null)
+                {
+                    if (prevControlType == 1 || prevControlType == 2)
+                    {
+                        Color curCol = ColorFromHSV(CustomHue, CustomSat, CustomVal);
+                        if (GraphicColorSubTab == 1)
+                        {
+                            List<int> stops = GetActiveGradientStops(selShape);
+                            List<float> positions = GetActiveGradientPositions(selShape, stops.Count);
+                            int idx = Math.Max(0, Math.Min(stops.Count - 1, SelectedGradientStopIndex));
+                            stops[idx] = curCol.ToArgb();
+                            ApplyActiveGradient(selShape, stops, positions, GetActiveGradientStyle(selShape), isInteractiveDrag: false);
+                        }
+                        else
+                        {
+                            ApplyActiveSolidColor(selShape, curCol, isInteractiveDrag: false);
+                        }
+                    }
+                    else if (prevControlType == 4)
+                    {
+                        List<int> stops = GetActiveGradientStops(selShape);
+                        List<float> positions = GetActiveGradientPositions(selShape, stops.Count);
+                        ApplyActiveGradient(selShape, stops, positions, GetActiveGradientStyle(selShape), isInteractiveDrag: false);
+                    }
+                    else if (prevControlType == 3 || prevControlType == 5)
+                    {
+                        selShape.CachedDetectedColors = null;
+                        selShape.InvalidateDisplayCache();
+                    }
+                }
+                if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
+                if (InvalidateCallback != null) InvalidateCallback();
+            }
             DraggingBgSliderType = 0;
+            DraggingColorControlType = 0;
             ShowSnapGuideX = false;
             ShowSnapGuideY = false;
             if (ActiveSmartGuides != null) ActiveSmartGuides.Clear();
@@ -31336,6 +35875,12 @@ namespace ZenQOffice.UI
                     Redo();
                     if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (InvalidateCallback != null) InvalidateCallback();
+                    return;
+                }
+                if (key == Keys.K && ActiveSlide != null)
+                {
+                    Control parentCtrl = (Application.OpenForms.Count > 0) ? Application.OpenForms[0] : null;
+                    OpenHyperlinkDialog(parentCtrl);
                     return;
                 }
                 if (key == Keys.A && ActiveSlide != null && ActiveSlide.Shapes.Count > 0)

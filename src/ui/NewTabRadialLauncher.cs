@@ -75,7 +75,7 @@ namespace ZenQOffice
                 new LauncherCardItem(
                     OfficeAppMode.Writer,
                     "Writer",
-                    "Văn bản Word",
+                    "Soạn thảo văn bản",
                     "DOCX",
                     Color.FromArgb(37, 99, 235),
                     Color.FromArgb(29, 78, 216),
@@ -85,7 +85,7 @@ namespace ZenQOffice
                 new LauncherCardItem(
                     OfficeAppMode.Calc,
                     "Calc",
-                    "Bảng tính Excel",
+                    "Bảng tính & Dữ liệu",
                     "XLSX",
                     Color.FromArgb(16, 185, 129),
                     Color.FromArgb(5, 150, 105),
@@ -95,7 +95,7 @@ namespace ZenQOffice
                 new LauncherCardItem(
                     OfficeAppMode.Slides,
                     "Slides",
-                    "Trình chiếu PowerPoint",
+                    "Trình chiếu & Thuyết trình",
                     "PPTX",
                     Color.FromArgb(234, 88, 12),
                     Color.FromArgb(194, 65, 12),

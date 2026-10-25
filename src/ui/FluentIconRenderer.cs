@@ -498,7 +498,11 @@ namespace ZenQOffice.UI
                 case "help":
                     return '\uE897';
                 case "info":
-                    return '\uE946';
+                    return '\uE946';
+                case "feedback":
+                    return '\uED15';
+                case "bug":
+                    return '\uEBE8';
                 case "warning":
                     return '\uE7BA';
                 case "error":

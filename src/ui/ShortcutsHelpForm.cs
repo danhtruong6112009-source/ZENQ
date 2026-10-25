@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -8,7 +8,7 @@ namespace ZenQOffice.UI
     {
         public ShortcutsHelpForm()
         {
-            this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - ZENQ OFFICE Suite";
+            this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - ZENQ OFFICE";
             this.Size = new Size(820, 620);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;

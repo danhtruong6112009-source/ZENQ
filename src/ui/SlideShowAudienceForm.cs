@@ -42,16 +42,12 @@ namespace ZenQOffice.UI
             }
             catch { }
 
-            // Timer đồng bộ khung hình 60 FPS
+            // Timer kiểm tra trạng thái kết thúc trình chiếu (khung hình 60 FPS được điều phối đồng bộ trực tiếp từ AppForm._animTimer)
             _syncTimer = new Timer();
-            _syncTimer.Interval = 16;
+            _syncTimer.Interval = 250;
             _syncTimer.Tick += (s, e) =>
             {
-                if (_slidesView != null && _slidesView.IsPresenting)
-                {
-                    Invalidate();
-                }
-                else
+                if (_slidesView == null || !_slidesView.IsPresenting)
                 {
                     Close();
                 }
@@ -130,7 +126,12 @@ namespace ZenQOffice.UI
                 _slidesView.PreviousPresenterStep();
             }
             Invalidate();
-            _appForm.Invalidate();
+            Update();
+            if (_appForm != null)
+            {
+                _appForm.Invalidate();
+                _appForm.Update();
+            }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)

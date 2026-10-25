@@ -308,6 +308,41 @@ namespace ZenQOffice.Core
         AfterPrevious
     }
 
+    public enum SlideActionType
+    {
+        None = 0,
+        NextSlide = 1,
+        PreviousSlide = 2,
+        FirstSlide = 3,
+        LastSlide = 4,
+        LastSlideViewed = 5,
+        EndShow = 6,
+        SpecificSlide = 7,
+        Url = 8,
+        OtherFile = 9,
+        RunProgram = 10,
+        ObjectAction = 11,
+        QuizCorrect = 12,
+        QuizWrong = 13
+    }
+
+    public enum SlideActionSound
+    {
+        None = 0,
+        Applause = 1,
+        Chime = 2,
+        Buzzer = 3,
+        Click = 4,
+        Coin = 5,
+        DrumRoll = 6,
+        Explosion = 7,
+        Laser = 8,
+        Camera = 9,
+        Whoosh = 10,
+        Bell = 11,
+        CustomFile = 12
+    }
+
     public enum ImpressViewMode
     {
         Normal = 0,
@@ -444,6 +479,7 @@ namespace ZenQOffice.Core
     public class ShapeNode
     {
         public string Id { get; set; }
+        public string PresetId { get; set; }
         public string MorphName { get; set; }
         public string RawSpid { get; set; } = "";
         public string Name { get; set; }
@@ -640,6 +676,28 @@ namespace ZenQOffice.Core
         public bool IsGraphic { get; set; }
         public string SvgContent { get; set; }
         public string OriginalSvgContent { get; set; }
+        public string GraphicStyleMatch { get; set; } = "None"; // "None", "Sticker", "Engraving", "Sketch"
+        public string GraphicFilterPreset { get; set; } = "None"; // "None", "Soft", "Vintage", "Mono", "Vivid", "Cool"
+        public bool HasGraphicGradient { get; set; } = false;
+        public string GraphicGradientStyle { get; set; } = "Linear90"; // "Linear90", "Linear180", "Linear135", "Radial", "RadialCorner", "Conic"
+        public List<int> GraphicGradientStopColors { get; set; } = new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) };
+        public List<float> GraphicGradientStopPositions { get; set; } = new List<float> { 0.0f, 1.0f };
+        public bool HasTextGradient { get; set; } = false;
+        public string TextGradientStyle { get; set; } = "Linear90";
+        public List<int> TextGradientStopColors { get; set; } = new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) };
+        public List<float> TextGradientStopPositions { get; set; } = new List<float> { 0.0f, 1.0f };
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public List<Color> CachedDetectedColors;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public List<Color> OriginalDetectedColors;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        [NonSerialized]
+        public Bitmap OriginalRasterBitmap;
 
         // Table Properties
         public int TableColumns { get; set; }
@@ -770,6 +828,37 @@ namespace ZenQOffice.Core
         public bool IsVisible { get; set; }
         public bool IsEditingText { get; set; }
         public int CaretPosition { get; set; }
+        public bool AutoFitWidth { get; set; }
+        public bool AutoFitHeight { get; set; } = true;
+
+        // MS365 Interactive Hyperlink & Action Settings (Mouse Click & Mouse Over)
+        public SlideActionType ClickActionType { get; set; } = SlideActionType.None;
+        public int ClickTargetSlideIndex { get; set; } = -1;
+        public string ClickTargetUrl { get; set; } = "";
+        public string HyperlinkScreenTip { get; set; } = "";
+        public bool ClickShowAndReturn { get; set; } = false;
+        public SlideActionSound ClickSound { get; set; } = SlideActionSound.None;
+        public string ClickCustomSoundPath { get; set; } = "";
+        public bool ClickHighlight { get; set; } = false;
+        public string ClickRevealShapeId { get; set; } = "";
+
+        public SlideActionType HoverActionType { get; set; } = SlideActionType.None;
+        public int HoverTargetSlideIndex { get; set; } = -1;
+        public string HoverTargetUrl { get; set; } = "";
+        public bool HoverShowAndReturn { get; set; } = false;
+        public SlideActionSound HoverSound { get; set; } = SlideActionSound.None;
+        public string HoverCustomSoundPath { get; set; } = "";
+        public bool HoverHighlight { get; set; } = false;
+
+        public bool HasInteractiveAction
+        {
+            get
+            {
+                return ClickActionType != SlideActionType.None ||
+                       HoverActionType != SlideActionType.None ||
+                       !string.IsNullOrEmpty(ClickRevealShapeId);
+            }
+        }
 
         public string GetDisplayName(int index)
         {
@@ -992,11 +1081,14 @@ namespace ZenQOffice.Core
             return new ShapeNode
             {
                 Id = Id,
+                PresetId = PresetId,
                 MorphName = MorphName,
                 RawSpid = RawSpid,
                 Name = Name,
                 Type = Type,
                 IsVisible = IsVisible,
+                AutoFitWidth = AutoFitWidth,
+                AutoFitHeight = AutoFitHeight,
                 Transform = Transform.Clone(),
                 MarginLeft = MarginLeft,
                 MarginTop = MarginTop,
@@ -1076,6 +1168,19 @@ namespace ZenQOffice.Core
                 IsGraphic = IsGraphic,
                 SvgContent = SvgContent,
                 OriginalSvgContent = OriginalSvgContent,
+                GraphicStyleMatch = GraphicStyleMatch ?? "None",
+                GraphicFilterPreset = GraphicFilterPreset ?? "None",
+                HasGraphicGradient = HasGraphicGradient,
+                GraphicGradientStyle = GraphicGradientStyle ?? "Linear90",
+                GraphicGradientStopColors = (GraphicGradientStopColors != null) ? new List<int>(GraphicGradientStopColors) : new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) },
+                GraphicGradientStopPositions = (GraphicGradientStopPositions != null) ? new List<float>(GraphicGradientStopPositions) : new List<float> { 0.0f, 1.0f },
+                HasTextGradient = HasTextGradient,
+                TextGradientStyle = TextGradientStyle ?? "Linear90",
+                TextGradientStopColors = (TextGradientStopColors != null) ? new List<int>(TextGradientStopColors) : new List<int> { unchecked((int)0xFF8B5CF6), unchecked((int)0xFFEC4899) },
+                TextGradientStopPositions = (TextGradientStopPositions != null) ? new List<float>(TextGradientStopPositions) : new List<float> { 0.0f, 1.0f },
+                CachedDetectedColors = (CachedDetectedColors != null) ? new List<Color>(CachedDetectedColors) : null,
+                OriginalDetectedColors = (OriginalDetectedColors != null) ? new List<Color>(OriginalDetectedColors) : null,
+                OriginalRasterBitmap = (OriginalRasterBitmap != null) ? new Bitmap(OriginalRasterBitmap) : null,
                 VideoPath = VideoPath,
                 VideoFadeInDuration = VideoFadeInDuration,
                 VideoFadeOutDuration = VideoFadeOutDuration,
@@ -1130,6 +1235,22 @@ namespace ZenQOffice.Core
                 ZoomReturnToSlide = ZoomReturnToSlide,
                 ZoomShowBorder = ZoomShowBorder,
                 ZoomTransitionDurationMs = ZoomTransitionDurationMs,
+                ClickActionType = ClickActionType,
+                ClickTargetSlideIndex = ClickTargetSlideIndex,
+                ClickTargetUrl = ClickTargetUrl ?? "",
+                HyperlinkScreenTip = HyperlinkScreenTip ?? "",
+                ClickShowAndReturn = ClickShowAndReturn,
+                ClickSound = ClickSound,
+                ClickCustomSoundPath = ClickCustomSoundPath ?? "",
+                ClickHighlight = ClickHighlight,
+                ClickRevealShapeId = ClickRevealShapeId ?? "",
+                HoverActionType = HoverActionType,
+                HoverTargetSlideIndex = HoverTargetSlideIndex,
+                HoverTargetUrl = HoverTargetUrl ?? "",
+                HoverShowAndReturn = HoverShowAndReturn,
+                HoverSound = HoverSound,
+                HoverCustomSoundPath = HoverCustomSoundPath ?? "",
+                HoverHighlight = HoverHighlight,
                 Selected = false,
                 IsEditingText = false
             };
@@ -1242,9 +1363,12 @@ namespace ZenQOffice.Core
         AnimationPane,
         FormatBackground,
         SelectionPane,
-        Designer
+        Designer,
+        GraphicEditor,
+        ColorPalettePicker
     }
 
+    public enum ColorPickerTarget { GraphicColor, ShapeFill, ShapeStroke, TextColor, TextStroke }
     public enum NeonGlowTarget
     {
         Both,
@@ -1269,6 +1393,11 @@ namespace ZenQOffice.Core
         public float Delay { get; set; }
         public TransitionDirection Direction { get; set; }
         public int OrderIndex { get; set; }
+
+        // MS365 Interactive Trigger & Emphasis Color / Sound
+        public string TriggerShapeId { get; set; }
+        public int EmphasisTargetColor { get; set; }
+        public SlideActionSound AnimationSound { get; set; }
 
         // Motion Path Custom Points & Endpoint Drag Adjustments
         public List<PointF> CustomPoints { get; set; }
@@ -1353,6 +1482,9 @@ namespace ZenQOffice.Core
             Delay = 0.0f;
             Direction = TransitionDirection.Smooth;
             OrderIndex = 0;
+            TriggerShapeId = "";
+            EmphasisTargetColor = 0;
+            AnimationSound = SlideActionSound.None;
             CustomPoints = new List<PointF>();
             EndOffsetX = 0f;
             EndOffsetY = 0f;
@@ -1382,6 +1514,9 @@ namespace ZenQOffice.Core
                 Delay = Delay,
                 Direction = Direction,
                 OrderIndex = OrderIndex,
+                TriggerShapeId = TriggerShapeId ?? "",
+                EmphasisTargetColor = EmphasisTargetColor,
+                AnimationSound = AnimationSound,
                 CustomPoints = CustomPoints != null ? new List<PointF>(CustomPoints) : new List<PointF>(),
                 EndOffsetX = EndOffsetX,
                 EndOffsetY = EndOffsetY,

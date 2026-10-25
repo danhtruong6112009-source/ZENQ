@@ -16,6 +16,7 @@ namespace ZenQOffice.Core
         public string Role { get; set; } // "user" hoặc "assistant" / "model"
         public string Content { get; set; }
         public DateTime Timestamp { get; set; }
+        public string CanvasQuizJson { get; set; }
 
         public AiChatMessage()
         {
@@ -380,6 +381,7 @@ namespace ZenQOffice.Core
 
             var genConfig = new Dictionary<string, object>();
             genConfig["temperature"] = (double)config.Temperature;
+            genConfig["maxOutputTokens"] = 16384;
             payload["generationConfig"] = genConfig;
 
             string jsonBody = JsonLite.Serialize(payload);
@@ -621,6 +623,7 @@ namespace ZenQOffice.Core
 
             var genConfig = new Dictionary<string, object>();
             genConfig["temperature"] = (double)config.Temperature;
+            genConfig["maxOutputTokens"] = 16384;
             payload["generationConfig"] = genConfig;
 
             string jsonBody = JsonLite.Serialize(payload);
@@ -628,8 +631,8 @@ namespace ZenQOffice.Core
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = "application/json; charset=utf-8";
-            request.Timeout = 90000;
-            request.ReadWriteTimeout = 90000;
+            request.Timeout = 120000;
+            request.ReadWriteTimeout = 120000;
 
             byte[] data = Encoding.UTF8.GetBytes(jsonBody);
             request.ContentLength = data.Length;

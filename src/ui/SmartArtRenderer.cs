@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -35,54 +35,120 @@ namespace ZenQOffice.UI
             string type = smartArtType ?? "Hierarchy_Labeled";
             if (type.StartsWith("Hierarchy_") || type.Contains("Org") || type.Contains("Tree"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Process_") || type.Contains("Chevron") || type.Contains("Linear") || type.Contains("Flow"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Cycle_") || type.Contains("Radial") || type.Contains("Venn") || type.Contains("Ring"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Matrix_"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Pyramid_"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Picture_"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)" };
             }
             else if (type.StartsWith("Rel_") || type.Contains("Balance") || type.Contains("Funnel") || type.Contains("Gear"))
             {
-                return new string[] { "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)" };
             }
             else
             {
-                return new string[] { "[Text]", "[Text]", "[Text]" };
+                return new string[] { "(Text)", "(Text)", "(Text)" };
             }
+        }
+
+        public static void GetGradientColors(Color baseColor, out Color cTop, out Color cBot, out Color cBorder)
+        {
+            // Microsoft Office 365 authentic vibrant gradient stops
+            int tr = Math.Min(255, (int)(baseColor.R * 1.25f + 25));
+            int tg = Math.Min(255, (int)(baseColor.G * 1.25f + 25));
+            int tb = Math.Min(255, (int)(baseColor.B * 1.25f + 25));
+            cTop = Color.FromArgb(tr, tg, tb);
+
+            int br = (int)(baseColor.R * 0.62f);
+            int bg = (int)(baseColor.G * 0.62f);
+            int bb = (int)(baseColor.B * 0.62f);
+            cBot = Color.FromArgb(br, bg, bb);
+
+            int dr = (int)(baseColor.R * 0.42f);
+            int dg = (int)(baseColor.G * 0.42f);
+            int db = (int)(baseColor.B * 0.42f);
+            cBorder = Color.FromArgb(dr, dg, db);
         }
 
         public static Color[] GetPaletteColors(int presetIndex, int count)
         {
             Color[][] presets = new Color[][]
             {
-                // Preset 0: Office Blue Uniform (Default Theme Accent 1)
-                new Color[] { Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196) },
-                // Preset 1: Office Blue Uniform (Theme Accent 1)
-                new Color[] { Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196), Color.FromArgb(68, 114, 196) },
-                // Preset 2: Colorful Accent (Đa Sắc Màu)
-                new Color[] { Color.FromArgb(30, 136, 229), Color.FromArgb(67, 160, 71), Color.FromArgb(251, 140, 0), Color.FromArgb(142, 36, 170), Color.FromArgb(229, 57, 53) },
-                // Preset 3: Emerald Green (Xanh Lục)
-                new Color[] { Color.FromArgb(27, 94, 32), Color.FromArgb(46, 125, 50), Color.FromArgb(67, 160, 71), Color.FromArgb(102, 187, 106), Color.FromArgb(129, 199, 132) },
-                // Preset 4: Purple & Magenta (Tím & Hồng)
-                new Color[] { Color.FromArgb(74, 20, 140), Color.FromArgb(123, 31, 162), Color.FromArgb(171, 71, 188), Color.FromArgb(216, 27, 96), Color.FromArgb(173, 20, 87) },
-                // Preset 5: Monochrome Gray (Đơn Sắc)
-                new Color[] { Color.FromArgb(38, 50, 56), Color.FromArgb(55, 71, 79), Color.FromArgb(69, 90, 100), Color.FromArgb(84, 110, 122), Color.FromArgb(120, 144, 156) }
+                // Preset 0: Microsoft Office 365 Colorful Accent (Default - Blue, Orange, Green, Purple, Red, Amber, Cyan)
+                new Color[] {
+                    Color.FromArgb(91, 155, 213),  // Accent 1: Modern Office Blue
+                    Color.FromArgb(237, 125, 49),  // Accent 2: Warm Orange
+                    Color.FromArgb(112, 173, 71),  // Accent 3: Fresh Green
+                    Color.FromArgb(142, 36, 170),  // Accent 4: Royal Purple
+                    Color.FromArgb(229, 57, 53),   // Accent 5: Crimson Red
+                    Color.FromArgb(255, 192, 0),   // Accent 6: Warm Amber
+                    Color.FromArgb(0, 168, 204),   // Accent 7: Vivid Cyan
+                    Color.FromArgb(233, 30, 99)    // Accent 8: Deep Pink
+                },
+                // Preset 1: Colorful Warm (Orange, Red, Amber, Purple)
+                new Color[] {
+                    Color.FromArgb(237, 125, 49),
+                    Color.FromArgb(229, 57, 53),
+                    Color.FromArgb(255, 192, 0),
+                    Color.FromArgb(171, 71, 188),
+                    Color.FromArgb(216, 27, 96)
+                },
+                // Preset 2: Colorful Cool (Blue, Teal, Green, Violet)
+                new Color[] {
+                    Color.FromArgb(91, 155, 213),
+                    Color.FromArgb(0, 168, 204),
+                    Color.FromArgb(112, 173, 71),
+                    Color.FromArgb(102, 187, 106),
+                    Color.FromArgb(123, 31, 162)
+                },
+                // Preset 3: Primary Blue Monochromatic (Shades of Accent 1)
+                new Color[] {
+                    Color.FromArgb(43, 91, 136),
+                    Color.FromArgb(91, 155, 213),
+                    Color.FromArgb(143, 190, 235),
+                    Color.FromArgb(189, 218, 245),
+                    Color.FromArgb(68, 114, 196)
+                },
+                // Preset 4: Emerald Green
+                new Color[] {
+                    Color.FromArgb(46, 125, 50),
+                    Color.FromArgb(67, 160, 71),
+                    Color.FromArgb(102, 187, 106),
+                    Color.FromArgb(129, 199, 132),
+                    Color.FromArgb(27, 94, 32)
+                },
+                // Preset 5: Purple & Magenta
+                new Color[] {
+                    Color.FromArgb(123, 31, 162),
+                    Color.FromArgb(171, 71, 188),
+                    Color.FromArgb(216, 27, 96),
+                    Color.FromArgb(173, 20, 87),
+                    Color.FromArgb(74, 20, 140)
+                },
+                // Preset 6: Monochrome Gray
+                new Color[] {
+                    Color.FromArgb(55, 71, 79),
+                    Color.FromArgb(69, 90, 100),
+                    Color.FromArgb(84, 110, 122),
+                    Color.FromArgb(120, 144, 156),
+                    Color.FromArgb(144, 164, 174)
+                }
             };
 
             int pIdx = Math.Max(0, Math.Min(presets.Length - 1, presetIndex));
@@ -107,7 +173,26 @@ namespace ZenQOffice.UI
         {
             renderDispatch = new Dictionary<string, Action<Graphics, Rectangle, string[], Color[], float>>();
 
-            // LIST
+            // ==================== LIST (38 TEMPLATES) ====================
+            Action<Graphics, Rectangle, string[], Color[], float> listBlocks = (g, r, t, c, s) => DrawListBlocks(g, r, t, c, s);
+            renderDispatch["List_BasicBlock"] = listBlocks;
+            renderDispatch["List_VerticalBlock"] = listBlocks;
+            renderDispatch["List_VerticalBox"] = listBlocks;
+            renderDispatch["List_VerticalBullet"] = listBlocks;
+            renderDispatch["List_HorizontalBullet"] = (g, r, t, c, s) => DrawProcessLinear(g, r, t, c, s);
+            renderDispatch["List_Grouped"] = listBlocks;
+            renderDispatch["List_Stacked"] = (g, r, t, c, s) => DrawPyramidLayers(g, r, t, c, s);
+            renderDispatch["List_SquareAccent"] = listBlocks;
+            renderDispatch["List_PictureAccent"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["List_BendingPictureAccent"] = (g, r, t, c, s) => DrawPictureAlternatingBlocks(g, r, t, c, s);
+            renderDispatch["List_ContinuousPicture"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["List_HorizontalPicture"] = (g, r, t, c, s) => DrawPictureStrips(g, r, t, c, s);
+            renderDispatch["List_VerticalPictureAccent"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["List_VerticalPicture"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["List_VerticalAccent"] = listBlocks;
+            renderDispatch["List_VerticalArrow"] = (g, r, t, c, s) => DrawChevronVertical(g, r, t, c, s);
+            renderDispatch["List_VerticalCircle"] = (g, r, t, c, s) => DrawCycleCircleArrow(g, r, t, c, s);
+            renderDispatch["List_VerticalCurved"] = (g, r, t, c, s) => DrawProcessBending(g, r, t, c, s);
             renderDispatch["List_AlternatingHexagon"] = (g, r, t, c, s) => DrawHexagonCluster(g, r, t, c, s);
             renderDispatch["List_Tab"] = (g, r, t, c, s) => DrawTabLayout(g, r, t, c, s);
             renderDispatch["List_Trapezoid"] = (g, r, t, c, s) => DrawPyramidLayers(g, r, t, c, s);
@@ -118,12 +203,23 @@ namespace ZenQOffice.UI
             renderDispatch["List_VerticalChevron"] = (g, r, t, c, s) => DrawChevronVertical(g, r, t, c, s);
             renderDispatch["List_DescendingBlock"] = (g, r, t, c, s) => DrawStepDown(g, r, t, c, s);
             renderDispatch["List_IncreasingCircle"] = (g, r, t, c, s) => DrawCycleRing(g, r, t, c, s);
+            renderDispatch["List_DetailedProcess"] = (g, r, t, c, s) => DrawProcessLinear(g, r, t, c, s);
+            renderDispatch["List_Hierarchy"] = (g, r, t, c, s) => DrawHierarchyTree(g, r, t, c, s);
+            renderDispatch["List_Lined"] = listBlocks;
+            renderDispatch["List_PictureCaption"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["List_PlusMinus"] = (g, r, t, c, s) => DrawEquationBlocks(g, r, t, c, s);
+            renderDispatch["List_Reverse"] = listBlocks;
+            renderDispatch["List_SegmentedProcess"] = (g, r, t, c, s) => DrawCycleSegmented(g, r, t, c, s);
+            renderDispatch["List_TableHierarchy"] = listBlocks;
+            renderDispatch["List_Table"] = listBlocks;
 
-            // PROCESS
+            // ==================== PROCESS (47 TEMPLATES) ====================
             Action<Graphics, Rectangle, string[], Color[], float> procChev = (g, r, t, c, s) => DrawProcessChevron(g, r, t, c, s);
             renderDispatch["Process_BasicChevron"] = procChev;
             renderDispatch["Process_ChevronAccent"] = procChev;
             renderDispatch["Process_ClosedChevron"] = procChev;
+            renderDispatch["Process_ChevronList"] = procChev;
+            renderDispatch["Process_Phased"] = procChev;
 
             Action<Graphics, Rectangle, string[], Color[], float> procBend = (g, r, t, c, s) => DrawProcessBending(g, r, t, c, s);
             renderDispatch["Process_BasicBending"] = procBend;
@@ -136,12 +232,25 @@ namespace ZenQOffice.UI
             renderDispatch["Process_CircleAccentTimeline"] = procTime;
             renderDispatch["Process_TimelinePipe"] = procTime;
 
+            Action<Graphics, Rectangle, string[], Color[], float> procLin = (g, r, t, c, s) => DrawProcessLinear(g, r, t, c, s);
+            renderDispatch["Process_Basic"] = procLin;
+            renderDispatch["Process_Accent"] = procLin;
+            renderDispatch["Process_Detailed"] = procLin;
+            renderDispatch["Process_ContinuousArrow"] = procLin;
+            renderDispatch["Process_ContinuousBlock"] = procLin;
+            renderDispatch["Process_InterconnectedBlock"] = procLin;
+            renderDispatch["Process_ProcessArrows"] = procLin;
+            renderDispatch["Process_ProcessList"] = procLin;
+            renderDispatch["Process_SubStep"] = procLin;
+
             renderDispatch["Process_Gear"] = (g, r, t, c, s) => DrawGearInterlock(g, r, t, c, s);
             renderDispatch["Process_Funnel"] = (g, r, t, c, s) => DrawFunnelShape(g, r, t, c, s);
             renderDispatch["Process_Equation"] = (g, r, t, c, s) => DrawEquationBlocks(g, r, t, c, s);
             renderDispatch["Process_VerticalEquation"] = (g, r, t, c, s) => DrawEquationBlocks(g, r, t, c, s);
             renderDispatch["Process_ConvergingArrows"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
-            renderDispatch["Process_DivergingArrows"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s); // reversed in full impl
+            renderDispatch["Process_DivergingArrows"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
+            renderDispatch["Process_ConvergingText"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
+            renderDispatch["Process_RandomToResult"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
             renderDispatch["Process_OpposingArrows"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
             renderDispatch["Process_ArrowRibbon"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
 
@@ -157,18 +266,27 @@ namespace ZenQOffice.UI
             renderDispatch["Process_CircleArrow"] = (g, r, t, c, s) => DrawCycleRing(g, r, t, c, s);
             renderDispatch["Process_AlternatingFlow"] = (g, r, t, c, s) => DrawAlternatingFlow(g, r, t, c, s);
             renderDispatch["Process_Alternating"] = (g, r, t, c, s) => DrawAlternatingFlow(g, r, t, c, s);
+            renderDispatch["Process_Segmented"] = (g, r, t, c, s) => DrawCycleSegmented(g, r, t, c, s);
 
-            // CYCLE
+            Action<Graphics, Rectangle, string[], Color[], float> procVertChev = (g, r, t, c, s) => DrawChevronVertical(g, r, t, c, s);
+            renderDispatch["Process_Vertical"] = procVertChev;
+            renderDispatch["Process_VerticalArrowList"] = procVertChev;
+            renderDispatch["Process_VerticalChevronList"] = procVertChev;
+
+            renderDispatch["Process_ContinuousPictureList"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["Process_PictureAccent"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["Process_AscendingPictureAccent"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+
+            // ==================== CYCLE (16 TEMPLATES) ====================
             Action<Graphics, Rectangle, string[], Color[], float> cycRadial = (g, r, t, c, s) => DrawCycleRadial(g, r, t, c, 0, s);
             renderDispatch["Cycle_BasicRadial"] = cycRadial;
             renderDispatch["Cycle_Radial"] = cycRadial;
             renderDispatch["Cycle_RadialCluster"] = cycRadial;
             renderDispatch["Cycle_DivergingRadial"] = cycRadial;
-            
+
             renderDispatch["Cycle_BasicPie"] = (g, r, t, c, s) => DrawCycleBasicPie(g, r, t, c, s);
             renderDispatch["Cycle_Segmented"] = (g, r, t, c, s) => DrawCycleSegmented(g, r, t, c, s);
             renderDispatch["Cycle_BlockLoop"] = (g, r, t, c, s) => DrawCycleBlockLoop(g, r, t, c, s);
-
             renderDispatch["Cycle_Gear"] = (g, r, t, c, s) => DrawGearInterlock(g, r, t, c, s);
             renderDispatch["Cycle_CycleMatrix"] = (g, r, t, c, s) => DrawMatrixGrid(g, r, t, c, s);
             renderDispatch["Cycle_RadialVenn"] = (g, r, t, c, s) => DrawVennDiagram(g, r, t, c, s);
@@ -185,18 +303,28 @@ namespace ZenQOffice.UI
             renderDispatch["Cycle_CircleArrow"] = (g, r, t, c, s) => DrawCycleCircleArrow(g, r, t, c, s);
             renderDispatch["Cycle_CircleArrowProcess"] = (g, r, t, c, s) => DrawCycleCircleArrow(g, r, t, c, s);
 
-            // HIERARCHY
+            // ==================== HIERARCHY (15 TEMPLATES) ====================
+            Action<Graphics, Rectangle, string[], Color[], float> hierTree = (g, r, t, c, s) => DrawHierarchyTree(g, r, t, c, s);
+            renderDispatch["Hierarchy_Tree"] = hierTree;
+            renderDispatch["Hierarchy_Basic"] = hierTree;
+            renderDispatch["Hierarchy_PictureOrgChart"] = hierTree;
+            renderDispatch["Hierarchy_NameTitleOrg"] = hierTree;
+            renderDispatch["Hierarchy_HalfCircleOrg"] = hierTree;
+            renderDispatch["Hierarchy_CirclePicture"] = hierTree;
+
             renderDispatch["Hierarchy_Labeled"] = (g, r, t, c, s) => DrawHierarchyLabeled(g, r, t, c, s);
+
             Action<Graphics, Rectangle, string[], Color[], float> hierHoriz = (g, r, t, c, s) => DrawHierarchyHorizontal(g, r, t, c, s);
             renderDispatch["Hierarchy_Horizontal"] = hierHoriz;
             renderDispatch["Hierarchy_HorizontalOrg"] = hierHoriz;
             renderDispatch["Hierarchy_HorizontalLabeled"] = hierHoriz;
             renderDispatch["Hierarchy_HorizontalMultiLevel"] = hierHoriz;
+            renderDispatch["Hierarchy_List"] = hierHoriz;
+            renderDispatch["Hierarchy_LinedList"] = hierHoriz;
             renderDispatch["Hierarchy_Architecture"] = procStep;
-            renderDispatch["Hierarchy_Table"] = (g, r, t, c, s) => DrawListBlocks(g, r, t, c, s);
-            // Default tree fallback handled in DrawSmartArt
+            renderDispatch["Hierarchy_Table"] = listBlocks;
 
-            // RELATIONSHIP
+            // ==================== RELATIONSHIP (34 TEMPLATES) ====================
             renderDispatch["Rel_Balance"] = (g, r, t, c, s) => DrawBalanceScale(g, r, t, c, s);
             renderDispatch["Rel_CounterbalanceArrows"] = (g, r, t, c, s) => DrawBalanceScale(g, r, t, c, s);
             renderDispatch["Rel_Funnel"] = (g, r, t, c, s) => DrawFunnelShape(g, r, t, c, s);
@@ -204,56 +332,102 @@ namespace ZenQOffice.UI
             renderDispatch["Rel_BasicTarget"] = (g, r, t, c, s) => DrawTargetRings(g, r, t, c, s);
             renderDispatch["Rel_NestedTarget"] = (g, r, t, c, s) => DrawTargetRings(g, r, t, c, s);
             renderDispatch["Rel_TargetList"] = (g, r, t, c, s) => DrawTargetRings(g, r, t, c, s);
-            
+
             Action<Graphics, Rectangle, string[], Color[], float> relVenn = (g, r, t, c, s) => DrawVennDiagram(g, r, t, c, s);
             renderDispatch["Rel_BasicVenn"] = relVenn;
             renderDispatch["Rel_LinearVenn"] = relVenn;
             renderDispatch["Rel_RadialVenn"] = relVenn;
             renderDispatch["Rel_StackedVenn"] = relVenn;
-            
+
             renderDispatch["Rel_Equation"] = (g, r, t, c, s) => DrawEquationBlocks(g, r, t, c, s);
             renderDispatch["Rel_HexagonCluster"] = (g, r, t, c, s) => DrawHexagonCluster(g, r, t, c, s);
             renderDispatch["Rel_BasicRadial"] = cycRadial;
             renderDispatch["Rel_RadialCluster"] = cycRadial;
+            renderDispatch["Rel_ConvergingRadial"] = cycRadial;
+            renderDispatch["Rel_DivergingRadial"] = cycRadial;
+            renderDispatch["Rel_RadialList"] = cycRadial;
+            renderDispatch["Rel_RadialCycle"] = cycRing;
+            renderDispatch["Rel_CircleRelationship"] = cycRing;
+            renderDispatch["Rel_NondirectionalCycle"] = cycRing;
+
             renderDispatch["Rel_ConvergingArrows"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
             renderDispatch["Rel_DivergingArrows"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
             renderDispatch["Rel_OpposingArrows"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
             renderDispatch["Rel_ArrowRibbon"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
             renderDispatch["Rel_OpposingIdeas"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
+
             renderDispatch["Rel_BasicPie"] = (g, r, t, c, s) => DrawCycleBasicPie(g, r, t, c, s);
-            renderDispatch["Rel_NondirectionalCycle"] = cycRing;
-            renderDispatch["Rel_RadialCycle"] = cycRing;
             renderDispatch["Rel_CycleMatrix"] = (g, r, t, c, s) => DrawMatrixGrid(g, r, t, c, s);
             renderDispatch["Rel_SegmentedPyramid"] = (g, r, t, c, s) => DrawPyramidLayers(g, r, t, c, s);
+            renderDispatch["Rel_ContinuousPictureList"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["Rel_PictureAccentList"] = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
+            renderDispatch["Rel_GroupedList"] = listBlocks;
+            renderDispatch["Rel_HierarchyList"] = hierHoriz;
+            renderDispatch["Rel_TableHierarchy"] = listBlocks;
 
-            // MATRIX
+            // ==================== MATRIX (4 TEMPLATES) ====================
             Action<Graphics, Rectangle, string[], Color[], float> matGrid = (g, r, t, c, s) => DrawMatrixGrid(g, r, t, c, s);
             renderDispatch["Matrix_Basic"] = matGrid;
             renderDispatch["Matrix_Grid"] = matGrid;
             renderDispatch["Matrix_Titled"] = matGrid;
             renderDispatch["Matrix_Cycle"] = cycRadial;
 
-            // PYRAMID
+            // ==================== PYRAMID (4 TEMPLATES) ====================
             renderDispatch["Pyramid_Basic"] = (g, r, t, c, s) => DrawPyramidLayers(g, r, t, c, s);
             renderDispatch["Pyramid_Segmented"] = (g, r, t, c, s) => DrawPyramidLayers(g, r, t, c, s);
             renderDispatch["Pyramid_Inverted"] = (g, r, t, c, s) => DrawPyramidInverted(g, r, t, c, s);
             renderDispatch["Pyramid_List"] = (g, r, t, c, s) => DrawPyramidList(g, r, t, c, s);
 
-            // PICTURE
+            // ==================== PICTURE (31 TEMPLATES) ====================
+            Action<Graphics, Rectangle, string[], Color[], float> picBlocks = (g, r, t, c, s) => DrawPictureBlocks(g, r, t, c, s);
             renderDispatch["Picture_Grid"] = (g, r, t, c, s) => DrawPictureGrid(g, r, t, c, s);
-            renderDispatch["Picture_AlternatingBlocks"] = (g, r, t, c, s) => DrawPictureAlternatingBlocks(g, r, t, c, s);
+            renderDispatch["Picture_Accented"] = picBlocks;
+            renderDispatch["Picture_AscendingAccentProcess"] = picBlocks;
+            renderDispatch["Picture_BubbleList"] = picBlocks;
+            renderDispatch["Picture_Captioned"] = picBlocks;
+            renderDispatch["Picture_ContinuousList"] = picBlocks;
+            renderDispatch["Picture_FramedText"] = picBlocks;
+            renderDispatch["Picture_AccentBlocks"] = picBlocks;
+            renderDispatch["Picture_AccentList"] = picBlocks;
+            renderDispatch["Picture_AccentProcess"] = picBlocks;
+            renderDispatch["Picture_CaptionList"] = picBlocks;
+            renderDispatch["Picture_SnapshotList"] = picBlocks;
+            renderDispatch["Picture_TitledAccentList"] = picBlocks;
+            renderDispatch["Picture_TitledBlocks"] = picBlocks;
+
+            Action<Graphics, Rectangle, string[], Color[], float> picAltBlocks = (g, r, t, c, s) => DrawPictureAlternatingBlocks(g, r, t, c, s);
+            renderDispatch["Picture_AlternatingBlocks"] = picAltBlocks;
+            renderDispatch["Picture_BendingAccentList"] = picAltBlocks;
+            renderDispatch["Picture_BendingBlocks"] = picAltBlocks;
+            renderDispatch["Picture_BendingCaption"] = picAltBlocks;
+            renderDispatch["Picture_BendingCaptionList"] = picAltBlocks;
+            renderDispatch["Picture_BendingSemiTransparent"] = picAltBlocks;
+            renderDispatch["Picture_VerticalAccentList"] = picAltBlocks;
+            renderDispatch["Picture_VerticalList"] = picAltBlocks;
+
             Action<Graphics, Rectangle, string[], Color[], float> picStrips = (g, r, t, c, s) => DrawPictureStrips(g, r, t, c, s);
             renderDispatch["Picture_Strips"] = picStrips;
             renderDispatch["Picture_Lineup"] = picStrips;
+            renderDispatch["Picture_TitleLineup"] = picStrips;
             renderDispatch["Picture_HorizontalList"] = picStrips;
+
+            renderDispatch["Picture_AlternatingCircles"] = (g, r, t, c, s) => DrawCycleCircleArrow(g, r, t, c, s);
+            renderDispatch["Picture_CircularCallout"] = (g, r, t, c, s) => DrawCycleCircleArrow(g, r, t, c, s);
             renderDispatch["Picture_CircleHierarchy"] = (g, r, t, c, s) => DrawHierarchyTree(g, r, t, c, s);
             renderDispatch["Picture_HexagonCluster"] = (g, r, t, c, s) => DrawHexagonCluster(g, r, t, c, s);
             renderDispatch["Picture_Spiral"] = cycRing;
 
-            // OFFICE.COM
+            // ==================== OFFICE.COM (10 TEMPLATES) ====================
             renderDispatch["Office_CircleProcess"] = cycRing;
             renderDispatch["Office_HexagonRadial"] = (g, r, t, c, s) => DrawHexagonCluster(g, r, t, c, s);
             renderDispatch["Office_TabList"] = (g, r, t, c, s) => DrawTabLayout(g, r, t, c, s);
+            renderDispatch["Office_ConvergingText"] = (g, r, t, c, s) => DrawArrowsConverging(g, r, t, c, s);
+            renderDispatch["Office_InterconnectedBlockProcess"] = procLin;
+            renderDispatch["Office_PictureFrame"] = picBlocks;
+            renderDispatch["Office_RadialPictureList"] = cycRadial;
+            renderDispatch["Office_ThemePictureAccent"] = picBlocks;
+            renderDispatch["Office_ThemeAlternatingAccent"] = picAltBlocks;
+            renderDispatch["Office_ThemePictureGrid"] = (g, r, t, c, s) => DrawPictureGrid(g, r, t, c, s);
         }
 
         public static void PopulateSubShapeBounds(Rectangle bounds, string smartArtType, int count, DocShapeObject shape)
@@ -334,8 +508,10 @@ namespace ZenQOffice.UI
                     // Non-radial cycle (Ring, CircleArrow, BlockLoop, Segmented, Gear, BasicPie, Nondirectional)
                     shape.AspectRatioLock = false;
                     float rOrbit = pixelRad;
-                    float nodeW = Math.Max(32f, minDim * 0.22f);
-                    float nodeH = Math.Max(20f, minDim * 0.13f);
+                    bool isCircleNodes = type.Contains("Ring") || type.Contains("Circle") || type.Contains("BasicCycle");
+                    float nodeDiam = Math.Max(36f, Math.Min(70f, minDim * 0.24f));
+                    float nodeW = isCircleNodes ? nodeDiam : Math.Max(32f, minDim * 0.22f);
+                    float nodeH = isCircleNodes ? nodeDiam : Math.Max(20f, minDim * 0.13f);
                     float satRelW = nodeW / bw;
                     float satRelH = nodeH / bh;
 
@@ -346,7 +522,7 @@ namespace ZenQOffice.UI
                         float cx = 0.5f + (rOrbit * (float)Math.Cos(rad)) / bw;
                         float cy = 0.5f + (rOrbit * (float)Math.Sin(rad)) / bh;
                         shape.SubShapeRelativeBounds.Add(new RectangleF(cx - satRelW / 2.0f, cy - satRelH / 2.0f, satRelW, satRelH));
-                        if (!shape.NodeShapeTypes.ContainsKey(i)) shape.NodeShapeTypes[i] = "RoundedRectangle";
+                        if (!shape.NodeShapeTypes.ContainsKey(i)) shape.NodeShapeTypes[i] = isCircleNodes ? "Circle" : "RoundedRectangle";
                     }
                 }
             }
@@ -368,13 +544,14 @@ namespace ZenQOffice.UI
                     shape.SubShapeRelativeBounds.Add(new RectangleF((1.0f - sw) / 2.0f, 0.06f + i * sh, sw, sh * 0.90f));
                 }
             }
-            else if (type.Contains("Vertical"))
+            else if (type.Contains("Vertical") || (type.StartsWith("List_") && !type.Contains("Horizontal") && !type.Contains("Segmented") && !type.Contains("Target") && !type.Contains("Pie") && !type.Contains("Hexagon") && !type.Contains("Chevron") && !type.Contains("Circle")) || type.Contains("Stacked") || type.Contains("StepDown"))
             {
-                // Vertical list
-                float sh = (0.92f - (count - 1) * 0.03f) / count;
+                // Vertical list / Stacked blocks
+                float gap = 0.03f;
+                float sh = (0.94f - (count - 1) * gap) / count;
                 for (int i = 0; i < count; i++)
                 {
-                    shape.SubShapeRelativeBounds.Add(new RectangleF(0.08f, 0.04f + i * (sh + 0.03f), 0.84f, sh));
+                    shape.SubShapeRelativeBounds.Add(new RectangleF(0.03f, 0.03f + i * (sh + gap), 0.94f, sh));
                 }
             }
             else if (type.Contains("Alternating") || type.Contains("hProcess4"))
@@ -395,9 +572,11 @@ namespace ZenQOffice.UI
                 // Horizontal process / list / chevron
                 float gap = 0.03f;
                 float sw = (0.94f - (count - 1) * gap) / count;
+                float cardRelH = Math.Min(0.60f, Math.Max(0.25f, sw * 0.70f * (bounds.Width / (float)Math.Max(1, bounds.Height))));
+                float cardRelY = (1.0f - cardRelH) / 2.0f;
                 for (int i = 0; i < count; i++)
                 {
-                    shape.SubShapeRelativeBounds.Add(new RectangleF(0.03f + i * (sw + gap), 0.15f, sw, 0.70f));
+                    shape.SubShapeRelativeBounds.Add(new RectangleF(0.03f + i * (sw + gap), cardRelY, sw, cardRelH));
                 }
             }
         }
@@ -413,9 +592,9 @@ namespace ZenQOffice.UI
                 colors = new Color[nodes.Length];
                 for (int i = 0; i < nodes.Length; i++)
                 {
-                    colors[i] = (shape.StylePresetIndex == 2)
-                        ? shape.ResolvedThemePalette[i % shape.ResolvedThemePalette.Length]
-                        : shape.ResolvedThemePalette[0];
+                    colors[i] = (shape.StylePresetIndex == 3 || shape.StylePresetIndex == 6)
+                        ? shape.ResolvedThemePalette[0]
+                        : shape.ResolvedThemePalette[i % shape.ResolvedThemePalette.Length];
                 }
             }
             else
@@ -541,6 +720,172 @@ namespace ZenQOffice.UI
             }
         }
 
+        // ==================== FLUENT 3D SHADING ENGINE ====================
+        public static void FillFluentCard(Graphics g, Rectangle rect, Color baseColor, int cornerRadius, int visualStyle, float zoom = 1f)
+        {
+            if (rect.Width <= 2 || rect.Height <= 2) return;
+            int r = Math.Max(2, (int)(cornerRadius * zoom));
+
+            // 1. Soft Multi-Pass Drop Shadow
+            if (visualStyle != 4)
+            {
+                Rectangle sh1 = new Rectangle(rect.X, rect.Y + (int)(3 * zoom), rect.Width, rect.Height);
+                using (GraphicsPath sp1 = CreateRoundedPath(sh1, r + 2))
+                using (SolidBrush sb1 = new SolidBrush(Color.FromArgb(24, 0, 0, 0)))
+                {
+                    g.FillPath(sb1, sp1);
+                }
+                Rectangle sh2 = new Rectangle(rect.X, rect.Y + (int)(1.5f * zoom), rect.Width, rect.Height);
+                using (GraphicsPath sp2 = CreateRoundedPath(sh2, r + 1))
+                using (SolidBrush sb2 = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+                {
+                    g.FillPath(sb2, sp2);
+                }
+            }
+
+            using (GraphicsPath path = CreateRoundedPath(rect, r))
+            {
+                if (visualStyle == 4) // Outline mode
+                {
+                    using (SolidBrush wb = new SolidBrush(Color.White))
+                        g.FillPath(wb, path);
+                    using (Pen op = new Pen(baseColor, 2f * zoom))
+                        g.DrawPath(op, path);
+                    return;
+                }
+
+                // 2. Fluent Multi-Stop Gradient Body
+                Color cTop, cBot, borderCol;
+                GetGradientColors(baseColor, out cTop, out cBot, out borderCol);
+                using (LinearGradientBrush lgb = new LinearGradientBrush(rect, cTop, cBot, 90f))
+                {
+                    g.FillPath(lgb, path);
+                }
+
+                // 3. Top-edge 3D Bevel Specular Highlight
+                Rectangle hRect = new Rectangle(rect.X + 2, rect.Y + 2, Math.Max(2, rect.Width - 4), Math.Max(2, (int)(rect.Height * 0.45f)));
+                using (GraphicsPath hp = CreateRoundedPath(hRect, Math.Max(2, r - 1)))
+                using (LinearGradientBrush hb = new LinearGradientBrush(hRect, Color.FromArgb(125, 255, 255, 255), Color.FromArgb(10, 255, 255, 255), 90f))
+                {
+                    g.FillPath(hb, hp);
+                }
+
+                // 4. Subtle Outer Border
+                using (Pen bp = new Pen(borderCol, 1.2f * zoom))
+                {
+                    g.DrawPath(bp, path);
+                }
+            }
+        }
+
+        public static void FillFluentCircle(Graphics g, RectangleF rect, Color baseColor, int visualStyle, float zoom = 1f)
+        {
+            if (rect.Width <= 2 || rect.Height <= 2) return;
+
+            // 1. Soft Drop Shadow
+            if (visualStyle != 4)
+            {
+                RectangleF sh1 = new RectangleF(rect.X, rect.Y + 3f * zoom, rect.Width, rect.Height);
+                using (SolidBrush sb1 = new SolidBrush(Color.FromArgb(24, 0, 0, 0)))
+                    g.FillEllipse(sb1, sh1);
+                RectangleF sh2 = new RectangleF(rect.X, rect.Y + 1.5f * zoom, rect.Width, rect.Height);
+                using (SolidBrush sb2 = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+                    g.FillEllipse(sb2, sh2);
+            }
+
+            if (visualStyle == 4)
+            {
+                using (SolidBrush wb = new SolidBrush(Color.White))
+                    g.FillEllipse(wb, rect);
+                using (Pen op = new Pen(baseColor, 2f * zoom))
+                    g.DrawEllipse(op, rect);
+                return;
+            }
+
+            // 2. Fluent Multi-Stop Gradient Body
+            Color cTop, cBot, borderCol;
+            GetGradientColors(baseColor, out cTop, out cBot, out borderCol);
+            using (LinearGradientBrush lgb = new LinearGradientBrush(rect, cTop, cBot, 90f))
+            {
+                g.FillEllipse(lgb, rect);
+            }
+
+            // 3. Top-edge 3D Bevel Specular Highlight
+            RectangleF hRect = new RectangleF(rect.X + rect.Width * 0.15f, rect.Y + 2f * zoom, rect.Width * 0.70f, rect.Height * 0.40f);
+            using (LinearGradientBrush hb = new LinearGradientBrush(hRect, Color.FromArgb(135, 255, 255, 255), Color.FromArgb(10, 255, 255, 255), 90f))
+            {
+                g.FillEllipse(hb, hRect);
+            }
+
+            // 4. Subtle Outer Border
+            using (Pen bp = new Pen(borderCol, 1.2f * zoom))
+            {
+                g.DrawEllipse(bp, rect);
+            }
+        }
+
+        public static void FillFluentPolygon(Graphics g, PointF[] points, Color baseColor, int visualStyle, float zoom = 1f)
+        {
+            if (points == null || points.Length < 3) return;
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddPolygon(points);
+                RectangleF bounds = path.GetBounds();
+                if (bounds.Width <= 2 || bounds.Height <= 2) return;
+
+                // 1. Soft Drop Shadow
+                if (visualStyle != 4)
+                {
+                    PointF[] shPoints = new PointF[points.Length];
+                    for (int i = 0; i < points.Length; i++)
+                        shPoints[i] = new PointF(points[i].X, points[i].Y + 2.5f * zoom);
+                    using (GraphicsPath shp = new GraphicsPath())
+                    {
+                        shp.AddPolygon(shPoints);
+                        using (SolidBrush sb = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
+                            g.FillPath(sb, shp);
+                    }
+                }
+
+                if (visualStyle == 4)
+                {
+                    using (SolidBrush wb = new SolidBrush(Color.White))
+                        g.FillPath(wb, path);
+                    using (Pen op = new Pen(baseColor, 2f * zoom))
+                        g.DrawPath(op, path);
+                    return;
+                }
+
+                // 2. Fluent Multi-Stop Gradient Body
+                Color cTop, cBot, borderCol;
+                GetGradientColors(baseColor, out cTop, out cBot, out borderCol);
+                using (LinearGradientBrush lgb = new LinearGradientBrush(bounds, cTop, cBot, 90f))
+                {
+                    g.FillPath(lgb, path);
+                }
+
+                // 3. Top-edge 3D Bevel Specular Highlight
+                using (Pen hp = new Pen(Color.FromArgb(130, 255, 255, 255), 1.5f * zoom))
+                {
+                    for (int i = 0; i < points.Length; i++)
+                    {
+                        PointF p1 = points[i];
+                        PointF p2 = points[(i + 1) % points.Length];
+                        if (p1.Y <= bounds.Top + bounds.Height * 0.55f || p2.Y <= bounds.Top + bounds.Height * 0.55f)
+                        {
+                            g.DrawLine(hp, p1, p2);
+                        }
+                    }
+                }
+
+                // 4. Subtle Outer Border
+                using (Pen bp = new Pen(borderCol, 1.2f * zoom))
+                {
+                    g.DrawPath(bp, path);
+                }
+            }
+        }
+
         // ==================== 1. CYCLE RADIAL (EXACT MATCH TO MS OFFICE) ====================
         private static void DrawCycleRadial(Graphics g, Rectangle r, string[] nodes, Color[] colors, int colorPreset, float zoom)
         {
@@ -595,14 +940,7 @@ namespace ZenQOffice.UI
             {
                 // 1. Draw Central Core Hub (i = 0)
                 RectangleF coreRect = new RectangleF(cx - rCore, cy - rCore, rCore * 2f, rCore * 2f);
-                using (SolidBrush cb = new SolidBrush(ringCol))
-                {
-                    g.FillEllipse(cb, coreRect);
-                }
-                using (Pen cp = new Pen(ControlPaint.Dark(ringCol, 0.2f), 1.5f * zoom))
-                {
-                    g.DrawEllipse(cp, coreRect.X, coreRect.Y, coreRect.Width, coreRect.Height);
-                }
+                FillFluentCircle(g, coreRect, ringCol, 0, zoom);
                 Rectangle coreTextRect = new Rectangle((int)coreRect.X, (int)coreRect.Y, (int)coreRect.Width, (int)coreRect.Height);
                 DrawAutoFitText(g, nodes[0], coreTextRect, Color.White);
 
@@ -616,14 +954,7 @@ namespace ZenQOffice.UI
                     Rectangle satRect = new Rectangle(nx - (int)rSat, ny - (int)rSat, (int)(rSat * 2f), (int)(rSat * 2f));
 
                     Color c = colors[i % colors.Length];
-                    using (SolidBrush b = new SolidBrush(c))
-                    {
-                        g.FillEllipse(b, satRect);
-                    }
-                    using (Pen p = new Pen(ControlPaint.Dark(c, 0.2f), 1.5f * zoom))
-                    {
-                        g.DrawEllipse(p, satRect);
-                    }
+                    FillFluentCircle(g, satRect, c, 0, zoom);
                     DrawAutoFitText(g, nodes[i], satRect, Color.White);
                 }
             }
@@ -657,26 +988,22 @@ namespace ZenQOffice.UI
             int count = nodes.Length;
             if (count <= 0) return;
 
-            int arrowW = Math.Max(12, Math.Min(30, (int)(r.Width * 0.08f)));
-            int arrowPad = Math.Max(4, (int)(r.Width * 0.025f));
+            int arrowW = Math.Max(16, Math.Min(34, (int)(r.Width * 0.07f)));
+            int arrowPad = Math.Max(4, (int)(r.Width * 0.02f));
             int totalSpacing = (arrowW + arrowPad * 2) * (count - 1);
-            int cardW = Math.Max(30, (r.Width - totalSpacing) / count);
-            int cardH = Math.Min(r.Height - 12, Math.Max(40, (int)(r.Height * 0.65f)));
+            int cardW = Math.Max(40, (r.Width - totalSpacing) / count);
+            int cardH = Math.Min(r.Height - 16, Math.Max(48, Math.Min((int)(r.Height * 0.54f), (int)(cardW * 0.65f))));
             int cardY = r.Y + (r.Height - cardH) / 2;
 
             int curX = r.X;
             for (int i = 0; i < count; i++)
             {
+                Rectangle cardR = new Rectangle(curX, cardY, cardW, cardH);
+                Color c = colors[i % colors.Length];
+
                 if (!SuppressNodeBodies)
                 {
-                    Rectangle cardR = new Rectangle(curX, cardY, cardW, cardH);
-                    Color c = colors[i % colors.Length];
-
-                    using (SolidBrush cb = new SolidBrush(c))
-                    {
-                        g.FillRectangle(cb, cardR);
-                    }
-
+                    FillFluentCard(g, cardR, c, 6, 0, zoom);
                     DrawAutoFitText(g, nodes[i], cardR, Color.White);
                 }
 
@@ -700,45 +1027,50 @@ namespace ZenQOffice.UI
             int count = nodes.Length;
             if (count <= 0) return;
 
-            int notch = Math.Max(16, (int)(36 * zoom));
-            int chW = (r.Width + (count - 1) * notch) / count;
-            int chH = Math.Min(r.Height, Math.Max(120, (int)(r.Height * 0.65f)));
+            int gap = Math.Max(3, (int)(5 * zoom));
+            int notch = Math.Max(16, (int)(Math.Min(r.Width / (count * 3.5f), 34 * zoom)));
+            int chW = (r.Width - gap * (count - 1) + (count - 1) * notch) / count;
+            int chH = Math.Min(r.Height - 16, Math.Max(48, (int)(r.Height * 0.58f)));
             int chY = r.Y + (r.Height - chH) / 2;
 
             int curX = r.X;
             for (int i = 0; i < count; i++)
             {
-                PointF[] pts = new PointF[]
+                PointF[] pts;
+                if (i == 0)
                 {
-                    new PointF(curX, chY),
-                    new PointF(curX + chW - notch, chY),
-                    new PointF(curX + chW, chY + chH / 2f),
-                    new PointF(curX + chW - notch, chY + chH),
-                    new PointF(curX, chY + chH),
-                    new PointF(curX + (i == 0 ? 0 : notch), chY + chH / 2f)
-                };
-
-                using (GraphicsPath cp = new GraphicsPath())
+                    pts = new PointF[]
+                    {
+                        new PointF(curX, chY),
+                        new PointF(curX + chW - notch, chY),
+                        new PointF(curX + chW, chY + chH / 2f),
+                        new PointF(curX + chW - notch, chY + chH),
+                        new PointF(curX, chY + chH)
+                    };
+                }
+                else
                 {
-                    cp.AddPolygon(pts);
-                    Color c = colors[i % colors.Length];
-                    using (SolidBrush cBrush = new SolidBrush(c))
+                    pts = new PointF[]
                     {
-                        g.FillPath(cBrush, cp);
-                    }
-                    using (Pen p = new Pen(Color.White, 2.5f * zoom))
-                    {
-                        g.DrawPath(p, cp);
-                    }
+                        new PointF(curX, chY),
+                        new PointF(curX + chW - notch, chY),
+                        new PointF(curX + chW, chY + chH / 2f),
+                        new PointF(curX + chW - notch, chY + chH),
+                        new PointF(curX, chY + chH),
+                        new PointF(curX + notch, chY + chH / 2f)
+                    };
                 }
 
-                int textLeft = curX + (i == 0 ? (int)(10 * zoom) : notch + (int)(6 * zoom));
-                int textW = Math.Max(20, chW - notch - (int)(16 * zoom));
+                Color c = colors[i % colors.Length];
+                FillFluentPolygon(g, pts, c, 0, zoom);
+
+                int textLeft = curX + (i == 0 ? (int)(8 * zoom) : notch + (int)(4 * zoom));
+                int textW = Math.Max(16, chW - notch - (int)(12 * zoom));
                 Rectangle tRect = new Rectangle(textLeft, chY, textW, chH);
 
                 DrawAutoFitText(g, nodes[i], tRect, Color.White);
 
-                curX += chW - notch;
+                curX += chW - notch + gap;
             }
         }
 
@@ -757,16 +1089,8 @@ namespace ZenQOffice.UI
             if (!SuppressNodeBodies)
             {
                 Color rootCol = colors[0];
-                using (SolidBrush rb = new SolidBrush(rootCol))
-                {
-                    g.FillRectangle(rb, rootRect);
-                }
-                float rfSize = Math.Max(12f, Math.Min(24f, rootH * 0.32f));
-                using (Font rf = new Font("Segoe UI", rfSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                {
-                    g.DrawString(nodes[0], rf, Brushes.White, rootRect, sf);
-                }
+                FillFluentCard(g, rootRect, rootCol, 6, 0, zoom);
+                DrawAutoFitText(g, nodes[0], rootRect, Color.White, 16f, 9f);
             }
 
             // Children boxes (nodes[1..N])
@@ -779,7 +1103,7 @@ namespace ZenQOffice.UI
             int childY = r.Bottom - childH - (int)(10 * zoom);
 
             int stemMidY = rootRect.Bottom + (childY - rootRect.Bottom) / 2;
-            using (Pen linePen = new Pen(Color.FromArgb(100, 116, 139), 2.5f * zoom))
+            using (Pen linePen = new Pen(Color.FromArgb(100, 116, 139), 2f * zoom))
             {
                 // Vertical line from root
                 g.DrawLine(linePen, r.X + r.Width / 2, rootRect.Bottom, r.X + r.Width / 2, stemMidY);
@@ -793,7 +1117,7 @@ namespace ZenQOffice.UI
             for (int i = 1; i <= childCount; i++)
             {
                 Rectangle cRect = new Rectangle(curX, childY, childW, childH);
-                using (Pen linePen = new Pen(Color.FromArgb(100, 116, 139), 2.5f * zoom))
+                using (Pen linePen = new Pen(Color.FromArgb(100, 116, 139), 2f * zoom))
                 {
                     g.DrawLine(linePen, cRect.X + cRect.Width / 2, stemMidY, cRect.X + cRect.Width / 2, cRect.Y);
                 }
@@ -801,17 +1125,8 @@ namespace ZenQOffice.UI
                 if (!SuppressNodeBodies)
                 {
                     Color cc = colors[i % colors.Length];
-                    using (SolidBrush cb = new SolidBrush(cc))
-                    {
-                        g.FillRectangle(cb, cRect);
-                    }
-
-                    float cfSize = Math.Max(11f, Math.Min(22f, childH * 0.30f));
-                    using (Font cf = new Font("Segoe UI", cfSize, FontStyle.Bold))
-                    using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
-                    {
-                        g.DrawString(nodes[i], cf, Brushes.White, cRect, sf);
-                    }
+                    FillFluentCard(g, cRect, cc, 6, 0, zoom);
+                    DrawAutoFitText(g, nodes[i], cRect, Color.White, 14f, 8f);
                 }
 
                 curX += childW + gap;
@@ -958,31 +1273,19 @@ namespace ZenQOffice.UI
                 Rectangle bRect = new Rectangle(r.X, curY, r.Width, blockH);
                 Color c = colors[i % colors.Length];
 
+                FillFluentCard(g, bRect, c, 6, 0, zoom);
+
+                // Badge overlay on left side
                 int badgeW = Math.Max(36, (int)(60 * zoom));
-                Rectangle badgeR = new Rectangle(bRect.X, bRect.Y, badgeW, bRect.Height);
-                using (SolidBrush bb = new SolidBrush(ControlPaint.Dark(c, 0.1f)))
+                Rectangle badgeR = new Rectangle(bRect.X + 2, bRect.Y + 2, badgeW, bRect.Height - 4);
+                using (SolidBrush bb = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
                 {
                     g.FillRectangle(bb, badgeR);
                 }
-                float bfSize = Math.Max(12f, Math.Min(24f, blockH * 0.35f));
-                using (Font bf = new Font("Segoe UI", bfSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                {
-                    g.DrawString((i + 1).ToString("D2"), bf, Brushes.White, badgeR, sf);
-                }
+                DrawAutoFitText(g, (i + 1).ToString("D2"), badgeR, Color.White, 18f, 10f);
 
-                Rectangle textR = new Rectangle(bRect.X + badgeW, bRect.Y, bRect.Width - badgeW, bRect.Height);
-                using (SolidBrush tb = new SolidBrush(c))
-                {
-                    g.FillRectangle(tb, textR);
-                }
-                float tfSize = Math.Max(12f, Math.Min(22f, blockH * 0.30f));
-                using (Font tf = new Font("Segoe UI", tfSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
-                {
-                    Rectangle innerText = new Rectangle(textR.X + (int)(16 * zoom), textR.Y, textR.Width - (int)(24 * zoom), textR.Height);
-                    g.DrawString(nodes[i], tf, Brushes.White, innerText, sf);
-                }
+                Rectangle textR = new Rectangle(bRect.X + badgeW + (int)(12 * zoom), bRect.Y + 2, bRect.Width - badgeW - (int)(18 * zoom), bRect.Height - 4);
+                DrawAutoFitText(g, nodes[i], textR, Color.White, 15f, 9f);
 
                 curY += blockH + gap;
             }
@@ -1008,18 +1311,10 @@ namespace ZenQOffice.UI
             {
                 Rectangle cR = cellRects[i];
                 Color c = colors[i % colors.Length];
-                using (SolidBrush cb = new SolidBrush(c))
-                {
-                    g.FillRectangle(cb, cR);
-                }
+                FillFluentCard(g, cR, c, 8, 0, zoom);
 
                 string nodeText = (i < nodes.Length) ? nodes[i] : "Mục " + (i + 1);
-                float tfSize = Math.Max(12f, Math.Min(24f, cellH * 0.18f));
-                using (Font tf = new Font("Segoe UI", tfSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
-                {
-                    g.DrawString(nodeText, tf, Brushes.White, cR, sf);
-                }
+                DrawAutoFitText(g, nodeText, cR, Color.White, 16f, 9f);
             }
         }
 
@@ -1030,7 +1325,7 @@ namespace ZenQOffice.UI
             int count = nodes.Length;
             if (count <= 0) return;
 
-            int gap = Math.Max(4, (int)(6 * zoom));
+            int gap = Math.Max(3, (int)(5 * zoom));
             int layerH = (r.Height - gap * (count - 1)) / count;
 
             int centerX = r.X + r.Width / 2;
@@ -1046,35 +1341,34 @@ namespace ZenQOffice.UI
 
                 int layerY = r.Y + i * (layerH + gap);
 
-                PointF[] pts = new PointF[]
+                PointF[] pts;
+                if (i == 0)
                 {
-                    new PointF(centerX - topW / 2f, layerY),
-                    new PointF(centerX + topW / 2f, layerY),
-                    new PointF(centerX + botW / 2f, layerY + layerH),
-                    new PointF(centerX - botW / 2f, layerY + layerH)
-                };
-
-                using (GraphicsPath pp = new GraphicsPath())
+                    // Top slice is a triangle
+                    pts = new PointF[]
+                    {
+                        new PointF(centerX, layerY),
+                        new PointF(centerX + botW / 2f, layerY + layerH),
+                        new PointF(centerX - botW / 2f, layerY + layerH)
+                    };
+                }
+                else
                 {
-                    pp.AddPolygon(pts);
-                    Color c = colors[i % colors.Length];
-                    using (SolidBrush pb = new SolidBrush(c))
+                    // Trapezoid slice
+                    pts = new PointF[]
                     {
-                        g.FillPath(pb, pp);
-                    }
-                    using (Pen pPen = new Pen(Color.White, 2.5f * zoom))
-                    {
-                        g.DrawPath(pPen, pp);
-                    }
+                        new PointF(centerX - topW / 2f, layerY),
+                        new PointF(centerX + topW / 2f, layerY),
+                        new PointF(centerX + botW / 2f, layerY + layerH),
+                        new PointF(centerX - botW / 2f, layerY + layerH)
+                    };
                 }
 
-                Rectangle tBox = new Rectangle(centerX - botW / 2 + (int)(12 * zoom), layerY, Math.Max(20, botW - (int)(24 * zoom)), layerH);
-                float pfSize = Math.Max(12f, Math.Min(22f, layerH * 0.32f));
-                using (Font pf = new Font("Segoe UI", pfSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
-                {
-                    g.DrawString(nodes[i], pf, Brushes.White, tBox, sf);
-                }
+                Color c = colors[i % colors.Length];
+                FillFluentPolygon(g, pts, c, 0, zoom);
+
+                Rectangle tBox = new Rectangle(centerX - botW / 2 + (int)(8 * zoom), layerY, Math.Max(20, botW - (int)(16 * zoom)), layerH);
+                DrawAutoFitText(g, nodes[i], tBox, Color.White, 15f, 8f);
             }
         }
 
@@ -1128,17 +1422,8 @@ namespace ZenQOffice.UI
                 // Caption Box
                 Rectangle capRect = new Rectangle(cardX, cardY + picH, cardW, cardH - picH);
                 Color c = colors[i % colors.Length];
-                using (SolidBrush cb = new SolidBrush(c))
-                {
-                    g.FillRectangle(cb, capRect);
-                }
-
-                float fSize = Math.Max(9f, Math.Min(16f, capRect.Height * 0.32f));
-                using (Font f = new Font("Segoe UI", fSize, FontStyle.Bold))
-                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
-                {
-                    g.DrawString(nodes[i], f, Brushes.White, capRect, sf);
-                }
+                FillFluentCard(g, capRect, c, 4, 0, zoom);
+                DrawAutoFitText(g, nodes[i], capRect, Color.White, 14f, 8f);
             }
         }
 
@@ -1148,19 +1433,28 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int cardW = Math.Max(30, (r.Width - (count * 20)) / count);
-            int cardH = Math.Min(r.Height / 2, 60);
-            using (Pen pathPen = new Pen(Color.FromArgb(180, 180, 180), 4f * zoom))
+
+            int gap = Math.Max(8, (int)(16 * zoom));
+            int cardW = Math.Max(40, (r.Width - (count - 1) * gap) / count);
+            int cardH = Math.Min(r.Height - 24, Math.Max(46, (int)(cardW * 0.68f)));
+
+            // S-curve connector pipe behind cards
+            using (Pen pathPen = new Pen(Color.FromArgb(180, 205, 230), 4f * zoom))
             {
-                g.DrawBezier(pathPen, r.X, r.Y + cardH, r.X + r.Width / 2, r.Y - cardH, r.X + r.Width / 2, r.Bottom + cardH, r.Right, r.Bottom - cardH);
+                int py1 = r.Y + cardH / 2;
+                int py2 = r.Bottom - cardH / 2;
+                g.DrawBezier(pathPen, r.X + 20, py1, r.X + r.Width / 3, py1, r.X + r.Width * 2 / 3, py2, r.Right - 20, py2);
             }
+
             for (int i = 0; i < count; i++)
             {
-                int cx = r.X + i * (cardW + 20);
-                int cy = r.Y + (i % 2 == 0 ? 0 : r.Height - cardH);
+                int cx = r.X + i * (cardW + gap);
+                bool isTop = (i % 2 == 0);
+                int cy = isTop ? r.Y + 8 : r.Bottom - cardH - 8;
                 Rectangle card = new Rectangle(cx, cy, cardW, cardH);
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(b, card);
-                DrawAutoFitText(g, nodes[i], card, Color.White);
+                Color c = colors[i % colors.Length];
+                FillFluentCard(g, card, c, 8, 0, zoom);
+                DrawAutoFitText(g, nodes[i], card, Color.White, 14f, 8f);
             }
         }
 
@@ -1609,16 +1903,35 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int cardW = Math.Max(20, (r.Width - (count * 20)) / count);
+
+            int opW = Math.Max(24, (int)(32 * zoom));
+            int totalOpW = opW * (count - 1);
+            int cardW = Math.Max(30, (r.Width - totalOpW - 20) / count);
+            int cardH = Math.Min(r.Height - 16, Math.Max(48, (int)(cardW * 0.70f)));
+            int cardY = r.Y + (r.Height - cardH) / 2;
+
+            int curX = r.X + 10;
             for (int i = 0; i < count; i++)
             {
-                Rectangle cr = new Rectangle(r.X + i * (cardW + 20), r.Y + r.Height / 4, cardW, r.Height / 2);
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(b, cr);
-                DrawAutoFitText(g, nodes[i], cr, Color.White);
-                if (i < count - 2)
-                    g.DrawString("+", new Font("Segoe UI", 14f, FontStyle.Bold), Brushes.Black, cr.Right + 2, cr.Y + cr.Height / 2 - 12);
-                else if (i == count - 2)
-                    g.DrawString("=", new Font("Segoe UI", 14f, FontStyle.Bold), Brushes.Black, cr.Right + 2, cr.Y + cr.Height / 2 - 12);
+                Rectangle cr = new Rectangle(curX, cardY, cardW, cardH);
+                Color c = colors[i % colors.Length];
+                FillFluentCard(g, cr, c, 8, 0, zoom);
+                DrawAutoFitText(g, nodes[i], cr, Color.White, 14f, 8f);
+
+                curX += cardW;
+
+                if (i < count - 1)
+                {
+                    string op = (i == count - 2) ? "=" : "+";
+                    Rectangle opRect = new Rectangle(curX, cardY, opW, cardH);
+                    using (Font opFont = new Font("Segoe UI", 18f * zoom, FontStyle.Bold))
+                    using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    using (SolidBrush opB = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                    {
+                        g.DrawString(op, opFont, opB, opRect, sf);
+                    }
+                    curX += opW;
+                }
             }
         }
 
@@ -1650,12 +1963,30 @@ namespace ZenQOffice.UI
         {
             if (SuppressNodeBodies) return;
             if (nodes.Length < 2) { DrawListBlocks(g, r, nodes, colors, zoom); return; }
-            Rectangle r1 = new Rectangle(r.X, r.Y + r.Height / 4, r.Width / 2 - 10, r.Height / 2);
-            Rectangle r2 = new Rectangle(r.X + r.Width / 2 + 10, r.Y + r.Height / 4, r.Width / 2 - 10, r.Height / 2);
-            using (SolidBrush b1 = new SolidBrush(colors[0])) g.FillRectangle(b1, r1);
-            using (SolidBrush b2 = new SolidBrush(colors[1 % colors.Length])) g.FillRectangle(b2, r2);
-            DrawAutoFitText(g, nodes[0], r1, Color.White);
-            DrawAutoFitText(g, nodes[1], r2, Color.White);
+
+            int gap = Math.Max(12, (int)(24 * zoom));
+            int cardW = (r.Width - gap) / 2;
+            int cardH = Math.Min(r.Height - 20, Math.Max(50, (int)(r.Height * 0.60f)));
+            int cardY = r.Y + (r.Height - cardH) / 2;
+
+            Rectangle r1 = new Rectangle(r.X, cardY, cardW, cardH);
+            Rectangle r2 = new Rectangle(r.X + cardW + gap, cardY, cardW, cardH);
+
+            FillFluentCard(g, r1, colors[0], 8, 0, zoom);
+            FillFluentCard(g, r2, colors[1 % colors.Length], 8, 0, zoom);
+
+            DrawAutoFitText(g, nodes[0], r1, Color.White, 15f, 9f);
+            DrawAutoFitText(g, nodes[1], r2, Color.White, 15f, 9f);
+
+            // Opposing arrows in the gap
+            int arrowY = cardY + cardH / 2;
+            int arrowX = r.X + cardW + gap / 2;
+            using (Pen ap = new Pen(Color.FromArgb(148, 163, 184), 3f * zoom))
+            {
+                ap.EndCap = LineCap.ArrowAnchor;
+                g.DrawLine(ap, arrowX + 8, arrowY - 8, arrowX - 8, arrowY - 8);
+                g.DrawLine(ap, arrowX - 8, arrowY + 8, arrowX + 8, arrowY + 8);
+            }
         }
 
         // ==================== 19. HEXAGON CLUSTER ====================
@@ -1664,18 +1995,27 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int hw = r.Width / 3, hh = r.Height / 3;
+            int cols = Math.Min(count, 3);
+            int rows = (count + cols - 1) / cols;
+            int hw = r.Width / Math.Max(2, cols);
+            int hh = r.Height / Math.Max(2, rows);
             for (int i = 0; i < count; i++)
             {
-                int cx = r.X + hw / 2 + (i % 3) * hw * 3 / 4;
-                int cy = r.Y + hh / 2 + (i / 3) * hh + (i % 2 == 0 ? 0 : hh / 2);
-                Point[] pts = {
-                    new Point(cx - hw/4, cy - hh/2), new Point(cx + hw/4, cy - hh/2),
-                    new Point(cx + hw/2, cy), new Point(cx + hw/4, cy + hh/2),
-                    new Point(cx - hw/4, cy + hh/2), new Point(cx - hw/2, cy)
+                int col = i % cols;
+                int row = i / cols;
+                int cx = r.X + hw / 2 + col * hw * 3 / 4;
+                int cy = r.Y + hh / 2 + row * hh + (col % 2 == 0 ? 0 : hh / 4);
+                PointF[] pts = {
+                    new PointF(cx - hw * 0.25f, cy - hh * 0.45f),
+                    new PointF(cx + hw * 0.25f, cy - hh * 0.45f),
+                    new PointF(cx + hw * 0.48f, cy),
+                    new PointF(cx + hw * 0.25f, cy + hh * 0.45f),
+                    new PointF(cx - hw * 0.25f, cy + hh * 0.45f),
+                    new PointF(cx - hw * 0.48f, cy)
                 };
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillPolygon(b, pts);
-                DrawAutoFitText(g, nodes[i], new Rectangle(cx - hw / 4, cy - hh / 4, hw / 2, hh / 2), Color.White);
+                Color c = colors[i % colors.Length];
+                FillFluentPolygon(g, pts, c, 0, zoom);
+                DrawAutoFitText(g, nodes[i], new Rectangle(cx - hw / 4, cy - hh / 4, hw / 2, hh / 2), Color.White, 14f, 8f);
             }
         }
 
@@ -1685,36 +2025,56 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int tabW = r.Width / count;
+            int gap = Math.Max(6, (int)(10 * zoom));
+            int tabW = (r.Width - gap * (count - 1)) / count;
+            int tabH = Math.Max(26, (int)(32 * zoom));
+            int bodyH = r.Height - tabH - 6;
+
             for (int i = 0; i < count; i++)
             {
-                Rectangle tab = new Rectangle(r.X + i * tabW, r.Y, tabW - 2, 30);
-                Rectangle body = new Rectangle(r.X + i * tabW, r.Y + 30, tabW - 2, r.Height - 30);
-                using (SolidBrush tb = new SolidBrush(ControlPaint.Dark(colors[i % colors.Length]))) g.FillRectangle(tb, tab);
-                using (SolidBrush bb = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(bb, body);
-                DrawAutoFitText(g, "Tab " + (i + 1).ToString(), tab, Color.White);
-                DrawAutoFitText(g, nodes[i], body, Color.White);
+                int tx = r.X + i * (tabW + gap);
+                Color c = colors[i % colors.Length];
+
+                // Tab header
+                Rectangle tabR = new Rectangle(tx, r.Y, tabW, tabH);
+                FillFluentCard(g, tabR, c, 6, 0, zoom);
+                DrawAutoFitText(g, "Tab " + (i + 1), tabR, Color.White, 12f, 7f);
+
+                // Body card
+                Rectangle bodyR = new Rectangle(tx, r.Y + tabH + 2, tabW, bodyH);
+                FillFluentCard(g, bodyR, ControlPaint.Light(c, 0.4f), 6, 0, zoom);
+                DrawAutoFitText(g, nodes[i], bodyR, Color.FromArgb(40, 40, 40), 14f, 8f);
             }
         }
 
         // ==================== 21. BRACKET LAYOUT ====================
         private static void DrawBracketLayout(Graphics g, Rectangle r, string[] nodes, Color[] colors, float zoom)
         {
-            using (Pen p = new Pen(Color.Gray, 3f * zoom))
-            {
-                g.DrawLine(p, r.X + 20, r.Y + 10, r.X + 20, r.Bottom - 10);
-                g.DrawLine(p, r.X + 20, r.Y + 10, r.X + 30, r.Y + 10);
-                g.DrawLine(p, r.X + 20, r.Bottom - 10, r.X + 30, r.Bottom - 10);
-            }
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int h = (r.Height - 20) / count;
+
+            // Stylish bracket on left
+            using (Pen p = new Pen(Color.FromArgb(91, 155, 213), 3.5f * zoom))
+            {
+                int bx = r.X + 16;
+                g.DrawLine(p, bx, r.Y + 8, bx, r.Bottom - 8);
+                g.DrawLine(p, bx, r.Y + 8, bx + 16, r.Y + 8);
+                g.DrawLine(p, bx, r.Bottom - 8, bx + 16, r.Bottom - 8);
+                g.DrawLine(p, bx - 10, r.Y + r.Height / 2, bx, r.Y + r.Height / 2);
+            }
+
+            int gap = Math.Max(4, (int)(8 * zoom));
+            int cardX = r.X + 38;
+            int cardW = r.Width - 48;
+            int cardH = (r.Height - 16 - gap * (count - 1)) / count;
+
             for (int i = 0; i < count; i++)
             {
-                Rectangle br = new Rectangle(r.X + 40, r.Y + 10 + i * h, r.Width - 40, h - 5);
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(b, br);
-                DrawAutoFitText(g, nodes[i], br, Color.White);
+                Rectangle br = new Rectangle(cardX, r.Y + 8 + i * (cardH + gap), cardW, cardH);
+                Color c = colors[i % colors.Length];
+                FillFluentCard(g, br, c, 6, 0, zoom);
+                DrawAutoFitText(g, nodes[i], br, Color.White, 14f, 8f);
             }
         }
 
@@ -1777,33 +2137,30 @@ namespace ZenQOffice.UI
             int count = (nodes != null) ? nodes.Length : 0;
             if (count == 0) return;
             int cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
-            int rad = (int)Math.Max(30f, Math.Min(r.Width, r.Height) * 0.32f);
+            float minDim = Math.Min(r.Width, r.Height);
+            float rad = Math.Max(35f, minDim * 0.35f);
 
-            Color ringCol = (colors != null && colors.Length > 0) ? colors[0] : Color.FromArgb(68, 114, 196);
-            using (Pen ringPen = new Pen(ringCol, 1.8f * zoom))
+            // Orbit ring track line
+            using (Pen ringPen = new Pen(Color.FromArgb(180, 205, 230), 3f * zoom))
             {
                 g.DrawEllipse(ringPen, cx - rad, cy - rad, rad * 2, rad * 2);
             }
 
             if (!SuppressNodeBodies)
             {
-                int cardW = Math.Max(38, (int)(rad * 0.70f));
-                int cardH = Math.Max(22, (int)(rad * 0.40f));
+                // Authentic circular nodes matching Microsoft Word
+                float nodeDiam = Math.Max(36f, Math.Min(70f, minDim * 0.24f));
                 for (int i = 0; i < count; i++)
                 {
                     double angle = (i * (360.0 / count) - 90.0) * Math.PI / 180.0;
-                    int px = cx + (int)(rad * Math.Cos(angle));
-                    int py = cy + (int)(rad * Math.Sin(angle));
-                    Rectangle nr = new Rectangle(px - cardW / 2, py - cardH / 2, cardW, cardH);
+                    float px = cx + (float)(rad * Math.Cos(angle));
+                    float py = cy + (float)(rad * Math.Sin(angle));
+                    RectangleF nr = new RectangleF(px - nodeDiam / 2f, py - nodeDiam / 2f, nodeDiam, nodeDiam);
                     Color c = colors[i % colors.Length];
-                    using (SolidBrush b = new SolidBrush(c))
-                    using (GraphicsPath path = CreateRoundedPath(nr, Math.Max(2, (int)(6 * zoom))))
-                    {
-                        g.FillPath(b, path);
-                        using (Pen p = new Pen(ControlPaint.Dark(c, 0.15f), 1.2f * zoom))
-                            g.DrawPath(p, path);
-                    }
-                    DrawAutoFitText(g, nodes[i], nr, Color.White);
+                    FillFluentCircle(g, nr, c, 0, zoom);
+
+                    Rectangle tRect = new Rectangle((int)nr.X + 2, (int)nr.Y + 2, (int)nr.Width - 4, (int)nr.Height - 4);
+                    DrawAutoFitText(g, nodes[i], tRect, Color.White, 13f, 7.5f);
                 }
             }
         }
@@ -1973,21 +2330,39 @@ namespace ZenQOffice.UI
         {
             if (SuppressNodeBodies) return;
             if (nodes.Length == 0) return;
-            int rw = r.Width / 3, rh = Math.Min(r.Height / Math.Max(1, nodes.Length), 40);
-            Rectangle root = new Rectangle(r.X, r.Y + r.Height / 2 - rh / 2, rw, rh);
-            using (SolidBrush b = new SolidBrush(colors[0])) g.FillRectangle(b, root);
-            DrawAutoFitText(g, nodes[0], root, Color.White);
-            for (int i = 1; i < nodes.Length; i++)
+
+            int colW = Math.Min(180, (r.Width - 50) / 2);
+            int rootH = Math.Min(r.Height - 30, Math.Max(46, (int)(r.Height * 0.30f)));
+            int rootY = r.Y + (r.Height - rootH) / 2;
+            Rectangle root = new Rectangle(r.X + 8, rootY, colW, rootH);
+
+            FillFluentCard(g, root, colors[0], 6, 0, zoom);
+            DrawAutoFitText(g, nodes[0], root, Color.White, 15f, 9f);
+
+            int childCount = nodes.Length - 1;
+            if (childCount <= 0) return;
+
+            int gap = Math.Max(6, (int)(10 * zoom));
+            int childH = Math.Min(70, Math.Max(36, (r.Height - 20 - gap * (childCount - 1)) / childCount));
+            int childX = r.Right - colW - 8;
+            int childStartY = r.Y + (r.Height - (childCount * childH + (childCount - 1) * gap)) / 2;
+            int midX = root.Right + (childX - root.Right) / 2;
+
+            for (int i = 1; i <= childCount; i++)
             {
-                Rectangle cr = new Rectangle(r.X + rw + 40, r.Y + (i - 1) * (rh + 10), rw, rh);
-                using (Pen p = new Pen(Color.Gray, 2f * zoom))
+                int cy = childStartY + (i - 1) * (childH + gap);
+                Rectangle cr = new Rectangle(childX, cy, colW, childH);
+                Color cc = colors[i % colors.Length];
+
+                using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 2f * zoom))
                 {
-                    g.DrawLine(p, root.Right, root.Y + rh / 2, cr.Left - 20, root.Y + rh / 2);
-                    g.DrawLine(p, cr.Left - 20, root.Y + rh / 2, cr.Left - 20, cr.Y + rh / 2);
-                    g.DrawLine(p, cr.Left - 20, cr.Y + rh / 2, cr.Left, cr.Y + rh / 2);
+                    g.DrawLine(p, root.Right, root.Y + rootH / 2, midX, root.Y + rootH / 2);
+                    g.DrawLine(p, midX, root.Y + rootH / 2, midX, cr.Y + childH / 2);
+                    g.DrawLine(p, midX, cr.Y + childH / 2, cr.Left, cr.Y + childH / 2);
                 }
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(b, cr);
-                DrawAutoFitText(g, nodes[i], cr, Color.White);
+
+                FillFluentCard(g, cr, cc, 6, 0, zoom);
+                DrawAutoFitText(g, nodes[i], cr, Color.White, 13f, 8f);
             }
         }
 
@@ -1997,19 +2372,47 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int h = r.Height / count;
+
+            int gap = Math.Max(3, (int)(5 * zoom));
+            int layerH = (r.Height - gap * (count - 1)) / count;
+            int centerX = r.X + r.Width / 2;
+            int halfBase = r.Width / 2;
+
             for (int i = 0; i < count; i++)
             {
-                int wTop = r.Width - i * (r.Width / count);
-                int wBot = r.Width - (i + 1) * (r.Width / count);
-                Point[] pts = {
-                    new Point(r.X + (r.Width - wTop) / 2, r.Y + i * h),
-                    new Point(r.X + (r.Width + wTop) / 2, r.Y + i * h),
-                    new Point(r.X + (r.Width + wBot) / 2, r.Y + (i + 1) * h - 2),
-                    new Point(r.X + (r.Width - wBot) / 2, r.Y + (i + 1) * h - 2)
-                };
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillPolygon(b, pts);
-                DrawAutoFitText(g, nodes[i], new Rectangle(r.X, r.Y + i * h, r.Width, h), Color.White);
+                float topRatio = 1f - (float)i / count;
+                float botRatio = 1f - (float)(i + 1) / count;
+
+                int topW = (int)(halfBase * topRatio * 2f);
+                int botW = (int)(halfBase * botRatio * 2f);
+                int layerY = r.Y + i * (layerH + gap);
+
+                PointF[] pts;
+                if (i == count - 1)
+                {
+                    pts = new PointF[]
+                    {
+                        new PointF(centerX - topW / 2f, layerY),
+                        new PointF(centerX + topW / 2f, layerY),
+                        new PointF(centerX, layerY + layerH)
+                    };
+                }
+                else
+                {
+                    pts = new PointF[]
+                    {
+                        new PointF(centerX - topW / 2f, layerY),
+                        new PointF(centerX + topW / 2f, layerY),
+                        new PointF(centerX + botW / 2f, layerY + layerH),
+                        new PointF(centerX - botW / 2f, layerY + layerH)
+                    };
+                }
+
+                Color c = colors[i % colors.Length];
+                FillFluentPolygon(g, pts, c, 0, zoom);
+
+                Rectangle tBox = new Rectangle(centerX - topW / 4, layerY, Math.Max(20, topW / 2), layerH);
+                DrawAutoFitText(g, nodes[i], tBox, Color.White, 14f, 8f);
             }
         }
 
@@ -2026,12 +2429,29 @@ namespace ZenQOffice.UI
             if (SuppressNodeBodies) return;
             int count = nodes.Length;
             if (count == 0) return;
-            int w = r.Width / count, h = r.Height / count;
+
+            int gap = Math.Max(6, (int)(10 * zoom));
+            int stepW = (r.Width - gap * (count - 1)) / count;
+            int maxH = r.Height - 20;
+            int minH = Math.Max(36, (int)(maxH * 0.35f));
+
             for (int i = 0; i < count; i++)
             {
-                Rectangle cr = new Rectangle(r.X + i * w, r.Y + i * h, w - 5, h - 5);
-                using (SolidBrush b = new SolidBrush(colors[i % colors.Length])) g.FillRectangle(b, cr);
-                DrawAutoFitText(g, nodes[i], cr, Color.White);
+                int sx = r.X + i * (stepW + gap);
+                int sh = maxH - (int)((maxH - minH) * ((float)i / Math.Max(1, count - 1)));
+                int sy = r.Bottom - 10 - sh;
+
+                Rectangle stepR = new Rectangle(sx, sy, stepW, sh);
+                Color c = colors[i % colors.Length];
+                FillFluentCard(g, stepR, c, 6, 0, zoom);
+                DrawAutoFitText(g, nodes[i], stepR, Color.White, 14f, 8f);
+            }
+
+            // Descending trend line
+            using (Pen arrPen = new Pen(Color.FromArgb(120, 140, 160), 2.5f * zoom))
+            {
+                arrPen.EndCap = LineCap.ArrowAnchor;
+                g.DrawLine(arrPen, r.X + 10, r.Y + 12, r.Right - 10, r.Bottom - minH - 12);
             }
         }
 

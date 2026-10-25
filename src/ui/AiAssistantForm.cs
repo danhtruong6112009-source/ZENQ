@@ -414,11 +414,11 @@ namespace ZenQOffice.UI
                 var slides = _appForm != null ? _appForm.SlidesView : null;
                 if (slides != null && slides.Presentation != null)
                 {
-                    contextDesc = string.Format("Trình chiếu PowerPoint: Slide {0}/{1} (Tiêu đề: {2})", slides.ActiveSlideIndex + 1, slides.Presentation.Slides.Count, slides.Presentation.Slides.Count > slides.ActiveSlideIndex ? slides.Presentation.Slides[slides.ActiveSlideIndex].Title : "");
+                    contextDesc = string.Format("Trình chiếu ZenQ: Slide {0}/{1} (Tiêu đề: {2})", slides.ActiveSlideIndex + 1, slides.Presentation.Slides.Count, slides.Presentation.Slides.Count > slides.ActiveSlideIndex ? slides.Presentation.Slides[slides.ActiveSlideIndex].Title : "");
                 }
                 else
                 {
-                    contextDesc = "Trình chiếu PowerPoint: Bản trình bày Slides.";
+                    contextDesc = "Trình chiếu ZenQ: Bản trình bày Slides.";
                 }
 
                 AddChip("Tạo bài thuyết trình 5 slide hoàn chỉnh", "Hãy lập dàn ý và tạo bài thuyết trình hoàn chỉnh gồm 5 Slide (có Slide 1: Tiêu đề, Slide 2, 3, 4, 5 với các ý chính gạch đầu dòng) về chủ đề: ", '\uE714');

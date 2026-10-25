@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -60,10 +60,16 @@ namespace ZenQOffice.Format
         public Dictionary<int, float> ParagraphLeftIndents { get; set; }
         public Dictionary<int, float> ParagraphRightIndents { get; set; }
         public Dictionary<int, float> ParagraphHangingIndents { get; set; }
+        public Dictionary<int, List<ZenQOffice.UI.TabStopInfo>> ParagraphTabStops { get; set; }
         public List<ZenQOffice.UI.DocTableObject> Tables { get; set; }
         public float DefaultLineSpacing { get; set; } = 1.0f;
         public float DefaultSpacingBefore { get; set; } = 0f;
         public float DefaultSpacingAfter { get; set; } = 0f;
+
+        public List<DocHeaderFooterRun> HeaderRuns { get; set; }
+        public List<DocHeaderFooterRun> FooterRuns { get; set; }
+        public List<DocHeaderFooterRun> HeaderEvenRuns { get; set; }
+        public List<DocHeaderFooterRun> FooterEvenRuns { get; set; }
 
         public DocxMetadata()
         {
@@ -72,6 +78,10 @@ namespace ZenQOffice.Format
             FormattedRuns = new List<FormattedRun>();
             HeaderText = "";
             FooterText = "";
+            HeaderRuns = new List<DocHeaderFooterRun>();
+            FooterRuns = new List<DocHeaderFooterRun>();
+            HeaderEvenRuns = new List<DocHeaderFooterRun>();
+            FooterEvenRuns = new List<DocHeaderFooterRun>();
             ShowPageNumbers = false;
             PageNumberFormat = "decimal";
             PageNumberStart = 1;
@@ -110,6 +120,36 @@ namespace ZenQOffice.Format
             ParagraphLeftIndents = new Dictionary<int, float>();
             ParagraphRightIndents = new Dictionary<int, float>();
             ParagraphHangingIndents = new Dictionary<int, float>();
+            ParagraphTabStops = new Dictionary<int, List<ZenQOffice.UI.TabStopInfo>>();
+        }
+    }
+
+    public class DocHeaderFooterRun
+    {
+        public string Text { get; set; } = "";
+        public string FontName { get; set; } = "Times New Roman";
+        public float FontSize { get; set; } = 9.0f;
+        public bool Bold { get; set; } = false;
+        public bool Italic { get; set; } = false;
+        public Color TextColor { get; set; } = Color.Black;
+        public bool IsPageNumber { get; set; } = false;
+        public bool IsNumPages { get; set; } = false;
+        public bool IsTab { get; set; } = false;
+
+        public DocHeaderFooterRun Clone()
+        {
+            return new DocHeaderFooterRun
+            {
+                Text = this.Text,
+                FontName = this.FontName,
+                FontSize = this.FontSize,
+                Bold = this.Bold,
+                Italic = this.Italic,
+                TextColor = this.TextColor,
+                IsPageNumber = this.IsPageNumber,
+                IsNumPages = this.IsNumPages,
+                IsTab = this.IsTab
+            };
         }
     }
 
@@ -195,6 +235,34 @@ namespace ZenQOffice.Format
                         string defaultHeaderTarget = null;
                         string evenHeaderTarget = null;
 
+                        bool settingsEvenAndOdd = false;
+                        ZipArchiveEntry settingsEntry = FindZipEntry(archive, "word/settings.xml") ?? archive.GetEntry("word/settings.xml");
+                        if (settingsEntry != null)
+                        {
+                            try
+                            {
+                                using (Stream st = settingsEntry.Open())
+                                using (StreamReader srSettings = new StreamReader(st, Encoding.UTF8))
+                                {
+                                    string sXml = srSettings.ReadToEnd();
+                                    if (sXml.Contains("evenAndOddHeaders"))
+                                    {
+                                        Match mVal = Regex.Match(sXml, @"<w:evenAndOddHeaders(?:\s+w:val=""([^""]*)"")?");
+                                        if (mVal.Success)
+                                        {
+                                            string v = mVal.Groups[1].Value;
+                                            settingsEvenAndOdd = string.IsNullOrEmpty(v) || v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
+                                        }
+                                        else
+                                        {
+                                            settingsEvenAndOdd = true;
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+
                         ZipArchiveEntry docRefEntry = FindZipEntry(archive, "word/document.xml") ?? archive.GetEntry("word/document.xml");
                         if (docRefEntry != null)
                         {
@@ -209,7 +277,7 @@ namespace ZenQOffice.Format
                                     if (mEvenF.Success && relsToTarget.ContainsKey(mEvenF.Groups[1].Value))
                                     {
                                         evenFooterTarget = relsToTarget[mEvenF.Groups[1].Value];
-                                        meta.DifferentOddEvenPages = true;
+                                        if (settingsEvenAndOdd) meta.DifferentOddEvenPages = true;
                                     }
 
                                     Match mDefF = Regex.Match(docXmlPreview, @"<w:footerReference[^>]+w:type=""default""[^>]+r:id=""([^""]+)""");
@@ -224,7 +292,7 @@ namespace ZenQOffice.Format
                                     if (mEvenH.Success && relsToTarget.ContainsKey(mEvenH.Groups[1].Value))
                                     {
                                         evenHeaderTarget = relsToTarget[mEvenH.Groups[1].Value];
-                                        meta.DifferentOddEvenPages = true;
+                                        if (settingsEvenAndOdd) meta.DifferentOddEvenPages = true;
                                     }
 
                                     Match mDefH = Regex.Match(docXmlPreview, @"<w:headerReference[^>]+w:type=""default""[^>]+r:id=""([^""]+)""");
@@ -238,30 +306,100 @@ namespace ZenQOffice.Format
                             catch { }
                         }
 
-                        foreach (var entry in archive.Entries)
+                        // 2.1 Explicitly load default & even headers / footers referenced in document.xml
+                        if (!string.IsNullOrEmpty(defaultHeaderTarget))
                         {
-                            string entryFileName = Path.GetFileName(entry.FullName);
-                            if (entry.FullName.StartsWith("word/header") && entry.FullName.EndsWith(".xml"))
+                            string hName = Path.GetFileName(defaultHeaderTarget);
+                            ZipArchiveEntry hEntry = archive.GetEntry("word/" + hName) ?? FindZipEntry(archive, hName);
+                            if (hEntry != null)
                             {
                                 try
                                 {
                                     XmlDocument hDoc = new XmlDocument();
-                                    using (Stream s = entry.Open()) hDoc.Load(s);
-                                    bool isEven = (evenHeaderTarget != null && entryFileName.Equals(Path.GetFileName(evenHeaderTarget), StringComparison.OrdinalIgnoreCase));
-                                    ParseHeaderFooterXml(hDoc, false, meta, isEven);
+                                    using (Stream s = hEntry.Open()) hDoc.Load(s);
+                                    ParseHeaderFooterXml(hDoc, false, meta, false);
                                 }
                                 catch { }
                             }
-                            else if (entry.FullName.StartsWith("word/footer") && entry.FullName.EndsWith(".xml"))
+                        }
+
+                        if (!string.IsNullOrEmpty(defaultFooterTarget))
+                        {
+                            string fName = Path.GetFileName(defaultFooterTarget);
+                            ZipArchiveEntry fEntry = archive.GetEntry("word/" + fName) ?? FindZipEntry(archive, fName);
+                            if (fEntry != null)
                             {
                                 try
                                 {
                                     XmlDocument fDoc = new XmlDocument();
-                                    using (Stream s = entry.Open()) fDoc.Load(s);
-                                    bool isEven = (evenFooterTarget != null && entryFileName.Equals(Path.GetFileName(evenFooterTarget), StringComparison.OrdinalIgnoreCase));
-                                    ParseHeaderFooterXml(fDoc, true, meta, isEven);
+                                    using (Stream s = fEntry.Open()) fDoc.Load(s);
+                                    ParseHeaderFooterXml(fDoc, true, meta, false);
                                 }
                                 catch { }
+                            }
+                        }
+
+                        if (meta.DifferentOddEvenPages)
+                        {
+                            if (!string.IsNullOrEmpty(evenHeaderTarget))
+                            {
+                                string ehName = Path.GetFileName(evenHeaderTarget);
+                                ZipArchiveEntry ehEntry = archive.GetEntry("word/" + ehName) ?? FindZipEntry(archive, ehName);
+                                if (ehEntry != null)
+                                {
+                                    try
+                                    {
+                                        XmlDocument ehDoc = new XmlDocument();
+                                        using (Stream s = ehEntry.Open()) ehDoc.Load(s);
+                                        ParseHeaderFooterXml(ehDoc, false, meta, true);
+                                    }
+                                    catch { }
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(evenFooterTarget))
+                            {
+                                string efName = Path.GetFileName(evenFooterTarget);
+                                ZipArchiveEntry efEntry = archive.GetEntry("word/" + efName) ?? FindZipEntry(archive, efName);
+                                if (efEntry != null)
+                                {
+                                    try
+                                    {
+                                        XmlDocument efDoc = new XmlDocument();
+                                        using (Stream s = efEntry.Open()) efDoc.Load(s);
+                                        ParseHeaderFooterXml(efDoc, true, meta, true);
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
+
+                        // Fallback: only if default header/footer targets were missing
+                        if (string.IsNullOrEmpty(meta.HeaderText) || string.IsNullOrEmpty(meta.FooterText))
+                        {
+                            foreach (var entry in archive.Entries)
+                            {
+                                string entryFileName = Path.GetFileName(entry.FullName);
+                                if (string.IsNullOrEmpty(meta.HeaderText) && entry.FullName.StartsWith("word/header") && entry.FullName.EndsWith(".xml"))
+                                {
+                                    try
+                                    {
+                                        XmlDocument hDoc = new XmlDocument();
+                                        using (Stream s = entry.Open()) hDoc.Load(s);
+                                        ParseHeaderFooterXml(hDoc, false, meta, false);
+                                    }
+                                    catch { }
+                                }
+                                else if (string.IsNullOrEmpty(meta.FooterText) && entry.FullName.StartsWith("word/footer") && entry.FullName.EndsWith(".xml"))
+                                {
+                                    try
+                                    {
+                                        XmlDocument fDoc = new XmlDocument();
+                                        using (Stream s = entry.Open()) fDoc.Load(s);
+                                        ParseHeaderFooterXml(fDoc, true, meta, false);
+                                    }
+                                    catch { }
+                                }
                             }
                         }
 
@@ -324,6 +462,49 @@ namespace ZenQOffice.Format
                 foreach (XmlNode t in tNodes) sb.Append(t.InnerText + " ");
             }
             return sb.ToString().Trim();
+        }
+
+        private static void ParseHeaderFooterRPr(XmlNode rPr, XmlNamespaceManager nsmgr, ref string rFont, ref float rSize, ref bool rBold, ref bool rItalic, ref Color rColor)
+        {
+            if (rPr == null) return;
+            XmlNode rf = rPr.SelectSingleNode("w:rFonts", nsmgr);
+            if (rf != null)
+            {
+                if (rf.Attributes["w:ascii"] != null && !string.IsNullOrEmpty(rf.Attributes["w:ascii"].Value)) rFont = rf.Attributes["w:ascii"].Value;
+                else if (rf.Attributes["w:hAnsi"] != null && !string.IsNullOrEmpty(rf.Attributes["w:hAnsi"].Value)) rFont = rf.Attributes["w:hAnsi"].Value;
+            }
+            XmlNode sz = rPr.SelectSingleNode("w:sz", nsmgr);
+            if (sz != null && sz.Attributes["w:val"] != null)
+            {
+                float szVal;
+                if (float.TryParse(sz.Attributes["w:val"].Value, out szVal) && szVal > 0) rSize = szVal / 2.0f;
+            }
+            XmlNode col = rPr.SelectSingleNode("w:color", nsmgr);
+            if (col != null && col.Attributes["w:val"] != null)
+            {
+                string cVal = col.Attributes["w:val"].Value;
+                if (!string.IsNullOrEmpty(cVal) && cVal != "auto" && cVal.Length >= 6)
+                {
+                    try
+                    {
+                        int cr = Convert.ToInt32(cVal.Substring(0, 2), 16);
+                        int cg = Convert.ToInt32(cVal.Substring(2, 2), 16);
+                        int cb = Convert.ToInt32(cVal.Substring(4, 2), 16);
+                        rColor = Color.FromArgb(cr, cg, cb);
+                    }
+                    catch { }
+                }
+            }
+            XmlNode b = rPr.SelectSingleNode("w:b", nsmgr);
+            if (b != null)
+            {
+                rBold = (b.Attributes["w:val"] == null || (b.Attributes["w:val"].Value != "0" && b.Attributes["w:val"].Value.ToLower() != "false"));
+            }
+            XmlNode it = rPr.SelectSingleNode("w:i", nsmgr);
+            if (it != null)
+            {
+                rItalic = (it.Attributes["w:val"] == null || (it.Attributes["w:val"].Value != "0" && it.Attributes["w:val"].Value.ToLower() != "false"));
+            }
         }
 
         private static void ParseHeaderFooterXml(XmlDocument doc, bool isFooter, DocxMetadata meta, bool isEven = false)
@@ -414,7 +595,7 @@ namespace ZenQOffice.Format
 
             if (align == -1)
             {
-                align = isFooter ? 1 : 0;
+                align = 0; // Word default paragraph alignment is always Left (0)
             }
 
             if (isFooter)
@@ -493,6 +674,12 @@ namespace ZenQOffice.Format
             // 3. Text & Dynamic Fields (PAGE, NUMPAGES)
             bool hasPageField = false;
             StringBuilder sb = new StringBuilder();
+            List<DocHeaderFooterRun> runsList = new List<DocHeaderFooterRun>();
+            string defaultFont = isFooter ? (meta.FooterFontName ?? "Times New Roman") : (meta.HeaderFontName ?? "Times New Roman");
+            float defaultSize = isFooter ? (meta.FooterFontSize > 0 ? meta.FooterFontSize : 11.0f) : (meta.HeaderFontSize > 0 ? meta.HeaderFontSize : 11.0f);
+            bool defaultBold = isFooter ? meta.FooterBold : meta.HeaderBold;
+            bool defaultItalic = isFooter ? meta.FooterItalic : meta.HeaderItalic;
+            Color defaultColor = isFooter ? (meta.FooterColor != Color.Empty ? meta.FooterColor : Color.Black) : (meta.HeaderColor != Color.Empty ? meta.HeaderColor : Color.Black);
 
             XmlNodeList pNodes = doc.SelectNodes("//w:p", nsmgr);
             if (pNodes != null && pNodes.Count > 0)
@@ -501,21 +688,45 @@ namespace ZenQOffice.Format
                 {
                     bool insidePageField = false;
                     bool insideNumPagesField = false;
+                    bool pageFieldHasRun = false;
+                    bool numPagesFieldHasRun = false;
 
                     foreach (XmlNode child in p.ChildNodes)
                     {
                         if (child.Name == "w:fldSimple")
                         {
                             string instr = child.Attributes["w:instr"] != null ? child.Attributes["w:instr"].Value.ToUpperInvariant() : "";
-                            if (instr.Contains("NUMPAGES"))
+                            bool isPage = instr.Contains("PAGE") && !instr.Contains("NUMPAGES");
+                            bool isNum = instr.Contains("NUMPAGES");
+                            if (isNum)
                             {
                                 sb.Append("{NUMPAGES}");
                             }
-                            else if (instr.Contains("PAGE"))
+                            else if (isPage)
                             {
                                 hasPageField = true;
                                 sb.Append("{PAGE}");
                             }
+
+                            XmlNode fldRPr = child.SelectSingleNode("w:rPr", nsmgr) ?? child.SelectSingleNode(".//w:rPr", nsmgr);
+                            string rFont = defaultFont;
+                            float rSize = defaultSize;
+                            bool rBold = defaultBold;
+                            bool rItalic = defaultItalic;
+                            Color rColor = defaultColor;
+                            ParseHeaderFooterRPr(fldRPr, nsmgr, ref rFont, ref rSize, ref rBold, ref rItalic, ref rColor);
+
+                            runsList.Add(new DocHeaderFooterRun
+                            {
+                                Text = isPage ? "{PAGE}" : (isNum ? "{NUMPAGES}" : child.InnerText),
+                                FontName = rFont,
+                                FontSize = rSize,
+                                Bold = rBold,
+                                Italic = rItalic,
+                                TextColor = rColor,
+                                IsPageNumber = isPage,
+                                IsNumPages = isNum
+                            });
                         }
                         else if (child.Name == "w:r")
                         {
@@ -526,13 +737,13 @@ namespace ZenQOffice.Format
                                 if (itxt.Contains("NUMPAGES"))
                                 {
                                     insideNumPagesField = true;
-                                    sb.Append("{NUMPAGES}");
+                                    numPagesFieldHasRun = false;
                                 }
                                 else if (itxt.Contains("PAGE"))
                                 {
                                     insidePageField = true;
                                     hasPageField = true;
-                                    sb.Append("{PAGE}");
+                                    pageFieldHasRun = false;
                                 }
                             }
 
@@ -542,18 +753,117 @@ namespace ZenQOffice.Format
                                 string fType = fldChar.Attributes["w:fldCharType"].Value.ToLowerInvariant();
                                 if (fType == "end")
                                 {
+                                    if (insidePageField && !pageFieldHasRun)
+                                    {
+                                        sb.Append("{PAGE}");
+                                        runsList.Add(new DocHeaderFooterRun
+                                        {
+                                            Text = "{PAGE}",
+                                            IsPageNumber = true,
+                                            FontName = defaultFont,
+                                            FontSize = defaultSize,
+                                            Bold = defaultBold,
+                                            Italic = defaultItalic,
+                                            TextColor = defaultColor
+                                        });
+                                    }
+                                    if (insideNumPagesField && !numPagesFieldHasRun)
+                                    {
+                                        sb.Append("{NUMPAGES}");
+                                        runsList.Add(new DocHeaderFooterRun
+                                        {
+                                            Text = "{NUMPAGES}",
+                                            IsNumPages = true,
+                                            FontName = defaultFont,
+                                            FontSize = defaultSize,
+                                            Bold = defaultBold,
+                                            Italic = defaultItalic,
+                                            TextColor = defaultColor
+                                        });
+                                    }
                                     insidePageField = false;
                                     insideNumPagesField = false;
+                                    pageFieldHasRun = false;
+                                    numPagesFieldHasRun = false;
                                 }
                             }
 
-                            if (!insidePageField && !insideNumPagesField)
+                            XmlNode rPr = child.SelectSingleNode("w:rPr", nsmgr);
+                            string rFont = defaultFont;
+                            float rSize = defaultSize;
+                            bool rBold = defaultBold;
+                            bool rItalic = defaultItalic;
+                            Color rColor = defaultColor;
+                            ParseHeaderFooterRPr(rPr, nsmgr, ref rFont, ref rSize, ref rBold, ref rItalic, ref rColor);
+
+                            if (child.SelectSingleNode("w:tab", nsmgr) != null)
                             {
-                                XmlNodeList tList = child.SelectNodes("w:t", nsmgr);
-                                if (tList != null)
+                                sb.Append('\t');
+                                runsList.Add(new DocHeaderFooterRun
                                 {
-                                    foreach (XmlNode t in tList) sb.Append(t.InnerText);
+                                    Text = "\t",
+                                    IsTab = true,
+                                    FontName = rFont,
+                                    FontSize = rSize,
+                                    TextColor = rColor
+                                });
+                            }
+
+                            XmlNodeList tList = child.SelectNodes("w:t", nsmgr);
+                            string runText = "";
+                            if (tList != null)
+                            {
+                                foreach (XmlNode t in tList) runText += t.InnerText;
+                            }
+
+                            if (insidePageField)
+                            {
+                                if (!string.IsNullOrEmpty(runText))
+                                {
+                                    sb.Append("{PAGE}");
+                                    runsList.Add(new DocHeaderFooterRun
+                                    {
+                                        Text = "{PAGE}",
+                                        IsPageNumber = true,
+                                        FontName = rFont,
+                                        FontSize = rSize,
+                                        Bold = rBold,
+                                        Italic = rItalic,
+                                        TextColor = rColor
+                                    });
+                                    pageFieldHasRun = true;
                                 }
+                            }
+                            else if (insideNumPagesField)
+                            {
+                                if (!string.IsNullOrEmpty(runText))
+                                {
+                                    sb.Append("{NUMPAGES}");
+                                    runsList.Add(new DocHeaderFooterRun
+                                    {
+                                        Text = "{NUMPAGES}",
+                                        IsNumPages = true,
+                                        FontName = rFont,
+                                        FontSize = rSize,
+                                        Bold = rBold,
+                                        Italic = rItalic,
+                                        TextColor = rColor
+                                    });
+                                    numPagesFieldHasRun = true;
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(runText))
+                            {
+                                sb.Append(runText);
+                                runsList.Add(new DocHeaderFooterRun
+                                {
+                                    Text = runText,
+                                    FontName = rFont,
+                                    FontSize = rSize,
+                                    Bold = rBold,
+                                    Italic = rItalic,
+                                    TextColor = rColor
+                                });
                             }
                         }
                     }
@@ -561,7 +871,20 @@ namespace ZenQOffice.Format
             }
             else
             {
-                sb.Append(ExtractAllTextFromXml(doc));
+                string extText = ExtractAllTextFromXml(doc);
+                sb.Append(extText);
+                if (!string.IsNullOrEmpty(extText))
+                {
+                    runsList.Add(new DocHeaderFooterRun
+                    {
+                        Text = extText,
+                        FontName = defaultFont,
+                        FontSize = defaultSize,
+                        Bold = defaultBold,
+                        Italic = defaultItalic,
+                        TextColor = defaultColor
+                    });
+                }
             }
 
             string text = sb.ToString().Trim();
@@ -605,29 +928,68 @@ namespace ZenQOffice.Format
                     if (string.IsNullOrEmpty(text)) text = "{PAGE}";
                     else text = text + "  {PAGE}";
                 }
+
+                if (runsList.Count > 0 && !runsList.Exists(r => r.IsPageNumber || (r.Text != null && r.Text.Contains("{PAGE}"))))
+                {
+                    runsList.Add(new DocHeaderFooterRun
+                    {
+                        Text = "{PAGE}",
+                        IsPageNumber = true,
+                        FontName = defaultFont,
+                        FontSize = defaultSize,
+                        Bold = defaultBold,
+                        Italic = defaultItalic,
+                        TextColor = defaultColor
+                    });
+                }
             }
 
             if (isFooter)
             {
                 if (isEven)
                 {
-                    meta.FooterEvenText = text;
+                    if (!string.IsNullOrEmpty(text) || string.IsNullOrEmpty(meta.FooterEvenText))
+                    {
+                        meta.FooterEvenText = text;
+                        if (runsList.Count > 0) meta.FooterEvenRuns = runsList;
+                    }
                 }
                 else
                 {
-                    meta.FooterText = text;
-                    meta.ShowPageNumbers = hasPageField;
+                    if (!string.IsNullOrEmpty(text) || string.IsNullOrEmpty(meta.FooterText))
+                    {
+                        meta.FooterText = text;
+                        meta.ShowPageNumbers = hasPageField;
+                        if (runsList.Count > 0)
+                        {
+                            meta.FooterRuns = runsList;
+                            var pageRun = runsList.Find(r => r.IsPageNumber) ?? runsList[0];
+                            if (!string.IsNullOrEmpty(pageRun.FontName)) meta.FooterFontName = pageRun.FontName;
+                            if (pageRun.FontSize > 0) meta.FooterFontSize = pageRun.FontSize;
+                            meta.FooterBold = pageRun.Bold;
+                            meta.FooterItalic = pageRun.Italic;
+                            if (pageRun.TextColor != Color.Empty && pageRun.TextColor.A > 0) meta.FooterColor = pageRun.TextColor;
+                        }
+                    }
                 }
             }
             else
             {
                 if (isEven)
                 {
-                    meta.HeaderEvenText = text;
+                    if (!string.IsNullOrEmpty(text) || string.IsNullOrEmpty(meta.HeaderEvenText))
+                    {
+                        meta.HeaderEvenText = text;
+                        if (runsList.Count > 0) meta.HeaderEvenRuns = runsList;
+                    }
                 }
                 else
                 {
-                    meta.HeaderText = text;
+                    if (!string.IsNullOrEmpty(text) || string.IsNullOrEmpty(meta.HeaderText))
+                    {
+                        meta.HeaderText = text;
+                        if (runsList.Count > 0) meta.HeaderRuns = runsList;
+                    }
                 }
             }
         }
@@ -1302,7 +1664,7 @@ namespace ZenQOffice.Format
                 {
                     if (child.LocalName == "p")
                     {
-                        ParseParagraphNode(child, nsmgr, archive, relsToTarget, sb, meta.FormattedRuns, docDefaultFont, docDefaultFontSize, stylesDict, meta.ParagraphAlignments, meta.ParagraphBottomBorders, meta.ParagraphBorders, meta.ParagraphLineSpacings, meta.ParagraphSpacingsBefore, meta.ParagraphSpacingsAfter, numberingDefs, numCounters, meta.ParagraphFirstLineIndents, meta.ParagraphLeftIndents, meta.ParagraphRightIndents, meta.ParagraphHangingIndents);
+                        ParseParagraphNode(child, nsmgr, archive, relsToTarget, sb, meta.FormattedRuns, docDefaultFont, docDefaultFontSize, stylesDict, meta.ParagraphAlignments, meta.ParagraphBottomBorders, meta.ParagraphBorders, meta.ParagraphLineSpacings, meta.ParagraphSpacingsBefore, meta.ParagraphSpacingsAfter, numberingDefs, numCounters, meta.ParagraphFirstLineIndents, meta.ParagraphLeftIndents, meta.ParagraphRightIndents, meta.ParagraphHangingIndents, meta.ParagraphTabStops);
                     }
                     else if (child.LocalName == "tbl")
                     {
@@ -1374,7 +1736,8 @@ namespace ZenQOffice.Format
             Dictionary<int, float> paraFirstLineIndents = null,
             Dictionary<int, float> paraLeftIndents = null,
             Dictionary<int, float> paraRightIndents = null,
-            Dictionary<int, float> paraHangingIndents = null)
+            Dictionary<int, float> paraHangingIndents = null,
+            Dictionary<int, List<ZenQOffice.UI.TabStopInfo>> paraTabStops = null)
         {
             int paraStartIndex = sb.Length;
 
@@ -1722,6 +2085,53 @@ namespace ZenQOffice.Format
                 paraRightIndents[paraStartIndex] = finalRight;
             }
 
+            // 7.8. Check Paragraph Tab Stops (<w:pPr/w:tabs>)
+            if (paraTabStops != null)
+            {
+                XmlNode tabsNode = p.SelectSingleNode("w:pPr/w:tabs", nsmgr);
+                if (tabsNode != null)
+                {
+                    XmlNodeList tabList = tabsNode.SelectNodes("w:tab", nsmgr);
+                    if (tabList != null && tabList.Count > 0)
+                    {
+                        var tStops = new List<ZenQOffice.UI.TabStopInfo>();
+                        foreach (XmlNode tabNode in tabList)
+                        {
+                            if (tabNode.Attributes["w:pos"] != null)
+                            {
+                                float twips;
+                                if (float.TryParse(tabNode.Attributes["w:pos"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out twips))
+                                {
+                                    float posPt = twips / 20.0f;
+                                    ZenQOffice.UI.TabStopType tType = ZenQOffice.UI.TabStopType.Left;
+                                    if (tabNode.Attributes["w:val"] != null)
+                                    {
+                                        string v = tabNode.Attributes["w:val"].Value.ToLowerInvariant();
+                                        if (v == "center") tType = ZenQOffice.UI.TabStopType.Center;
+                                        else if (v == "right") tType = ZenQOffice.UI.TabStopType.Right;
+                                        else if (v == "decimal") tType = ZenQOffice.UI.TabStopType.Decimal;
+                                        else if (v == "bar") tType = ZenQOffice.UI.TabStopType.Bar;
+                                    }
+                                    int leader = 0;
+                                    if (tabNode.Attributes["w:leader"] != null)
+                                    {
+                                        string l = tabNode.Attributes["w:leader"].Value.ToLowerInvariant();
+                                        if (l == "dot") leader = 1;
+                                        else if (l == "hyphen") leader = 2;
+                                        else if (l == "underscore") leader = 3;
+                                    }
+                                    tStops.Add(new ZenQOffice.UI.TabStopInfo(posPt, tType, leader));
+                                }
+                            }
+                        }
+                        if (tStops.Count > 0)
+                        {
+                            paraTabStops[paraStartIndex] = tStops;
+                        }
+                    }
+                }
+            }
+
             // 8. Iterate paragraph child nodes (Runs, Drawings, Hyperlinks, etc.)
             float currentParaFontSize = ApplyOpenXmlCharacterScaling(paraFontSize, paraWidthScale, paraCharSpacingPt);
             string currentParaFont = paraFont;
@@ -1837,7 +2247,7 @@ namespace ZenQOffice.Format
                             else if (va == "superscript") superscript = true;
                         }
 
-                        // 8.4. Fonts: prefer ascii/hAnsi, then cs, then eastAsia
+                        // 8.4. Fonts: prefer ascii/hAnsi, then theme fonts, avoid cs/eastAsia for Latin/Vietnamese
                         XmlNode rFonts = rPr.SelectSingleNode("w:rFonts", nsmgr);
                         if (rFonts != null)
                         {
@@ -1845,10 +2255,12 @@ namespace ZenQOffice.Format
                                 fontName = rFonts.Attributes["w:ascii"].Value;
                             else if (rFonts.Attributes["w:hAnsi"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:hAnsi"].Value))
                                 fontName = rFonts.Attributes["w:hAnsi"].Value;
-                            else if (rFonts.Attributes["w:cs"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:cs"].Value))
-                                fontName = rFonts.Attributes["w:cs"].Value;
-                            else if (rFonts.Attributes["w:eastAsia"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:eastAsia"].Value))
-                                fontName = rFonts.Attributes["w:eastAsia"].Value;
+                            else if (rFonts.Attributes["w:asciiTheme"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:asciiTheme"].Value))
+                                fontName = (rFonts.Attributes["w:asciiTheme"].Value.IndexOf("major", StringComparison.OrdinalIgnoreCase) >= 0) ? paraFont : docDefaultFont;
+                            else if (rFonts.Attributes["w:hAnsiTheme"] != null && !string.IsNullOrEmpty(rFonts.Attributes["w:hAnsiTheme"].Value))
+                                fontName = docDefaultFont;
+                            // w:cs / w:eastAsia chỉ áp dụng cho chữ phức / chữ Đông Á; chữ Latin và tiếng Việt
+                            // dùng ascii/hAnsi, nếu thiếu thì kế thừa font của đoạn/style.
                         }
 
                         // 8.5. Font size: check both w:sz (Latin) and w:szCs (Complex Script / Vietnamese)
@@ -1965,6 +2377,7 @@ namespace ZenQOffice.Format
                                 }
                             }
                             else if (tNode.LocalName == "cr") str = "\n";
+                            else if (tNode.LocalName == "tab") str = "\t";
                             else if (tNode.LocalName == "noBreakHyphen") str = "-";
                             else if (tNode.LocalName == "sym" && tNode.Attributes["w:char"] != null)
                             {
@@ -3581,7 +3994,7 @@ namespace ZenQOffice.Format
                             saObj.SmartArtType = saType;
                             saObj.SmartArtTitle = saTitle;
                             saObj.TextContent = saText;
-                            saObj.StylePresetIndex = 1;
+                            saObj.StylePresetIndex = 0;
                             saObj.AspectRatioLock = saArLock;
                             saObj.OriginalBoundsEmu = saOrigBoundsEmu;
                             saObj.ResolvedThemePalette = saResolvedPalette;
@@ -3600,7 +4013,7 @@ namespace ZenQOffice.Format
                     if (string.IsNullOrEmpty(safeText)) safeText = "Văn bản 1|Văn bản 2|Văn bản 3";
 
                     string shapeId = "sa_" + Guid.NewGuid().ToString("N").Substring(0, 8);
-                    tag = string.Format("![SHAPE:ID={0}:TYPE=SmartArt:SMARTART={1}:TITLE={2}:TEXT={3}:STYLE=1:PATH={4}:NODES={5}:X={6}:Y={7}:W={8}:H={9}:WRAP={10}:PAGE=-1:YREL={11}:ARLOCK={12}:EMUX={13}:EMUY={14}:EMUW={15}:EMUH={16}]",
+                    tag = string.Format("![SHAPE:ID={0}:TYPE=SmartArt:SMARTART={1}:TITLE={2}:TEXT={3}:STYLE=0:PATH={4}:NODES={5}:X={6}:Y={7}:W={8}:H={9}:WRAP={10}:PAGE=-1:YREL={11}:ARLOCK={12}:EMUX={13}:EMUY={14}:EMUW={15}:EMUH={16}]",
                         shapeId, saType ?? "Cycle_Radial", safeTitle, safeText, tempFile ?? "", nodesMeta ?? "", x, y, w, h, wrapMode, yRel,
                         saArLock ? "1" : "0", saOrigBoundsEmu.X, saOrigBoundsEmu.Y, saOrigBoundsEmu.Width, saOrigBoundsEmu.Height);
 
@@ -3609,7 +4022,7 @@ namespace ZenQOffice.Format
                         SmartArtType = saType,
                         SmartArtTitle = safeTitle,
                         TextContent = safeText,
-                        StylePresetIndex = 1,
+                        StylePresetIndex = 0,
                         NodesMeta = nodesMeta,
                         AspectRatioLock = saArLock,
                         OriginalBoundsEmu = saOrigBoundsEmu,
@@ -4392,6 +4805,35 @@ namespace ZenQOffice.Format
                 }
             }
 
+            XmlNode tblCellMar = tblPr != null ? (tblPr.SelectSingleNode(".//w:tblCellMar", nsmgr) ?? tblPr.SelectSingleNode(".//*[local-name()='tblCellMar']")) : null;
+            if (tblCellMar != null)
+            {
+                XmlNode cmTop = tblCellMar.SelectSingleNode(".//w:top", nsmgr) ?? tblCellMar.SelectSingleNode(".//*[local-name()='top']");
+                if (cmTop != null && cmTop.Attributes["w:w"] != null)
+                {
+                    int dxa;
+                    if (int.TryParse(cmTop.Attributes["w:w"].Value, out dxa)) tableObj.CellMarginTopPt = dxa / 20f;
+                }
+                XmlNode cmBottom = tblCellMar.SelectSingleNode(".//w:bottom", nsmgr) ?? tblCellMar.SelectSingleNode(".//*[local-name()='bottom']");
+                if (cmBottom != null && cmBottom.Attributes["w:w"] != null)
+                {
+                    int dxa;
+                    if (int.TryParse(cmBottom.Attributes["w:w"].Value, out dxa)) tableObj.CellMarginBottomPt = dxa / 20f;
+                }
+                XmlNode cmLeft = tblCellMar.SelectSingleNode(".//w:left", nsmgr) ?? tblCellMar.SelectSingleNode(".//*[local-name()='left']");
+                if (cmLeft != null && cmLeft.Attributes["w:w"] != null)
+                {
+                    int dxa;
+                    if (int.TryParse(cmLeft.Attributes["w:w"].Value, out dxa)) tableObj.CellMarginLeftPt = dxa / 20f;
+                }
+                XmlNode cmRight = tblCellMar.SelectSingleNode(".//w:right", nsmgr) ?? tblCellMar.SelectSingleNode(".//*[local-name()='right']");
+                if (cmRight != null && cmRight.Attributes["w:w"] != null)
+                {
+                    int dxa;
+                    if (int.TryParse(cmRight.Attributes["w:w"].Value, out dxa)) tableObj.CellMarginRightPt = dxa / 20f;
+                }
+            }
+
             XmlNode tblBorders = tblPr != null ? (tblPr.SelectSingleNode(".//w:tblBorders", nsmgr) ?? tblPr.SelectSingleNode(".//*[local-name()='tblBorders']")) : null;
             Color defBorderColor = Color.Black;
 
@@ -5049,7 +5491,11 @@ namespace ZenQOffice.Format
             float customTopMarginInches = 1.0f,
             float customBottomMarginInches = 1.0f,
             float paperWidthInches = 0f,
-            float paperHeightInches = 0f)
+            float paperHeightInches = 0f,
+            List<DocHeaderFooterRun> headerRuns = null,
+            List<DocHeaderFooterRun> footerRuns = null,
+            int headerAlignment = 1,
+            int footerAlignment = 1)
         {
             try
             {
@@ -5061,6 +5507,9 @@ namespace ZenQOffice.Format
                 using (FileStream fs = new FileStream(filepath, FileMode.Create, FileAccess.Write))
                 using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Create))
                 {
+                    bool hasHeader = !string.IsNullOrEmpty(headerText) || (headerRuns != null && headerRuns.Count > 0);
+                    bool hasFooter = !string.IsNullOrEmpty(footerText) || showPageNumbers || (footerRuns != null && footerRuns.Count > 0);
+
                     // 1. [Content_Types].xml
                     var ctEntry = archive.CreateEntry("[Content_Types].xml");
                     using (StreamWriter sw = new StreamWriter(ctEntry.Open(), Encoding.UTF8))
@@ -5085,8 +5534,8 @@ namespace ZenQOffice.Format
                         sw.WriteLine("  <Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/>");
                         sw.WriteLine("  <Override PartName=\"/word/webSettings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml\"/>");
                         sw.WriteLine("  <Override PartName=\"/word/fontTable.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml\"/>");
-                        if (!string.IsNullOrEmpty(headerText)) sw.WriteLine("  <Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>");
-                        if (!string.IsNullOrEmpty(footerText) || showPageNumbers) sw.WriteLine("  <Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>");
+                        if (hasHeader) sw.WriteLine("  <Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>");
+                        if (hasFooter) sw.WriteLine("  <Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>");
                         sw.WriteLine("</Types>");
                     }
 
@@ -5101,7 +5550,69 @@ namespace ZenQOffice.Format
                     }
 
                     // 4. word/header1.xml (if any)
-                    if (!string.IsNullOrEmpty(headerText))
+                    if (headerRuns != null && headerRuns.Count > 0)
+                    {
+                        var hEntry = archive.CreateEntry("word/header1.xml");
+                        using (StreamWriter sw = new StreamWriter(hEntry.Open(), Encoding.UTF8))
+                        {
+                            sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                            sw.WriteLine("<w:hdr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                            sw.WriteLine("  <w:p>");
+                            string hJc = (headerAlignment == 0) ? "left" : ((headerAlignment == 2) ? "right" : "center");
+                            sw.WriteLine(string.Format("    <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", hJc));
+                            foreach (var hr in headerRuns)
+                            {
+                                if (hr.IsPageNumber)
+                                {
+                                    sw.Write("    <w:fldSimple w:instr=\"PAGE\"><w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(hr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((hr.FontSize > 0 ? hr.FontSize : 9f) * 2) + "\"/>");
+                                    if (hr.Bold) sw.Write("<w:b/>");
+                                    if (hr.Italic) sw.Write("<w:i/>");
+                                    if (hr.TextColor != Color.Empty && hr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", hr.TextColor.R, hr.TextColor.G, hr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr><w:t>1</w:t></w:r></w:fldSimple>\n");
+                                }
+                                else if (hr.IsNumPages)
+                                {
+                                    sw.Write("    <w:fldSimple w:instr=\"NUMPAGES\"><w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(hr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((hr.FontSize > 0 ? hr.FontSize : 9f) * 2) + "\"/>");
+                                    if (hr.Bold) sw.Write("<w:b/>");
+                                    if (hr.Italic) sw.Write("<w:i/>");
+                                    if (hr.TextColor != Color.Empty && hr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", hr.TextColor.R, hr.TextColor.G, hr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr><w:t>1</w:t></w:r></w:fldSimple>\n");
+                                }
+                                else
+                                {
+                                    sw.Write("    <w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(hr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((hr.FontSize > 0 ? hr.FontSize : 9f) * 2) + "\"/>");
+                                    if (hr.Bold) sw.Write("<w:b/>");
+                                    if (hr.Italic) sw.Write("<w:i/>");
+                                    if (hr.TextColor != Color.Empty && hr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", hr.TextColor.R, hr.TextColor.G, hr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr>");
+                                    if (hr.IsTab) sw.Write("<w:tab/>");
+                                    else sw.Write("<w:t xml:space=\"preserve\">" + EscapeXml(hr.Text ?? "") + "</w:t>");
+                                    sw.WriteLine("</w:r>");
+                                }
+                            }
+                            sw.WriteLine("  </w:p>");
+                            sw.WriteLine("</w:hdr>");
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(headerText))
                     {
                         var hEntry = archive.CreateEntry("word/header1.xml");
                         using (StreamWriter sw = new StreamWriter(hEntry.Open(), Encoding.UTF8))
@@ -5114,7 +5625,72 @@ namespace ZenQOffice.Format
                     }
 
                     // 5. word/footer1.xml (if any)
-                    if (!string.IsNullOrEmpty(footerText) || showPageNumbers)
+                    if (footerRuns != null && footerRuns.Count > 0)
+                    {
+                        var fEntry = archive.CreateEntry("word/footer1.xml");
+                        using (StreamWriter sw = new StreamWriter(fEntry.Open(), Encoding.UTF8))
+                        {
+                            sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                            sw.WriteLine("<w:ftr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                            sw.WriteLine("  <w:p>");
+                            if (footerRuns != null && footerRuns.Count > 0 && !footerRuns.Exists(r => r.IsTab || (r.Text != null && (r.Text.Contains("\t") || System.Text.RegularExpressions.Regex.IsMatch(r.Text, @"^\s{4,}$")))))
+                            {
+                                string fJc = (footerAlignment == 0) ? "left" : ((footerAlignment == 2) ? "right" : "center");
+                                sw.WriteLine(string.Format("    <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", fJc));
+                            }
+                            foreach (var fr in footerRuns)
+                            {
+                                if (fr.IsPageNumber)
+                                {
+                                    sw.Write("    <w:fldSimple w:instr=\"PAGE\"><w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(fr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((fr.FontSize > 0 ? fr.FontSize : 9f) * 2) + "\"/>");
+                                    if (fr.Bold) sw.Write("<w:b/>");
+                                    if (fr.Italic) sw.Write("<w:i/>");
+                                    if (fr.TextColor != Color.Empty && fr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", fr.TextColor.R, fr.TextColor.G, fr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr><w:t>1</w:t></w:r></w:fldSimple>\n");
+                                }
+                                else if (fr.IsNumPages)
+                                {
+                                    sw.Write("    <w:fldSimple w:instr=\"NUMPAGES\"><w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(fr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((fr.FontSize > 0 ? fr.FontSize : 9f) * 2) + "\"/>");
+                                    if (fr.Bold) sw.Write("<w:b/>");
+                                    if (fr.Italic) sw.Write("<w:i/>");
+                                    if (fr.TextColor != Color.Empty && fr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", fr.TextColor.R, fr.TextColor.G, fr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr><w:t>1</w:t></w:r></w:fldSimple>\n");
+                                }
+                                else
+                                {
+                                    sw.Write("    <w:r><w:rPr>");
+                                    sw.Write("<w:rFonts w:ascii=\"" + EscapeXml(fr.FontName ?? "Times New Roman") + "\"/>");
+                                    sw.Write("<w:sz w:val=\"" + (int)Math.Round((fr.FontSize > 0 ? fr.FontSize : 9f) * 2) + "\"/>");
+                                    if (fr.Bold) sw.Write("<w:b/>");
+                                    if (fr.Italic) sw.Write("<w:i/>");
+                                    if (fr.TextColor != Color.Empty && fr.TextColor != Color.Transparent)
+                                    {
+                                        string hex = string.Format("{0:X2}{1:X2}{2:X2}", fr.TextColor.R, fr.TextColor.G, fr.TextColor.B);
+                                        sw.Write("<w:color w:val=\"" + hex + "\"/>");
+                                    }
+                                    sw.Write("</w:rPr>");
+                                    if (fr.IsTab) sw.Write("<w:tab/>");
+                                    else sw.Write("<w:t xml:space=\"preserve\">" + EscapeXml(fr.Text ?? "") + "</w:t>");
+                                    sw.WriteLine("</w:r>");
+                                }
+                            }
+                            sw.WriteLine("  </w:p>");
+                            sw.WriteLine("</w:ftr>");
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(footerText) || showPageNumbers)
                     {
                         var fEntry = archive.CreateEntry("word/footer1.xml");
                         using (StreamWriter sw = new StreamWriter(fEntry.Open(), Encoding.UTF8))
@@ -5311,10 +5887,14 @@ namespace ZenQOffice.Format
                                     sw.WriteLine(string.Format("          <w:insideV w:val=\"{0}\" w:sz=\"{1}\" w:space=\"0\" w:color=\"{2}\"/>", inVStyle, inVSz, inVClr));
                                     sw.WriteLine("        </w:tblBorders>");
                                     sw.WriteLine("        <w:tblCellMar>");
-                                    sw.WriteLine("          <w:top w:w=\"120\" w:type=\"dxa\"/>");
-                                    sw.WriteLine("          <w:bottom w:w=\"120\" w:type=\"dxa\"/>");
-                                    sw.WriteLine("          <w:left w:w=\"160\" w:type=\"dxa\"/>");
-                                    sw.WriteLine("          <w:right w:w=\"160\" w:type=\"dxa\"/>");
+                                    int topDxa = (docTbl != null && docTbl.CellMarginTopPt >= 0) ? (int)Math.Round(docTbl.CellMarginTopPt * 20) : 120;
+                                    int botDxa = (docTbl != null && docTbl.CellMarginBottomPt >= 0) ? (int)Math.Round(docTbl.CellMarginBottomPt * 20) : 120;
+                                    int leftDxa = (docTbl != null && docTbl.CellMarginLeftPt >= 0) ? (int)Math.Round(docTbl.CellMarginLeftPt * 20) : 160;
+                                    int rightDxa = (docTbl != null && docTbl.CellMarginRightPt >= 0) ? (int)Math.Round(docTbl.CellMarginRightPt * 20) : 160;
+                                    sw.WriteLine(string.Format("          <w:top w:w=\"{0}\" w:type=\"dxa\"/>", topDxa));
+                                    sw.WriteLine(string.Format("          <w:bottom w:w=\"{0}\" w:type=\"dxa\"/>", botDxa));
+                                    sw.WriteLine(string.Format("          <w:left w:w=\"{0}\" w:type=\"dxa\"/>", leftDxa));
+                                    sw.WriteLine(string.Format("          <w:right w:w=\"{0}\" w:type=\"dxa\"/>", rightDxa));
                                     sw.WriteLine("        </w:tblCellMar>");
                                     sw.WriteLine("      </w:tblPr>");
                                     sw.WriteLine("      <w:tblGrid>");
@@ -5934,8 +6514,8 @@ namespace ZenQOffice.Format
 
                         // Section Properties
                         sw.WriteLine("    <w:sectPr>");
-                        if (!string.IsNullOrEmpty(headerText)) sw.WriteLine("      <w:headerReference r:id=\"rIdHeader1\" w:type=\"default\"/>");
-                        if (!string.IsNullOrEmpty(footerText) || showPageNumbers) sw.WriteLine("      <w:footerReference r:id=\"rIdFooter1\" w:type=\"default\"/>");
+                        if (hasHeader) sw.WriteLine("      <w:headerReference r:id=\"rIdHeader1\" w:type=\"default\"/>");
+                        if (hasFooter) sw.WriteLine("      <w:footerReference r:id=\"rIdFooter1\" w:type=\"default\"/>");
 
                         int pgW = (int)Math.Round((paperWidthInches > 0 ? paperWidthInches : (isLandscape ? 11.69f : 8.27f)) * 1440);
                         int pgH = (int)Math.Round((paperHeightInches > 0 ? paperHeightInches : (isLandscape ? 8.27f : 11.69f)) * 1440);
@@ -5975,11 +6555,11 @@ namespace ZenQOffice.Format
                         sw.WriteLine("  <Relationship Id=\"rIdSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/>");
                         sw.WriteLine("  <Relationship Id=\"rIdWebSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings\" Target=\"webSettings.xml\"/>");
                         sw.WriteLine("  <Relationship Id=\"rIdFontTable\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable\" Target=\"fontTable.xml\"/>");
-                        if (!string.IsNullOrEmpty(headerText))
+                        if (hasHeader)
                         {
                             sw.WriteLine("  <Relationship Id=\"rIdHeader1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header1.xml\"/>");
                         }
-                        if (!string.IsNullOrEmpty(footerText) || showPageNumbers)
+                        if (hasFooter)
                         {
                             sw.WriteLine("  <Relationship Id=\"rIdFooter1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer\" Target=\"footer1.xml\"/>");
                         }
@@ -6636,8 +7216,26 @@ namespace ZenQOffice.Format
                         var ar = shapeAudioRels[shape];
                         nvPrXml = string.Format("<p:nvPr><a:audioFile r:link=\"{0}\"/><p:extLst><p:ext uri=\"{{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}}\"><p14:media xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" r:embed=\"{1}\"/></p:ext></p:extLst></p:nvPr>", ar.Key, ar.Value);
                     }
+                    string cNvDescrAttr = "";
+                    if (shape.IsGraphic || shape.IsSvg || !string.IsNullOrEmpty(shape.SvgContent))
+                    {
+                        string svgRaw = !string.IsNullOrEmpty(shape.SvgContent) ? shape.SvgContent : shape.OriginalSvgContent;
+                        if (string.IsNullOrEmpty(svgRaw) && !string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && File.Exists(shape.ImagePath))
+                        {
+                            try { svgRaw = File.ReadAllText(shape.ImagePath, Encoding.UTF8); } catch { }
+                        }
+                        if (!string.IsNullOrEmpty(svgRaw))
+                        {
+                            string b64Svg = Convert.ToBase64String(Encoding.UTF8.GetBytes(svgRaw));
+                            cNvDescrAttr = string.Format(" descr=\"ZenQGraphic|SVG:{0}\"", EscapeXml(b64Svg));
+                        }
+                        else
+                        {
+                            cNvDescrAttr = " descr=\"ZenQGraphic\"";
+                        }
+                    }
                     sw.WriteLine("      <p:pic>");
-                    sw.WriteLine(string.Format("        <p:nvPicPr><p:cNvPr id=\"{0}\" name=\"{1}\"/><p:cNvPicPr><a:picLocks noChangeAspect=\"0\"/></p:cNvPicPr>{2}</p:nvPicPr>", spId, EscapeXml(shapeName), nvPrXml));
+                    sw.WriteLine(string.Format("        <p:nvPicPr><p:cNvPr id=\"{0}\" name=\"{1}\"{3}/><p:cNvPicPr><a:picLocks noChangeAspect=\"0\"/></p:cNvPicPr>{2}</p:nvPicPr>", spId, EscapeXml(shapeName), nvPrXml, cNvDescrAttr));
                     string srcRectXml = "";
                     if (shape.CropLeft > 0.0001f || shape.CropTop > 0.0001f || shape.CropRight > 0.0001f || shape.CropBottom > 0.0001f)
                     {
@@ -6781,7 +7379,40 @@ namespace ZenQOffice.Format
                 {
                     sw.WriteLine("      <p:sp>");
                     sw.WriteLine("        <p:nvSpPr>");
-                    sw.WriteLine(string.Format("          <p:cNvPr id=\"{0}\" name=\"{1}\"/>", spId, EscapeXml(shapeName)));
+                    if (shape.HasInteractiveAction)
+                    {
+                        string ppAction = "";
+                        switch (shape.ClickActionType)
+                        {
+                            case SlideActionType.NextSlide: ppAction = "ppaction://hlinkshowjump?jump=nextslide"; break;
+                            case SlideActionType.PreviousSlide: ppAction = "ppaction://hlinkshowjump?jump=previousslide"; break;
+                            case SlideActionType.FirstSlide: ppAction = "ppaction://hlinkshowjump?jump=firstslide"; break;
+                            case SlideActionType.LastSlide: ppAction = "ppaction://hlinkshowjump?jump=lastslide"; break;
+                            case SlideActionType.LastSlideViewed: ppAction = "ppaction://hlinkshowjump?jump=lastslideviewed"; break;
+                            case SlideActionType.EndShow: ppAction = "ppaction://hlinkshowjump?jump=endshow"; break;
+                            case SlideActionType.SpecificSlide: ppAction = "ppaction://hlinksldjump"; break;
+                        }
+                        sw.WriteLine(string.Format("          <p:cNvPr id=\"{0}\" name=\"{1}\">", spId, EscapeXml(shapeName)));
+                        sw.WriteLine(string.Format("            <a:hlinkClick action=\"{0}\" tooltip=\"{1}\" highlightClick=\"{2}\" zqAction=\"{3}\" zqTargetSlide=\"{4}\" zqUrl=\"{5}\" zqReturn=\"{6}\" zqSound=\"{7}\" zqRevealId=\"{8}\" zqHoverAction=\"{9}\" zqHoverSlide=\"{10}\" zqHoverUrl=\"{11}\" zqHoverSound=\"{12}\"/>",
+                            EscapeXml(ppAction),
+                            EscapeXml(shape.HyperlinkScreenTip ?? ""),
+                            shape.ClickHighlight ? "1" : "0",
+                            shape.ClickActionType,
+                            shape.ClickTargetSlideIndex,
+                            EscapeXml(shape.ClickTargetUrl ?? ""),
+                            shape.ClickShowAndReturn ? "1" : "0",
+                            shape.ClickSound,
+                            EscapeXml(shape.ClickRevealShapeId ?? ""),
+                            shape.HoverActionType,
+                            shape.HoverTargetSlideIndex,
+                            EscapeXml(shape.HoverTargetUrl ?? ""),
+                            shape.HoverSound));
+                        sw.WriteLine("          </p:cNvPr>");
+                    }
+                    else
+                    {
+                        sw.WriteLine(string.Format("          <p:cNvPr id=\"{0}\" name=\"{1}\"/>", spId, EscapeXml(shapeName)));
+                    }
                     sw.WriteLine("          <p:cNvSpPr/>");
                     sw.WriteLine("          <p:nvPr/>");
                     sw.WriteLine("        </p:nvSpPr>");
@@ -8250,6 +8881,87 @@ namespace ZenQOffice.Format
                     shape.Name = n;
                     if (n.StartsWith("!!")) shape.MorphName = n;
                 }
+                XmlNode hlinkClick = cNvPr.SelectSingleNode("./*[local-name()='hlinkClick']");
+                if (hlinkClick != null && hlinkClick.Attributes != null)
+                {
+                    if (hlinkClick.Attributes["tooltip"] != null)
+                        shape.HyperlinkScreenTip = hlinkClick.Attributes["tooltip"].Value;
+                    if (hlinkClick.Attributes["highlightClick"] != null)
+                        shape.ClickHighlight = (hlinkClick.Attributes["highlightClick"].Value == "1" || hlinkClick.Attributes["highlightClick"].Value.Equals("true", StringComparison.OrdinalIgnoreCase));
+
+                    if (hlinkClick.Attributes["zqAction"] != null)
+                    {
+                        SlideActionType parsedAct;
+                        if (Enum.TryParse<SlideActionType>(hlinkClick.Attributes["zqAction"].Value, true, out parsedAct))
+                            shape.ClickActionType = parsedAct;
+                    }
+                    else if (hlinkClick.Attributes["action"] != null)
+                    {
+                        string actStr = hlinkClick.Attributes["action"].Value.ToLowerInvariant();
+                        if (actStr.Contains("jump=nextslide")) shape.ClickActionType = SlideActionType.NextSlide;
+                        else if (actStr.Contains("jump=previousslide")) shape.ClickActionType = SlideActionType.PreviousSlide;
+                        else if (actStr.Contains("jump=firstslide")) shape.ClickActionType = SlideActionType.FirstSlide;
+                        else if (actStr.Contains("jump=lastslideviewed")) shape.ClickActionType = SlideActionType.LastSlideViewed;
+                        else if (actStr.Contains("jump=lastslide")) shape.ClickActionType = SlideActionType.LastSlide;
+                        else if (actStr.Contains("jump=endshow")) shape.ClickActionType = SlideActionType.EndShow;
+                        else if (actStr.Contains("hlinksldjump")) shape.ClickActionType = SlideActionType.SpecificSlide;
+                    }
+
+                    int tSlide;
+                    if (hlinkClick.Attributes["zqTargetSlide"] != null && int.TryParse(hlinkClick.Attributes["zqTargetSlide"].Value, out tSlide))
+                        shape.ClickTargetSlideIndex = tSlide;
+                    if (hlinkClick.Attributes["zqUrl"] != null)
+                        shape.ClickTargetUrl = hlinkClick.Attributes["zqUrl"].Value;
+                    if (hlinkClick.Attributes["zqReturn"] != null)
+                        shape.ClickShowAndReturn = (hlinkClick.Attributes["zqReturn"].Value == "1");
+                    if (hlinkClick.Attributes["zqSound"] != null)
+                    {
+                        SlideActionSound parsedSnd;
+                        if (Enum.TryParse<SlideActionSound>(hlinkClick.Attributes["zqSound"].Value, true, out parsedSnd))
+                            shape.ClickSound = parsedSnd;
+                    }
+                    if (hlinkClick.Attributes["zqRevealId"] != null)
+                        shape.ClickRevealShapeId = hlinkClick.Attributes["zqRevealId"].Value;
+                    if (hlinkClick.Attributes["zqHoverAction"] != null)
+                    {
+                        SlideActionType parsedHov;
+                        if (Enum.TryParse<SlideActionType>(hlinkClick.Attributes["zqHoverAction"].Value, true, out parsedHov))
+                            shape.HoverActionType = parsedHov;
+                    }
+                    int hSlide;
+                    if (hlinkClick.Attributes["zqHoverSlide"] != null && int.TryParse(hlinkClick.Attributes["zqHoverSlide"].Value, out hSlide))
+                        shape.HoverTargetSlideIndex = hSlide;
+                    if (hlinkClick.Attributes["zqHoverUrl"] != null)
+                        shape.HoverTargetUrl = hlinkClick.Attributes["zqHoverUrl"].Value;
+                    if (hlinkClick.Attributes["zqHoverSound"] != null)
+                    {
+                        SlideActionSound parsedHSnd;
+                        if (Enum.TryParse<SlideActionSound>(hlinkClick.Attributes["zqHoverSound"].Value, true, out parsedHSnd))
+                            shape.HoverSound = parsedHSnd;
+                    }
+                }
+                if (cNvPr.Attributes["descr"] != null)
+                {
+                    string descr = cNvPr.Attributes["descr"].Value;
+                    shape.AltText = descr;
+                    if (descr.StartsWith("ZenQGraphic", StringComparison.Ordinal))
+                    {
+                        shape.IsGraphic = true;
+                        int svgIdx = descr.IndexOf("|SVG:", StringComparison.Ordinal);
+                        if (svgIdx >= 0)
+                        {
+                            try
+                            {
+                                string b64 = descr.Substring(svgIdx + 5);
+                                string svgXml = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                                shape.IsSvg = true;
+                                shape.SvgContent = svgXml;
+                                shape.OriginalSvgContent = svgXml;
+                            }
+                            catch { }
+                        }
+                    }
+                }
             }
 
             // Geometry Type: Check Custom Geometry vs Preset Geometry
@@ -8478,8 +9190,11 @@ namespace ZenQOffice.Format
                                             int renderW = Math.Max(1200, (int)Math.Max(shape.Transform.Width * 2, 800));
                                             int renderH = Math.Max(1200, (int)Math.Max(shape.Transform.Height * 2, 800));
                                             shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
+                                            if (shape.CachedImage != null) shape.OriginalRasterBitmap = new Bitmap(shape.CachedImage);
                                             shape.IsSvg = true;
                                             shape.IsGraphic = true;
+                                            shape.SvgContent = svgText;
+                                            shape.OriginalSvgContent = svgText;
                                             try
                                             {
                                                 string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
@@ -8496,6 +9211,7 @@ namespace ZenQOffice.Format
                                             using (Image rawImg = Image.FromStream(ms))
                                             {
                                                 shape.CachedImage = new Bitmap(rawImg);
+                                                shape.OriginalRasterBitmap = new Bitmap(rawImg);
                                             }
                                             shape.ImagePath = target;
                                             if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
@@ -9395,6 +10111,32 @@ namespace ZenQOffice.Format
                 if (cNvPr.Attributes["id"] != null) picShape.RawSpid = cNvPr.Attributes["id"].Value;
                 picShape.Id = Guid.NewGuid().ToString("N");
                 if (cNvPr.Attributes["name"] != null) picShape.Name = cNvPr.Attributes["name"].Value;
+                if (cNvPr.Attributes["descr"] != null)
+                {
+                    string descr = cNvPr.Attributes["descr"].Value;
+                    picShape.AltText = descr;
+                    if (descr.StartsWith("ZenQGraphic", StringComparison.Ordinal))
+                    {
+                        picShape.IsGraphic = true;
+                        int svgIdx = descr.IndexOf("|SVG:", StringComparison.Ordinal);
+                        if (svgIdx >= 0)
+                        {
+                            try
+                            {
+                                string b64 = descr.Substring(svgIdx + 5);
+                                string svgXml = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                                picShape.IsSvg = true;
+                                picShape.SvgContent = svgXml;
+                                picShape.OriginalSvgContent = svgXml;
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                if (!picShape.IsGraphic && !string.IsNullOrEmpty(picShape.Name) && picShape.Name.IndexOf("Minh họa Vector", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    picShape.IsGraphic = true;
+                }
             }
 
             XmlNode pxFrm = picNode.SelectSingleNode("./*[local-name()='spPr']/*[local-name()='xfrm']") 
@@ -9564,8 +10306,11 @@ namespace ZenQOffice.Format
                                         int renderW = Math.Max(1200, (int)Math.Max(picShape.Transform.Width * 2, 800));
                                         int renderH = Math.Max(1200, (int)Math.Max(picShape.Transform.Height * 2, 800));
                                         picShape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
+                                        if (picShape.CachedImage != null) picShape.OriginalRasterBitmap = new Bitmap(picShape.CachedImage);
                                         picShape.IsSvg = true;
                                         picShape.IsGraphic = true;
+                                        picShape.SvgContent = svgText;
+                                        picShape.OriginalSvgContent = svgText;
                                         try
                                         {
                                             string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
@@ -9581,6 +10326,7 @@ namespace ZenQOffice.Format
                                         using (Image rawImg = Image.FromStream(ms))
                                         {
                                             picShape.CachedImage = new Bitmap(rawImg);
+                                            picShape.OriginalRasterBitmap = new Bitmap(rawImg);
                                         }
                                         picShape.ImagePath = target;
                                     }

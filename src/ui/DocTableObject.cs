@@ -173,6 +173,14 @@ namespace ZenQOffice.UI
         public int IndentPt { get; set; }
         /// <summary>Internal cell padding in points (default 4.0pt)</summary>
         public float CellPaddingPt { get; set; }
+        /// <summary>Explicit top cell margin in points (from OOXML w:tblCellMar/w:top)</summary>
+        public float CellMarginTopPt { get; set; } = -1f;
+        /// <summary>Explicit bottom cell margin in points (from OOXML w:tblCellMar/w:bottom)</summary>
+        public float CellMarginBottomPt { get; set; } = -1f;
+        /// <summary>Explicit left cell margin in points (from OOXML w:tblCellMar/w:left)</summary>
+        public float CellMarginLeftPt { get; set; } = -1f;
+        /// <summary>Explicit right cell margin in points (from OOXML w:tblCellMar/w:right)</summary>
+        public float CellMarginRightPt { get; set; } = -1f;
         /// <summary>Repeat header row across pages</summary>
         public bool RepeatHeaderRow { get; set; }
 
@@ -218,6 +226,10 @@ namespace ZenQOffice.UI
             Alignment = 0;
             IndentPt = 0;
             CellPaddingPt = 4.0f;
+            CellMarginTopPt = -1f;
+            CellMarginBottomPt = -1f;
+            CellMarginLeftPt = -1f;
+            CellMarginRightPt = -1f;
             RepeatHeaderRow = false;
         }
     }

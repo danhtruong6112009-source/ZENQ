@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -10,7 +10,7 @@ namespace ZenQOffice.UI
         public string SmartArtType;
         public string SmartArtTitle;
         public string TextContent;
-        public int StylePresetIndex = 1;
+        public int StylePresetIndex = 0;
         public float AdjustValue1 = 0.2f;
         public float AdjustValue2 = 0.4f;
         public float AdjustValue3 = 0.8f;
@@ -22,6 +22,7 @@ namespace ZenQOffice.UI
         public Dictionary<int, Color> NodeOutlineColors;
         public Dictionary<int, Color> NodeTextColors;
         public Dictionary<int, float> NodeScaleDeltas;
+        public Dictionary<int, PointF> NodeOffsetDeltas;
         public Rectangle OriginalBoundsEmu;
         public bool AspectRatioLock;
         public Color[] ResolvedThemePalette;
@@ -211,6 +212,8 @@ namespace ZenQOffice.UI
         public Dictionary<int, Color> NodeOutlineColors = new Dictionary<int, Color>();
         public Dictionary<int, Color> NodeTextColors = new Dictionary<int, Color>();
         public Dictionary<int, float> NodeScaleDeltas = new Dictionary<int, float>();
+        public Dictionary<int, PointF> NodeOffsetDeltas = new Dictionary<int, PointF>();
+        public HashSet<int> UserCustomizedNodeShapes = new HashSet<int>();
         public Rectangle OriginalBoundsEmu { get; set; }
         public bool AspectRatioLock { get; set; }
         public Color[] ResolvedThemePalette { get; set; }
@@ -442,6 +445,7 @@ namespace ZenQOffice.UI
                 if (p.NodeOutlineColors != null) NodeOutlineColors = new Dictionary<int, Color>(p.NodeOutlineColors);
                 if (p.NodeTextColors != null) NodeTextColors = new Dictionary<int, Color>(p.NodeTextColors);
                 if (p.NodeScaleDeltas != null) NodeScaleDeltas = new Dictionary<int, float>(p.NodeScaleDeltas);
+                if (p.NodeOffsetDeltas != null) NodeOffsetDeltas = new Dictionary<int, PointF>(p.NodeOffsetDeltas);
                 if (p.OriginalBoundsEmu != Rectangle.Empty) OriginalBoundsEmu = p.OriginalBoundsEmu;
                 if (p.AspectRatioLock) AspectRatioLock = true;
                 if (p.ResolvedThemePalette != null) ResolvedThemePalette = p.ResolvedThemePalette;
@@ -461,6 +465,36 @@ namespace ZenQOffice.UI
         public static void ClearTagParseCache()
         {
             ParsedTagCache.Clear();
+        }
+
+        public static int FindTagEnd(string text, int tagStart)
+        {
+            if (string.IsNullOrEmpty(text) || tagStart < 0 || tagStart >= text.Length) return -1;
+            int nextTag = text.IndexOf("![", tagStart + 2);
+            int lineEnd = text.IndexOf('\n', tagStart);
+            int limit = text.Length;
+            if (nextTag >= 0 && nextTag < limit) limit = nextTag;
+            if (lineEnd >= 0 && lineEnd < limit) limit = lineEnd;
+            if (limit <= tagStart || limit - 1 < 0) return -1;
+
+            int count = limit - tagStart;
+            int tagEnd = -1;
+            try
+            {
+                tagEnd = text.LastIndexOf(']', limit - 1, count);
+                if (tagEnd < 0) tagEnd = text.LastIndexOf(')', limit - 1, count);
+            }
+            catch
+            {
+                tagEnd = -1;
+            }
+
+            if (tagEnd < 0)
+            {
+                int cand = text.IndexOf(']', tagStart);
+                if (cand >= 0 && cand < limit) tagEnd = cand;
+            }
+            return tagEnd;
         }
 
         public static void ParseShapeTag(string tag, out string shapeId, out string shapeType, out string imgPath, out int tagX, out int tagY, out int tagW, out int tagH, out int tagWrap, out int tagPage, out int tagStyle, out int tagYRel)

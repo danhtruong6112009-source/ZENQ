@@ -18,6 +18,8 @@ namespace ZenQOffice.UI
     {
         public Color SelectedColor { get; private set; }
         public event Action<Color> OnColorSelected;
+        public event Action OnMoreColorsRequested;
+        public event Action OnGradientRequested;
 
         public ColorPaletteMode Mode { get; set; }
 
@@ -171,7 +173,8 @@ namespace ZenQOffice.UI
 
             if (Mode == ColorPaletteMode.Highlight)
             {
-                desiredH = 160;
+                desiredW = 180;
+                desiredH = 176;
             }
             else
             {
@@ -279,12 +282,30 @@ namespace ZenQOffice.UI
             }
             else if (sec == 5) // More Colors...
             {
-                OpenMoreColorsDialog();
+                if (OnMoreColorsRequested != null)
+                {
+                    var cb = OnMoreColorsRequested;
+                    Close();
+                    cb();
+                }
+                else
+                {
+                    OpenMoreColorsDialog();
+                }
             }
             else if (sec == 6) // Gradient >
             {
-                Color baseC = (_currentColor != Color.Empty && _currentColor != Color.Transparent) ? _currentColor : Color.FromArgb(43, 87, 154);
-                SelectColorAndClose(baseC);
+                if (OnGradientRequested != null)
+                {
+                    var cb = OnGradientRequested;
+                    Close();
+                    cb();
+                }
+                else
+                {
+                    Color baseC = (_currentColor != Color.Empty && _currentColor != Color.Transparent) ? _currentColor : Color.FromArgb(43, 87, 154);
+                    SelectColorAndClose(baseC);
+                }
             }
             else if (sec == 7) // Eyedropper
             {
@@ -311,12 +332,12 @@ namespace ZenQOffice.UI
 
             if (Mode == ColorPaletteMode.Highlight)
             {
-                int startX = 14;
-                int startY = 10;
-                int cellW = 34;
-                int cellH = 24;
-                int gapX = 4;
-                int gapY = 4;
+                int cellW = 26;
+                int cellH = 26;
+                int gapX = 6;
+                int gapY = 6;
+                int startX = (Width - (5 * cellW + 4 * gapX)) / 2;
+                int startY = 12;
 
                 for (int i = 0; i < HighlightColors.Length; i++)
                 {
@@ -332,17 +353,17 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                int noColY = startY + 3 * (cellH + gapY) + 6;
-                if (y >= noColY && y <= noColY + 24 && x >= 6 && x <= Width - 6)
+                int noColY = startY + 3 * (cellH + gapY) + 8;
+                if (y >= noColY && y <= noColY + 26 && x >= 8 && x <= Width - 8)
                 {
-                    section = 1; // No Color
+                    section = 1; // Không có màu (No Color)
                     return;
                 }
 
-                int stopY = noColY + 26;
-                if (y >= stopY && y <= stopY + 24 && x >= 6 && x <= Width - 6)
+                int stopY = noColY + 30;
+                if (y >= stopY && y <= stopY + 26 && x >= 8 && x <= Width - 8)
                 {
-                    section = 11; // Stop Highlighting
+                    section = 11; // Dừng tô màu (Stop Highlighting)
                     return;
                 }
                 return;
@@ -724,12 +745,12 @@ namespace ZenQOffice.UI
 
         private void PaintHighlightMode(D2DGraphics g)
         {
-            int startX = 14;
-            int startY = 10;
-            int cellW = 34;
-            int cellH = 24;
-            int gapX = 4;
-            int gapY = 4;
+            int cellW = 26;
+            int cellH = 26;
+            int gapX = 6;
+            int gapY = 6;
+            int startX = (Width - (5 * cellW + 4 * gapX)) / 2;
+            int startY = 12;
 
             for (int i = 0; i < HighlightColors.Length; i++)
             {
@@ -745,14 +766,25 @@ namespace ZenQOffice.UI
                 }
 
                 bool isHovered = (_hoverSection == 10 && _hoverCol == i);
-                using (Pen p = new Pen(isHovered ? Color.FromArgb(245, 158, 11) : Color.FromArgb(200, 208, 218), isHovered ? 1.6f : 1.0f))
+                if (isHovered)
                 {
-                    g.DrawRectangle(p, cellRect.X, cellRect.Y, cellRect.Width - 1, cellRect.Height - 1);
+                    using (Pen p = new Pen(Color.FromArgb(16, 110, 190), 2.0f))
+                    {
+                        g.DrawRectangle(p, cellRect.X - 1, cellRect.Y - 1, cellRect.Width + 1, cellRect.Height + 1);
+                    }
+                }
+                else
+                {
+                    using (Pen p = new Pen(Color.FromArgb(218, 222, 228), 1.0f))
+                    {
+                        g.DrawRectangle(p, cellRect.X, cellRect.Y, cellRect.Width - 1, cellRect.Height - 1);
+                    }
                 }
             }
 
-            int noColY = startY + 3 * (cellH + gapY) + 6;
-            Rectangle noColorBtn = new Rectangle(6, noColY, Width - 12, 24);
+            // 1. Nút "Không có màu" (No Color)
+            int noColY = startY + 3 * (cellH + gapY) + 8;
+            Rectangle noColorBtn = new Rectangle(8, noColY, Width - 16, 26);
             if (_hoverSection == 1)
             {
                 using (SolidBrush hb = new SolidBrush(Color.FromArgb(237, 243, 251)))
@@ -766,21 +798,22 @@ namespace ZenQOffice.UI
             using (SolidBrush sb = new SolidBrush(Color.White))
             using (Pen sp = new Pen(Color.FromArgb(180, 185, 195), 1.0f))
             {
-                g.FillRectangle(sb, 14, noColY + 4, 16, 16);
-                g.DrawRectangle(sp, 14, noColY + 4, 16, 16);
+                g.FillRectangle(sb, 14, noColY + 5, 16, 16);
+                g.DrawRectangle(sp, 14, noColY + 5, 16, 16);
             }
             using (Pen redSlash = new Pen(Color.FromArgb(220, 38, 38), 1.5f))
             {
-                g.DrawLine(redSlash, 14 + 2, noColY + 4 + 14, 14 + 14, noColY + 4 + 2);
+                g.DrawLine(redSlash, 14 + 2, noColY + 5 + 14, 14 + 14, noColY + 5 + 2);
             }
             using (Font itemFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
-            using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush tb = new SolidBrush(Color.FromArgb(32, 31, 30)))
             {
-                g.DrawString("No Color", itemFont, tb, 42, noColY + 3);
+                g.DrawString("Không có màu", itemFont, tb, 40, noColY + 4);
             }
 
-            int stopY = noColY + 26;
-            Rectangle stopBtn = new Rectangle(6, stopY, Width - 12, 24);
+            // 2. Nút "Dừng tô màu" (Stop Highlighting)
+            int stopY = noColY + 30;
+            Rectangle stopBtn = new Rectangle(8, stopY, Width - 16, 26);
             if (_hoverSection == 11)
             {
                 using (SolidBrush hb = new SolidBrush(Color.FromArgb(237, 243, 251)))
@@ -791,9 +824,9 @@ namespace ZenQOffice.UI
                 }
             }
             using (Font itemFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
-            using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush tb = new SolidBrush(Color.FromArgb(32, 31, 30)))
             {
-                g.DrawString("Stop Highlighting", itemFont, tb, 14, stopY + 3);
+                g.DrawString("Dừng tô màu", itemFont, tb, 14, stopY + 4);
             }
         }
 

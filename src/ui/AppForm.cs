@@ -28,6 +28,7 @@ namespace ZenQOffice.UI
 
         public void OpenBackstageView(int defaultTab = 0, OfficeAppMode? overrideMode = null)
         {
+            SlidesView?.HideSearchBox();
             if (BackstageView == null) BackstageView = new OfficeBackstageView(this);
             BackstageView.Open(defaultTab, overrideMode);
             Invalidate();
@@ -41,6 +42,7 @@ namespace ZenQOffice.UI
 
         public void ToggleBackstageView()
         {
+            SlidesView?.HideSearchBox();
             if (BackstageView != null && BackstageView.IsOpen) CloseBackstageView();
             else OpenBackstageView();
         }
@@ -620,7 +622,7 @@ namespace ZenQOffice.UI
                 SlidesView.IsPresenterViewMode = false;
                 TopMost = false;
                 FormBorderStyle = FormBorderStyle.Sizable;
-                Text = "Trình chiếu PowerPoint - " + (SlidesView != null && SlidesView.Presentation != null && !string.IsNullOrEmpty(SlidesView.Presentation.Title) ? SlidesView.Presentation.Title : "Trình bày 1");
+                Text = "Trình chiếu ZenQ - " + (SlidesView != null && SlidesView.Presentation != null && !string.IsNullOrEmpty(SlidesView.Presentation.Title) ? SlidesView.Presentation.Title : "Trình bày 1");
             }
             else if (SlidesView.ShowType == 2)
             {
@@ -803,8 +805,13 @@ namespace ZenQOffice.UI
         public void HandleSlideShowKeyDown(Keys key)
         {
             SlidesView.HandleKeyDown(key);
+            if (_audienceForm != null && !_audienceForm.IsDisposed)
+            {
+                _audienceForm.Invalidate();
+                _audienceForm.Update();
+            }
             Invalidate();
-            if (_audienceForm != null) _audienceForm.Invalidate();
+            Update();
         }
 
         public void ShowAiConfig()
@@ -899,10 +906,27 @@ namespace ZenQOffice.UI
         {
             if (_aiSidebar != null && _aiSidebar.Visible)
             {
-                int sbW = 380;
-                int topY = RibbonBar.RibbonHeight;
-                int botH = 26; // Status bar
+                int topY = (Ribbon != null) ? Ribbon.ActualRibbonBottom : RibbonBar.RibbonHeight;
+                int botH = 26;
+                if (Ribbon != null && Ribbon.CurrentDpiScale > 0)
+                {
+                    botH = (int)Math.Round(26f * Ribbon.CurrentDpiScale);
+                }
                 int sbH = Math.Max(100, ClientSize.Height - topY - botH);
+
+                int sbW;
+                if (_aiSidebar.IsCanvasOpen)
+                {
+                    int targetW = (int)(ClientSize.Width * 0.68f);
+                    int maxAllowed = Math.Max(300, ClientSize.Width - 280);
+                    sbW = Math.Min(maxAllowed, Math.Max(640, Math.Min(1120, targetW)));
+                }
+                else
+                {
+                    float dpiScale = (Ribbon != null && Ribbon.CurrentDpiScale > 0) ? Ribbon.CurrentDpiScale : 1.0f;
+                    sbW = Math.Min(ClientSize.Width - 40, (int)Math.Round(380f * dpiScale));
+                }
+
                 _aiSidebar.Location = new Point(Math.Max(0, ClientSize.Width - sbW), topY);
                 _aiSidebar.Size = new Size(sbW, sbH);
                 _aiSidebar.BringToFront();
@@ -1003,10 +1027,15 @@ namespace ZenQOffice.UI
             };
             SlidesView.InvalidateCallback = () =>
             {
-                Invalidate();
                 if (_audienceForm != null && !_audienceForm.IsDisposed && SlidesView.IsPresenting)
                 {
                     _audienceForm.Invalidate();
+                    _audienceForm.Update();
+                }
+                Invalidate();
+                if (SlidesView.IsPresenting)
+                {
+                    Update();
                 }
             };
             SlideVideoPlayerManager.Instance.OnFrameRendered = () =>
@@ -1085,7 +1114,7 @@ namespace ZenQOffice.UI
                 bool anim1 = (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null) ? WriterView.UpdateSmoothScroll() : false;
                 bool anim2 = (Ribbon.CurrentMode == OfficeAppMode.Home && HomeView != null) ? HomeView.UpdateSmoothScroll(ClientSize.Height, ClientSize.Width) : false;
                 bool anim3 = false;
-                if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
+                if (SlidesView != null && (Ribbon.CurrentMode == OfficeAppMode.Slides || SlidesView.IsPresenting))
                 {
                     anim3 = SlidesView.UpdateAnimationAndTransition();
                 }
@@ -1099,7 +1128,17 @@ namespace ZenQOffice.UI
 
                 if (anim1 || anim2 || anim3 || anim4 || anim5 || anim6)
                 {
-                    if (anim3 && SlidesView != null && SlidesView.IsPreviewingTransition && !SlidesView.IsPresenting && !anim1 && !anim2 && !anim4 && !anim5 && !anim6)
+                    if (anim3 && SlidesView != null && SlidesView.IsPresenting)
+                    {
+                        if (_audienceForm != null && !_audienceForm.IsDisposed)
+                        {
+                            _audienceForm.Invalidate();
+                            _audienceForm.Update();
+                        }
+                        Invalidate();
+                        Update();
+                    }
+                    else if (anim3 && SlidesView != null && SlidesView.IsPreviewingTransition && !SlidesView.IsPresenting && !anim1 && !anim2 && !anim4 && !anim5 && !anim6)
                     {
                         int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
                         SlidesView.GetEffectiveLayoutMetrics(ClientSize.Width, ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
@@ -1108,11 +1147,6 @@ namespace ZenQOffice.UI
                     else
                     {
                         Invalidate();
-                    }
-
-                    if (anim3 && _audienceForm != null && SlidesView.IsPresenting)
-                    {
-                        _audienceForm.Invalidate();
                     }
                 }
             };
@@ -1697,11 +1731,14 @@ namespace ZenQOffice.UI
 
                 if (BackstageView != null && BackstageView.IsOpen)
                 {
+                    SlidesView?.HideSearchBox();
                     bool isStandalone = (Ribbon != null && Ribbon.StandaloneMode);
                     if (!isStandalone && Ribbon != null)
                     {
                         // Giữ lại thanh tab ứng dụng phía trên (Trang chính | doc 1 | doc 2 | +)
-                        Ribbon.DrawTopDocTabBar(g, clientWidth);
+                        {
+                            Ribbon.DrawTopDocTabBar(g, clientWidth);
+                        }
 
                         int bsTopOffset = (Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
                         var gState = g.Save();
@@ -1722,11 +1759,7 @@ namespace ZenQOffice.UI
 
                 // Ensure top title bar area (0..36px) is solidly prefilled
                 bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-                Color titleBarColor = (isIsland && Ribbon != null)
-                    ? ((Ribbon.CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
-                       ((Ribbon.CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
-                       Color.FromArgb(238, 238, 238)))
-                    : Color.FromArgb(248, 250, 252);
+                Color titleBarColor = Color.FromArgb(248, 250, 252);
                 int topFillH = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
                 using (SolidBrush titleBg = new SolidBrush(titleBarColor))
                 {
@@ -1769,6 +1802,7 @@ namespace ZenQOffice.UI
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
                         {
+                            SlidesView?.HideSearchBox();
                             PdfView.Draw(g, effectiveDocWidth, clientHeight, Ribbon);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
@@ -1797,7 +1831,7 @@ namespace ZenQOffice.UI
                 // 2. Draw Ribbon Bar
                 try
                 {
-                    if (Ribbon != null)
+                            if (Ribbon != null)
                     {
                         Ribbon.Draw(g, clientWidth, clientHeight, WriterView, SlidesView, CalcView, PdfView, PhotoView);
                     }
@@ -2118,21 +2152,22 @@ namespace ZenQOffice.UI
             int barH = 26;
             Rectangle statusRect = new Rectangle(0, height - barH, width, barH);
             
-            // MS Word Signature Status Bar Color (#2B579A Navy Blue)
-            Color statusBg = (Ribbon.PrimaryColor == Color.White) ? Color.FromArgb(43, 87, 154) : Ribbon.PrimaryColor;
+            // Modern Fluent Status Bar (#F9F9F9 with #E5E5E5 1px top border)
+            Color statusBg = Color.FromArgb(249, 249, 249);
             using (SolidBrush statusBrush = new SolidBrush(statusBg))
             {
                 g.FillRectangle(statusBrush, statusRect);
             }
 
-            // Top subtle accent line
-            using (Pen topPen = new Pen(Color.FromArgb(50, 255, 255, 255), 1))
+            // Top subtle 1px divider (#E5E5E5)
+            using (Pen topPen = new Pen(Color.FromArgb(229, 229, 229), 1))
             {
                 g.DrawLine(topPen, 0, height - barH, width, height - barH);
             }
 
             using (Font sFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (Font iconFont = new Font("Segoe UI Symbol", 9.0f, FontStyle.Regular))
+            using (SolidBrush statusTextBrush = new SolidBrush(Color.FromArgb(75, 85, 99)))
             {
                 // LEFT SECTION: Page count, Word/Char count, Language Proofing
                 if (Ribbon.CurrentMode == OfficeAppMode.Writer)
@@ -2147,44 +2182,44 @@ namespace ZenQOffice.UI
                     string pageStr = string.Format("Trang {0} / {1}", curPg, totPgs);
                     string wordStr = string.Format("{0:N0} từ, {1:N0} ký tự{2}", totalWords, totalChars, selStr);
 
-                    g.DrawString(pageStr, sFont, Brushes.White, 16, height - 20);
-                    g.DrawString(wordStr, sFont, Brushes.White, 110, height - 20);
+                    g.DrawString(pageStr, sFont, statusTextBrush, 16, height - 20);
+                    g.DrawString(wordStr, sFont, statusTextBrush, 110, height - 20);
 
                     // Proofing / Language icon [📖✓]
-                    g.DrawString("📖✓  Tiếng Việt (Unicode)", sFont, Brushes.White, 310, height - 20);
+                    g.DrawString("📖✓  Tiếng Việt (Unicode)", sFont, statusTextBrush, 310, height - 20);
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
                 {
                     string addr = SparseMatrix.ColIndexToName(CalcView.SelectedCol) + CalcView.SelectedRow;
                     string bcBadge = AppSettings.Instance.CalcBarcodeScannerMode ? "   |   📠 Máy quét Mã vạch: BẬT" : "";
-                    g.DrawString("Sẵn sàng   |   Ô chọn: " + addr + bcBadge, sFont, Brushes.White, 16, height - 20);
+                    g.DrawString("Sẵn sàng   |   Ô chọn: " + addr + bcBadge, sFont, statusTextBrush, 16, height - 20);
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                 {
                     string info = "Slide " + (SlidesView.ActiveSlideIndex + 1) + " / " + SlidesView.Presentation.Slides.Count;
-                    g.DrawString(info, sFont, Brushes.White, 16, height - 20);
+                    g.DrawString(info, sFont, statusTextBrush, 16, height - 20);
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
                 {
                     int curP = PdfView.ActivePageIndex + 1;
                     int totP = (PdfView.Document != null) ? Math.Max(1, PdfView.Document.Pages.Count) : 1;
                     string pageStr = string.Format("Trang {0} / {1}", curP, totP);
-                    g.DrawString(pageStr, sFont, Brushes.White, 16, height - 20);
-                    g.DrawString("PDF Editor (Chuẩn PDF 1.7)", sFont, Brushes.White, 140, height - 20);
+                    g.DrawString(pageStr, sFont, statusTextBrush, 16, height - 20);
+                    g.DrawString("PDF Editor (Chuẩn PDF 1.7)", sFont, statusTextBrush, 140, height - 20);
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Photo && PhotoView != null)
                 {
                     int lCount = (PhotoView.Document != null) ? PhotoView.Document.Layers.Count : 0;
                     int curL = (PhotoView.Document != null && PhotoView.Document.ActiveLayer != null) ? PhotoView.Document.ActiveLayerIndex + 1 : 0;
                     string lStr = string.Format("Lớp {0} / {1}", curL, lCount);
-                    g.DrawString(lStr, sFont, Brushes.White, 16, height - 20);
+                    g.DrawString(lStr, sFont, statusTextBrush, 16, height - 20);
                     int dw = (PhotoView.Document != null) ? PhotoView.Document.Width : 1920;
                     int dh = (PhotoView.Document != null) ? PhotoView.Document.Height : 1080;
-                    g.DrawString(string.Format("ZenQ Vector Designer ({0} x {1} px)", dw, dh), sFont, Brushes.White, 120, height - 20);
+                    g.DrawString(string.Format("ZenQ Vector Designer ({0} x {1} px)", dw, dh), sFont, statusTextBrush, 120, height - 20);
                 }
                 else
                 {
-                    g.DrawString("Sẵn sàng", sFont, Brushes.White, 16, height - 20);
+                    g.DrawString("Sẵn sàng", sFont, statusTextBrush, 16, height - 20);
                 }
 
                 // RIGHT SECTION: View Mode icons (Read 📖, Print 📄, Web 🌐), Smooth Drag Zoom Slider, Zoom Percentage
@@ -2208,11 +2243,14 @@ namespace ZenQOffice.UI
                 bool touchOn = AppSettings.Instance.TouchModeEnabled;
                 if (touchOn)
                 {
-                    using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(85, 255, 255, 255)))
+                    using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(224, 231, 240)))
                     {
                         g.FillRectangle(activeBg, _statusTouchToggleBounds);
                     }
-                    g.DrawRectangle(Pens.White, _statusTouchToggleBounds);
+                    using (Pen activePen = new Pen(Color.FromArgb(180, 195, 215), 1f))
+                    {
+                        g.DrawRectangle(activePen, _statusTouchToggleBounds);
+                    }
                 }
                 string touchGlyph = touchOn
                     ? (PeripheralDeviceManager.LastActivePointerType == PointerInputType.Pen ? "\uED63" : "\uE815")
@@ -2220,23 +2258,35 @@ namespace ZenQOffice.UI
                 string touchLabel = touchOn
                     ? (PeripheralDeviceManager.LastActivePointerType == PointerInputType.Pen ? "Bút Stylus" : "Cảm ứng")
                     : "Cảm ứng";
-                FluentIconRenderer.DrawGlyph(g, touchGlyph, new Rectangle(_statusTouchToggleBounds.X + 4, _statusTouchToggleBounds.Y + 2, 16, 16), Color.White, 8.5f);
-                g.DrawString(touchLabel, sFont, Brushes.White, _statusTouchToggleBounds.X + 21, _statusTouchToggleBounds.Y + 2);
+                FluentIconRenderer.DrawGlyph(g, touchGlyph, new Rectangle(_statusTouchToggleBounds.X + 4, _statusTouchToggleBounds.Y + 2, 16, 16), touchOn ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99), 8.5f);
+                g.DrawString(touchLabel, sFont, touchOn ? Brushes.Navy : statusTextBrush, _statusTouchToggleBounds.X + 21, _statusTouchToggleBounds.Y + 2);
 
                 // 0. Speaker Notes Toggle Button ("Ghi chú") for Slides Mode (PowerPoint-style)
                 if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
                 {
                     Rectangle notesBtnRect = new Rectangle(width - 344, height - 23, 68, 20);
-                    if (SlidesView.IsNotesPaneOpen)
+                    Point curMouse = PointToClient(Cursor.Position);
+                    bool isHoverNotes = notesBtnRect.Contains(curMouse);
+
+                    if (SlidesView.IsNotesPaneOpen || isHoverNotes)
                     {
-                        using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                        Color bgCol = SlidesView.IsNotesPaneOpen ? Color.FromArgb(224, 231, 240) : Color.FromArgb(240, 243, 248);
+                        Color borderCol = SlidesView.IsNotesPaneOpen ? Color.FromArgb(180, 195, 215) : Color.FromArgb(210, 220, 235);
+                        using (SolidBrush activeBg = new SolidBrush(bgCol))
                         {
                             g.FillRectangle(activeBg, notesBtnRect);
                         }
-                        g.DrawRectangle(Pens.White, notesBtnRect);
+                        using (Pen activePen = new Pen(borderCol, 1f))
+                        {
+                            g.DrawRectangle(activePen, notesBtnRect);
+                        }
                     }
-                    FluentIconRenderer.DrawGlyph(g, "\uE70B", new Rectangle(notesBtnRect.X + 3, notesBtnRect.Y + 2, 16, 16), Color.White, 8.5f);
-                    g.DrawString("Ghi chú", sFont, Brushes.White, notesBtnRect.X + 19, notesBtnRect.Y + 2);
+                    Color textIconCol = SlidesView.IsNotesPaneOpen ? Color.FromArgb(16, 110, 190) : (isHoverNotes ? Color.FromArgb(30, 41, 59) : Color.FromArgb(75, 85, 99));
+                    FluentIconRenderer.DrawGlyph(g, "\uE70B", new Rectangle(notesBtnRect.X + 3, notesBtnRect.Y + 2, 16, 16), textIconCol, 8.5f);
+                    using (SolidBrush textBrush = new SolidBrush(textIconCol))
+                    {
+                        g.DrawString("Ghi chú", sFont, textBrush, notesBtnRect.X + 19, notesBtnRect.Y + 2);
+                    }
                 }
 
                 // 1. View Mode & Slide Show Icons
@@ -2255,13 +2305,16 @@ namespace ZenQOffice.UI
 
                         if (isActive)
                         {
-                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(224, 231, 240)))
                             {
                                 g.FillRectangle(activeBg, mRect);
                             }
-                            g.DrawRectangle(Pens.White, mRect);
+                            using (Pen activePen = new Pen(Color.FromArgb(180, 195, 215), 1f))
+                            {
+                                g.DrawRectangle(activePen, mRect);
+                            }
                         }
-                        DrawSlideStatusBarButton(g, m, mRect);
+                        DrawSlideStatusBarButton(g, m, mRect, isActive);
                     }
                 }
                 else
@@ -2275,13 +2328,16 @@ namespace ZenQOffice.UI
                         int curVm = (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null) ? WriterView.ViewMode : ActiveViewMode;
                         if (curVm == m)
                         {
-                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+                            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(224, 231, 240)))
                             {
                                 g.FillRectangle(activeBg, mRect);
                             }
-                            g.DrawRectangle(Pens.White, mRect);
+                            using (Pen activePen = new Pen(Color.FromArgb(180, 195, 215), 1f))
+                            {
+                                g.DrawRectangle(activePen, mRect);
+                            }
                         }
-                        FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, Color.White, 9.5f);
+                        FluentIconRenderer.DrawGlyph(g, modeGlyphs[m], mRect, (curVm == m) ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99), 9.5f);
                     }
                 }
 
@@ -2290,21 +2346,21 @@ namespace ZenQOffice.UI
                 Rectangle minusRect = new Rectangle(zoomMinusX, height - 23, 18, 20);
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
-                    g.DrawString("-", sFont, Brushes.White, new RectangleF(minusRect.X, minusRect.Y, minusRect.Width, minusRect.Height), sf);
+                    g.DrawString("-", sFont, statusTextBrush, new RectangleF(minusRect.X, minusRect.Y, minusRect.Width, minusRect.Height), sf);
                 }
 
                 // 3. Smooth Continuous Drag Trackbar Line (70px)
                 int sliderX = width - 142;
                 int sliderW = 70;
                 int sliderY = height - 13;
-                using (Pen trackPen = new Pen(Color.FromArgb(180, 255, 255, 255), 2))
+                using (Pen trackPen = new Pen(Color.FromArgb(200, 203, 209), 2))
                 {
                     g.DrawLine(trackPen, sliderX, sliderY, sliderX + sliderW, sliderY);
                 }
 
                 // 100% Center Notch Tick (at exact 50% midpoint of track)
                 int midNotchX = sliderX + sliderW / 2;
-                using (Pen notchPen = new Pen(Color.FromArgb(240, 255, 255, 255), 1.5f))
+                using (Pen notchPen = new Pen(Color.FromArgb(160, 165, 175), 1.5f))
                 {
                     g.DrawLine(notchPen, midNotchX, sliderY - 4, midNotchX, sliderY + 4);
                 }
@@ -2343,14 +2399,14 @@ namespace ZenQOffice.UI
                 int knobX = sliderX + (int)Math.Round(zoomFrac * sliderW);
                 Rectangle knobRect = new Rectangle(knobX - 3, sliderY - 6, 7, 13);
                 g.FillRectangle(Brushes.White, knobRect);
-                g.DrawRectangle(Pens.DarkSlateGray, knobRect);
+                using (Pen knobBorder = new Pen(Color.FromArgb(100, 110, 125), 1f)) g.DrawRectangle(knobBorder, knobRect);
 
                 // 4. Zoom Plus [+] Button
                 int zoomPlusX = width - 68;
                 Rectangle plusRect = new Rectangle(zoomPlusX, height - 23, 18, 20);
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
-                    g.DrawString("+", sFont, Brushes.White, new RectangleF(plusRect.X, plusRect.Y, plusRect.Width, plusRect.Height), sf);
+                    g.DrawString("+", sFont, statusTextBrush, new RectangleF(plusRect.X, plusRect.Y, plusRect.Width, plusRect.Height), sf);
                 }
 
                 // 5. Zoom Percentage Text (100%)
@@ -2358,7 +2414,7 @@ namespace ZenQOffice.UI
                 Rectangle pctRect = new Rectangle(width - 46, height - 23, 42, 20);
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
-                    g.DrawString(pctStr, sFont, Brushes.White, pctRect, sf);
+                    g.DrawString(pctStr, sFont, statusTextBrush, pctRect, sf);
                 }
             }
 
@@ -2368,21 +2424,22 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawSlideStatusBarButton(D2DGraphics g, int mode, Rectangle mRect)
+        private void DrawSlideStatusBarButton(D2DGraphics g, int mode, Rectangle mRect, bool isActive = false)
         {
+            Color c = isActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99);
             switch (mode)
             {
                 case 0: // Normal View
-                    FluentIconRenderer.DrawGlyph(g, "/slidenormal", mRect, Color.White, 9.5f);
+                    FluentIconRenderer.DrawGlyph(g, "/slidenormal", mRect, c, 9.5f);
                     break;
                 case 1: // Slide Sorter
-                    FluentIconRenderer.DrawGlyph(g, "/slidesorter", mRect, Color.White, 9.5f);
+                    FluentIconRenderer.DrawGlyph(g, "/slidesorter", mRect, c, 9.5f);
                     break;
                 case 2: // Reading View
-                    FluentIconRenderer.DrawGlyph(g, "/read", mRect, Color.White, 9.5f);
+                    FluentIconRenderer.DrawGlyph(g, "/read", mRect, c, 9.5f);
                     break;
                 case 3: // Slide Show
-                    FluentIconRenderer.DrawGlyph(g, "/slideshow", mRect, Color.White, 9.5f);
+                    FluentIconRenderer.DrawGlyph(g, "/slideshow", mRect, c, 9.5f);
                     break;
             }
         }
@@ -2488,7 +2545,12 @@ namespace ZenQOffice.UI
             if (Ribbon.CurrentMode == OfficeAppMode.Home)
             {
                 int maxScroll = HomeView.GetMaxScroll(ClientSize.Height, ClientSize.Width);
-                HomeView.TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(HomeView.TargetScrollY - wheelNotches * 95f)));
+                float step = -wheelNotches * 84f;
+                float diff = HomeView.TargetScrollY - HomeView.SmoothScrollY;
+                float lead = ((step > 0 && diff > 0) || (step < 0 && diff < 0)) ? Math.Sign(diff) * Math.Min(Math.Abs(diff), 60f) : 0f;
+                HomeView.TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(HomeView.SmoothScrollY + lead + step)));
+                HomeView.UpdateSmoothScroll(ClientSize.Height, ClientSize.Width);
+                Invalidate();
             }
             else if (Ribbon.CurrentMode == OfficeAppMode.Writer)
             {
@@ -2521,8 +2583,11 @@ namespace ZenQOffice.UI
                     int maxScrollX = WriterView.GetMaxScrollX(docW);
                     if (maxScrollX > 0)
                     {
-                        float hDelta = -wheelNotches * 95f;
-                        WriterView.TargetScrollX = Math.Max(0f, Math.Min(maxScrollX, WriterView.TargetScrollX + hDelta));
+                        float hDelta = -wheelNotches * 84f;
+                        float diffX = WriterView.TargetScrollX - WriterView.SmoothScrollX;
+                        float leadX = ((hDelta > 0 && diffX > 0) || (hDelta < 0 && diffX < 0)) ? Math.Sign(diffX) * Math.Min(Math.Abs(diffX), 60f) : 0f;
+                        WriterView.TargetScrollX = Math.Max(0f, Math.Min(maxScrollX, WriterView.SmoothScrollX + leadX + hDelta));
+                        WriterView.UpdateSmoothScroll();
                         Invalidate();
                     }
                 }
@@ -2580,8 +2645,11 @@ namespace ZenQOffice.UI
                     }
 
                     int maxScroll = WriterView.GetMaxScrollY(ClientSize.Height, Ribbon);
-                    float vDelta = -wheelNotches * 95f;
-                    WriterView.TargetScrollY = Math.Max(0f, Math.Min(maxScroll, WriterView.TargetScrollY + vDelta));
+                    float vDelta = -wheelNotches * 84f;
+                    float diffY = WriterView.TargetScrollY - WriterView.SmoothScrollY;
+                    float leadY = ((vDelta > 0 && diffY > 0) || (vDelta < 0 && diffY < 0)) ? Math.Sign(diffY) * Math.Min(Math.Abs(diffY), 60f) : 0f;
+                    WriterView.TargetScrollY = Math.Max(0f, Math.Min(maxScroll, WriterView.SmoothScrollY + leadY + vDelta));
+                    WriterView.UpdateSmoothScroll();
 
                     if (WriterView.IsDraggingShape)
                     {
@@ -2676,15 +2744,29 @@ namespace ZenQOffice.UI
                     int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
                     SlidesView.GetEffectiveLayoutMetrics(ClientSize.Width, ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
 
-                    // Khi lăn chuột trên thanh trượt đáy (Bottom Thumbnail Strip)
-                    if (bottomThumbH > 0 && e.Y >= contentY + contentH)
+                    // Khi lăn chuột trên thanh trượt đáy (Bottom Thumbnail Strip) hoặc đang giữ kéo thumbnail ngang
+                    if (bottomThumbH > 0 && (e.Y >= contentY + contentH || (SlidesView.PotentialDragSlideIndex >= 0 && SlidesView.IsDraggingBottomSlideThumbnail)))
                     {
                         int totalBottomWidth = (SlidesView.Presentation != null ? SlidesView.Presentation.Slides.Count : 0) * (86 + 10) + 60;
                         int trackW = canvasW - 16 - 130;
                         int maxBottomScroll = Math.Max(0, totalBottomWidth - trackW);
                         int bottomScrollStep = (e.Delta > 0) ? -60 : 60;
-                        float newBottom = Math.Max(0, Math.Min(maxBottomScroll, (float)Math.Round(SlidesView.TargetBottomThumbScrollX + bottomScrollStep)));
+                        float diffBtm = SlidesView.TargetBottomThumbScrollX - SlidesView.SmoothBottomThumbScrollX;
+                        float leadBtm = ((bottomScrollStep > 0 && diffBtm > 0) || (bottomScrollStep < 0 && diffBtm < 0)) ? Math.Sign(diffBtm) * Math.Min(Math.Abs(diffBtm), 45f) : 0f;
+                        float newBottom = Math.Max(0, Math.Min(maxBottomScroll, (float)Math.Round(SlidesView.SmoothBottomThumbScrollX + leadBtm + bottomScrollStep)));
                         SlidesView.TargetBottomThumbScrollX = newBottom;
+                        if (SlidesView.PotentialDragSlideIndex >= 0)
+                        {
+                            SlidesView.BottomThumbScrollX = (int)newBottom;
+                            SlidesView.SmoothBottomThumbScrollX = newBottom;
+                            SlidesView.IsDraggingSlideThumbnail = true;
+                            SlidesView.UpdateDragSlideTargetFromMouse(e.Location, ClientSize.Width, ClientSize.Height);
+                        }
+                        else
+                        {
+                            SlidesView.UpdateSmoothScroll();
+                        }
+                        Invalidate(new Rectangle(canvasX, contentY + contentH, canvasW, bottomThumbH));
                         return;
                     }
 
@@ -2692,25 +2774,43 @@ namespace ZenQOffice.UI
                     {
                         if (SlidesView.ElementsDrawerSelectedTab == 1 && SlidesView.ShapeTaskPane != null)
                         {
-                            SlidesView.ShapeTaskPane.HandleMouseWheel(e.Delta);
-                            Invalidate();
+                            SlidesView.ShapeTaskPane.HandleMouseWheel(e.Delta, true);
+                            Invalidate(new Rectangle(0, contentY, leftSidebarW, contentH));
                             return;
                         }
                         else
                         {
-                            int scrollStep = (e.Delta > 0) ? -60 : 60;
-                            float newElem = Math.Max(0, (float)Math.Round(SlidesView.TargetElementsScrollY + scrollStep));
+                            int scrollStep = (e.Delta > 0) ? -80 : 80;
+                            float diffEl = SlidesView.TargetElementsScrollY - SlidesView.SmoothElementsScrollY;
+                            float leadEl = ((scrollStep > 0 && diffEl > 0) || (scrollStep < 0 && diffEl < 0)) ? Math.Sign(diffEl) * Math.Min(Math.Abs(diffEl), 60f) : 0f;
+                            float newElem = Math.Max(0, (float)Math.Round(SlidesView.SmoothElementsScrollY + leadEl + scrollStep));
                             SlidesView.TargetElementsScrollY = newElem;
+                            SlidesView.UpdateSmoothScroll();
+                            Invalidate(new Rectangle(0, contentY, leftSidebarW, contentH));
                             return;
                         }
                     }
-                    else if (e.X <= leftSidebarW && !SlidesView.IsElementsDrawerOpen)
+                    else if ((e.X <= leftSidebarW || (SlidesView.PotentialDragSlideIndex >= 0 && !SlidesView.IsDraggingBottomSlideThumbnail)) && !SlidesView.IsElementsDrawerOpen)
                     {
-                        // Scroll Thumbnails Pane (Cuộn danh sách slide thu nhỏ siêu nhẹ, thanh thoát chuẩn PowerPoint)
+                        // Scroll Thumbnails Pane (Nội suy ngắn ~55ms, dừng gọn không trôi)
                         int maxThumbScroll = SlidesView.GetMaxThumbScrollY();
-                        int scrollStep = (e.Delta > 0) ? -48 : 48; // Bước cuộn 48px siêu nhẹ, êm ái
-                        float newThumb = Math.Max(0, Math.Min(maxThumbScroll, (float)Math.Round(SlidesView.TargetThumbScrollY + scrollStep)));
+                        int scrollStep = (e.Delta > 0) ? -56 : 56;
+                        float diffTh = SlidesView.TargetThumbScrollY - SlidesView.SmoothThumbScrollY;
+                        float leadTh = ((scrollStep > 0 && diffTh > 0) || (scrollStep < 0 && diffTh < 0)) ? Math.Sign(diffTh) * Math.Min(Math.Abs(diffTh), 45f) : 0f;
+                        float newThumb = Math.Max(0, Math.Min(maxThumbScroll, (float)Math.Round(SlidesView.SmoothThumbScrollY + leadTh + scrollStep)));
                         SlidesView.TargetThumbScrollY = newThumb;
+                        if (SlidesView.PotentialDragSlideIndex >= 0)
+                        {
+                            SlidesView.ThumbScrollY = (int)newThumb;
+                            SlidesView.SmoothThumbScrollY = newThumb;
+                            SlidesView.IsDraggingSlideThumbnail = true;
+                            SlidesView.UpdateDragSlideTargetFromMouse(e.Location, ClientSize.Width, ClientSize.Height);
+                        }
+                        else
+                        {
+                            SlidesView.UpdateSmoothScroll();
+                        }
+                        Invalidate(new Rectangle(0, contentY, leftSidebarW, contentH));
                         return;
                     }
                     else
@@ -2719,7 +2819,8 @@ namespace ZenQOffice.UI
                         if (rightSidebarW > 0 && e.X >= ClientSize.Width - rightSidebarW)
                         {
                             int scrollStep = (e.Delta > 0) ? 60 : -60;
-                            SlidesView.SidebarScrollY = Math.Min(0, SlidesView.SidebarScrollY + scrollStep);
+                            int minSidebarScroll = Math.Min(0, (ClientSize.Height - 155 - 26 - 42) - 660);
+                            SlidesView.SidebarScrollY = Math.Max(minSidebarScroll, Math.Min(0, SlidesView.SidebarScrollY + scrollStep));
                             Invalidate();
                             return;
                         }
@@ -2789,14 +2890,18 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            // 2. Chế độ Phóng to (Zoomed In): Cuộn nội dung slide với bước cuộn êm ái
+                            // 2. Chế độ Phóng to (Zoomed In): Cuộn nội dung slide mượt ~55ms rồi dừng gọn, không trôi
                             int slideScrollStep = (e.Delta > 0) ? -65 : 65;
-                            float newTargetScrollY = Math.Max(minScrollY, Math.Min(maxScrollY, (float)Math.Round(SlidesView.TargetCanvasScrollY + slideScrollStep)));
+                            float diffCv = SlidesView.TargetCanvasScrollY - SlidesView.SmoothCanvasScrollY;
+                            float leadCv = ((slideScrollStep > 0 && diffCv > 0) || (slideScrollStep < 0 && diffCv < 0)) ? Math.Sign(diffCv) * Math.Min(Math.Abs(diffCv), 50f) : 0f;
+                            float newTargetScrollY = Math.Max(minScrollY, Math.Min(maxScrollY, (float)Math.Round(SlidesView.SmoothCanvasScrollY + leadCv + slideScrollStep)));
 
-                            if (Math.Abs(newTargetScrollY - SlidesView.TargetCanvasScrollY) > 0.5f)
+                            if (Math.Abs(newTargetScrollY - SlidesView.SmoothCanvasScrollY) > 0.5f)
                             {
                                 SlidesView.TargetCanvasScrollY = newTargetScrollY;
+                                SlidesView.UpdateSmoothScroll();
                                 SlideWheelTickCount = 0;
+                                Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
                                 return;
                             }
                             else
@@ -2891,17 +2996,23 @@ namespace ZenQOffice.UI
                     int viewH = ClientSize.Height - 155 - 26;
                     if (PdfView.ShowThumbnailsSidebar && e.X <= PdfView.SidebarWidth)
                     {
-                        // Cuộn thanh trang thu nhỏ Thumbnail ở Sidebar bên trái
+                        // Cuộn thanh trang thu nhỏ Thumbnail ở Sidebar bên trái (mượt ~55ms, dừng gọn không trôi)
                         int maxSidebarScroll = PdfView.GetMaxSidebarScrollY(viewH - 36);
-                        float sideScrollAmount = -wheelNotches * 90f;
-                        PdfView.TargetSidebarScrollY = Math.Max(0, Math.Min(maxSidebarScroll, PdfView.TargetSidebarScrollY + sideScrollAmount));
+                        float sideScrollAmount = -wheelNotches * 80f;
+                        float diffSide = PdfView.TargetSidebarScrollY - PdfView.SidebarScrollY;
+                        float leadSide = ((sideScrollAmount > 0 && diffSide > 0) || (sideScrollAmount < 0 && diffSide < 0)) ? Math.Sign(diffSide) * Math.Min(Math.Abs(diffSide), 50f) : 0f;
+                        PdfView.TargetSidebarScrollY = Math.Max(0, Math.Min(maxSidebarScroll, PdfView.SidebarScrollY + leadSide + sideScrollAmount));
+                        PdfView.UpdateSmoothScroll();
                     }
                     else
                     {
-                        // Cuộn các trang PDF chính mượt mà qua UpdateSmoothScroll
+                        // Cuộn các trang PDF chính mượt ~55ms, dừng gọn không trôi
                         int maxScroll = PdfView.GetMaxScrollY(viewH);
-                        float wheelStep = -wheelNotches * 110f;
-                        PdfView.TargetScrollY = Math.Max(0, Math.Min(maxScroll, PdfView.TargetScrollY + wheelStep));
+                        float wheelStep = -wheelNotches * 95f;
+                        float diffPdf = PdfView.TargetScrollY - PdfView.ScrollY;
+                        float leadPdf = ((wheelStep > 0 && diffPdf > 0) || (wheelStep < 0 && diffPdf < 0)) ? Math.Sign(diffPdf) * Math.Min(Math.Abs(diffPdf), 60f) : 0f;
+                        PdfView.TargetScrollY = Math.Max(0, Math.Min(maxScroll, PdfView.ScrollY + leadPdf + wheelStep));
+                        PdfView.UpdateSmoothScroll();
                         PdfView.UpdateActivePageFromScroll(ClientSize.Width, ClientSize.Height, 155, 26);
                     }
                     Invalidate();
@@ -3084,10 +3195,18 @@ namespace ZenQOffice.UI
                     if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && e.X >= w - 344 && e.X <= w - 276)
                     {
                         SlidesView.IsNotesPaneOpen = !SlidesView.IsNotesPaneOpen;
+                        if (SlidesView.IsNotesPaneOpen && SlidesView.NotesPaneHeight < 30)
+                        {
+                            SlidesView.NotesPaneHeight = 68;
+                        }
                         if (!SlidesView.IsNotesPaneOpen)
                         {
                             SlidesView.IsEditingSpeakerNotes = false;
                         }
+                        int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
+                        SlidesView.GetEffectiveLayoutMetrics(ClientSize.Width, ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
+                        SlidesView.ClampScroll(canvasW, contentH);
+                        if (SlidesView.InvalidateCallback != null) SlidesView.InvalidateCallback();
                         Invalidate();
                         return;
                     }
@@ -3286,6 +3405,7 @@ namespace ZenQOffice.UI
                 int ribbonH = (Ribbon.CurrentMode == OfficeAppMode.Home) ? 64 : 155;
                 if (e.Y <= ribbonH)
                 {
+                    if (WriterView != null) WriterView.IsSelecting = false;
                     int rTop = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
                     if (e.Y <= rTop && e.Button == MouseButtons.Left && Ribbon != null)
                     {
@@ -3344,11 +3464,37 @@ namespace ZenQOffice.UI
                         }
                     }
 
+                    if (e.Button == MouseButtons.Right && e.Y <= 155 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                    {
+                        ContextMenuStrip rMenu = new ContextMenuStrip();
+                        bool isStandard = (AppSettings.Instance.RibbonStyle == RibbonStyle.Standard);
+                        
+                        ToolStripMenuItem miStd = new ToolStripMenuItem("Tiêu chuẩn (Chuẩn Microsoft Office)", null, (s, ev) =>
+                        {
+                            AppSettings.Instance.RibbonStyle = RibbonStyle.Standard;
+                            AppSettings.Instance.Save();
+                            Invalidate();
+                        }) { Checked = isStandard };
+
+                        ToolStripMenuItem miIsl = new ToolStripMenuItem("Dạng Đảo (Floating Island)", null, (s, ev) =>
+                        {
+                            AppSettings.Instance.RibbonStyle = RibbonStyle.Island;
+                            AppSettings.Instance.Save();
+                            Invalidate();
+                        }) { Checked = !isStandard };
+
+                        rMenu.Items.Add(new ToolStripLabel("Kiểu thanh Ribbon:"));
+                        rMenu.Items.Add(miStd);
+                        rMenu.Items.Add(miIsl);
+                        rMenu.Show(this, e.Location);
+                        return;
+                    }
+
                     Ribbon.UpdateHover(e.X, e.Y);
                     bool handled = Ribbon.HandleClick(e.X, e.Y, WriterView, this, SlidesView, CalcView, PdfView, PhotoView);
                     SetModeIcon(Ribbon.CurrentMode);
                     PositionAiConfigPanel();
-
+        
                     if (!handled && e.Y <= rTop && e.Button == MouseButtons.Left && !Ribbon.IsDraggingTab && Ribbon.DraggingTabIndex < 1)
                     {
                         ReleaseCapture();
@@ -3675,8 +3821,13 @@ namespace ZenQOffice.UI
             else
             {
                 SlidesView.HandleMouseDown(e.Location, ClientSize.Width, ClientSize.Height, e.Button, this);
+                if (_audienceForm != null && !_audienceForm.IsDisposed)
+                {
+                    _audienceForm.Invalidate();
+                    _audienceForm.Update();
+                }
                 Invalidate();
-                if (_audienceForm != null) _audienceForm.Invalidate();
+                Update();
             }
         }
 
@@ -3956,7 +4107,7 @@ namespace ZenQOffice.UI
                             Cursor.Current = newCur;
                         }
                     }
-                    if (e.Button != MouseButtons.None || SlidesView.ShowRuler || SlidesView.IsDrawingActive || SlidesView.IsPanningCanvas)
+                    if (SlidesView.ShowRuler)
                     {
                         Invalidate();
                     }
@@ -3992,8 +4143,6 @@ namespace ZenQOffice.UI
             else
             {
                 SlidesView.HandleMouseMove(e.Location, ClientSize.Width, ClientSize.Height);
-                Invalidate();
-                if (_audienceForm != null) _audienceForm.Invalidate();
             }
         }
 
@@ -4314,123 +4463,12 @@ namespace ZenQOffice.UI
 
                     if (WriterView.IsEditingHeaderFooter)
                     {
-                        if (e.KeyChar == '\b')
-                        {
-                            if (WriterView.IsEditingHeaderMode)
-                            {
-                                if (WriterView.IsHeaderTextSelected)
-                                {
-                                    if (WriterView.CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
-                                    {
-                                        if (WriterView.ActiveThreeColIndex == 0) WriterView.ThreeColHeaderLeft = "";
-                                        else if (WriterView.ActiveThreeColIndex == 1) WriterView.ThreeColHeaderCenter = "";
-                                        else if (WriterView.ActiveThreeColIndex == 2) WriterView.ThreeColHeaderRight = "";
-                                    }
-                                    else
-                                    {
-                                        WriterView.HeaderTitleText = "";
-                                        WriterView.HeaderText = "";
-                                    }
-                                    WriterView.IsHeaderTextSelected = false;
-                                }
-                                else
-                                {
-                                    if (WriterView.CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
-                                    {
-                                        if (WriterView.ActiveThreeColIndex == 0)
-                                        {
-                                            if (WriterView.ThreeColHeaderLeft == "[Nhập tại đây]") WriterView.ThreeColHeaderLeft = "";
-                                            else if (WriterView.ThreeColHeaderLeft.Length > 0) WriterView.ThreeColHeaderLeft = WriterView.ThreeColHeaderLeft.Substring(0, WriterView.ThreeColHeaderLeft.Length - 1);
-                                        }
-                                        else if (WriterView.ActiveThreeColIndex == 1)
-                                        {
-                                            if (WriterView.ThreeColHeaderCenter == "[Nhập tại đây]") WriterView.ThreeColHeaderCenter = "";
-                                            else if (WriterView.ThreeColHeaderCenter.Length > 0) WriterView.ThreeColHeaderCenter = WriterView.ThreeColHeaderCenter.Substring(0, WriterView.ThreeColHeaderCenter.Length - 1);
-                                        }
-                                        else if (WriterView.ActiveThreeColIndex == 2)
-                                        {
-                                            if (WriterView.ThreeColHeaderRight == "[Nhập tại đây]") WriterView.ThreeColHeaderRight = "";
-                                            else if (WriterView.ThreeColHeaderRight.Length > 0) WriterView.ThreeColHeaderRight = WriterView.ThreeColHeaderRight.Substring(0, WriterView.ThreeColHeaderRight.Length - 1);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        string curT = WriterView.HeaderTitleText;
-                                        if (curT == "TIÊU ĐỀ ĐẦU TRANG" || curT == "[Tiêu đề tài liệu]" || curT == "[Nhập tại đây]")
-                                        {
-                                            WriterView.HeaderTitleText = "";
-                                            WriterView.HeaderText = "";
-                                        }
-                                        else if (WriterView.HeaderTitleText.Length > 0)
-                                        {
-                                            WriterView.HeaderTitleText = WriterView.HeaderTitleText.Substring(0, WriterView.HeaderTitleText.Length - 1);
-                                            WriterView.HeaderText = WriterView.HeaderTitleText;
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (WriterView.FooterText.Length > 0) WriterView.FooterText = WriterView.FooterText.Substring(0, WriterView.FooterText.Length - 1);
-                            }
-                        }
-                        else if (e.KeyChar != '\r')
-                        {
-                            if (WriterView.IsEditingHeaderMode)
-                            {
-                                if (WriterView.IsHeaderTextSelected)
-                                {
-                                    if (WriterView.CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
-                                    {
-                                        if (WriterView.ActiveThreeColIndex == 0) WriterView.ThreeColHeaderLeft = e.KeyChar.ToString();
-                                        else if (WriterView.ActiveThreeColIndex == 1) WriterView.ThreeColHeaderCenter = e.KeyChar.ToString();
-                                        else if (WriterView.ActiveThreeColIndex == 2) WriterView.ThreeColHeaderRight = e.KeyChar.ToString();
-                                    }
-                                    else
-                                    {
-                                        WriterView.HeaderTitleText = e.KeyChar.ToString();
-                                        WriterView.HeaderText = WriterView.HeaderTitleText;
-                                    }
-                                    WriterView.IsHeaderTextSelected = false;
-                                }
-                                else
-                                {
-                                    if (WriterView.CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
-                                    {
-                                        if (WriterView.ActiveThreeColIndex == 0)
-                                        {
-                                            if (WriterView.ThreeColHeaderLeft == "[Nhập tại đây]") WriterView.ThreeColHeaderLeft = "";
-                                            WriterView.ThreeColHeaderLeft += e.KeyChar;
-                                        }
-                                        else if (WriterView.ActiveThreeColIndex == 1)
-                                        {
-                                            if (WriterView.ThreeColHeaderCenter == "[Nhập tại đây]") WriterView.ThreeColHeaderCenter = "";
-                                            WriterView.ThreeColHeaderCenter += e.KeyChar;
-                                        }
-                                        else if (WriterView.ActiveThreeColIndex == 2)
-                                        {
-                                            if (WriterView.ThreeColHeaderRight == "[Nhập tại đây]") WriterView.ThreeColHeaderRight = "";
-                                            WriterView.ThreeColHeaderRight += e.KeyChar;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        string curT = WriterView.HeaderTitleText;
-                                        if (curT == "TIÊU ĐỀ ĐẦU TRANG" || curT == "[Tiêu đề tài liệu]" || curT == "[Nhập tại đây]")
-                                        {
-                                            WriterView.HeaderTitleText = "";
-                                            WriterView.HeaderText = "";
-                                        }
-                                        WriterView.HeaderTitleText += e.KeyChar;
-                                        WriterView.HeaderText = WriterView.HeaderTitleText;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                WriterView.FooterText += e.KeyChar;
-                            }
-                        }
+                        WriterView.HandleChar(e.KeyChar);
+                        MarkActiveTabModified();
+                        ResetCursorBlink();
+                        e.Handled = true;
+                        Invalidate();
+                        return;
                     }
                     else if (WriterView.ActiveChart != null)
                     {
@@ -4498,27 +4536,23 @@ namespace ZenQOffice.UI
                             string nodeTxt = sh.GetNodeText(targetNode);
                             int cur = Math.Max(0, Math.Min(sh.TextCursorIndex, nodeTxt.Length));
 
-                            if (e.KeyChar == (char)Keys.Back)
+                            if (e.KeyChar == (char)Keys.Back || e.KeyChar == '\r' || e.KeyChar == '\n')
                             {
-                                if (cur > 0 && nodeTxt.Length > 0)
-                                {
-                                    nodeTxt = nodeTxt.Substring(0, cur - 1) + nodeTxt.Substring(cur);
-                                    sh.SetNodeText(targetNode, nodeTxt);
-                                    sh.TextCursorIndex = cur - 1;
-                                }
+                                e.Handled = true;
+                                return;
                             }
-                            else if (!char.IsControl(e.KeyChar) || e.KeyChar == '\r' || e.KeyChar == '\n')
+                            else if (!char.IsControl(e.KeyChar))
                             {
-                                string ins = (e.KeyChar == '\r' ? "\n" : e.KeyChar.ToString());
+                                string ins = e.KeyChar.ToString();
                                 nodeTxt = nodeTxt.Insert(cur, ins);
                                 sh.SetNodeText(targetNode, nodeTxt);
                                 sh.TextCursorIndex = cur + ins.Length;
+                                WriterView.SyncShapeTagInDocument(sh);
+                                MarkActiveTabModified();
+                                e.Handled = true;
+                                Invalidate();
+                                return;
                             }
-                            WriterView.SyncShapeTagInDocument(sh);
-                            MarkActiveTabModified();
-                            e.Handled = true;
-                            Invalidate();
-                            return;
                         }
 
                         if (!sh.IsEditingText)
@@ -4716,8 +4750,13 @@ namespace ZenQOffice.UI
                     return;
                 }
                 SlidesView.HandleKeyDown(e.KeyCode);
+                if (_audienceForm != null && !_audienceForm.IsDisposed)
+                {
+                    _audienceForm.Invalidate();
+                    _audienceForm.Update();
+                }
                 Invalidate();
-                if (_audienceForm != null) _audienceForm.Invalidate();
+                Update();
             }
             else
             {
@@ -5380,7 +5419,13 @@ namespace ZenQOffice.UI
                             }
                             else
                             {
-                                if (Ribbon.CurrentMode == OfficeAppMode.Writer) WriterView.Copy();
+                                if (Ribbon.CurrentMode == OfficeAppMode.Writer)
+                                {
+                                    if (WriterView.IsEditingHeaderFooter)
+                                        WriterView.HandleKeyDown(e.KeyData, Ribbon, ClientSize.Height);
+                                    else
+                                        WriterView.Copy();
+                                }
                                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                                 {
                                     if (SlidesView.IsEditingSpeakerNotes) SlidesView.HandleKeyDown(Keys.C);
@@ -5413,7 +5458,10 @@ namespace ZenQOffice.UI
                         case Keys.X:
                             if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                             {
-                                WriterView.Cut();
+                                if (WriterView.IsEditingHeaderFooter)
+                                    WriterView.HandleKeyDown(e.KeyData, Ribbon, ClientSize.Height);
+                                else
+                                    WriterView.Cut();
                                 MarkActiveTabModified();
                             }
                             else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
@@ -5447,7 +5495,10 @@ namespace ZenQOffice.UI
                             {
                                 if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                                 {
-                                    WriterView.Paste();
+                                    if (WriterView.IsEditingHeaderFooter)
+                                        WriterView.HandleKeyDown(e.KeyData, Ribbon, ClientSize.Height);
+                                    else
+                                        WriterView.Paste();
                                     MarkActiveTabModified();
                                 }
                                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
@@ -5534,8 +5585,15 @@ namespace ZenQOffice.UI
                             }
                             if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                             {
-                                WriterView.SelectAll();
-                                WriterView.UpdateRibbonState(Ribbon);
+                                if (WriterView.IsEditingHeaderFooter)
+                                {
+                                    WriterView.IsHeaderTextSelected = true;
+                                }
+                                else
+                                {
+                                    WriterView.SelectAll();
+                                    WriterView.UpdateRibbonState(Ribbon);
+                                }
                             }
                             else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
                             {
@@ -5555,7 +5613,7 @@ namespace ZenQOffice.UI
                             }
                             else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView.SelectedShape != null)
                             {
-                                SlidesView.SelectedShape.Bold = !SlidesView.SelectedShape.Bold;
+                                SlidesView.ToggleSelectionBold();
                             }
                             Invalidate();
                             return;
@@ -5571,7 +5629,7 @@ namespace ZenQOffice.UI
                             }
                             else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView.SelectedShape != null)
                             {
-                                SlidesView.SelectedShape.Italic = !SlidesView.SelectedShape.Italic;
+                                SlidesView.ToggleSelectionItalic();
                             }
                             Invalidate();
                             return;
@@ -5587,7 +5645,7 @@ namespace ZenQOffice.UI
                             }
                             else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView.SelectedShape != null)
                             {
-                                SlidesView.SelectedShape.Underline = !SlidesView.SelectedShape.Underline;
+                                SlidesView.ToggleSelectionUnderline();
                             }
                             Invalidate();
                             return;
@@ -5907,6 +5965,14 @@ namespace ZenQOffice.UI
                         case Keys.Home:
                             if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null)
                             {
+                                if (WriterView.IsEditingHeaderFooter)
+                                {
+                                    WriterView.HandleKeyDown(Keys.Home, Ribbon, ClientSize.Height);
+                                    ResetCursorBlink();
+                                    Invalidate();
+                                    e.Handled = true;
+                                    return;
+                                }
                                 WriterView.CursorPosition = 0;
                                 if (e.Shift)
                                 {
@@ -5928,6 +5994,14 @@ namespace ZenQOffice.UI
                         case Keys.End:
                             if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null)
                             {
+                                if (WriterView.IsEditingHeaderFooter)
+                                {
+                                    WriterView.HandleKeyDown(Keys.End, Ribbon, ClientSize.Height);
+                                    ResetCursorBlink();
+                                    Invalidate();
+                                    e.Handled = true;
+                                    return;
+                                }
                                 WriterView.CursorPosition = WriterView.PieceTable.Length;
                                 if (e.Shift)
                                 {
@@ -6015,6 +6089,18 @@ namespace ZenQOffice.UI
 
                 if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                 {
+                    if (WriterView.IsEditingHeaderFooter)
+                    {
+                        ResetCursorBlink();
+                        bool hfHandled = WriterView.HandleKeyDown(e.KeyData, Ribbon, ClientSize.Height);
+                        if (hfHandled)
+                        {
+                            MarkActiveTabModified();
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+
                     // 1. Khi đang chọn Biểu đồ (Chart)
                     if (WriterView.ActiveChart != null)
                     {
@@ -6146,6 +6232,30 @@ namespace ZenQOffice.UI
                                     e.Handled = true;
                                     return;
                                 }
+                                if (e.KeyCode == Keys.Back)
+                                {
+                                    if (nodeCur > 0 && nodeTxt.Length > 0)
+                                    {
+                                        nodeTxt = nodeTxt.Substring(0, nodeCur - 1) + nodeTxt.Substring(nodeCur);
+                                        sh.SetNodeText(targetNode, nodeTxt);
+                                        sh.TextCursorIndex = nodeCur - 1;
+                                        WriterView.SyncShapeTagInDocument(sh);
+                                        MarkActiveTabModified();
+                                        Invalidate();
+                                    }
+                                    else if (nodeTxt.Length == 0)
+                                    {
+                                        sh.IsEditingText = false;
+                                        WriterView.DeleteSelectedSmartArtNode(sh);
+                                        sh.IsEditingText = true;
+                                        string prevTxt = sh.GetNodeText(sh.SelectedNodeIndex);
+                                        sh.TextCursorIndex = prevTxt.Length;
+                                        MarkActiveTabModified();
+                                        Invalidate();
+                                    }
+                                    e.Handled = true;
+                                    return;
+                                }
                                 if (e.KeyCode == Keys.Delete)
                                 {
                                     if (nodeCur < nodeTxt.Length)
@@ -6153,6 +6263,15 @@ namespace ZenQOffice.UI
                                         nodeTxt = nodeTxt.Substring(0, nodeCur) + nodeTxt.Substring(nodeCur + 1);
                                         sh.SetNodeText(targetNode, nodeTxt);
                                         WriterView.SyncShapeTagInDocument(sh);
+                                        MarkActiveTabModified();
+                                        Invalidate();
+                                    }
+                                    else if (nodeTxt.Length == 0)
+                                    {
+                                        sh.IsEditingText = false;
+                                        WriterView.DeleteSelectedSmartArtNode(sh);
+                                        sh.IsEditingText = true;
+                                        sh.TextCursorIndex = 0;
                                         MarkActiveTabModified();
                                         Invalidate();
                                     }
@@ -6197,8 +6316,18 @@ namespace ZenQOffice.UI
                                     sh.IsEditingText = false;
                                     if (sh.SubShapeRelativeBounds != null && sh.SubShapeRelativeBounds.Count > 0)
                                     {
-                                        sh.SelectedNodeIndex = (targetNode + 1) % sh.SubShapeRelativeBounds.Count;
+                                        if (e.Shift)
+                                        {
+                                            sh.SelectedNodeIndex = (targetNode - 1 + sh.SubShapeRelativeBounds.Count) % sh.SubShapeRelativeBounds.Count;
+                                        }
+                                        else
+                                        {
+                                            sh.SelectedNodeIndex = (targetNode + 1) % sh.SubShapeRelativeBounds.Count;
+                                        }
                                     }
+                                    sh.IsEditingText = true;
+                                    string curNText = sh.GetNodeText(sh.SelectedNodeIndex);
+                                    sh.TextCursorIndex = curNText.Length;
                                     Invalidate();
                                     e.Handled = true;
                                     return;
@@ -7795,8 +7924,13 @@ namespace ZenQOffice.UI
                         if (SlidesView != null && SlidesView.IsPresenting)
                         {
                             SlidesView.AdvancePresenterStep();
+                            if (_audienceForm != null && !_audienceForm.IsDisposed)
+                            {
+                                _audienceForm.Invalidate();
+                                _audienceForm.Update();
+                            }
                             Invalidate();
-                            if (_audienceForm != null) _audienceForm.Invalidate();
+                            Update();
                             return true;
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null && SlidesView.Presentation != null)
@@ -7815,8 +7949,13 @@ namespace ZenQOffice.UI
                         if (SlidesView != null && SlidesView.IsPresenting)
                         {
                             SlidesView.PreviousPresenterStep();
+                            if (_audienceForm != null && !_audienceForm.IsDisposed)
+                            {
+                                _audienceForm.Invalidate();
+                                _audienceForm.Update();
+                            }
                             Invalidate();
-                            if (_audienceForm != null) _audienceForm.Invalidate();
+                            Update();
                             return true;
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Slides && SlidesView != null)
@@ -8076,12 +8215,18 @@ namespace ZenQOffice.UI
             System.Drawing.Drawing2D.SmoothingMode oldSm = g.SmoothingMode;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            // Soft shadow + dark translucent vertical pill dock
-            using (SolidBrush shadow = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+            // Soft multi-layer drop shadow + dark translucent vertical pill dock ('đen mờ')
+            int[] barShadowAlphas = new int[] { 22, 14, 7, 3 };
+            for (int si = 0; si < barShadowAlphas.Length; si++)
+            {
+                using (SolidBrush sh = new SolidBrush(Color.FromArgb(barShadowAlphas[si], 0, 0, 0)))
+                {
+                    g.FillRectangle(sh, barX - si, barY + 1 + si, barW + si * 2, barH + si);
+                }
+            }
             using (SolidBrush pillBg = new SolidBrush(Color.FromArgb(238, 15, 23, 42)))
             using (Pen pillBorder = new Pen(Color.FromArgb(90, 148, 163, 184), 1f))
             {
-                g.FillRectangle(shadow, barX + 2, barY + 3, barW, barH);
                 g.FillRectangle(pillBg, _touchBarBounds);
                 g.DrawRectangle(pillBorder, _touchBarBounds);
             }
@@ -8230,12 +8375,18 @@ namespace ZenQOffice.UI
             System.Drawing.Drawing2D.SmoothingMode oldSm = g.SmoothingMode;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            // Soft shadow + dark translucent vertical palette dock
-            using (SolidBrush shadow = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+            // Soft multi-layer drop shadow + dark translucent vertical palette dock ('đen mờ')
+            int[] palShadowAlphas = new int[] { 22, 14, 7, 3 };
+            for (int si = 0; si < palShadowAlphas.Length; si++)
+            {
+                using (SolidBrush sh = new SolidBrush(Color.FromArgb(palShadowAlphas[si], 0, 0, 0)))
+                {
+                    g.FillRectangle(sh, palX - si, palY + 1 + si, palW + si * 2, palH + si);
+                }
+            }
             using (SolidBrush pillBg = new SolidBrush(Color.FromArgb(238, 15, 23, 42)))
             using (Pen pillBorder = new Pen(Color.FromArgb(90, 148, 163, 184), 1f))
             {
-                g.FillRectangle(shadow, palX + 2, palY + 3, palW, palH);
                 g.FillRectangle(pillBg, _inkPaletteBounds);
                 g.DrawRectangle(pillBorder, _inkPaletteBounds);
             }

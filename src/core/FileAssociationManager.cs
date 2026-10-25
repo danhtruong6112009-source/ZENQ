@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -173,7 +173,7 @@ namespace ZenQOffice.Core
                 {
                     if (appKey != null)
                     {
-                        appKey.SetValue("FriendlyAppName", "ZenQ Office Suite");
+                        appKey.SetValue("FriendlyAppName", "ZenQ Office");
                         appKey.SetValue("ApplicationCompany", "NextGenEduSpace Studio");
                         appKey.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office");
                         using (RegistryKey iconKey = appKey.CreateSubKey("DefaultIcon"))
@@ -211,7 +211,7 @@ namespace ZenQOffice.Core
                 {
                     if (capKey != null)
                     {
-                        capKey.SetValue("ApplicationName", "ZenQ Office Suite");
+                        capKey.SetValue("ApplicationName", "ZenQ Office");
                         capKey.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office (Writer, Calc, Slides, PDF)");
 
                         using (RegistryKey faKey = capKey.CreateSubKey("FileAssociations"))

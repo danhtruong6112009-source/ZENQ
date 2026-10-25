@@ -315,3 +315,50 @@ Triển khai thanh điều khiển thuộc tính phía trên khi chọn công c�
 ### Kiểm thử và đóng gói
 - [ ] Dự án biên dịch thành công 0 lỗi với lệnh `dotnet build ZenQOffice.csproj`.
 - [ ] Tệp thực thi `ZenQOffice.exe` và các thư viện liên quan được đồng bộ ra thư mục gốc để người dùng kiểm tra ngay lập tức.
+
+
+## 2026-10-21T14:28:44Z
+
+This is a single self-contained fix; keep it small and focused.
+
+Working directory: c:\Users\Danh\Desktop\genofficepy
+Integrity mode: development
+
+## Project Overview
+Fix document pagination and formatting fidelity in ZenQ Office to match Microsoft Word for the test document C:\Users\Danh\Downloads\thuvienhoclieu.com-Bai-tap-chuyen-sau-Anh-12-Global-Unit-2-A-Multicultural-World.docx. Eliminate table row jumping across zoom levels, refactor Header/Footer to support multi-color rich text runs (e.g. blue "thuvienhoclieu" and red ".com", and "Trang 1" with proper colors and page number replacement), and ensure accurate table alignment.
+
+## Verification Resources
+- Test document: C:\Users\Danh\Downloads\thuvienhoclieu.com-Bai-tap-chuyen-sau-Anh-12-Global-Unit-2-A-Multicultural-World.docx
+- Build script: build_setup.bat (outputs ZenQOffice-Setup.exe and ZenQOffice.exe)
+
+## Requirements
+
+### R1. Zoom-Invariant Table Pagination
+- The document pagination (page breaks and table row breaks) must be completely identical across all zoom levels (40% to 400%), exactly matching Microsoft Word.
+- In the vocabulary table of the test document, rows 0..41 (header row + vocab items 1 to 41) must strictly reside on Page 1 at all zoom levels.
+- Rows 42 ("42.confusion") and 43 ("43.anxiety") must strictly break to Page 2 at all zoom levels. Zooming in or out must NEVER cause rows to jump between pages.
+
+### R2. Rich Multi-Run Header & Footer Model & Rendering
+- Refactor Header and Footer from a flat single-color string to a rich multi-run structure (e.g., List<DocCellParagraph> or List<DocTextRun>) that preserves individual run properties: text, font family, font size, bold, italic, and color.
+- In FormatHandlers.cs: Parse all runs inside <w:hdr> and <w:ftr> preserving their individual <w:color> and styling.
+- Header Rendering: Render multiple runs with their individual colors (e.g., "thuvienhoclieu" in #00B0F0 blue and ".com" in #FF0000 red), correctly aligned (e.g. centered).
+- Footer Rendering: Support multiple colored runs and dynamic page number fields. Preserve the full text "Trang {PAGE}" (where "Trang" is red and the page number is blue) rather than extracting only a bare number.
+- Dynamic replacement of {PAGE} and {NUMPAGES} must update per page without destroying the surrounding run formatting.
+
+### R3. Table Margin & Right-Edge Alignment
+- Table cell margins (w:tblCellMar: top, bottom, left, right) and table body width must align with document margins without overflowing or clipping.
+
+## Acceptance Criteria
+
+### Pagination & Zoom Stability
+- [ ] At 40%, 100%, 150%, and 200% zoom, Page 1 ends at row 41; rows 42 and 43 are on Page 2.
+- [ ] Zooming in or out never causes table rows to jump between pages.
+
+### Header/Footer Fidelity
+- [ ] Header displays "thuvienhoclieu" in blue (#00B0F0) and ".com" in red (#FF0000) centered at top of page.
+- [ ] Footer displays "thuvienhoclieu.com" on the left and "Trang 1" (with "Trang" in red and "1" in blue) on the right.
+- [ ] Page numbers dynamically increment across pages while preserving prefix text and colors.
+
+### Build & Compilation
+- [ ] Project compiles with 0 errors via dotnet build ZenQOffice.csproj.
+- [ ] build_setup.bat succeeds and generates ZenQOffice-Setup.exe.

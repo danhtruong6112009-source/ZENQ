@@ -12,7 +12,7 @@ namespace ZenQOffice.UI
 {
     /// <summary>
     /// Trang Tệp (Backstage View) chuẩn Microsoft Office 365 (PowerPoint, Excel, Word),
-    /// tích hợp bộ chọn đa dạng tỷ lệ trình chiếu chuẩn Canva (16:9, 4:3, A4, FB, Insta, TikTok...)
+    /// tích hợp bộ chọn đa dạng tỷ lệ trình chiếu đa năng (16:9, 4:3, A4, FB, Insta, TikTok...)
     /// kèm chức năng "Tùy chỉnh" kích thước linh hoạt bằng pixel, cm, mm, inch.
     /// Toàn bộ đồ họa sử dụng Vector 2D khử răng cưa mượt mà và Fluent Vector Icons.
     /// </summary>
@@ -32,7 +32,7 @@ namespace ZenQOffice.UI
         private int _lastWidth = 1200;
         private int _lastHeight = 800;
 
-        // Trình chiếu chuẩn Canva: Kích thước & Tùy chỉnh
+        // Trình chiếu Slides: Kích thước & Tùy chỉnh
         public bool ShowCustomSizePanel { get; set; } = false; // "bấm vô chữ tuỳ chỉnh nó mới hiện"
         public string CustomWidthText { get; set; } = "1920";
         public string CustomHeightText { get; set; } = "1080";
@@ -69,6 +69,7 @@ namespace ZenQOffice.UI
         private RectangleF _searchBoxBounds = RectangleF.Empty;
         private RectangleF _browseBtnBounds = RectangleF.Empty;
         private RectangleF _optionsBtnBounds = RectangleF.Empty;
+        private RectangleF _feedbackBtnBounds = RectangleF.Empty;
 
         // Custom size panel bounds
         private RectangleF _customPanelBounds = RectangleF.Empty;
@@ -78,7 +79,7 @@ namespace ZenQOffice.UI
         private readonly List<RectangleF> _quickRatioBtnBounds = new List<RectangleF>();
         private RectangleF _createCustomBtnBounds = RectangleF.Empty;
 
-        // Định nghĩa các tỷ lệ Canva cho Slides
+        // Định nghĩa các tỷ lệ cho Slides
         public struct SlideRatioPreset
         {
             public string Title;
@@ -145,6 +146,7 @@ namespace ZenQOffice.UI
             FocusedInputIndex = -1;
             if (_appForm != null)
             {
+                _appForm.SlidesView?.HideSearchBox();
                 _appForm.Invalidate();
             }
         }
@@ -197,7 +199,8 @@ namespace ZenQOffice.UI
             int prevInt = (int)Math.Round(SmoothScrollY);
             int targetInt = (int)TargetScrollY;
 
-            if (prevInt == targetInt)
+            float diff = TargetScrollY - SmoothScrollY;
+            if (Math.Abs(diff) <= 1.5f || prevInt == targetInt)
             {
                 if (SmoothScrollY != TargetScrollY)
                 {
@@ -206,21 +209,10 @@ namespace ZenQOffice.UI
                 return false;
             }
 
-            float diff = TargetScrollY - SmoothScrollY;
-            float step = diff * 0.25f;
-            float maxStep = 80f;
-            if (Math.Abs(step) > maxStep) step = Math.Sign(step) * maxStep;
-
+            float step = diff * 0.45f;
+            if (Math.Abs(step) < 2.0f) step = Math.Sign(diff) * Math.Min(Math.Abs(diff), 2.0f);
             float nextSmooth = SmoothScrollY + step;
-            int nextInt = (int)Math.Round(nextSmooth);
-
-            if (nextInt == prevInt)
-            {
-                nextInt = prevInt + Math.Sign(diff);
-                nextSmooth = nextInt;
-            }
-
-            if ((diff > 0 && nextInt >= targetInt) || (diff < 0 && nextInt <= targetInt))
+            if (Math.Abs(TargetScrollY - nextSmooth) <= 1.5f)
             {
                 SmoothScrollY = TargetScrollY;
             }
@@ -287,6 +279,10 @@ namespace ZenQOffice.UI
 
         public void Draw(Graphics g, int width, int height)
         {
+            if (_appForm != null)
+            {
+                _appForm.SlidesView?.HideSearchBox();
+            }
             _lastWidth = width;
             _lastHeight = height;
 
@@ -417,6 +413,13 @@ namespace ZenQOffice.UI
                     curItemY += 40f;
                 }
 
+                // Mục "Báo lỗi & Góp ý" ghim ngay trên Tùy chọn ở góc dưới Sidebar
+                _feedbackBtnBounds = new RectangleF(0, height - 88f, sidebarWidth, 38f);
+                bool isHoverFeedback = (HoverSidebarIndex == 101);
+                if (isHoverFeedback) g.FillRectangle(hoverBg, _feedbackBtnBounds);
+                FluentIconRenderer.DrawGlyph(g, '\uED15', new Rectangle(20, (int)_feedbackBtnBounds.Y + 9, 20, 20), Color.White, 16f);
+                g.DrawString("Báo lỗi & Góp ý", itemFont, textBrush, 50, _feedbackBtnBounds.Y + 10);
+
                 // Mục "Tùy chọn / Cài đặt" ghim ở góc dưới Sidebar
                 _optionsBtnBounds = new RectangleF(0, height - 46f, sidebarWidth, 38f);
                 bool isHoverOpt = (HoverSidebarIndex == 100);
@@ -512,7 +515,7 @@ namespace ZenQOffice.UI
 
             topY += 34f;
 
-            // Danh sách Thẻ Mẫu / Presets (Chuẩn Canva cho Slides, hoặc Templates cho Word/Excel)
+            // Danh sách Thẻ Mẫu / Presets (Chuẩn tỷ lệ cho Slides, hoặc Templates cho Word/Excel)
             _templateCardBounds.Clear();
             float cardW = 126f;
             float cardH = 138f;
@@ -532,13 +535,13 @@ namespace ZenQOffice.UI
 
                     RectangleF cRect = new RectangleF(curCardX, topY, cardW, cardH);
                     _templateCardBounds.Add(cRect);
-                    DrawSlideCanvaCard(g, cRect, SlidePresets[i], HoverTemplateCardIndex == i, themeColor);
+                    DrawSlidePresetCard(g, cRect, SlidePresets[i], HoverTemplateCardIndex == i, themeColor);
                     curCardX += cardW + cardSpacing;
                 }
                 topY += cardH + 16f;
 
                 // ==========================================
-                // BẢNG ĐIỀU KHIỂN TÙY CHỈNH KÍCH THƯỚC (CANVA CUSTOM SIZE PANEL)
+                // BẢNG ĐIỀU KHIỂN TÙY CHỈNH KÍCH THƯỚC (CUSTOM SIZE PANEL)
                 // "bấm vô chữ tuỳ chỉnh nó mới hiện"
                 // ==========================================
                 if (ShowCustomSizePanel)
@@ -633,9 +636,9 @@ namespace ZenQOffice.UI
         }
 
         // ==========================================
-        // VẼ THẺ PRESET TỶ LỆ TRÌNH CHIẾU CANVA
+        // VẼ THẺ PRESET TỶ LỆ TRÌNH CHIẾU
         // ==========================================
-        private void DrawSlideCanvaCard(Graphics g, RectangleF bounds, SlideRatioPreset preset, bool isHover, Color themeColor)
+        private void DrawSlidePresetCard(Graphics g, RectangleF bounds, SlideRatioPreset preset, bool isHover, Color themeColor)
         {
             using (GraphicsPath path = CreateRoundedPath(bounds, 6f))
             using (SolidBrush bgBrush = new SolidBrush(isHover ? Color.FromArgb(248, 250, 252) : Color.White))
@@ -656,7 +659,7 @@ namespace ZenQOffice.UI
 
             if (preset.IsCustom)
             {
-                // Biểu tượng Thước kẻ / Cỡ tùy chỉnh chuẩn Canva
+                // Biểu tượng Thước kẻ / Cỡ tùy chỉnh
                 FluentIconRenderer.DrawGlyph(g, '\uE790', new Rectangle((int)thumbBox.X + (int)thumbBox.Width / 2 - 14, (int)thumbBox.Y + 14, 28, 28), themeColor, 24f);
                 using (Font cFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
                 using (SolidBrush cBr = new SolidBrush(themeColor))
@@ -757,7 +760,7 @@ namespace ZenQOffice.UI
         }
 
         // ==========================================
-        // VẼ BẢNG TÙY CHỈNH KÍCH THƯỚC (CANVA CUSTOM SIZE)
+        // VẼ BẢNG TÙY CHỈNH KÍCH THƯỚC (CUSTOM SIZE)
         // ==========================================
         private void DrawCustomSizePanel(Graphics g, float x, float y, float width, Color themeColor)
         {
@@ -1033,6 +1036,16 @@ namespace ZenQOffice.UI
                 }
             }
 
+            // Click Báo lỗi & Góp ý ở cuối Sidebar (trên Tùy chọn)
+            if (!_feedbackBtnBounds.IsEmpty && _feedbackBtnBounds.Contains(e.Location))
+            {
+                using (var dlg = new BugReportDialogForm(_appForm))
+                {
+                    dlg.ShowDialog(_appForm);
+                }
+                return;
+            }
+
             // Click Tùy chọn ở cuối Sidebar
             if (!_optionsBtnBounds.IsEmpty && _optionsBtnBounds.Contains(e.Location))
             {
@@ -1205,7 +1218,8 @@ namespace ZenQOffice.UI
                     break;
                 }
             }
-            if (!_optionsBtnBounds.IsEmpty && _optionsBtnBounds.Contains(e.Location)) HoverSidebarIndex = 100;
+            if (!_feedbackBtnBounds.IsEmpty && _feedbackBtnBounds.Contains(e.Location)) HoverSidebarIndex = 101;
+            else if (!_optionsBtnBounds.IsEmpty && _optionsBtnBounds.Contains(e.Location)) HoverSidebarIndex = 100;
 
             HoverModePillIndex = -1;
             for (int p = 0; p < _modePillBounds.Count; p++)
@@ -1262,9 +1276,11 @@ namespace ZenQOffice.UI
 
         public void OnMouseWheel(MouseEventArgs e)
         {
-            TargetScrollY -= e.Delta * 0.75f;
             int max = GetMaxScroll(_lastHeight, _lastWidth);
-            TargetScrollY = Math.Max(0, Math.Min(max, TargetScrollY));
+            float step = -e.Delta * 0.65f;
+            float diff = TargetScrollY - SmoothScrollY;
+            float lead = ((step > 0 && diff > 0) || (step < 0 && diff < 0)) ? Math.Sign(diff) * Math.Min(Math.Abs(diff), 50f) : 0f;
+            TargetScrollY = Math.Max(0, Math.Min(max, SmoothScrollY + lead + step));
             UpdateSmoothScroll(_lastHeight, _lastWidth);
         }
 

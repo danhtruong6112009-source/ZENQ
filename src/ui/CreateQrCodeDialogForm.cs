@@ -54,6 +54,17 @@ namespace ZenQOffice.UI
             };
             Controls.Add(picPreview);
 
+            Label lblSubtitle = new Label
+            {
+                Text = "✓ Chuẩn quốc tế ISO/IEC 18004 — Quét tức thì bằng Camera điện thoại",
+                Location = new Point(20, 310),
+                Size = new Size(364, 40),
+                TextAlign = ContentAlignment.TopCenter,
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
+            Controls.Add(lblSubtitle);
+
             btnInsert = new Button
             {
                 Text = "Chèn vào trang chiếu",

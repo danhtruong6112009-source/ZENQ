@@ -142,15 +142,15 @@ namespace ZenQOffice.UI
 
             // 5 App Options
             _itemBorders = new Border[5];
-            _itemBorders[0] = CreateItemRow(OfficeAppMode.Writer, "Writer", "Văn bản Word", "DOCX",
+            _itemBorders[0] = CreateItemRow(OfficeAppMode.Writer, "Writer", "Soạn thảo văn bản", "DOCX",
                 Color.FromRgb(37, 99, 235), Color.FromRgb(29, 78, 216),
                 Color.FromRgb(239, 246, 255), Color.FromRgb(191, 219, 254), 0);
 
-            _itemBorders[1] = CreateItemRow(OfficeAppMode.Calc, "Calc", "Bảng tính Excel", "XLSX",
+            _itemBorders[1] = CreateItemRow(OfficeAppMode.Calc, "Calc", "Bảng tính & Dữ liệu", "XLSX",
                 Color.FromRgb(16, 185, 129), Color.FromRgb(5, 150, 105),
                 Color.FromRgb(236, 253, 245), Color.FromRgb(167, 243, 208), 1);
 
-            _itemBorders[2] = CreateItemRow(OfficeAppMode.Slides, "Slides", "Trình chiếu PowerPoint", "PPTX",
+            _itemBorders[2] = CreateItemRow(OfficeAppMode.Slides, "Slides", "Trình chiếu & Thuyết trình", "PPTX",
                 Color.FromRgb(249, 115, 22), Color.FromRgb(217, 70, 239),
                 Color.FromRgb(255, 247, 237), Color.FromRgb(254, 215, 170), 2);
 

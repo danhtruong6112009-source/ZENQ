@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ZenQOffice.Core;
@@ -49,7 +49,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Tùy chọn - ZENQ OFFICE Suite 4.0";
+            this.Text = "Tùy chọn - ZENQ OFFICE 5.8";
             this.Size = new Size(760, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -658,7 +658,7 @@ namespace ZenQOffice.UI
             GroupBox grpAbout = new GroupBox { Text = "Thông tin bản quyền & Đơn vị phát triển", Location = new Point(10, curY), Size = new Size(470, 95), Font = new Font("Segoe UI", 9.25f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             Label lblAbout = new Label
             {
-                Text = "ZENQ OFFICE SUITE - PHIÊN BẢN 5.7 (BUILD 2026)\nPhát triển bởi: NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh\nTối ưu cho Windows 10/11 với hiệu năng Direct2D siêu tốc.",
+                Text = "ZENQ OFFICE - PHIÊN BẢN 5.8 (BUILD 2026)\nPhát triển bởi: NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh\nTối ưu cho Windows 10/11 với hiệu năng Direct2D siêu tốc.",
                 Location = new Point(16, 26),
                 Size = new Size(430, 56),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),

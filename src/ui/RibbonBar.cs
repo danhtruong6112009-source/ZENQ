@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -95,6 +95,10 @@ namespace ZenQOffice.UI
         public int WriterHeaderAlignment { get; set; }
         public int WriterHeaderEvenAlignment { get; set; }
         public string WriterHeaderEvenText { get; set; }
+        public List<DocHeaderFooterRun> WriterHeaderRuns { get; set; }
+        public List<DocHeaderFooterRun> WriterFooterRuns { get; set; }
+        public List<DocHeaderFooterRun> WriterHeaderEvenRuns { get; set; }
+        public List<DocHeaderFooterRun> WriterFooterEvenRuns { get; set; }
         public Dictionary<int, bool> WriterTableFixPositions { get; set; }
         public Dictionary<int, float> WriterParagraphFirstLineIndents { get; set; }
         public Dictionary<int, float> WriterParagraphLeftIndents { get; set; }
@@ -186,6 +190,10 @@ namespace ZenQOffice.UI
             WriterHeaderAlignment = 0;
             WriterHeaderEvenAlignment = 0;
             WriterHeaderEvenText = "";
+            WriterHeaderRuns = new List<DocHeaderFooterRun>();
+            WriterFooterRuns = new List<DocHeaderFooterRun>();
+            WriterHeaderEvenRuns = new List<DocHeaderFooterRun>();
+            WriterFooterEvenRuns = new List<DocHeaderFooterRun>();
             WriterTableFixPositions = new Dictionary<int, bool>();
             WriterParagraphFirstLineIndents = new Dictionary<int, float>();
             WriterParagraphLeftIndents = new Dictionary<int, float>();
@@ -261,6 +269,7 @@ namespace ZenQOffice.UI
         public float CurrentDpiScale { get; set; }
         public int RibbonTopHeight { get; set; }
         public const int RibbonHeight = 155;
+        public int ActualRibbonBottom => (CurrentMode == OfficeAppMode.Home) ? ((RibbonTopHeight > 0) ? RibbonTopHeight : 36) : ((RibbonTopHeight > 0 ? RibbonTopHeight : (int)Math.Round(36f * (CurrentDpiScale > 0 ? CurrentDpiScale : 1.0f))) + (int)Math.Round(28f * (CurrentDpiScale > 0 ? CurrentDpiScale : 1.0f)) + 91);
         public int _lastDocAreaX { get; set; } = 120;
         public int _lastDocAreaW { get; set; } = 800;
 
@@ -273,6 +282,11 @@ namespace ZenQOffice.UI
         public Rectangle DocTabScrollLeftBounds = Rectangle.Empty;
         public Rectangle DocTabScrollRightBounds = Rectangle.Empty;
         public bool IsParentMaximized { get; set; }
+        public event Action StateChanged;
+        public void NotifyStateChanged()
+        {
+            try { StateChanged?.Invoke(); } catch { }
+        }
 
         public bool OnMouseDown(MouseEventArgs e, Form parentForm = null)
         {
@@ -363,6 +377,10 @@ namespace ZenQOffice.UI
         public int Alignment { get; set; } // 0: Left, 1: Center, 2: Right, 3: Justify
         public string ActiveStyle { get; set; }
         public int StyleGalleryScrollOffset { get; set; } = 0;
+        private static readonly string[] StyleGalleryNames = new string[] {
+            "Normal", "No Spacing", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle",
+            "Heading 4", "Subtle Emphasis", "Emphasis", "Strong", "Quote", "Intense Quote"
+        };
         public bool ShowFormattingMarks { get; set; }
         public bool IsFormatPainterActive { get; set; }
 
@@ -1140,6 +1158,10 @@ namespace ZenQOffice.UI
                 tab.WriterHeaderAlignment = writerView.HeaderAlignment;
                 tab.WriterHeaderEvenAlignment = writerView.HeaderEvenAlignment;
                 tab.WriterHeaderEvenText = writerView.HeaderEvenText;
+                tab.WriterHeaderRuns = writerView.HeaderRuns != null ? new List<DocHeaderFooterRun>(writerView.HeaderRuns) : new List<DocHeaderFooterRun>();
+                tab.WriterFooterRuns = writerView.FooterRuns != null ? new List<DocHeaderFooterRun>(writerView.FooterRuns) : new List<DocHeaderFooterRun>();
+                tab.WriterHeaderEvenRuns = writerView.HeaderEvenRuns != null ? new List<DocHeaderFooterRun>(writerView.HeaderEvenRuns) : new List<DocHeaderFooterRun>();
+                tab.WriterFooterEvenRuns = writerView.FooterEvenRuns != null ? new List<DocHeaderFooterRun>(writerView.FooterEvenRuns) : new List<DocHeaderFooterRun>();
                 tab.WriterTableFixPositions = writerView.TableFixPositions != null ? new Dictionary<int, bool>(writerView.TableFixPositions) : new Dictionary<int, bool>();
                 tab.WriterParagraphFirstLineIndents = writerView.ParagraphFirstLineIndents != null ? new Dictionary<int, float>(writerView.ParagraphFirstLineIndents) : new Dictionary<int, float>();
                 tab.WriterParagraphLeftIndents = writerView.ParagraphLeftIndents != null ? new Dictionary<int, float>(writerView.ParagraphLeftIndents) : new Dictionary<int, float>();
@@ -1283,6 +1305,10 @@ namespace ZenQOffice.UI
                 writerView.HeaderAlignment = tab.WriterHeaderAlignment;
                 writerView.HeaderEvenAlignment = tab.WriterHeaderEvenAlignment;
                 writerView.HeaderEvenText = tab.WriterHeaderEvenText;
+                writerView.HeaderRuns = tab.WriterHeaderRuns != null ? new List<DocHeaderFooterRun>(tab.WriterHeaderRuns) : new List<DocHeaderFooterRun>();
+                writerView.FooterRuns = tab.WriterFooterRuns != null ? new List<DocHeaderFooterRun>(tab.WriterFooterRuns) : new List<DocHeaderFooterRun>();
+                writerView.HeaderEvenRuns = tab.WriterHeaderEvenRuns != null ? new List<DocHeaderFooterRun>(tab.WriterHeaderEvenRuns) : new List<DocHeaderFooterRun>();
+                writerView.FooterEvenRuns = tab.WriterFooterEvenRuns != null ? new List<DocHeaderFooterRun>(tab.WriterFooterEvenRuns) : new List<DocHeaderFooterRun>();
                 writerView.TableFixPositions = tab.WriterTableFixPositions != null ? new Dictionary<int, bool>(tab.WriterTableFixPositions) : new Dictionary<int, bool>();
                 writerView.ParagraphFirstLineIndents = tab.WriterParagraphFirstLineIndents != null ? new Dictionary<int, float>(tab.WriterParagraphFirstLineIndents) : new Dictionary<int, float>();
                 writerView.ParagraphLeftIndents = tab.WriterParagraphLeftIndents != null ? new Dictionary<int, float>(tab.WriterParagraphLeftIndents) : new Dictionary<int, float>();
@@ -1740,7 +1766,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawInteractiveButton(Graphics g, Rectangle rect, bool isActive, int radius = 2)
+        private void DrawInteractiveButton(Graphics g, Rectangle rect, bool isActive, int radius = 4)
         {
             if (!ActiveDropdownBounds.IsEmpty && ActiveDropdownBounds.IntersectsWith(rect))
             {
@@ -1749,66 +1775,44 @@ namespace ZenQOffice.UI
             bool isHover = IsHovering(rect);
             if (isActive && isHover)
             {
-                using (SolidBrush b = new SolidBrush(Color.FromArgb(215, 218, 223)))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(204, 226, 244))) // #CCE2F4
                     FillRoundedRectangle(g, b, rect, radius);
-                using (Pen p = new Pen(Color.FromArgb(155, 158, 164), 1.0f))
+                using (Pen p = new Pen(Color.FromArgb(98, 148, 196), 1.0f))
                     DrawRoundedRectangle(g, p, rect, radius);
             }
             else if (isActive)
             {
-                using (SolidBrush b = new SolidBrush(Color.FromArgb(226, 228, 232)))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(216, 234, 248))) // #D8EAF8 Fluent checked
                     FillRoundedRectangle(g, b, rect, radius);
-                using (Pen p = new Pen(Color.FromArgb(175, 178, 184), 1.0f))
+                using (Pen p = new Pen(Color.FromArgb(123, 168, 212), 1.0f)) // #7BA8D4
                     DrawRoundedRectangle(g, p, rect, radius);
             }
             else if (isHover)
             {
-                using (SolidBrush b = new SolidBrush(Color.FromArgb(238, 240, 243)))
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(237, 243, 249))) // #EDF3F9 Fluent hover
                     FillRoundedRectangle(g, b, rect, radius);
-                using (Pen p = new Pen(Color.FromArgb(205, 208, 214), 1.0f))
+                using (Pen p = new Pen(Color.FromArgb(200, 216, 232), 1.0f)) // #C8D8E8
                     DrawRoundedRectangle(g, p, rect, radius);
             }
         }
 
         private void DrawAlignmentIcon(Graphics g, int x, int y, int alignType, Color color)
         {
-            using (Pen pen = new Pen(Color.FromArgb(89, 89, 89), 1.0f))
+            using (Pen pen = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
             {
-                pen.StartCap = LineCap.Flat;
-                pen.EndCap = LineCap.Flat;
+                float ox = x + 4.0f;
+                float oy = y + 6.0f;
+                float w = 13.0f;
+                float gap = 3.0f;
 
-                float ox = x + 4f;
-                float oy = y + 5.5f;
-                float w = 13f;
-                float gap = 3.2f;
-
-                if (alignType == 0) // Align Left
+                for (int i = 0; i < 4; i++)
                 {
-                    g.DrawLine(pen, ox, oy, ox + w, oy);
-                    g.DrawLine(pen, ox, oy + gap, ox + 8f, oy + gap);
-                    g.DrawLine(pen, ox, oy + gap * 2, ox + w, oy + gap * 2);
-                    g.DrawLine(pen, ox, oy + gap * 3, ox + 10f, oy + gap * 3);
-                }
-                else if (alignType == 1) // Center
-                {
-                    g.DrawLine(pen, ox, oy, ox + w, oy);
-                    g.DrawLine(pen, ox + 2.5f, oy + gap, ox + w - 2.5f, oy + gap);
-                    g.DrawLine(pen, ox, oy + gap * 2, ox + w, oy + gap * 2);
-                    g.DrawLine(pen, ox + 1.5f, oy + gap * 3, ox + w - 1.5f, oy + gap * 3);
-                }
-                else if (alignType == 2) // Align Right
-                {
-                    g.DrawLine(pen, ox, oy, ox + w, oy);
-                    g.DrawLine(pen, ox + 5f, oy + gap, ox + w, oy + gap);
-                    g.DrawLine(pen, ox, oy + gap * 2, ox + w, oy + gap * 2);
-                    g.DrawLine(pen, ox + 3f, oy + gap * 3, ox + w, oy + gap * 3);
-                }
-                else if (alignType == 3) // Justify
-                {
-                    g.DrawLine(pen, ox, oy, ox + w, oy);
-                    g.DrawLine(pen, ox, oy + gap, ox + w, oy + gap);
-                    g.DrawLine(pen, ox, oy + gap * 2, ox + w, oy + gap * 2);
-                    g.DrawLine(pen, ox, oy + gap * 3, ox + w, oy + gap * 3);
+                    float ly = oy + i * gap;
+                    float lw = (i % 2 == 1 && alignType != 3) ? 8.5f : w;
+                    float lx = ox;
+                    if (alignType == 1) lx = ox + (w - lw) / 2.0f;
+                    else if (alignType == 2) lx = ox + (w - lw);
+                    g.DrawLine(pen, lx, ly, lx + lw, ly);
                 }
             }
         }
@@ -1902,48 +1906,48 @@ namespace ZenQOffice.UI
 
         private void DrawPasteIconLarge(Graphics g, float x, float y)
         {
-            // Sleek Office Fluent Clipboard Monoline
-            Color slate = Color.FromArgb(51, 65, 85);
-            Color blue = Color.FromArgb(16, 110, 190);
-            using (Pen slatePen = new Pen(slate, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (Pen linePen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
-            using (Pen bluePen = new Pen(blue, 1.2f))
-            using (SolidBrush paperBg = new SolidBrush(Color.White))
+            // Word warm golden clipboard (#F5BA4B fill, #B06C0C border) + crisp white sheet in front
+            using (SolidBrush bBoard = new SolidBrush(Color.FromArgb(245, 186, 75)))
+            using (Pen pBoard = new Pen(Color.FromArgb(176, 108, 12), 1.0f))
+            using (Pen pSheet = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
             {
-                // Clipboard Board Backing
-                RectangleF boardRect = new RectangleF(x + 6, y + 4, 22, 25);
-                using (GraphicsPath bp = CreateRoundedRectanglePath(Rectangle.Round(boardRect), 3))
-                {
-                    g.FillPath(paperBg, bp);
-                    g.DrawPath(slatePen, bp);
-                }
+                // Clipboard board
+                RectangleF board = new RectangleF(x + 5, y + 5, 18, 22);
+                g.FillRectangle(bBoard, board);
+                g.DrawRectangle(pBoard, board.X, board.Y, board.Width, board.Height);
 
-                // Paper sheet in front
-                RectangleF paperRect = new RectangleF(x + 10, y + 8, 15, 19);
-                g.FillRectangle(paperBg, paperRect);
-                g.DrawRectangle(linePen, paperRect.X, paperRect.Y, paperRect.Width, paperRect.Height);
+                // Top clip (stepped T-clip in white/silver with golden-brown border)
+                PointF[] clip = new PointF[] {
+                    new PointF(x + 10, y + 5),
+                    new PointF(x + 10, y + 3),
+                    new PointF(x + 12, y + 3),
+                    new PointF(x + 12, y + 1.5f),
+                    new PointF(x + 16, y + 1.5f),
+                    new PointF(x + 16, y + 3),
+                    new PointF(x + 18, y + 3),
+                    new PointF(x + 18, y + 5)
+                };
+                g.FillPolygon(Brushes.White, clip);
+                g.DrawPolygon(pBoard, clip);
 
-                // Lines on paper with blue top accent
-                g.DrawLine(bluePen, x + 13, y + 12, x + 21, y + 12);
-                g.DrawLine(linePen, x + 13, y + 16, x + 21, y + 16);
-                g.DrawLine(linePen, x + 13, y + 20, x + 18, y + 20);
-
-                // Top Metal Clip
-                RectangleF clipRect = new RectangleF(x + 13, y + 2, 8, 4);
-                g.FillRectangle(paperBg, clipRect);
-                g.DrawRectangle(slatePen, clipRect.X, clipRect.Y, clipRect.Width, clipRect.Height);
+                // White paper sheet overlapping bottom-right
+                RectangleF sheet = new RectangleF(x + 13, y + 11, 14, 17);
+                g.FillRectangle(Brushes.White, sheet);
+                g.DrawRectangle(pSheet, sheet.X, sheet.Y, sheet.Width, sheet.Height);
             }
         }
 
         private void DrawCutIcon(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (Pen pBlade = new Pen(Color.FromArgb(110, 110, 110), 1.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen pLoop = new Pen(Color.FromArgb(16, 110, 190), 1.1f))
             {
-                // Sleek Crossed Scissors Monoline
-                g.DrawEllipse(p, x + 1.5f, y + 9.5f, 4.5f, 4.5f);
-                g.DrawEllipse(p, x + 8.5f, y + 9.5f, 4.5f, 4.5f);
-                g.DrawLine(p, x + 4, y + 10, x + 12.5f, y + 1.5f);
-                g.DrawLine(p, x + 10.5f, y + 10, x + 2, y + 1.5f);
+                // Blades (top)
+                g.DrawLine(pBlade, x + 5.0f, y + 10.0f, x + 10.5f, y + 1.5f);
+                g.DrawLine(pBlade, x + 9.0f, y + 10.0f, x + 3.5f, y + 1.5f);
+                // Finger loops (bottom)
+                g.DrawEllipse(pLoop, x + 2.0f, y + 9.5f, 4.2f, 4.2f);
+                g.DrawEllipse(pLoop, x + 7.8f, y + 9.5f, 4.2f, 4.2f);
             }
         }
 
@@ -1954,19 +1958,18 @@ namespace ZenQOffice.UI
 
         private void DrawCopyIcon(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (SolidBrush bg = new SolidBrush(Color.White))
+            using (Pen p = new Pen(Color.FromArgb(110, 110, 110), 1.0f))
             {
-                // Back sheet
-                g.DrawLine(p, x + 4.5f, y + 5, x + 4.5f, y + 2);
-                g.DrawLine(p, x + 4.5f, y + 2, x + 13, y + 2);
-                g.DrawLine(p, x + 13, y + 2, x + 13, y + 10);
-                g.DrawLine(p, x + 13, y + 10, x + 10, y + 10);
-
-                // Front sheet
-                RectangleF front = new RectangleF(x + 1.5f, y + 5, 8.5f, 9.5f);
-                g.FillRectangle(bg, front);
-                g.DrawRectangle(p, front.X, front.Y, front.Width, front.Height);
+                // Back page
+                g.FillRectangle(Brushes.White, x + 1.5f, y + 1.5f, 8.0f, 10.0f);
+                g.DrawRectangle(p, x + 1.5f, y + 1.5f, 8.0f, 10.0f);
+                // Front page
+                g.FillRectangle(Brushes.White, x + 4.5f, y + 4.0f, 8.0f, 10.0f);
+                g.DrawRectangle(p, x + 4.5f, y + 4.0f, 8.0f, 10.0f);
+                // Subtle text lines on front page
+                g.DrawLine(p, x + 6.5f, y + 6.5f, x + 10.5f, y + 6.5f);
+                g.DrawLine(p, x + 6.5f, y + 8.5f, x + 10.5f, y + 8.5f);
+                g.DrawLine(p, x + 6.5f, y + 10.5f, x + 9.5f, y + 10.5f);
             }
         }
 
@@ -1988,195 +1991,125 @@ namespace ZenQOffice.UI
         private void DrawHighlightIcon(Graphics g, int x, int y, Color color)
         {
             Color barColor = (CurrentHighlightColor != Color.Transparent && CurrentHighlightColor.A > 0)
-                ? CurrentHighlightColor : Color.FromArgb(255, 235, 59);
+                ? CurrentHighlightColor : Color.FromArgb(255, 242, 0); // Word default yellow #FFF200
 
-            using (Pen pOutline = new Pen(color, 1.0f) { LineJoin = LineJoin.Miter })
-            using (SolidBrush bBody = new SolidBrush(Color.FromArgb(240, 240, 240)))
-            using (SolidBrush bCollar = new SolidBrush(Color.FromArgb(160, 160, 160)))
-            using (SolidBrush bNib = new SolidBrush(barColor))
+            FluentIconRenderer.DrawGlyph(g, "\uE7E6", new Rectangle(x, y - 1, 16, 15), color, 10.5f);
+
+            // Bottom highlight color bar (14x3.5px) aligned with Font Color and Shading
             using (SolidBrush bBar = new SolidBrush(barColor))
             {
-                // Barrel
-                PointF[] barrel = new PointF[] {
-                    new PointF(x + 5.5f, y + 7.5f),
-                    new PointF(x + 10.5f, y + 2.5f),
-                    new PointF(x + 13.5f, y + 5.5f),
-                    new PointF(x + 8.5f, y + 10.5f)
-                };
-                g.FillPolygon(bBody, barrel);
-                g.DrawPolygon(pOutline, barrel);
-
-                // Collar band
-                PointF[] collar = new PointF[] {
-                    new PointF(x + 4.5f, y + 8.5f),
-                    new PointF(x + 5.5f, y + 7.5f),
-                    new PointF(x + 8.5f, y + 10.5f),
-                    new PointF(x + 7.5f, y + 11.5f)
-                };
-                g.FillPolygon(bCollar, collar);
-                g.DrawPolygon(pOutline, collar);
-
-                // Chisel Nib
-                PointF[] nib = new PointF[] {
-                    new PointF(x + 2.0f, y + 11.0f),
-                    new PointF(x + 4.5f, y + 8.5f),
-                    new PointF(x + 7.5f, y + 11.5f),
-                    new PointF(x + 4.0f, y + 13.5f)
-                };
-                g.FillPolygon(bNib, nib);
-                g.DrawPolygon(pOutline, nib);
-
-                // Dropdown chevron
-                DrawDropdownChevron(g, x + 17, y + 7, Color.FromArgb(80, 80, 80));
-
-                // Horizontal color bar underneath
-                g.FillRectangle(bBar, x + 1, y + 16, 14, 3);
+                g.FillRectangle(bBar, x + 1.0f, y + 15.0f, 14.0f, 3.5f);
             }
+
+            DrawDropdownChevron(g, x + 17.5f, y + 10.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawListBulletedIcon(Graphics g, int x, int y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (SolidBrush bDot = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (SolidBrush bDot = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                float[] ys = { y + 2.5f, y + 6.5f, y + 10.5f };
+                float[] ys = { y + 3.0f, y + 7.0f, y + 11.0f };
                 foreach (float dy in ys)
                 {
-                    g.FillEllipse(bDot, x + 0.5f, dy - 0.8f, 2.0f, 2.0f);
-                    g.DrawLine(pLine, x + 4.5f, dy, x + 14f, dy);
+                    g.FillRectangle(bDot, x + 1.0f, dy - 1.0f, 2.2f, 2.2f);
+                    g.DrawLine(pLine, x + 5.5f, dy, x + 14.5f, dy);
                 }
             }
         }
 
         private void DrawListNumberedIcon(Graphics g, int x, int y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Font fNum = new Font("Segoe UI", 5.0f, FontStyle.Regular))
-            using (SolidBrush bNum = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (Font fNum = new Font("Segoe UI", 4.8f, FontStyle.Regular))
+            using (SolidBrush bNum = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                // "1." + line
-                g.DrawString("1.", fNum, bNum, x - 1.5f, y + 0.5f);
-                g.DrawLine(pLine, x + 5.5f, y + 3.5f, x + 14.5f, y + 3.5f);
+                g.DrawString("1", fNum, bNum, x - 0.5f, y - 0.8f);
+                g.DrawLine(pLine, x + 5.5f, y + 3.0f, x + 14.5f, y + 3.0f);
 
-                // "2." + line
-                g.DrawString("2.", fNum, bNum, x - 1.5f, y + 4.5f);
-                g.DrawLine(pLine, x + 5.5f, y + 7.5f, x + 14.5f, y + 7.5f);
+                g.DrawString("2", fNum, bNum, x - 0.5f, y + 3.2f);
+                g.DrawLine(pLine, x + 5.5f, y + 7.0f, x + 14.5f, y + 7.0f);
 
-                // "3." + line
-                g.DrawString("3.", fNum, bNum, x - 1.5f, y + 8.5f);
-                g.DrawLine(pLine, x + 5.5f, y + 11.5f, x + 14.5f, y + 11.5f);
+                g.DrawString("3", fNum, bNum, x - 0.5f, y + 7.2f);
+                g.DrawLine(pLine, x + 5.5f, y + 11.0f, x + 14.5f, y + 11.0f);
             }
         }
 
         private void DrawFormatPainterIcon(Graphics g, float x, float y, Color color)
         {
-            // Sleek Office Fluent Paintbrush Monoline
-            Color blue = Color.FromArgb(16, 110, 190);
-            using (Pen handlePen = new Pen(color, 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (Pen ferrulePen = new Pen(color, 1.1f))
-            using (SolidBrush tipBrush = new SolidBrush(blue))
-            using (SolidBrush ferruleBrush = new SolidBrush(Color.FromArgb(226, 232, 240)))
+            // Word paintbrush: dark handle top-right, white ferrule, golden-orange bristles bottom-left
+            using (Pen pDark = new Pen(color, 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bGold = new SolidBrush(Color.FromArgb(245, 170, 45)))
+            using (Pen pGold = new Pen(Color.FromArgb(196, 118, 12), 1.0f) { LineJoin = LineJoin.Round })
             {
-                // Angled wooden/metal handle
-                g.DrawLine(handlePen, x + 2, y + 13.5f, x + 7, y + 8);
+                // Handle (top-right)
+                g.DrawLine(pDark, x + 13.0f, y + 1.5f, x + 9.0f, y + 5.5f);
                 // Ferrule band
-                RectangleF ferrule = new RectangleF(x + 6.5f, y + 5.5f, 4, 3);
-                g.FillRectangle(ferruleBrush, ferrule);
-                g.DrawRectangle(ferrulePen, ferrule.X, ferrule.Y, ferrule.Width, ferrule.Height);
-                // Brush head with subtle blue tip
-                PointF[] br = new PointF[] {
-                    new PointF(x + 7.5f, y + 5.5f),
-                    new PointF(x + 12, y + 1.5f),
-                    new PointF(x + 14, y + 3.5f),
-                    new PointF(x + 10, y + 7.5f)
+                PointF[] ferrule = new PointF[] {
+                    new PointF(x + 7.5f, y + 4.0f),
+                    new PointF(x + 10.5f, y + 7.0f),
+                    new PointF(x + 9.0f, y + 8.5f),
+                    new PointF(x + 6.0f, y + 5.5f)
                 };
-                g.DrawPolygon(handlePen, br);
-                // Small blue paint accent at tip
-                g.FillEllipse(tipBrush, x + 11.5f, y + 1.5f, 3.5f, 3.5f);
+                g.FillPolygon(Brushes.White, ferrule);
+                g.DrawPolygon(pDark, ferrule);
+                // Golden bristles (bottom-left)
+                PointF[] bristles = new PointF[] {
+                    new PointF(x + 6.0f, y + 5.5f),
+                    new PointF(x + 9.0f, y + 8.5f),
+                    new PointF(x + 5.5f, y + 12.5f),
+                    new PointF(x + 2.0f, y + 9.5f)
+                };
+                g.FillPolygon(bGold, bristles);
+                g.DrawPolygon(pGold, bristles);
             }
         }
 
         private void DrawDropdownChevron(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (Pen p = new Pen(color, 1.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawLine(p, x, y, x + 2.8f, y + 2.8f);
-                g.DrawLine(p, x + 2.8f, y + 2.8f, x + 5.6f, y);
+                g.DrawLine(p, x, y, x + 2.5f, y + 2.5f);
+                g.DrawLine(p, x + 2.5f, y + 2.5f, x + 5.0f, y);
             }
         }
 
         private void DrawLucideAIncrease(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font f = new Font("Segoe UI", 9.5f, FontStyle.Regular))
             using (SolidBrush b = new SolidBrush(color))
-            using (Pen p = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Pen pBlue = new Pen(Color.FromArgb(16, 110, 190), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString("A", f, b, x, y + 1);
-                // Blue Up Arrow ▲
-                g.DrawLine(p, x + 11, y + 5, x + 14, y + 1);
-                g.DrawLine(p, x + 14, y + 1, x + 17, y + 5);
-                g.DrawLine(p, x + 14, y + 1, x + 14, y + 9);
+                g.DrawString("A", f, b, x, y + 1.0f);
+                // Crisp blue upward caret ^ at top-right
+                g.DrawLine(pBlue, x + 11.5f, y + 4.5f, x + 13.5f, y + 2.2f);
+                g.DrawLine(pBlue, x + 13.5f, y + 2.2f, x + 15.5f, y + 4.5f);
             }
         }
 
         private void DrawLucideADecrease(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 8.0f, FontStyle.Bold))
+            using (Font f = new Font("Segoe UI", 8.0f, FontStyle.Regular))
             using (SolidBrush b = new SolidBrush(color))
-            using (Pen p = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Pen pBlue = new Pen(Color.FromArgb(16, 110, 190), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString("A", f, b, x + 1, y + 3);
-                // Blue Down Arrow ▼
-                g.DrawLine(p, x + 11, y + 6, x + 14, y + 10);
-                g.DrawLine(p, x + 14, y + 10, x + 17, y + 6);
-                g.DrawLine(p, x + 14, y + 2, x + 14, y + 10);
+                g.DrawString("A", f, b, x + 1.0f, y + 3.5f);
+                // Crisp blue downward caret v at top-right
+                g.DrawLine(pBlue, x + 10.5f, y + 3.0f, x + 12.5f, y + 5.3f);
+                g.DrawLine(pBlue, x + 12.5f, y + 5.3f, x + 14.5f, y + 3.0f);
             }
         }
 
         private void DrawFluentHighlighter(Graphics g, float x, float y, Color penCol, Color barCol, Color chevronCol)
         {
-            using (Pen pOutline = new Pen(penCol, 1.0f) { LineJoin = LineJoin.Miter })
-            using (SolidBrush bBody = new SolidBrush(Color.FromArgb(240, 240, 240)))
-            using (SolidBrush bCollar = new SolidBrush(Color.FromArgb(160, 160, 160)))
-            using (SolidBrush bNib = new SolidBrush(barCol))
+            FluentIconRenderer.DrawGlyph(g, "\uE7E6", new Rectangle((int)x + 2, (int)y + 1, 16, 15), penCol, 10.5f);
+
             using (SolidBrush bBar = new SolidBrush(barCol))
             {
-                // Barrel tilted 45 degrees
-                PointF[] barrel = new PointF[] {
-                    new PointF(x + 5.5f, y + 7.5f),
-                    new PointF(x + 10.5f, y + 2.5f),
-                    new PointF(x + 13.5f, y + 5.5f),
-                    new PointF(x + 8.5f, y + 10.5f)
-                };
-                g.FillPolygon(bBody, barrel);
-                g.DrawPolygon(pOutline, barrel);
-
-                // Collar band
-                PointF[] collar = new PointF[] {
-                    new PointF(x + 4.5f, y + 8.5f),
-                    new PointF(x + 5.5f, y + 7.5f),
-                    new PointF(x + 8.5f, y + 10.5f),
-                    new PointF(x + 7.5f, y + 11.5f)
-                };
-                g.FillPolygon(bCollar, collar);
-                g.DrawPolygon(pOutline, collar);
-
-                // Chisel Nib
-                PointF[] nib = new PointF[] {
-                    new PointF(x + 2.0f, y + 11.0f),
-                    new PointF(x + 4.5f, y + 8.5f),
-                    new PointF(x + 7.5f, y + 11.5f),
-                    new PointF(x + 4.0f, y + 13.5f)
-                };
-                g.FillPolygon(bNib, nib);
-                g.DrawPolygon(pOutline, nib);
-
-                // Dropdown chevron
-                DrawDropdownChevron(g, (int)(x + 21), (int)(y + 10), chevronCol);
-
-                // Horizontal color bar underneath
-                g.FillRectangle(bBar, x + 2.0f, y + 16.0f, 13.0f, 3.2f);
+                g.FillRectangle(bBar, x + 3.0f, y + 17.0f, 14.0f, 3.5f);
             }
+
+            DrawDropdownChevron(g, x + 20.5f, y + 11.0f, chevronCol);
         }
 
         private void DrawFluentCharacterSpacing(Graphics g, float x, float y, Color col, Color chevronCol)
@@ -2287,220 +2220,243 @@ namespace ZenQOffice.UI
 
         private void DrawLucideCaseChange(Graphics g, float x, float y, Color color)
         {
-            using (Font fCap = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-            using (Font fLow = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (Font f = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (SolidBrush b = new SolidBrush(color))
             {
-                g.DrawString("A", fCap, b, x, y + 1);
-                g.DrawString("a", fLow, b, x + 8, y + 3);
-                DrawDropdownChevron(g, x + 16, y + 9, Color.FromArgb(80, 80, 80));
+                g.DrawString("Aa", f, b, x - 0.5f, y + 2.5f);
+                DrawDropdownChevron(g, x + 15.5f, y + 8.5f, Color.FromArgb(96, 94, 92));
             }
         }
 
         private void DrawLucideClearFormatting(Graphics g, float x, float y)
         {
-            using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Bold))
-            using (SolidBrush b = new SolidBrush(Color.FromArgb(38, 38, 42)))
-            using (Pen p = new Pen(Color.FromArgb(190, 24, 93), 1.1f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (SolidBrush eb = new SolidBrush(Color.FromArgb(236, 72, 153)))
+            using (Font f = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+            using (SolidBrush b = new SolidBrush(Color.FromArgb(59, 58, 57)))
             {
-                g.DrawString("A", f, b, x, y + 1);
-                // Slanted eraser
-                PointF[] er = new PointF[] {
-                    new PointF(x + 9, y + 9),
-                    new PointF(x + 14, y + 4),
-                    new PointF(x + 17, y + 7),
-                    new PointF(x + 12, y + 12)
+                g.DrawString("A", f, b, x, y + 1.0f);
+            }
+            Color plum = Color.FromArgb(148, 33, 116); // Word eraser purple #942174
+            using (Pen pEraser = new Pen(plum, 1.0f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bPink = new SolidBrush(Color.FromArgb(180, 62, 143)))
+            {
+                // White knockout halo so eraser doesn't collide with A's right leg
+                PointF[] halo = new PointF[] {
+                    new PointF(x + 7.5f, y + 11.5f),
+                    new PointF(x + 12.5f, y + 6.5f),
+                    new PointF(x + 16.5f, y + 10.5f),
+                    new PointF(x + 11.5f, y + 15.5f)
                 };
-                g.FillPolygon(eb, er);
-                g.DrawPolygon(p, er);
-                g.DrawLine(p, x + 7, y + 13, x + 15, y + 13);
+                g.FillPolygon(Brushes.White, halo);
+
+                // Top-right pink-purple half of eraser
+                PointF[] topHalf = new PointF[] {
+                    new PointF(x + 10.2f, y + 9.8f),
+                    new PointF(x + 12.8f, y + 7.2f),
+                    new PointF(x + 15.6f, y + 10.0f),
+                    new PointF(x + 13.0f, y + 12.6f)
+                };
+                g.FillPolygon(bPink, topHalf);
+
+                // Bottom-left white half of eraser
+                PointF[] botHalf = new PointF[] {
+                    new PointF(x + 8.4f, y + 11.6f),
+                    new PointF(x + 10.2f, y + 9.8f),
+                    new PointF(x + 13.0f, y + 12.6f),
+                    new PointF(x + 11.2f, y + 14.4f)
+                };
+                g.FillPolygon(Brushes.White, botHalf);
+
+                // Outer contour + middle seam
+                PointF[] fullEraser = new PointF[] {
+                    new PointF(x + 8.4f, y + 11.6f),
+                    new PointF(x + 12.8f, y + 7.2f),
+                    new PointF(x + 15.6f, y + 10.0f),
+                    new PointF(x + 11.2f, y + 14.4f)
+                };
+                g.DrawPolygon(pEraser, fullEraser);
+                g.DrawLine(pEraser, x + 10.2f, y + 9.8f, x + 13.0f, y + 12.6f);
             }
         }
 
         private void DrawLucideBold(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (SolidBrush b = new SolidBrush(color))
             {
-                g.DrawString("B", f, b, x + 2, y + 1);
+                g.DrawString("B", f, b, x + 2.5f, y + 1.5f);
             }
         }
 
         private void DrawLucideItalic(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 9.5f, FontStyle.Italic))
-            using (SolidBrush b = new SolidBrush(color))
+            // Word's Italic icon is a classic serifed Italic 'I' (top bar, slanted stem, bottom bar)
+            using (Pen p = new Pen(color, 1.35f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Pen pBar = new Pen(color, 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                g.DrawString("I", f, b, x + 4, y + 1);
+                g.DrawLine(pBar, x + 6.5f, y + 4.0f, x + 11.5f, y + 4.0f); // top serif
+                g.DrawLine(p, x + 9.3f, y + 4.0f, x + 6.7f, y + 13.0f);    // slanted stem
+                g.DrawLine(pBar, x + 4.5f, y + 13.0f, x + 9.5f, y + 13.0f); // bottom serif
             }
         }
 
         private void DrawLucideUnderline(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Regular))
+            using (Font f = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (SolidBrush b = new SolidBrush(color))
-            using (Pen p = new Pen(color, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen p = new Pen(color, 1.15f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
             {
-                g.DrawString("U", f, b, x + 2, y);
-                g.DrawLine(p, x + 2, y + 14, x + 12, y + 14);
-                DrawDropdownChevron(g, x + 17, y + 9, color);
+                g.DrawString("U", f, b, x + 1.5f, y + 0.5f);
+                g.DrawLine(p, x + 3.0f, y + 14.0f, x + 11.0f, y + 14.0f);
+                DrawDropdownChevron(g, x + 16.0f, y + 8.0f, Color.FromArgb(96, 94, 92));
             }
         }
 
         private void DrawLucideStrikethrough(Graphics g, float x, float y, Color color)
         {
-            using (Font f = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+            using (Font f = new Font("Segoe UI", 8.2f, FontStyle.Regular))
             using (SolidBrush b = new SolidBrush(color))
-            using (Pen p = new Pen(color, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen p = new Pen(color, 1.1f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
             {
-                g.DrawString("ab", f, b, x, y + 1);
-                g.DrawLine(p, x, y + 8, x + 14, y + 8);
+                g.DrawString("ab", f, b, x + 0.5f, y + 1.5f);
+                g.DrawLine(p, x + 1.0f, y + 9.5f, x + 15.5f, y + 9.5f);
             }
         }
 
         private void DrawLucideSubscript(Graphics g, float x, float y, Color color)
         {
-            using (Font fX = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font f2 = new Font("Segoe UI", 6.0f, FontStyle.Bold))
-            using (SolidBrush b = new SolidBrush(color))
+            // Word: Bold dark 'x' on same baseline + Bold Office-blue '2' subscript
+            using (Font fX = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font f2 = new Font("Segoe UI", 6.2f, FontStyle.Bold))
+            using (SolidBrush bX = new SolidBrush(color))
+            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                g.DrawString("x", fX, b, x, y + 1);
-                g.DrawString("2", f2, b, x + 7, y + 7);
+                g.DrawString("x", fX, bX, x + 1.5f, y + 1.5f);
+                g.DrawString("2", f2, b2, x + 8.5f, y + 6.5f);
             }
         }
 
         private void DrawLucideSuperscript(Graphics g, float x, float y, Color color)
         {
-            using (Font fX = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font f2 = new Font("Segoe UI", 6.0f, FontStyle.Bold))
-            using (SolidBrush b = new SolidBrush(color))
+            // Word: Bold dark 'x' on exact same baseline as Subscript + Bold Office-blue '2' superscript
+            using (Font fX = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font f2 = new Font("Segoe UI", 6.2f, FontStyle.Bold))
+            using (SolidBrush bX = new SolidBrush(color))
+            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                g.DrawString("x", fX, b, x, y + 3);
-                g.DrawString("2", f2, b, x + 7, y);
+                g.DrawString("x", fX, bX, x + 1.5f, y + 1.5f);
+                g.DrawString("2", f2, b2, x + 8.5f, y + 0.0f);
             }
         }
 
         private void DrawLucideTextEffects(Graphics g, float x, float y)
         {
-            using (Font f = new Font("Segoe UI", 10.0f, FontStyle.Bold))
-            using (SolidBrush bGlow = new SolidBrush(Color.FromArgb(180, 210, 245)))
-            using (SolidBrush bWhite = new SolidBrush(Color.White))
-            using (Pen pBlue = new Pen(Color.FromArgb(68, 114, 196), 1.0f))
+            // Word Text Effects: hollow white 'A' with crisp blue outline and soft outer glow
+            using (FontFamily ff = new FontFamily("Segoe UI"))
+            using (GraphicsPath gp = new GraphicsPath())
             {
-                // Soft blue outer glow
-                g.DrawString("A", f, bGlow, x + 2.5f, y + 1.5f);
-                // Crisp white body
-                g.DrawString("A", f, bWhite, x + 2.0f, y + 1.0f);
-                // Sharp blue contour
-                using (GraphicsPath gp = new GraphicsPath())
+                gp.AddString("A", ff, (int)FontStyle.Bold, 13.5f, new PointF(x + 1.0f, y + 1.0f), StringFormat.GenericDefault);
+                using (Pen pGlow = new Pen(Color.FromArgb(140, 185, 240), 2.4f) { LineJoin = LineJoin.Round })
+                using (Pen pBlue = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { LineJoin = LineJoin.Round })
                 {
-                    gp.AddString("A", f.FontFamily, (int)FontStyle.Bold, 13.5f, new PointF(x + 1.5f, y + 0.5f), StringFormat.GenericDefault);
+                    g.DrawPath(pGlow, gp);
+                    g.FillPath(Brushes.White, gp);
                     g.DrawPath(pBlue, gp);
                 }
-                DrawDropdownChevron(g, x + 16, y + 9, Color.FromArgb(110, 110, 110));
             }
+            DrawDropdownChevron(g, x + 15.5f, y + 8.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawLucideListTree(Graphics g, float x, float y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Font fLbl = new Font("Segoe UI", 4.5f, FontStyle.Regular))
-            using (SolidBrush bLbl = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (Font fLbl = new Font("Segoe UI", 4.6f, FontStyle.Regular))
+            using (SolidBrush bLbl = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                // Level 1: "1." + line
-                g.DrawString("1.", fLbl, bLbl, x - 1f, y + 0.5f);
-                g.DrawLine(pLine, x + 5f, y + 3.5f, x + 14.5f, y + 3.5f);
+                g.DrawString("1", fLbl, bLbl, x - 0.5f, y - 0.8f);
+                g.DrawLine(pLine, x + 5.0f, y + 3.0f, x + 14.5f, y + 3.0f);
 
-                // Level 2: "a." indented + line
-                g.DrawString("a.", fLbl, bLbl, x + 2f, y + 5f);
-                g.DrawLine(pLine, x + 8f, y + 8f, x + 14.5f, y + 8f);
+                g.DrawString("a", fLbl, bLbl, x + 2.0f, y + 3.2f);
+                g.DrawLine(pLine, x + 7.5f, y + 7.0f, x + 14.5f, y + 7.0f);
 
-                // Level 3: "i." further indented + line
-                g.DrawString("i.", fLbl, bLbl, x + 5f, y + 9.5f);
-                g.DrawLine(pLine, x + 10f, y + 12.5f, x + 14.5f, y + 12.5f);
+                g.DrawString("i", fLbl, bLbl, x + 4.8f, y + 7.2f);
+                g.DrawLine(pLine, x + 9.5f, y + 11.0f, x + 14.5f, y + 11.0f);
             }
         }
 
         private void DrawLucideOutdent(Graphics g, float x, float y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Pen pArrow = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (SolidBrush bArrow = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.0f))
+            using (SolidBrush bArrow = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                // Left-pointing arrow with shaft
-                float arrowY = y + 7.5f;
-                // Shaft
-                g.DrawLine(pArrow, x + 1.5f, arrowY, x + 5.5f, arrowY);
-                // Arrowhead (filled triangle)
+                // Top and bottom full lines, middle 2 indented lines
+                g.DrawLine(pLine, x + 1.0f, y + 2.0f, x + 14.5f, y + 2.0f);
+                g.DrawLine(pLine, x + 7.5f, y + 5.3f, x + 14.5f, y + 5.3f);
+                g.DrawLine(pLine, x + 7.5f, y + 8.6f, x + 14.5f, y + 8.6f);
+                g.DrawLine(pLine, x + 1.0f, y + 12.0f, x + 14.5f, y + 12.0f);
+
+                // Left blue arrow ←
+                float ay = y + 7.0f;
+                g.DrawLine(pArrow, x + 1.5f, ay, x + 5.8f, ay);
                 PointF[] head = new PointF[] {
-                    new PointF(x + 1.0f, arrowY),
-                    new PointF(x + 3.5f, arrowY - 2.5f),
-                    new PointF(x + 3.5f, arrowY + 2.5f)
+                    new PointF(x + 1.0f, ay),
+                    new PointF(x + 3.6f, ay - 2.2f),
+                    new PointF(x + 3.6f, ay + 2.2f)
                 };
                 g.FillPolygon(bArrow, head);
-
-                // 4 text lines on the right
-                g.DrawLine(pLine, x + 7f, y + 2.5f, x + 15f, y + 2.5f);
-                g.DrawLine(pLine, x + 7f, y + 5.8f, x + 15f, y + 5.8f);
-                g.DrawLine(pLine, x + 7f, y + 9.1f, x + 15f, y + 9.1f);
-                g.DrawLine(pLine, x + 7f, y + 12.4f, x + 15f, y + 12.4f);
             }
         }
 
         private void DrawLucideIndent(Graphics g, float x, float y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Pen pArrow = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (SolidBrush bArrow = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.0f))
+            using (SolidBrush bArrow = new SolidBrush(Color.FromArgb(16, 110, 190)))
             {
-                // Right-pointing arrow with shaft
-                float arrowY = y + 7.5f;
-                // Shaft
-                g.DrawLine(pArrow, x + 1.5f, arrowY, x + 5.5f, arrowY);
-                // Arrowhead (filled triangle)
+                g.DrawLine(pLine, x + 1.0f, y + 2.0f, x + 14.5f, y + 2.0f);
+                g.DrawLine(pLine, x + 7.5f, y + 5.3f, x + 14.5f, y + 5.3f);
+                g.DrawLine(pLine, x + 7.5f, y + 8.6f, x + 14.5f, y + 8.6f);
+                g.DrawLine(pLine, x + 1.0f, y + 12.0f, x + 14.5f, y + 12.0f);
+
+                // Right blue arrow →
+                float ay = y + 7.0f;
+                g.DrawLine(pArrow, x + 1.0f, ay, x + 5.3f, ay);
                 PointF[] head = new PointF[] {
-                    new PointF(x + 6.0f, arrowY),
-                    new PointF(x + 3.5f, arrowY - 2.5f),
-                    new PointF(x + 3.5f, arrowY + 2.5f)
+                    new PointF(x + 5.8f, ay),
+                    new PointF(x + 3.2f, ay - 2.2f),
+                    new PointF(x + 3.2f, ay + 2.2f)
                 };
                 g.FillPolygon(bArrow, head);
-
-                // 4 text lines on the right
-                g.DrawLine(pLine, x + 7f, y + 2.5f, x + 15f, y + 2.5f);
-                g.DrawLine(pLine, x + 7f, y + 5.8f, x + 15f, y + 5.8f);
-                g.DrawLine(pLine, x + 7f, y + 9.1f, x + 15f, y + 9.1f);
-                g.DrawLine(pLine, x + 7f, y + 12.4f, x + 15f, y + 12.4f);
             }
         }
 
         private void DrawLucideSortAZ(Graphics g, float x, float y, Color color)
         {
-            using (Font fA = new Font("Segoe UI", 5.5f, FontStyle.Bold))
-            using (SolidBrush bA = new SolidBrush(Color.FromArgb(68, 114, 196)))
-            using (SolidBrush bZ = new SolidBrush(Color.FromArgb(89, 89, 89)))
-            using (Pen pArrow = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Font f = new Font("Segoe UI", 5.8f, FontStyle.Bold))
+            using (SolidBrush bA = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (SolidBrush bZ = new SolidBrush(color))
+            using (Pen pArrow = new Pen(color, 1.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                g.DrawString("A", fA, bA, x - 1f, y - 0.5f);
-                g.DrawString("Z", fA, bZ, x - 1f, y + 6f);
-                // Down Arrow ↓
-                g.DrawLine(pArrow, x + 10f, y + 1.5f, x + 10f, y + 12f);
-                g.DrawLine(pArrow, x + 7.5f, y + 9.5f, x + 10f, y + 12f);
-                g.DrawLine(pArrow, x + 12.5f, y + 9.5f, x + 10f, y + 12f);
+                g.DrawString("A", f, bA, x + 0.5f, y - 0.5f);
+                g.DrawString("Z", f, bZ, x + 0.5f, y + 6.0f);
+                // Crisp dark vertical arrow ↓
+                g.DrawLine(pArrow, x + 11.0f, y + 1.5f, x + 11.0f, y + 12.5f);
+                g.DrawLine(pArrow, x + 8.8f, y + 10.2f, x + 11.0f, y + 12.5f);
+                g.DrawLine(pArrow, x + 13.2f, y + 10.2f, x + 11.0f, y + 12.5f);
             }
         }
 
         private void DrawLucidePilcrow(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (SolidBrush b = new SolidBrush(Color.FromArgb(89, 89, 89)))
+            using (Pen p = new Pen(color, 1.0f))
+            using (SolidBrush b = new SolidBrush(color))
             {
-                g.DrawLine(p, x + 2f, y + 2f, x + 11f, y + 2f);
-                g.DrawLine(p, x + 8f, y + 2f, x + 8f, y + 13f);
-                g.DrawLine(p, x + 10.5f, y + 2f, x + 10.5f, y + 13f);
+                g.DrawLine(p, x + 4.0f, y + 2.0f, x + 11.5f, y + 2.0f);
+                g.DrawLine(p, x + 8.0f, y + 2.0f, x + 8.0f, y + 13.0f);
+                g.DrawLine(p, x + 10.2f, y + 2.0f, x + 10.2f, y + 13.0f);
                 using (GraphicsPath loop = new GraphicsPath())
                 {
-                    loop.AddArc(x + 2f, y + 2f, 6f, 6f, 90, 180);
+                    loop.AddArc(x + 3.2f, y + 2.0f, 5.5f, 5.5f, 90, 180);
                     loop.CloseFigure();
                     g.FillPath(b, loop);
                 }
@@ -2509,133 +2465,145 @@ namespace ZenQOffice.UI
 
         private void DrawLucideLineSpacing(Graphics g, float x, float y, Color color)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(140, 140, 140), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Pen pArrow = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.0f))
             {
-                // Vertical Double Arrow ↕
-                g.DrawLine(pArrow, x + 2.5f, y + 2.5f, x + 2.5f, y + 12.5f);
-                g.DrawLine(pArrow, x + 1f, y + 4.5f, x + 2.5f, y + 2.5f);
-                g.DrawLine(pArrow, x + 4f, y + 4.5f, x + 2.5f, y + 2.5f);
-                g.DrawLine(pArrow, x + 1f, y + 10.5f, x + 2.5f, y + 12.5f);
-                g.DrawLine(pArrow, x + 4f, y + 10.5f, x + 2.5f, y + 12.5f);
+                // 4 crisp 1px horizontal lines aligned with Align icons
+                float oy = y + 6.0f;
+                for (int i = 0; i < 4; i++)
+                {
+                    g.DrawLine(pLine, x + 6.5f, oy + i * 3.0f, x + 14.5f, oy + i * 3.0f);
+                }
 
-                // 4 text lines
-                g.DrawLine(pLine, x + 6.5f, y + 2.5f, x + 14.5f, y + 2.5f);
-                g.DrawLine(pLine, x + 6.5f, y + 6f, x + 14.5f, y + 6f);
-                g.DrawLine(pLine, x + 6.5f, y + 9.5f, x + 14.5f, y + 9.5f);
-                g.DrawLine(pLine, x + 6.5f, y + 13f, x + 14.5f, y + 13f);
+                // Vertical blue double arrow on left
+                float ax = x + 3.0f;
+                g.DrawLine(pArrow, ax, y + 5.5f, ax, y + 15.5f);
+                g.DrawLine(pArrow, ax - 1.8f, y + 7.5f, ax, y + 5.5f);
+                g.DrawLine(pArrow, ax + 1.8f, y + 7.5f, ax, y + 5.5f);
+                g.DrawLine(pArrow, ax - 1.8f, y + 13.5f, ax, y + 15.5f);
+                g.DrawLine(pArrow, ax + 1.8f, y + 13.5f, ax, y + 15.5f);
 
-                DrawDropdownChevron(g, x + 17f, y + 7f, Color.FromArgb(110, 110, 110));
+                DrawDropdownChevron(g, x + 17.5f, y + 10.0f, Color.FromArgb(96, 94, 92));
             }
         }
 
         private void DrawLucidePaintBucket(Graphics g, float x, float y, Color color)
         {
-            Color barColor = CurrentShadingColor;
-            bool hasColor = (barColor != Color.Transparent && barColor.A > 0);
+            bool hasCustom = (CurrentShadingColor != Color.Transparent && CurrentShadingColor.A > 0);
+            Color dropColor = hasCustom ? CurrentShadingColor : Color.FromArgb(16, 110, 190);
 
-            using (Pen pOutline = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (SolidBrush bBody = new SolidBrush(Color.FromArgb(248, 248, 248)))
-            using (SolidBrush bPaint = new SolidBrush(Color.FromArgb(68, 114, 196)))
+            using (Pen pOutline = new Pen(color, 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bDrop = new SolidBrush(dropColor))
             {
-                // Classic tilted paint bucket matching Word's Shading icon
-                // Bucket body - tilted trapezoid (wider at top/opening, narrower at bottom)
+                // Top handle post
+                g.DrawLine(pOutline, x + 6.5f, y + 3.5f, x + 6.5f, y + 6.5f);
+
+                // Tilted diamond bucket body
                 PointF[] bucket = new PointF[] {
-                    new PointF(x + 1.5f, y + 2.5f),   // top-left (rim)
-                    new PointF(x + 11.5f, y + 2.5f),  // top-right (rim)
-                    new PointF(x + 10f, y + 11f),      // bottom-right
-                    new PointF(x + 3f, y + 11f)         // bottom-left
+                    new PointF(x + 6.5f, y + 4.8f),
+                    new PointF(x + 10.5f, y + 8.8f),
+                    new PointF(x + 6.5f, y + 12.8f),
+                    new PointF(x + 2.5f, y + 8.8f)
                 };
-                g.FillPolygon(bBody, bucket);
+                g.FillPolygon(Brushes.White, bucket);
                 g.DrawPolygon(pOutline, bucket);
 
-                // Bucket rim line (thick top edge)
-                g.DrawLine(pOutline, x + 1.5f, y + 2.5f, x + 11.5f, y + 2.5f);
+                // Horizontal paint level line inside bucket
+                g.DrawLine(pOutline, x + 3.2f, y + 9.2f, x + 9.8f, y + 9.2f);
 
-                // Handle arc above bucket
-                g.DrawArc(pOutline, x + 3.5f, y - 0.5f, 6f, 4f, 180, 180);
+                // Vibrant blue paint drop on right spout
+                PointF[] drop = new PointF[] {
+                    new PointF(x + 11.8f, y + 8.2f),
+                    new PointF(x + 13.2f, y + 10.8f),
+                    new PointF(x + 11.8f, y + 12.2f),
+                    new PointF(x + 10.4f, y + 10.8f)
+                };
+                g.FillPolygon(bDrop, drop);
+                g.FillEllipse(bDrop, x + 10.4f, y + 10.0f, 2.8f, 2.6f);
+            }
 
-                // Paint drip/pour from right side
-                g.FillEllipse(bPaint, x + 10.5f, y + 6f, 3f, 4.5f);
-
-                DrawDropdownChevron(g, x + 16f, y + 7f, Color.FromArgb(110, 110, 110));
-
-                // Horizontal color bar underneath
-                if (hasColor)
+            // Bottom shading color bar (14x3.5px) at exact same Y as Highlighter & Font Color
+            if (hasCustom)
+            {
+                using (SolidBrush bBar = new SolidBrush(CurrentShadingColor))
                 {
-                    using (SolidBrush bBar = new SolidBrush(barColor))
-                        g.FillRectangle(bBar, x + 1, y + 15, 14, 3);
-                }
-                else
-                {
-                    using (Pen pBar = new Pen(Color.FromArgb(165, 168, 172), 0.8f))
-                    {
-                        g.FillRectangle(Brushes.White, x + 1, y + 15, 14, 3);
-                        g.DrawRectangle(pBar, x + 1, y + 15, 14, 3);
-                    }
+                    g.FillRectangle(bBar, x + 1.0f, y + 15.0f, 14.0f, 3.5f);
                 }
             }
+            else
+            {
+                // Word default "No Color" bar: crisp white rectangle with light gray border (no red slash)
+                using (Pen pBarBdr = new Pen(Color.FromArgb(160, 160, 160), 1.0f))
+                {
+                    g.FillRectangle(Brushes.White, x + 1.0f, y + 15.0f, 14.0f, 3.0f);
+                    g.DrawRectangle(pBarBdr, x + 1.0f, y + 15.0f, 13.0f, 3.0f);
+                }
+            }
+
+            DrawDropdownChevron(g, x + 17.5f, y + 10.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawLucideBorders(Graphics g, float x, float y, Color color)
         {
-            using (Pen pOuter = new Pen(Color.FromArgb(89, 89, 89), 1.0f))
-            using (Pen pInner = new Pen(Color.FromArgb(185, 185, 185), 0.8f))
-            using (Pen pBottom = new Pen(Color.FromArgb(60, 60, 60), 1.5f))
+            float bx = (float)Math.Round(x + 1.0f), by = (float)Math.Round(y + 4.0f), bw = 12.0f, bh = 12.0f;
+            using (Pen pGrid = new Pen(Color.FromArgb(145, 143, 141), 1.0f))
+            using (Pen pBot = new Pen(color, 1.5f))
             {
-                float bx = x + 1.5f, by = y + 2f, bw = 11f, bh = 11f;
-                // Outer rectangle (light)
-                g.DrawLine(pOuter, bx, by, bx + bw, by);           // top
-                g.DrawLine(pOuter, bx, by, bx, by + bh);           // left
-                g.DrawLine(pOuter, bx + bw, by, bx + bw, by + bh); // right
-                // Bottom edge — thicker to indicate "Bottom Border" default
-                g.DrawLine(pBottom, bx, by + bh, bx + bw, by + bh);
-                // Inner cross dividers (lighter)
-                g.DrawLine(pInner, bx + bw / 2, by, bx + bw / 2, by + bh);
-                g.DrawLine(pInner, bx, by + bh / 2, bx + bw, by + bh / 2);
-                // Chevron ▾
-                DrawDropdownChevron(g, x + 16f, y + 7f, Color.FromArgb(110, 110, 110));
+                // Crisp 4-quadrant window grid (top, left, right, inner cross)
+                g.DrawLine(pGrid, bx, by, bx + bw, by);
+                g.DrawLine(pGrid, bx, by, bx, by + bh);
+                g.DrawLine(pGrid, bx + bw, by, bx + bw, by + bh);
+                g.DrawLine(pGrid, bx + bw / 2f, by, bx + bw / 2f, by + bh);
+                g.DrawLine(pGrid, bx, by + bh / 2f, bx + bw, by + bh / 2f);
+                // Solid dark bottom border
+                g.DrawLine(pBot, bx - 0.5f, by + bh, bx + bw + 0.5f, by + bh);
             }
+            DrawDropdownChevron(g, x + 16.5f, y + 10.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawLucideSearch(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            // Word magnifying glass: lens on top-right, handle pointing down-left
+            using (Pen p = new Pen(color, 1.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                g.DrawEllipse(p, x + 2, y + 2, 8, 8);
-                g.DrawLine(p, x + 8, y + 8, x + 13, y + 13);
+                g.DrawEllipse(p, x + 5.5f, y + 1.5f, 7.5f, 7.5f);
+                g.DrawLine(p, x + 6.2f, y + 8.0f, x + 2.0f, y + 12.2f);
             }
         }
 
         private void DrawLucideReplace(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (Font f = new Font("Segoe UI", 7.0f, FontStyle.Bold))
-            using (SolidBrush b = new SolidBrush(color))
+            // Word Replace: purple 'b' top, blue 'c' bottom-right, blue L-arrow
+            using (Font f = new Font("Segoe UI", 6.5f, FontStyle.Bold))
+            using (SolidBrush bPurple = new SolidBrush(Color.FromArgb(148, 33, 116)))
+            using (SolidBrush bBlue = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (Pen pBlue = new Pen(Color.FromArgb(16, 110, 190), 1.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                g.DrawString("ab", f, b, x, y);
-                // Arrow →
-                g.DrawLine(p, x + 1, y + 11, x + 12, y + 11);
-                g.DrawLine(p, x + 9, y + 8, x + 12, y + 11);
-                g.DrawLine(p, x + 9, y + 14, x + 12, y + 11);
+                g.DrawString("b", f, bPurple, x + 4.5f, y - 1.0f);
+                g.DrawString("c", f, bBlue, x + 8.0f, y + 6.0f);
+                // L-arrow from left down and right to 'c'
+                g.DrawLine(pBlue, x + 3.0f, y + 4.5f, x + 3.0f, y + 10.5f);
+                g.DrawLine(pBlue, x + 3.0f, y + 10.5f, x + 7.5f, y + 10.5f);
+                g.DrawLine(pBlue, x + 5.8f, y + 8.8f, x + 7.5f, y + 10.5f);
+                g.DrawLine(pBlue, x + 5.8f, y + 12.2f, x + 7.5f, y + 10.5f);
             }
         }
 
         private void DrawLucideSelectPointer(Graphics g, float x, float y, Color color)
         {
-            using (Pen p = new Pen(color, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            using (SolidBrush b = new SolidBrush(Color.FromArgb(40, color)))
+            // Word Select: crisp white mouse cursor outlined in 1px dark gray
+            using (Pen p = new Pen(Color.FromArgb(59, 58, 57), 1.0f) { LineJoin = LineJoin.Round })
             {
                 PointF[] arrow = new PointF[] {
-                    new PointF(x + 2, y + 1),
-                    new PointF(x + 2, y + 13),
-                    new PointF(x + 5, y + 10),
-                    new PointF(x + 8, y + 14),
-                    new PointF(x + 10, y + 13),
-                    new PointF(x + 7, y + 9),
-                    new PointF(x + 11, y + 9)
+                    new PointF(x + 3.0f, y + 1.5f),
+                    new PointF(x + 3.0f, y + 12.5f),
+                    new PointF(x + 5.5f, y + 10.0f),
+                    new PointF(x + 7.5f, y + 13.8f),
+                    new PointF(x + 9.2f, y + 13.0f),
+                    new PointF(x + 7.2f, y + 9.2f),
+                    new PointF(x + 10.5f, y + 9.2f)
                 };
-                g.FillPolygon(b, arrow);
+                g.FillPolygon(Brushes.White, arrow);
                 g.DrawPolygon(p, arrow);
             }
         }
@@ -2842,7 +2810,7 @@ namespace ZenQOffice.UI
             bool isHoverPeriph = IsHovering(CaptionPeripheralsBounds);
             bool isHoverMobile = IsHovering(CaptionMobileConnectBounds);
 
-            Color wsBg = (mode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
+            Color wsBg = (mode == OfficeAppMode.Writer) ? Color.FromArgb(243, 243, 243) :
                          ((mode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
                          Color.FromArgb(238, 238, 238));
             Color normalIconColor = Color.FromArgb(71, 85, 105);
@@ -3533,11 +3501,13 @@ namespace ZenQOffice.UI
                 else if (slidesView != null && slidesView.SelectedShape != null)
                 {
                     var shape = slidesView.SelectedShape;
-                    bool isSvgGraphic = shape.IsSvg || shape.IsGraphic || (!string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase));
-                    if (isSvgGraphic)
+                    bool isSvgGraphic = SlidesView.IsRasterOrSvgGraphic(shape);
+                    if (shape.Type == ShapeType.Image && !shape.IsSvg && !shape.IsGraphic && (string.IsNullOrEmpty(shape.ImagePath) || !shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)))
                     {
-                        shape.IsSvg = true;
-                        shape.IsGraphic = true;
+                        pTabs.Add("Định dạng Hình ảnh");
+                    }
+                    else if (isSvgGraphic)
+                    {
                         pTabs.Add("Định dạng Đồ họa");
                     }
                     else if (shape.Type == ShapeType.Video || !string.IsNullOrEmpty(shape.VideoPath))
@@ -3645,14 +3615,14 @@ namespace ZenQOffice.UI
             int docAreaX = _lastDocAreaX;
             int docAreaW = _lastDocAreaW;
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-            Color wsBg = (CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(229, 229, 229) :
+            Color wsBg = (CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(243, 243, 243) :
                          ((CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
                          Color.FromArgb(238, 238, 238));
 
             if (isIsland && CurrentMode != OfficeAppMode.Home)
             {
-                // In Island mode, backdrop seamlessly matches workspace - no artificial background shelf
-                using (SolidBrush chromeBg = new SolidBrush(wsBg))
+                // In Island mode, backdrop uses clean Fluent light tone - no artificial gray shelf
+                using (SolidBrush chromeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
                 {
                     g.FillRectangle(chromeBg, 0, ribbonTop, width, 155 - ribbonTop);
                 }
@@ -3762,19 +3732,27 @@ namespace ZenQOffice.UI
             {
                 // 2. Island Card: Floating rounded container (Y: 38 to 150)
                 int islandMargin = 10;
-                Rectangle islandRect = new Rectangle(islandMargin, 38, width - islandMargin * 2, 112);
+                float cardRadius = 8f;
+                Rectangle islandRect = new Rectangle(islandMargin, 38, width - islandMargin * 2, 114);
                 RibbonIslandBounds = islandRect;
 
-                // Subtle Fluent 2 drop shadows for authentic floating card elevation
-                using (GraphicsPath sPath1 = CreateRoundedRectanglePath(new RectangleF(islandRect.X, islandRect.Y + 1.5f, islandRect.Width, islandRect.Height), 8f))
-                using (SolidBrush sBrush1 = new SolidBrush(Color.FromArgb(8, 0, 0, 0)))
+                // Authentic subtle Fluent 2 elevation shadow - curves smoothly around card corners ("bo theo ribbon") with zero banding
+                float[] sOffsetsY = new float[] { 0.8f, 1.5f, 2.4f, 3.4f, 4.6f };
+                float[] sExpands = new float[] { 0.4f, 0.8f, 1.4f, 2.0f, 2.8f };
+                int[] sAlphas = new int[] { 5, 4, 3, 2, 1 };
+
+                for (int si = 0; si < sOffsetsY.Length; si++)
                 {
-                    g.FillPath(sBrush1, sPath1);
-                }
-                using (GraphicsPath sPath2 = CreateRoundedRectanglePath(new RectangleF(islandRect.X, islandRect.Y + 3.5f, islandRect.Width, islandRect.Height), 9f))
-                using (SolidBrush sBrush2 = new SolidBrush(Color.FromArgb(12, 0, 0, 0)))
-                {
-                    g.FillPath(sBrush2, sPath2);
+                    RectangleF sRect = new RectangleF(
+                        islandRect.X - sExpands[si],
+                        islandRect.Y + sOffsetsY[si],
+                        islandRect.Width + sExpands[si] * 2f,
+                        islandRect.Height);
+                    using (GraphicsPath sPath = CreateRoundedRectanglePath(sRect, cardRadius + sExpands[si]))
+                    using (SolidBrush sBrush = new SolidBrush(Color.FromArgb(sAlphas[si], 0, 0, 0)))
+                    {
+                        g.FillPath(sBrush, sPath);
+                    }
                 }
 
                 // Island Card Surface (Pure White with subtle border)
@@ -4017,6 +3995,26 @@ namespace ZenQOffice.UI
             {
                 DrawPhotoRibbonToolbar(g, width, photoView);
             }
+
+            // Authentic Microsoft Office 365 / Windows 11 hairline divider and soft black drop shadow ('đen mờ')
+            if (!isIsland && CurrentMode != OfficeAppMode.Home)
+            {
+                // 1. Crisp 1px hairline border at ribbon bottom (exact MS Office Row 19: RGB(210, 208, 206))
+                using (Pen dividerPen = new Pen(Color.FromArgb(210, 208, 206), 1.0f))
+                {
+                    g.DrawLine(dividerPen, 0, 154, width, 154);
+                }
+
+                // 2. Subtle translucent black soft drop shadow (light, natural, airy - exactly as MS Office Image 2)
+                int[] msShadowAlphas = new int[] { 14, 9, 5, 2 };
+                for (int s = 0; s < msShadowAlphas.Length; s++)
+                {
+                    using (Pen sPen = new Pen(Color.FromArgb(msShadowAlphas[s], 0, 0, 0), 1.0f))
+                    {
+                        g.DrawLine(sPen, 0, 155 + s, width, 155 + s);
+                    }
+                }
+            }
         }
 
         private void DrawWriterRibbonContent(Graphics g, int width, WriterView writerView = null)
@@ -4058,158 +4056,201 @@ namespace ZenQOffice.UI
             using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (Font boldFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (Font codeFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (SolidBrush fluentTextBrush = new SolidBrush(Color.FromArgb(32, 31, 30))) // #201F1E Fluent Charcoal
+            using (SolidBrush groupLabelBrush = new SolidBrush(Color.FromArgb(97, 97, 97)))
+            using (Pen pGroupDivider = new Pen(Color.FromArgb(224, 224, 224), 1.0f)) // #E0E0E0 1px divider
+            using (Pen pSubgroup = new Pen(Color.FromArgb(216, 216, 216), 1.0f)) // Crisp Word subgroup divider
             {
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                Color iconCol = Color.FromArgb(59, 58, 57); // #3B3A39 Fluent Charcoal Stroke
 
                 // ==================== Group 1: Clipboard (Bảng tạm) (X: 14 to 236) ====================
                 Rectangle pasteBox = new Rectangle(14, 68, 52, 62);
                 DrawInteractiveButton(g, pasteBox, false, 4);
                 DrawPasteIconLarge(g, 22, 70);
-                g.DrawString("Dán ▾", btnFont, Brushes.Black, 22, 107);
+                g.DrawString("Dán ▾", btnFont, fluentTextBrush, 22, 107);
 
                 Rectangle cutBox = new Rectangle(72, 68, 162, 20);
-                DrawInteractiveButton(g, cutBox, false, 3);
-                DrawCutIcon(g, 76, 71, Color.FromArgb(51, 65, 85));
-                g.DrawString("Cắt", btnFont, Brushes.Black, 102, 70);
+                DrawInteractiveButton(g, cutBox, false, 4);
+                DrawCutIcon(g, 76, 71, iconCol);
+                g.DrawString("Cắt", btnFont, fluentTextBrush, 102, 70);
 
                 Rectangle copyBox = new Rectangle(72, 89, 162, 20);
-                DrawInteractiveButton(g, copyBox, false, 3);
-                DrawCopyIcon(g, 76, 92, Color.FromArgb(51, 65, 85));
-                g.DrawString("Sao chép", btnFont, Brushes.Black, 102, 91);
+                DrawInteractiveButton(g, copyBox, false, 4);
+                DrawCopyIcon(g, 76, 92, iconCol);
+                g.DrawString("Sao chép", btnFont, fluentTextBrush, 102, 91);
 
                 Rectangle fmtBox = new Rectangle(72, 110, 162, 20);
                 bool isFmtActive = (writerView != null && writerView.IsFormatPainterActive) || IsFormatPainterActive;
-                DrawInteractiveButton(g, fmtBox, isFmtActive, 3);
-                DrawFormatPainterIcon(g, 76, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
-                g.DrawString("Sao chép định dạng", btnFont, isFmtActive ? Brushes.Navy : Brushes.Black, 102, 112);
+                DrawInteractiveButton(g, fmtBox, isFmtActive, 4);
+                DrawFormatPainterIcon(g, 76, 112, isFmtActive ? Color.FromArgb(16, 110, 190) : iconCol);
+                g.DrawString("Sao chép định dạng", btnFont, isFmtActive ? Brushes.Navy : fluentTextBrush, 102, 112);
 
-                g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 90, 137);
+                g.DrawString("Bảng tạm", labelFont, groupLabelBrush, 90, 137);
                 DrawDialogLauncherIcon(g, 224, 136);
-                g.DrawLine(Pens.LightGray, 240, 68, 240, 148);
+                g.DrawLine(pGroupDivider, 240, 68, 240, 148);
 
                 // ==================== Group 2: Font (Phông chữ) (X: 248 to 512) ====================
                 // Row 1: Font Combo, Size Combo, A^, Av, Aa▾, Clear Formatting
                 Rectangle fontCombo = new Rectangle(248, 68, 120, 24);
-                g.FillRectangle(Brushes.White, fontCombo);
-                using (Pen pBorder = new Pen(Color.FromArgb(203, 213, 225), 1f)) g.DrawRectangle(pBorder, fontCombo);
-                DrawInteractiveButton(g, fontCombo, false, 3);
-                g.DrawString(SelectedFont, btnFont, Brushes.Black, 252, 71);
-                DrawDropdownChevron(g, 352, 78, Color.FromArgb(100, 116, 139));
+                bool fontHover = IsHovering(fontCombo);
+                FillRoundedRectangle(g, Brushes.White, fontCombo, 4);
+                Color fontBdrColor = fontHover ? Color.FromArgb(134, 137, 142) : Color.FromArgb(196, 199, 204);
+                using (Pen pBdr = new Pen(fontBdrColor, 1f))
+                {
+                    DrawRoundedRectangle(g, pBdr, fontCombo, 4);
+                }
+                if (fontHover)
+                {
+                    using (SolidBrush hb = new SolidBrush(Color.FromArgb(10, 0, 0, 0)))
+                        FillRoundedRectangle(g, hb, fontCombo, 4);
+                }
+                Rectangle fontTextRect = new Rectangle(252, 69, 96, 22);
+                using (StringFormat sfFont = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter })
+                {
+                    g.DrawString(SelectedFont, btnFont, fluentTextBrush, fontTextRect, sfFont);
+                }
+                DrawDropdownChevron(g, 352, 79, Color.FromArgb(90, 90, 90));
 
                 Rectangle sizeCombo = new Rectangle(372, 68, 42, 24);
-                g.FillRectangle(Brushes.White, sizeCombo);
-                using (Pen pBorder = new Pen(Color.FromArgb(203, 213, 225), 1f)) g.DrawRectangle(pBorder, sizeCombo);
-                DrawInteractiveButton(g, sizeCombo, false, 3);
-                g.DrawString(FontSize.ToString("0.#"), btnFont, Brushes.Black, 376, 71);
-                DrawDropdownChevron(g, 400, 78, Color.FromArgb(100, 116, 139));
+                bool sizeHover = IsHovering(sizeCombo);
+                FillRoundedRectangle(g, Brushes.White, sizeCombo, 4);
+                Color sizeBdrColor = sizeHover ? Color.FromArgb(134, 137, 142) : Color.FromArgb(196, 199, 204);
+                using (Pen pBdr = new Pen(sizeBdrColor, 1f))
+                {
+                    DrawRoundedRectangle(g, pBdr, sizeCombo, 4);
+                }
+                if (sizeHover)
+                {
+                    using (SolidBrush hb = new SolidBrush(Color.FromArgb(10, 0, 0, 0)))
+                        FillRoundedRectangle(g, hb, sizeCombo, 4);
+                }
+                Rectangle sizeTextRect = new Rectangle(374, 69, 24, 22);
+                using (StringFormat sfSize = new StringFormat { LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString(FontSize.ToString("0.#"), btnFont, fluentTextBrush, sizeTextRect, sfSize);
+                }
+                DrawDropdownChevron(g, 400, 79, Color.FromArgb(90, 90, 90));
 
                 Rectangle aIncBox = new Rectangle(418, 68, 22, 24);
-                DrawInteractiveButton(g, aIncBox, false, 2);
-                DrawLucideAIncrease(g, 419, 70, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, aIncBox, false, 4);
+                DrawLucideAIncrease(g, 419, 70, iconCol);
 
                 Rectangle aDecBox = new Rectangle(442, 68, 22, 24);
-                DrawInteractiveButton(g, aDecBox, false, 2);
-                DrawLucideADecrease(g, 443, 70, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, aDecBox, false, 4);
+                DrawLucideADecrease(g, 443, 70, iconCol);
+
+                // Subgroup divider between Av and Aa
+                g.DrawLine(pSubgroup, 465, 71, 465, 89);
 
                 Rectangle aCaseBox = new Rectangle(466, 68, 22, 24);
-                DrawInteractiveButton(g, aCaseBox, false, 2);
-                DrawLucideCaseChange(g, 467, 70, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, aCaseBox, false, 4);
+                DrawLucideCaseChange(g, 467, 70, iconCol);
+
+                // Subgroup divider between Aa and Clear Formatting
+                g.DrawLine(pSubgroup, 489, 71, 489, 89);
 
                 Rectangle aClrBox = new Rectangle(490, 68, 22, 24);
-                DrawInteractiveButton(g, aClrBox, false, 2);
+                DrawInteractiveButton(g, aClrBox, false, 4);
                 DrawLucideClearFormatting(g, 491, 70);
 
                 // Row 2: B, I, U▾, ab, x_2, x^2, A▾ (Effects), Highlighter▾, Font Color▾
                 Rectangle bRect = new Rectangle(248, 96, 22, 24);
-                DrawInteractiveButton(g, bRect, IsBold, 2);
-                DrawLucideBold(g, 250, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, bRect, IsBold, 4);
+                DrawLucideBold(g, 250, 98, iconCol);
 
                 Rectangle iRect = new Rectangle(272, 96, 22, 24);
-                DrawInteractiveButton(g, iRect, IsItalic, 2);
-                DrawLucideItalic(g, 274, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, iRect, IsItalic, 4);
+                DrawLucideItalic(g, 274, 98, iconCol);
 
                 Rectangle uRect = new Rectangle(296, 96, 26, 24);
-                DrawInteractiveButton(g, uRect, IsUnderline, 2);
-                DrawLucideUnderline(g, 298, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, uRect, IsUnderline, 4);
+                DrawLucideUnderline(g, 298, 98, iconCol);
 
                 Rectangle sRect = new Rectangle(324, 96, 22, 24);
-                DrawInteractiveButton(g, sRect, IsStrikethrough, 2);
-                DrawLucideStrikethrough(g, 326, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, sRect, IsStrikethrough, 4);
+                DrawLucideStrikethrough(g, 326, 98, iconCol);
 
                 Rectangle subBox = new Rectangle(348, 96, 22, 24);
-                DrawInteractiveButton(g, subBox, IsSubscript, 2);
-                DrawLucideSubscript(g, 350, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, subBox, IsSubscript, 4);
+                DrawLucideSubscript(g, 350, 98, iconCol);
 
                 Rectangle supBox = new Rectangle(372, 96, 22, 24);
-                DrawInteractiveButton(g, supBox, IsSuperscript, 2);
-                DrawLucideSuperscript(g, 374, 98, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, supBox, IsSuperscript, 4);
+                DrawLucideSuperscript(g, 374, 98, iconCol);
+
+                // Subgroup divider between x^2 and Text Effects A
+                g.DrawLine(pSubgroup, 395, 99, 395, 117);
 
                 Rectangle fxRect = new Rectangle(396, 96, 26, 24);
-                DrawInteractiveButton(g, fxRect, false, 2);
+                DrawInteractiveButton(g, fxRect, false, 4);
                 DrawLucideTextEffects(g, 398, 98);
 
                 Rectangle hlRect = new Rectangle(424, 96, 28, 24);
-                DrawInteractiveButton(g, hlRect, false, 2);
-                DrawHighlightIcon(g, 425, 96, Color.FromArgb(38, 38, 42));
+                DrawInteractiveButton(g, hlRect, false, 4);
+                DrawHighlightIcon(g, 425, 96, iconCol);
 
                 Rectangle fcRect = new Rectangle(454, 96, 28, 24);
-                DrawInteractiveButton(g, fcRect, false, 2);
-                using (SolidBrush bA = new SolidBrush(Color.FromArgb(38, 38, 42)))
+                DrawInteractiveButton(g, fcRect, false, 4);
+                Color fcBarColor = (CurrentFontColor != Color.Transparent && CurrentFontColor.A > 0)
+                    ? CurrentFontColor : Color.FromArgb(232, 17, 35); // Word default red #E81123
+                using (Font fRegA = new Font("Segoe UI", 9.0f, FontStyle.Regular))
+                using (SolidBrush bA = new SolidBrush(iconCol))
+                using (SolidBrush fcBar = new SolidBrush(fcBarColor))
                 {
-                    g.DrawString("A", boldFont, bA, 457, 97);
+                    g.DrawString("A", fRegA, bA, 457.5f, 97.5f);
+                    g.FillRectangle(fcBar, 456.0f, 111.0f, 14.0f, 3.5f);
                 }
-                DrawDropdownChevron(g, 473, 106, Color.FromArgb(80, 80, 80));
-                using (SolidBrush fcBar = new SolidBrush(CurrentFontColor != Color.Transparent ? CurrentFontColor : Color.FromArgb(220, 38, 38)))
-                {
-                    g.FillRectangle(fcBar, 456, 115, 15, 3);
-                }
+                DrawDropdownChevron(g, 472.5f, 106.0f, Color.FromArgb(96, 94, 92));
 
-                g.DrawString("Phông chữ", labelFont, Brushes.Gray, 355, 137);
+                g.DrawString("Phông chữ", labelFont, groupLabelBrush, 355, 137);
                 DrawDialogLauncherIcon(g, 504, 136);
-                g.DrawLine(Pens.LightGray, 520, 68, 520, 148);
+                g.DrawLine(pGroupDivider, 520, 68, 520, 148);
 
                 // ==================== Group 3: Paragraph (Đoạn văn) (X: 528 to 714) ====================
-                using (Pen pSubgroup = new Pen(Color.FromArgb(225, 228, 233), 1f))
                 {
                     // Top Row: Bullets▾, Numbering▾, Multilevel▾, Dec Indent, Inc Indent, Sort, Show/Hide ¶
                     Rectangle bListRect = new Rectangle(528, 68, 28, 24);
-                    DrawInteractiveButton(g, bListRect, false, 2);
-                    DrawListBulletedIcon(g, 530, 71, Color.FromArgb(38, 38, 42));
-                    DrawDropdownChevron(g, 547, 78, Color.FromArgb(80, 80, 80));
+                    DrawInteractiveButton(g, bListRect, false, 4);
+                    DrawListBulletedIcon(g, 530, 71, iconCol);
+                    DrawDropdownChevron(g, 547, 78, Color.FromArgb(90, 90, 90));
 
                     Rectangle nListRect = new Rectangle(558, 68, 28, 24);
-                    DrawInteractiveButton(g, nListRect, false, 2);
-                    DrawListNumberedIcon(g, 560, 71, Color.FromArgb(38, 38, 42));
-                    DrawDropdownChevron(g, 577, 78, Color.FromArgb(80, 80, 80));
+                    DrawInteractiveButton(g, nListRect, false, 4);
+                    DrawListNumberedIcon(g, 560, 71, iconCol);
+                    DrawDropdownChevron(g, 577, 78, Color.FromArgb(90, 90, 90));
 
                     Rectangle mListRect = new Rectangle(588, 68, 28, 24);
-                    DrawInteractiveButton(g, mListRect, false, 2);
-                    DrawLucideListTree(g, 590, 71, Color.FromArgb(38, 38, 42));
-                    DrawDropdownChevron(g, 607, 78, Color.FromArgb(80, 80, 80));
+                    DrawInteractiveButton(g, mListRect, false, 4);
+                    DrawLucideListTree(g, 590, 71, iconCol);
+                    DrawDropdownChevron(g, 607, 78, Color.FromArgb(90, 90, 90));
 
                     // Subgroup divider 1 (top)
                     g.DrawLine(pSubgroup, 617, 71, 617, 89);
 
                     Rectangle decIndentRect = new Rectangle(618, 68, 22, 24);
-                    DrawInteractiveButton(g, decIndentRect, false, 2);
-                    DrawLucideOutdent(g, 620, 71, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, decIndentRect, false, 4);
+                    DrawLucideOutdent(g, 620, 71, iconCol);
 
                     Rectangle incIndentRect = new Rectangle(642, 68, 22, 24);
-                    DrawInteractiveButton(g, incIndentRect, false, 2);
-                    DrawLucideIndent(g, 644, 71, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, incIndentRect, false, 4);
+                    DrawLucideIndent(g, 644, 71, iconCol);
 
                     // Subgroup divider 2 (top)
                     g.DrawLine(pSubgroup, 665, 71, 665, 89);
 
                     Rectangle sortRect = new Rectangle(666, 68, 22, 24);
-                    DrawInteractiveButton(g, sortRect, false, 2);
-                    DrawLucideSortAZ(g, 668, 71, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, sortRect, false, 4);
+                    DrawLucideSortAZ(g, 668, 71, iconCol);
+
+                    // Subgroup divider 3 (top) between Sort A-Z and Pilcrow ¶
+                    g.DrawLine(pSubgroup, 689, 71, 689, 89);
 
                     Rectangle showHideRect = new Rectangle(690, 68, 22, 24);
                     bool isMarksActive = ShowFormattingMarks;
-                    DrawInteractiveButton(g, showHideRect, isMarksActive, 2);
-                    DrawLucidePilcrow(g, 692, 71, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, showHideRect, isMarksActive, 4);
+                    DrawLucidePilcrow(g, 692, 71, iconCol);
 
                     // Bottom Row: Align Left, Center, Right, Justify, Line Spacing▾, Shading▾, Borders▾
                     int alignX = 528;
@@ -4217,8 +4258,8 @@ namespace ZenQOffice.UI
                     {
                         Rectangle aRect = new Rectangle(alignX, 96, 22, 24);
                         bool isCurAlign = (Alignment == a);
-                        DrawInteractiveButton(g, aRect, isCurAlign, 2);
-                        DrawAlignmentIcon(g, alignX, 96, a, Color.FromArgb(38, 38, 42));
+                        DrawInteractiveButton(g, aRect, isCurAlign, 4);
+                        DrawAlignmentIcon(g, alignX, 96, a, iconCol);
                         alignX += 24;
                     }
 
@@ -4227,30 +4268,30 @@ namespace ZenQOffice.UI
 
                     // Line Spacing ↕≡▾
                     Rectangle lsRect = new Rectangle(626, 96, 28, 24);
-                    DrawInteractiveButton(g, lsRect, false, 2);
-                    DrawLucideLineSpacing(g, 628, 96, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, lsRect, false, 4);
+                    DrawLucideLineSpacing(g, 628, 96, iconCol);
 
                     // Subgroup divider 2 (bottom)
                     g.DrawLine(pSubgroup, 655, 99, 655, 117);
 
                     // Shading 🪣▾
                     Rectangle shadeRect = new Rectangle(656, 96, 28, 24);
-                    DrawInteractiveButton(g, shadeRect, false, 2);
-                    DrawLucidePaintBucket(g, 657, 96, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, shadeRect, false, 4);
+                    DrawLucidePaintBucket(g, 657, 96, iconCol);
 
                     // Borders ⊞▾
                     Rectangle bdrRect = new Rectangle(686, 96, 28, 24);
-                    DrawInteractiveButton(g, bdrRect, false, 2);
-                    DrawLucideBorders(g, 688, 96, Color.FromArgb(38, 38, 42));
+                    DrawInteractiveButton(g, bdrRect, false, 4);
+                    DrawLucideBorders(g, 688, 96, iconCol);
                 }
 
-                g.DrawString("Đoạn văn", labelFont, Brushes.Gray, 602, 137);
+                g.DrawString("Đoạn văn", labelFont, groupLabelBrush, 602, 137);
                 DrawDialogLauncherIcon(g, 706, 136);
-                g.DrawLine(Pens.LightGray, 722, 68, 722, 148);
+                g.DrawLine(pGroupDivider, 722, 68, 722, 148);
 
                 // ==================== Group 4: Quick Styles Gallery (Kiểu hiển thị) (X: 730+) ====================
                 int styleX = 730;
-                string[] styleNames = new string[] { "Normal", "No Spacing", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle" };
+                string[] styleNames = StyleGalleryNames;
                 int cardW = 68;
                 int maxCardsPossible = Math.Max(2, (width - 155 - styleX - 16) / cardW);
                 int numStyleCards = Math.Min(styleNames.Length, maxCardsPossible);
@@ -4276,9 +4317,9 @@ namespace ZenQOffice.UI
 
                         if (isActiveStyle)
                         {
-                            // Selected style card: rectangular crisp border, subtle background like Image 2 (¶ Normal)
-                            using (SolidBrush ab = new SolidBrush(Color.FromArgb(248, 249, 250)))
-                            using (Pen ap = new Pen(Color.FromArgb(170, 175, 180), 1.0f))
+                            // Selected style card: Fluent active blue fill & border
+                            using (SolidBrush ab = new SolidBrush(Color.FromArgb(216, 234, 248)))
+                            using (Pen ap = new Pen(Color.FromArgb(123, 168, 212), 1.0f))
                             {
                                 Rectangle selR = new Rectangle(cardRect.X + 1, cardRect.Y + 1, cardRect.Width - 2, cardRect.Height - 2);
                                 g.FillRectangle(ab, selR);
@@ -4287,8 +4328,9 @@ namespace ZenQOffice.UI
                         }
                         else if (isHover)
                         {
-                            using (SolidBrush hb = new SolidBrush(Color.FromArgb(243, 246, 251)))
-                            using (Pen hp = new Pen(Color.FromArgb(205, 218, 235), 1.0f))
+                            // Hovered style card: Fluent subtle hover
+                            using (SolidBrush hb = new SolidBrush(Color.FromArgb(237, 243, 249)))
+                            using (Pen hp = new Pen(Color.FromArgb(200, 216, 232), 1.0f))
                             {
                                 Rectangle hovR = new Rectangle(cardRect.X + 1, cardRect.Y + 1, cardRect.Width - 2, cardRect.Height - 2);
                                 g.FillRectangle(hb, hovR);
@@ -4297,16 +4339,18 @@ namespace ZenQOffice.UI
                         }
 
                         // Draw card typography preview
-                        Color sampleCol = (curStyle.StartsWith("Heading") ? Color.FromArgb(43, 87, 154) : (curStyle == "Subtitle" ? Color.FromArgb(100, 116, 139) : Color.FromArgb(20, 20, 20)));
+                        Color sampleCol = (curStyle.StartsWith("Heading") || curStyle == "Title" || curStyle == "Emphasis" || curStyle == "Intense Quote")
+                            ? Color.FromArgb(30, 112, 186)
+                            : (curStyle == "Strong" ? Color.FromArgb(31, 78, 121) : (curStyle == "Subtitle" || curStyle == "Quote" || curStyle == "Subtle Emphasis" ? Color.FromArgb(100, 116, 139) : Color.FromArgb(32, 31, 30)));
                         using (SolidBrush sampleBrush = new SolidBrush(sampleCol))
-                        using (Font sampleFont = new Font("Segoe UI", (curStyle == "Title") ? 9.5f : 8.0f, (curStyle != "Normal" && curStyle != "No Spacing") ? (curStyle == "Subtitle" ? FontStyle.Italic : FontStyle.Bold) : FontStyle.Regular))
+                        using (Font sampleFont = new Font("Segoe UI", (curStyle == "Title") ? 9.5f : 8.0f, (curStyle != "Normal" && curStyle != "No Spacing") ? (curStyle.Contains("Subtitle") || curStyle.Contains("Emphasis") || curStyle.Contains("Quote") ? FontStyle.Italic : FontStyle.Bold) : FontStyle.Regular))
                         {
                             string sampleText = (curStyle == "Title") ? "AaBb" : "AaBbCcD";
                             g.DrawString(sampleText, sampleFont, sampleBrush, cardRect.X + 4, 72);
                         }
 
                         string displayName = (curStyle == "Normal") ? "¶ Normal" : curStyle;
-                        g.DrawString(displayName, labelFont, Brushes.Gray, cardRect.X + 3, 103);
+                        g.DrawString(displayName, labelFont, groupLabelBrush, cardRect.X + 3, 103);
                     }
 
                     // 3-Button Strip on right edge of gallery
@@ -4317,27 +4361,27 @@ namespace ZenQOffice.UI
                 }
 
                 int styleDividerX = stylesGalleryRect.Right + 8;
-                g.DrawString("Kiểu hiển thị", labelFont, Brushes.Gray, stylesGalleryRect.X + stylesGalleryRect.Width / 2 - 28, 137);
-                g.DrawLine(Pens.LightGray, styleDividerX, 68, styleDividerX, 148);
+                g.DrawString("Kiểu hiển thị", labelFont, groupLabelBrush, stylesGalleryRect.X + stylesGalleryRect.Width / 2 - 28, 137);
+                g.DrawLine(pGroupDivider, styleDividerX, 68, styleDividerX, 148);
 
                 // ==================== Group 5: Editing (Chỉnh sửa) ====================
                 int editX = styleDividerX + 8;
                 Rectangle searchBox = new Rectangle(editX, 68, 108, 20);
-                DrawInteractiveButton(g, searchBox, false, 3);
-                DrawLucideSearch(g, editX + 3, 70, Color.FromArgb(51, 65, 85));
-                g.DrawString("Tìm kiếm ▾", btnFont, Brushes.Black, editX + 24, 70);
+                DrawInteractiveButton(g, searchBox, false, 4);
+                DrawLucideSearch(g, editX + 3, 70, iconCol);
+                g.DrawString("Tìm kiếm ▾", btnFont, fluentTextBrush, editX + 24, 70);
 
                 Rectangle replaceBox = new Rectangle(editX, 89, 108, 20);
-                DrawInteractiveButton(g, replaceBox, false, 3);
-                DrawLucideReplace(g, editX + 3, 91, Color.FromArgb(51, 65, 85));
-                g.DrawString("Thay thế", btnFont, Brushes.Black, editX + 24, 91);
+                DrawInteractiveButton(g, replaceBox, false, 4);
+                DrawLucideReplace(g, editX + 3, 91, iconCol);
+                g.DrawString("Thay thế", btnFont, fluentTextBrush, editX + 24, 91);
 
                 Rectangle selectBox = new Rectangle(editX, 110, 108, 20);
-                DrawInteractiveButton(g, selectBox, false, 3);
-                DrawLucideSelectPointer(g, editX + 3, 112, Color.FromArgb(51, 65, 85));
-                g.DrawString("Chọn vùng ▾", btnFont, Brushes.Black, editX + 24, 112);
+                DrawInteractiveButton(g, selectBox, false, 4);
+                DrawLucideSelectPointer(g, editX + 3, 112, Color.FromArgb(30, 112, 186));
+                g.DrawString("Chọn vùng ▾", btnFont, fluentTextBrush, editX + 24, 112);
 
-                g.DrawString("Chỉnh sửa", labelFont, Brushes.Gray, editX + 24, 137);
+                g.DrawString("Chỉnh sửa", labelFont, groupLabelBrush, editX + 24, 137);
             }
         }
 
@@ -6000,7 +6044,7 @@ namespace ZenQOffice.UI
             Rectangle pRect = new Rectangle(x + 1, y, 19, 24);
 
             // Drop shadow
-            using (SolidBrush sb = new SolidBrush(Color.FromArgb(220, 224, 230)))
+            using (SolidBrush sb = new SolidBrush(Color.FromArgb(35, 0, 0, 0)))
             {
                 g.FillRectangle(sb, pRect.X + 2, pRect.Y + 2, pRect.Width, pRect.Height);
             }
@@ -6056,7 +6100,7 @@ namespace ZenQOffice.UI
             Rectangle pRect = new Rectangle(x + 1, y, 19, 24);
 
             // Drop shadow
-            using (SolidBrush sb = new SolidBrush(Color.FromArgb(220, 224, 230)))
+            using (SolidBrush sb = new SolidBrush(Color.FromArgb(35, 0, 0, 0)))
             {
                 g.FillRectangle(sb, pRect.X + 2, pRect.Y + 2, pRect.Width, pRect.Height);
             }
@@ -6141,7 +6185,7 @@ namespace ZenQOffice.UI
             Rectangle pRect = new Rectangle(x + 1, y, 19, 24);
 
             // Drop shadow
-            using (SolidBrush sb = new SolidBrush(Color.FromArgb(220, 224, 230)))
+            using (SolidBrush sb = new SolidBrush(Color.FromArgb(35, 0, 0, 0)))
             {
                 g.FillRectangle(sb, pRect.X + 2, pRect.Y + 2, pRect.Width, pRect.Height);
             }
@@ -11598,100 +11642,128 @@ namespace ZenQOffice.UI
 
         private void DrawOrientationMini(Graphics g, float x, float y)
         {
-            using (Font f = new Font("Segoe UI", 6.8f, FontStyle.Bold))
-            using (Pen p = new Pen(Color.FromArgb(37, 99, 235), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Font f = new Font("Segoe UI", 6.2f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString("ab", f, Brushes.Black, x, y + 1);
-                g.DrawLine(p, x + 9, y + 10, x + 14, y + 3);
-                g.DrawLine(p, x + 11, y + 3, x + 14, y + 3);
-                g.DrawLine(p, x + 14, y + 6, x + 14, y + 3);
+                // Diagonal "ab" stepped like Excel
+                g.DrawString("a", f, bTxt, x - 0.5f, y + 3.0f);
+                g.DrawString("b", f, bTxt, x + 4.2f, y - 1.5f);
+                // Crisp diagonal blue arrow ↗ underneath
+                g.DrawLine(pArr, x + 3.5f, y + 13.0f, x + 11.5f, y + 5.0f);
+                g.DrawLine(pArr, x + 8.0f, y + 5.0f, x + 11.5f, y + 5.0f);
+                g.DrawLine(pArr, x + 11.5f, y + 8.5f, x + 11.5f, y + 5.0f);
             }
         }
 
         private void DrawCellStylesIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 18;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (SolidBrush bBlue = new SolidBrush(Color.FromArgb(59, 130, 246)))
-            using (SolidBrush bSoft = new SolidBrush(Color.FromArgb(219, 234, 254)))
+            float w = 22f, h = 16f;
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(180, 178, 176), 1.0f))
+            using (SolidBrush bTop = new SolidBrush(Color.FromArgb(147, 197, 253)))
+            using (SolidBrush bMid = new SolidBrush(Color.FromArgb(254, 215, 170)))
+            using (SolidBrush bBtm = new SolidBrush(Color.FromArgb(187, 247, 208)))
             {
                 g.FillRectangle(Brushes.White, x, y, w, h);
-                g.FillRectangle(bSoft, x + 7, y + 6, 7, 6);
-                g.FillRectangle(bBlue, x + 14, y + 6, 6, 6);
+                g.FillRectangle(bTop, x + 1, y + 1, w - 2, 5);
+                g.FillRectangle(bMid, x + 1, y + 6, 10, 5);
+                g.FillRectangle(bBtm, x + 11, y + 6, 10, 5);
 
-                g.DrawRectangle(pGrid, x, y, w, h);
-                g.DrawLine(pThin, x + 7, y, x + 7, y + h);
-                g.DrawLine(pThin, x + 14, y, x + 14, y + h);
-                g.DrawLine(pThin, x, y + 6, x + w, y + 6);
-                g.DrawLine(pThin, x, y + 12, x + w, y + 12);
+                g.DrawLine(pGrid, x, y + 6, x + w, y + 6);
+                g.DrawLine(pGrid, x, y + 11, x + w, y + 11);
+                g.DrawLine(pGrid, x + 11, y + 6, x + 11, y + h);
+                g.DrawRectangle(pBorder, x, y, w, h);
+
+                // Slanted Office artist paintbrush overlapping bottom-right
+                using (Pen pHandle = new Pen(Color.FromArgb(196, 118, 12), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (Pen pFerr = new Pen(Color.FromArgb(96, 94, 92), 1.8f))
+                using (SolidBrush bTip = new SolidBrush(Color.FromArgb(16, 110, 190)))
+                {
+                    g.DrawLine(pHandle, x + w + 2, y + 3, x + w - 4, y + 11);
+                    g.DrawLine(pFerr, x + w - 4, y + 11, x + w - 6, y + 13.5f);
+                    PointF[] tip = new PointF[] {
+                        new PointF(x + w - 6, y + 13),
+                        new PointF(x + w - 10, y + 17.5f),
+                        new PointF(x + w - 4.5f, y + 15.5f)
+                    };
+                    g.FillPolygon(bTip, tip);
+                }
             }
         }
 
         private void DrawFormatCellsIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 16;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (SolidBrush bTab = new SolidBrush(Color.FromArgb(59, 130, 246)))
+            float gx = x + 3f, gy = y + 4f, gw = 19f, gh = 14f;
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(180, 178, 176), 1.0f))
+            using (SolidBrush bBlue = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (SolidBrush bTint = new SolidBrush(Color.FromArgb(219, 234, 254)))
             {
-                g.FillRectangle(Brushes.White, x, y + 2, w, h);
-                g.DrawRectangle(pGrid, x, y + 2, w, h);
-                g.DrawLine(pThin, x + 7, y + 2, x + 7, y + 2 + h);
-                g.DrawLine(pThin, x + 14, y + 2, x + 14, y + 2 + h);
-                g.DrawLine(pThin, x, y + 2 + h / 2, x + w, y + 2 + h / 2);
+                g.FillRectangle(Brushes.White, gx, gy, gw, gh);
+                g.FillRectangle(bTint, gx + 6, gy + 1, 7, gh - 2);
+                g.DrawLine(pGrid, gx + 6, gy, gx + 6, gy + gh);
+                g.DrawLine(pGrid, gx + 13, gy, gx + 13, gy + gh);
+                g.DrawLine(pGrid, gx, gy + 7, gx + gw, gy + 7);
+                g.DrawRectangle(pBorder, gx, gy, gw, gh);
 
-                // Sizing/dimension blue bar on top
-                g.FillRectangle(bTab, x + 5, y, 10, 3);
+                // Top horizontal blue column-width bar & left vertical row-height bar (Excel Format icon)
+                g.FillRectangle(bBlue, gx + 6, y, 7, 2.5f);
+                g.FillRectangle(bBlue, x, gy + 1, 2.0f, 6.0f);
             }
         }
 
         private void DrawEraserIconMini(Graphics g, float x, float y)
         {
-            using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.0f) { LineJoin = LineJoin.Round })
-            using (SolidBrush bPurple = new SolidBrush(Color.FromArgb(192, 132, 252)))
-            using (SolidBrush bWhite = new SolidBrush(Color.White))
+            Color plum = Color.FromArgb(148, 33, 116);
+            using (Pen p = new Pen(plum, 1.0f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bPink = new SolidBrush(Color.FromArgb(194, 57, 179)))
             {
-                PointF[] pTop = new PointF[] {
-                    new PointF(x + 2, y + 7),
-                    new PointF(x + 7, y + 1),
-                    new PointF(x + 11, y + 5),
-                    new PointF(x + 6, y + 11)
+                // Top-right pink-magenta body
+                PointF[] topHalf = new PointF[] {
+                    new PointF(x + 4.5f, y + 6.5f),
+                    new PointF(x + 8.5f, y + 2.5f),
+                    new PointF(x + 12.5f, y + 6.5f),
+                    new PointF(x + 8.5f, y + 10.5f)
                 };
-                g.FillPolygon(bPurple, pTop);
-                g.DrawPolygon(p, pTop);
+                g.FillPolygon(bPink, topHalf);
 
-                PointF[] pBtm = new PointF[] {
-                    new PointF(x + 4, y + 9),
-                    new PointF(x + 6, y + 11),
-                    new PointF(x + 9, y + 14),
-                    new PointF(x + 7, y + 12)
+                // Bottom-left white bevel tip
+                PointF[] botHalf = new PointF[] {
+                    new PointF(x + 2.0f, y + 9.0f),
+                    new PointF(x + 4.5f, y + 6.5f),
+                    new PointF(x + 8.5f, y + 10.5f),
+                    new PointF(x + 6.0f, y + 13.0f)
                 };
-                g.FillPolygon(bWhite, pBtm);
+                g.FillPolygon(Brushes.White, botHalf);
+
+                PointF[] full = new PointF[] {
+                    new PointF(x + 2.0f, y + 9.0f),
+                    new PointF(x + 8.5f, y + 2.5f),
+                    new PointF(x + 12.5f, y + 6.5f),
+                    new PointF(x + 6.0f, y + 13.0f)
+                };
+                g.DrawPolygon(p, full);
+                g.DrawLine(p, x + 4.5f, y + 6.5f, x + 8.5f, y + 10.5f);
             }
         }
 
         private void DrawFillSeriesIcon(Graphics g, float x, float y)
         {
-            using (Pen pBox = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
-            using (Pen pArr = new Pen(Color.FromArgb(37, 99, 235), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen pBox = new Pen(Color.FromArgb(110, 110, 110), 1.0f))
+            using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawRectangle(pBox, x, y, 11, 11);
-                g.DrawLine(pArr, x + 5.5f, y + 2, x + 5.5f, y + 9);
-                g.DrawLine(pArr, x + 3, y + 6.5f, x + 5.5f, y + 9);
-                g.DrawLine(pArr, x + 8, y + 6.5f, x + 5.5f, y + 9);
+                g.FillRectangle(Brushes.White, x + 1, y + 1, 11, 11);
+                g.DrawRectangle(pBox, x + 1, y + 1, 11, 11);
+                g.DrawLine(pArr, x + 6.5f, y + 2.5f, x + 6.5f, y + 10.0f);
+                g.DrawLine(pArr, x + 4.0f, y + 7.5f, x + 6.5f, y + 10.0f);
+                g.DrawLine(pArr, x + 9.0f, y + 7.5f, x + 6.5f, y + 10.0f);
             }
         }
 
         private void DrawGroupLauncherIcon(Graphics g, int x, int y)
         {
-            using (Pen p = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
-            {
-                g.DrawRectangle(p, x, y, 7, 7);
-                g.DrawLine(p, x + 2, y + 5, x + 5, y + 2);
-                g.DrawLine(p, x + 3, y + 2, x + 5, y + 2);
-                g.DrawLine(p, x + 5, y + 4, x + 5, y + 2);
-            }
+            DrawDialogLauncherIcon(g, x, y);
         }
 
         private void DrawCalcTabHome(Graphics g, int width, CalcView calcView)
@@ -11738,13 +11810,14 @@ namespace ZenQOffice.UI
                 g.DrawLine(Pens.LightGray, 240, 68, 240, 148);
 
                 // ==================== Group 2: Phông chữ (X: 248..462) ====================
+                Color iconCharcoal = Color.FromArgb(59, 58, 57);
                 Rectangle fontCombo = new Rectangle(248, 68, 114, 24);
                 g.FillRectangle(Brushes.White, fontCombo);
                 g.DrawRectangle(pBorder, fontCombo);
                 DrawInteractiveButton(g, fontCombo, false, 2);
                 string fNameDisp = !string.IsNullOrEmpty(summary.FontName) ? summary.FontName : "Calibri";
                 g.DrawString(fNameDisp, btnFont, Brushes.Black, 251, 71);
-                DrawDropdownChevron(g, 348, 78, Color.FromArgb(100, 116, 139));
+                DrawDropdownChevron(g, 348, 78, Color.FromArgb(96, 94, 92));
 
                 Rectangle sizeCombo = new Rectangle(366, 68, 40, 24);
                 g.FillRectangle(Brushes.White, sizeCombo);
@@ -11752,41 +11825,47 @@ namespace ZenQOffice.UI
                 DrawInteractiveButton(g, sizeCombo, false, 2);
                 string fSizeDisp = (summary.FontSize > 0) ? summary.FontSize.ToString("0.#") : "11";
                 g.DrawString(fSizeDisp, btnFont, Brushes.Black, 370, 71);
-                DrawDropdownChevron(g, 394, 78, Color.FromArgb(100, 116, 139));
+                DrawDropdownChevron(g, 394, 78, Color.FromArgb(96, 94, 92));
 
                 Rectangle aIncBox = new Rectangle(410, 68, 22, 24);
                 DrawInteractiveButton(g, aIncBox, false, 2);
-                DrawLucideAIncrease(g, 411, 70, Color.FromArgb(38, 38, 42));
+                DrawLucideAIncrease(g, 412, 71, iconCharcoal);
 
                 Rectangle aDecBox = new Rectangle(434, 68, 22, 24);
                 DrawInteractiveButton(g, aDecBox, false, 2);
-                DrawLucideADecrease(g, 435, 70, Color.FromArgb(38, 38, 42));
+                DrawLucideADecrease(g, 437, 71, iconCharcoal);
 
-                // Row 2: B, I, U, Border, Fill, Color
+                // Row 2: B, I, U, | , Border, | , Fill, Color
                 Rectangle bRect = new Rectangle(248, 96, 22, 24);
                 DrawInteractiveButton(g, bRect, summary.Bold, 2);
-                DrawLucideBold(g, 250, 98, Color.FromArgb(38, 38, 42));
+                DrawLucideBold(g, 250, 99, iconCharcoal);
 
                 Rectangle iRect = new Rectangle(272, 96, 22, 24);
                 DrawInteractiveButton(g, iRect, summary.Italic, 2);
-                DrawLucideItalic(g, 274, 98, Color.FromArgb(38, 38, 42));
+                DrawLucideItalic(g, 274, 99, iconCharcoal);
 
                 Rectangle uRect = new Rectangle(296, 96, 28, 24);
                 DrawInteractiveButton(g, uRect, summary.Underline, 2);
-                DrawLucideUnderline(g, 298, 98, Color.FromArgb(38, 38, 42));
+                DrawLucideUnderline(g, 298, 99, iconCharcoal);
+
+                using (Pen subDiv = new Pen(Color.FromArgb(225, 223, 221), 1f))
+                {
+                    g.DrawLine(subDiv, 325, 100, 325, 116);
+                    g.DrawLine(subDiv, 355, 100, 355, 116);
+                }
 
                 Rectangle bdrRect = new Rectangle(326, 96, 28, 24);
                 DrawInteractiveButton(g, bdrRect, false, 2);
-                DrawLucideBorders(g, 327, 97, Color.FromArgb(89, 89, 89));
+                DrawLucideBorders(g, 328, 97, iconCharcoal);
 
                 Rectangle fillRect = new Rectangle(356, 96, 28, 24);
                 DrawInteractiveButton(g, fillRect, false, 2);
-                Color activeBg = (summary.BgColor != unchecked((int)0xFFFFFFFF) && summary.BgColor != 0) ? Color.FromArgb(summary.BgColor) : Color.FromArgb(250, 204, 21);
+                Color activeBg = (summary.BgColor != unchecked((int)0xFFFFFFFF) && summary.BgColor != 0) ? Color.FromArgb(summary.BgColor) : Color.FromArgb(255, 242, 0);
                 DrawCalcPaintBucket(g, 357, 97, activeBg);
 
                 Rectangle colorRect = new Rectangle(386, 96, 28, 24);
                 DrawInteractiveButton(g, colorRect, false, 2);
-                Color activeTxt = (summary.TextColor != 0) ? Color.FromArgb(summary.TextColor) : Color.FromArgb(220, 38, 38);
+                Color activeTxt = (summary.TextColor != 0) ? Color.FromArgb(summary.TextColor) : Color.FromArgb(232, 17, 35);
                 DrawCalcFontColorBtn(g, 387, 97, activeTxt, boldFont);
 
                 g.DrawString("Phông chữ", labelFont, Brushes.Gray, 335, 137);
@@ -11798,53 +11877,61 @@ namespace ZenQOffice.UI
                 Rectangle tAlign = new Rectangle(470, 68, 22, 24);
                 bool isTop = (summary.VAlign == 0);
                 DrawInteractiveButton(g, tAlign, isTop, 2);
-                DrawVAlignVector(g, 470, 68, 0, isTop ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawVAlignVector(g, 470, 68, 0, isTop ? Color.FromArgb(16, 110, 190) : iconCharcoal);
 
                 Rectangle mAlign = new Rectangle(494, 68, 22, 24);
                 bool isMid = (summary.VAlign == 1);
                 DrawInteractiveButton(g, mAlign, isMid, 2);
-                DrawVAlignVector(g, 494, 68, 1, isMid ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawVAlignVector(g, 494, 68, 1, isMid ? Color.FromArgb(16, 110, 190) : iconCharcoal);
 
                 Rectangle bAlign = new Rectangle(518, 68, 22, 24);
                 bool isBtm = (summary.VAlign == 2);
                 DrawInteractiveButton(g, bAlign, isBtm, 2);
-                DrawVAlignVector(g, 518, 68, 2, isBtm ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawVAlignVector(g, 518, 68, 2, isBtm ? Color.FromArgb(16, 110, 190) : iconCharcoal);
+
+                using (Pen subDiv = new Pen(Color.FromArgb(225, 223, 221), 1f))
+                {
+                    g.DrawLine(subDiv, 542, 72, 542, 88);
+                    g.DrawLine(subDiv, 572, 72, 572, 88);
+                    g.DrawLine(subDiv, 542, 100, 542, 116);
+                    g.DrawLine(subDiv, 572, 100, 572, 116);
+                }
 
                 Rectangle oriBtn = new Rectangle(544, 68, 26, 24);
                 DrawInteractiveButton(g, oriBtn, false, 2);
                 DrawOrientationMini(g, 545, 71);
-                DrawDropdownChevron(g, 560, 78, Color.FromArgb(100, 116, 139));
+                DrawDropdownChevron(g, 560, 78, Color.FromArgb(96, 94, 92));
 
                 Rectangle wrapBtn = new Rectangle(574, 68, 78, 24);
                 DrawInteractiveButton(g, wrapBtn, summary.WrapText, 2);
-                DrawWrapTextIcon(g, 576, 72, summary.WrapText ? Color.FromArgb(16, 110, 190) : Color.FromArgb(51, 65, 85));
+                DrawWrapTextIcon(g, 576, 72, summary.WrapText ? Color.FromArgb(16, 110, 190) : iconCharcoal);
                 g.DrawString("Ngắt dòng", btnFont, summary.WrapText ? Color.FromArgb(16, 110, 190).ToBrush() : Brushes.Black, 595, 71);
 
                 // Row 2: Left, Center, Right, Dec Indent, Merge & Center
                 Rectangle lAlign = new Rectangle(470, 96, 22, 24);
                 bool isLeft = (summary.Align == 0);
                 DrawInteractiveButton(g, lAlign, isLeft, 2);
-                DrawAlignmentIcon(g, 470, 96, 0, isLeft ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawAlignmentIcon(g, 470, 96, 0, isLeft ? Color.FromArgb(16, 110, 190) : iconCharcoal);
 
                 Rectangle cAlign = new Rectangle(494, 96, 22, 24);
                 bool isCtr = (summary.Align == 1);
                 DrawInteractiveButton(g, cAlign, isCtr, 2);
-                DrawAlignmentIcon(g, 494, 96, 1, isCtr ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawAlignmentIcon(g, 494, 96, 1, isCtr ? Color.FromArgb(16, 110, 190) : iconCharcoal);
 
                 Rectangle rAlign = new Rectangle(518, 96, 22, 24);
                 bool isRight = (summary.Align == 2);
                 DrawInteractiveButton(g, rAlign, isRight, 2);
-                DrawAlignmentIcon(g, 518, 96, 2, isRight ? Color.FromArgb(16, 110, 190) : Color.FromArgb(75, 85, 99));
+                DrawAlignmentIcon(g, 518, 96, 2, isRight ? Color.FromArgb(16, 110, 190) : iconCharcoal);
 
                 Rectangle decIndBtn = new Rectangle(544, 96, 26, 24);
                 DrawInteractiveButton(g, decIndBtn, false, 2);
-                DrawLucideIndent(g, 547, 99, Color.FromArgb(75, 85, 99));
+                DrawLucideIndent(g, 547, 100, iconCharcoal);
 
                 Rectangle mergeBtn = new Rectangle(574, 96, 78, 24);
                 DrawInteractiveButton(g, mergeBtn, summary.IsMerged, 2);
-                DrawMergeCenterIcon(g, 576, 99, 14, 14, summary.IsMerged ? Color.FromArgb(16, 110, 190) : Color.FromArgb(37, 99, 235));
+                DrawMergeCenterIcon(g, 576, 101, 14, 14, summary.IsMerged ? Color.FromArgb(16, 110, 190) : Color.FromArgb(16, 110, 190));
                 g.DrawString("Gộp ô", btnFont, summary.IsMerged ? Color.FromArgb(16, 110, 190).ToBrush() : Brushes.Black, 596, 99);
-                DrawDropdownChevron(g, 638, 107, Color.FromArgb(100, 116, 139));
+                DrawDropdownChevron(g, 638, 107, Color.FromArgb(96, 94, 92));
 
                 g.DrawString("Căn chỉnh", labelFont, Brushes.Gray, 545, 137);
                 DrawGroupLauncherIcon(g, 642, 136);
@@ -11857,29 +11944,41 @@ namespace ZenQOffice.UI
                 DrawInteractiveButton(g, numCombo, false, 2);
                 string nFmtDisp = !string.IsNullOrEmpty(summary.NumberFormat) ? (summary.NumberFormat == "General" ? "Chung" : summary.NumberFormat) : "Chung";
                 g.DrawString(nFmtDisp, btnFont, Brushes.Black, 670, 71);
-                DrawDropdownChevron(g, 772, 78, Color.FromArgb(100, 116, 139));
+                DrawDropdownChevron(g, 772, 78, Color.FromArgb(96, 94, 92));
 
-                // Row 2: $, %, ,, Inc Dec, Dec Dec
+                // Row 2: $, %, ,, | , Inc Dec, Dec Dec
                 Rectangle currBtn = new Rectangle(666, 96, 22, 24);
                 DrawInteractiveButton(g, currBtn, false, 2);
-                g.DrawString("$", boldFont, Brushes.Black, 667, 98);
-                DrawDropdownChevron(g, 678, 107, Color.FromArgb(100, 116, 139));
+                using (Font numSymFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (SolidBrush bChar = new SolidBrush(iconCharcoal))
+                {
+                    g.DrawString("$", numSymFont, bChar, 667, 99);
+                    DrawDropdownChevron(g, 679, 107, Color.FromArgb(96, 94, 92));
 
-                Rectangle pctBtn = new Rectangle(690, 96, 22, 24);
-                DrawInteractiveButton(g, pctBtn, false, 2);
-                g.DrawString("%", boldFont, Brushes.Black, 692, 98);
+                    Rectangle pctBtn = new Rectangle(690, 96, 22, 24);
+                    DrawInteractiveButton(g, pctBtn, false, 2);
+                    g.DrawString("%", numSymFont, bChar, 694, 99);
 
-                Rectangle commaBtn = new Rectangle(714, 96, 22, 24);
-                DrawInteractiveButton(g, commaBtn, false, 2);
-                g.DrawString(",", boldFont, Brushes.Black, 718, 98);
+                    Rectangle commaBtn = new Rectangle(714, 96, 22, 24);
+                    DrawInteractiveButton(g, commaBtn, false, 2);
+                    using (Font commaFont = new Font("Georgia", 11.0f, FontStyle.Bold))
+                    {
+                        g.DrawString(",", commaFont, bChar, 720, 95);
+                    }
+                }
+
+                using (Pen subDiv = new Pen(Color.FromArgb(225, 223, 221), 1f))
+                {
+                    g.DrawLine(subDiv, 737, 100, 737, 116);
+                }
 
                 Rectangle incDecBtn = new Rectangle(738, 96, 22, 24);
                 DrawInteractiveButton(g, incDecBtn, false, 2);
-                DrawDecimalIncIcon(g, 739, 98, Color.FromArgb(37, 99, 235));
+                DrawDecimalIncIcon(g, 739, 101, Color.FromArgb(16, 110, 190));
 
                 Rectangle decDecBtn = new Rectangle(762, 96, 22, 24);
                 DrawInteractiveButton(g, decDecBtn, false, 2);
-                DrawDecimalDecIcon(g, 763, 98, Color.FromArgb(37, 99, 235));
+                DrawDecimalDecIcon(g, 763, 101, Color.FromArgb(16, 110, 190));
 
                 g.DrawString("Định dạng Số", labelFont, Brushes.Gray, 710, 137);
                 DrawGroupLauncherIcon(g, 778, 136);
@@ -12845,9 +12944,20 @@ namespace ZenQOffice.UI
                 // Defined Names
                 Rectangle nameMgrBtn = new Rectangle(curX, 68, 80, 54);
                 DrawInteractiveButton(g, nameMgrBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 12f, FontStyle.Bold))
+                using (Pen pTag = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { LineJoin = LineJoin.Round })
+                using (SolidBrush bTag = new SolidBrush(Color.FromArgb(219, 234, 254)))
                 {
-                    g.DrawString("🏷️", symFont, Color.FromArgb(37, 99, 235).ToBrush(), curX + 28, 72);
+                    PointF[] tagPts = new PointF[] {
+                        new PointF(curX + 30, 74),
+                        new PointF(curX + 42, 74),
+                        new PointF(curX + 49, 81),
+                        new PointF(curX + 40, 90),
+                        new PointF(curX + 30, 80)
+                    };
+                    g.FillPolygon(bTag, tagPts);
+                    g.DrawPolygon(pTag, tagPts);
+                    g.FillEllipse(Brushes.White, curX + 33, 77, 3.2f, 3.2f);
+                    g.DrawEllipse(pTag, curX + 33, 77, 3.2f, 3.2f);
                 }
                 g.DrawString("Quản lý Tên", labelFont, Brushes.Black, curX + 10, 100);
                 curX += 84;
@@ -12859,27 +12969,48 @@ namespace ZenQOffice.UI
                 // Formula Auditing
                 Rectangle tracePrecBtn = new Rectangle(curX, 68, 76, 54);
                 DrawInteractiveButton(g, tracePrecBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 11f, FontStyle.Bold))
+                using (Pen pCell = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+                using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(16, 110, 190)))
                 {
-                    g.DrawString("↖", symFont, Color.FromArgb(37, 99, 235).ToBrush(), curX + 29, 73);
+                    g.FillRectangle(Brushes.White, curX + 39, 82, 10, 8);
+                    g.DrawRectangle(pCell, curX + 39, 82, 10, 8);
+                    g.FillEllipse(bDot, curX + 26, 74, 4, 4);
+                    g.DrawLine(pArr, curX + 28, 76, curX + 39, 85);
+                    g.DrawLine(pArr, curX + 35, 85, curX + 39, 85);
+                    g.DrawLine(pArr, curX + 39, 81, curX + 39, 85);
                 }
                 g.DrawString("Vết Tiền đề", labelFont, Brushes.Black, curX + 10, 100);
                 curX += 80;
 
                 Rectangle traceDepBtn = new Rectangle(curX, 68, 82, 54);
                 DrawInteractiveButton(g, traceDepBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 11f, FontStyle.Bold))
+                using (Pen pCell = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+                using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(16, 110, 190)))
                 {
-                    g.DrawString("↘", symFont, Color.FromArgb(37, 99, 235).ToBrush(), curX + 32, 73);
+                    g.FillRectangle(Brushes.White, curX + 29, 73, 10, 8);
+                    g.DrawRectangle(pCell, curX + 29, 73, 10, 8);
+                    g.FillEllipse(bDot, curX + 32, 75, 4, 4);
+                    g.FillRectangle(Brushes.White, curX + 43, 83, 10, 8);
+                    g.DrawRectangle(pCell, curX + 43, 83, 10, 8);
+                    g.DrawLine(pArr, curX + 34, 77, curX + 44, 86);
+                    g.DrawLine(pArr, curX + 40, 86, curX + 44, 86);
+                    g.DrawLine(pArr, curX + 44, 82, curX + 44, 86);
                 }
                 g.DrawString("Vết Phụ thuộc", labelFont, Brushes.Black, curX + 8, 100);
                 curX += 86;
 
                 Rectangle remArrBtn = new Rectangle(curX, 68, 76, 54);
                 DrawInteractiveButton(g, remArrBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 11f, FontStyle.Bold))
+                using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (Pen pRed = new Pen(Color.FromArgb(220, 38, 38), 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
-                    g.DrawString("✕", symFont, Color.FromArgb(220, 38, 38).ToBrush(), curX + 29, 73);
+                    g.DrawLine(pArr, curX + 27, 86, curX + 46, 75);
+                    g.DrawLine(pArr, curX + 42, 75, curX + 46, 75);
+                    g.DrawLine(pArr, curX + 46, 79, curX + 46, 75);
+                    g.DrawLine(pRed, curX + 34, 78, curX + 42, 86);
+                    g.DrawLine(pRed, curX + 42, 78, curX + 34, 86);
                 }
                 g.DrawString("Xóa Mũi tên", labelFont, Brushes.Black, curX + 9, 100);
                 curX += 80;
@@ -12943,18 +13074,41 @@ namespace ZenQOffice.UI
 
                 Rectangle flashFillBtn = new Rectangle(curX, 68, 76, 54);
                 DrawInteractiveButton(g, flashFillBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 12f, FontStyle.Bold))
+                using (Pen pGrid = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+                using (SolidBrush bBolt = new SolidBrush(Color.FromArgb(245, 158, 11)))
+                using (Pen pBolt = new Pen(Color.FromArgb(180, 83, 9), 0.9f) { LineJoin = LineJoin.Round })
                 {
-                    g.DrawString("⚡", symFont, Color.FromArgb(217, 119, 6).ToBrush(), curX + 26, 72);
+                    g.FillRectangle(Brushes.White, curX + 27, 74, 15, 15);
+                    g.DrawLine(pGrid, curX + 27, 79, curX + 42, 79);
+                    g.DrawLine(pGrid, curX + 27, 84, curX + 42, 84);
+                    g.DrawRectangle(pGrid, curX + 27, 74, 15, 15);
+                    PointF[] bolt = new PointF[] {
+                        new PointF(curX + 44, 73),
+                        new PointF(curX + 38, 82),
+                        new PointF(curX + 42, 82),
+                        new PointF(curX + 39, 90),
+                        new PointF(curX + 48, 80),
+                        new PointF(curX + 43, 80)
+                    };
+                    g.FillPolygon(bBolt, bolt);
+                    g.DrawPolygon(pBolt, bolt);
                 }
                 g.DrawString("Điền nhanh", labelFont, Brushes.Black, curX + 11, 100);
                 curX += 80;
 
                 Rectangle dataValBtn = new Rectangle(curX, 68, 96, 54);
                 DrawInteractiveButton(g, dataValBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 11f, FontStyle.Bold))
+                using (Pen pGrid = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+                using (Pen pChk = new Pen(Color.FromArgb(16, 124, 65), 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                using (Pen pNo = new Pen(Color.FromArgb(220, 38, 38), 1.3f))
                 {
-                    g.DrawString("✓▤", symFont, Color.FromArgb(16, 124, 65).ToBrush(), curX + 36, 73);
+                    g.FillRectangle(Brushes.White, curX + 36, 73, 18, 7);
+                    g.DrawRectangle(pGrid, curX + 36, 73, 18, 7);
+                    g.FillRectangle(Brushes.White, curX + 36, 83, 18, 7);
+                    g.DrawRectangle(pGrid, curX + 36, 83, 18, 7);
+                    g.DrawLines(pChk, new PointF[] { new PointF(curX + 51, 74), new PointF(curX + 54, 78), new PointF(curX + 59, 71) });
+                    g.DrawEllipse(pNo, curX + 51, 83, 7, 7);
+                    g.DrawLine(pNo, curX + 52.5f, 84.5f, curX + 56.5f, 88.5f);
                 }
                 g.DrawString("Xác thực Dữ liệu ▾", labelFont, Brushes.Black, curX + 3, 100);
                 curX += 100;
@@ -12966,18 +13120,31 @@ namespace ZenQOffice.UI
                 // What-If Analysis
                 Rectangle goalSeekBtn = new Rectangle(curX, 68, 86, 54);
                 DrawInteractiveButton(g, goalSeekBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 12f, FontStyle.Bold))
+                using (Pen pOuter = new Pen(Color.FromArgb(220, 38, 38), 1.3f))
+                using (Pen pMid = new Pen(Color.FromArgb(16, 110, 190), 1.2f))
+                using (SolidBrush bCenter = new SolidBrush(Color.FromArgb(220, 38, 38)))
                 {
-                    g.DrawString("🎯", symFont, Color.FromArgb(37, 99, 235).ToBrush(), curX + 31, 72);
+                    g.FillEllipse(Brushes.White, curX + 34, 73, 18, 18);
+                    g.DrawEllipse(pOuter, curX + 34, 73, 18, 18);
+                    g.DrawEllipse(pMid, curX + 38, 77, 10, 10);
+                    g.FillEllipse(bCenter, curX + 41, 80, 4, 4);
                 }
                 g.DrawString("Dò Mục tiêu", labelFont, Brushes.Black, curX + 14, 100);
                 curX += 90;
 
                 Rectangle scenBtn = new Rectangle(curX, 68, 100, 54);
                 DrawInteractiveButton(g, scenBtn, false, 4);
-                using (Font symFont = new Font("Segoe UI Symbol", 12f, FontStyle.Bold))
+                using (Pen pCard = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+                using (SolidBrush bHdr1 = new SolidBrush(Color.FromArgb(16, 110, 190)))
+                using (SolidBrush bHdr2 = new SolidBrush(Color.FromArgb(16, 124, 65)))
                 {
-                    g.DrawString("📋", symFont, Color.FromArgb(37, 99, 235).ToBrush(), curX + 38, 72);
+                    g.FillRectangle(Brushes.White, curX + 38, 73, 16, 13);
+                    g.FillRectangle(bHdr1, curX + 38, 73, 16, 3.5f);
+                    g.DrawRectangle(pCard, curX + 38, 73, 16, 13);
+
+                    g.FillRectangle(Brushes.White, curX + 44, 78, 16, 13);
+                    g.FillRectangle(bHdr2, curX + 44, 78, 16, 3.5f);
+                    g.DrawRectangle(pCard, curX + 44, 78, 16, 13);
                 }
                 g.DrawString("Quản lý Kịch bản", labelFont, Brushes.Black, curX + 6, 100);
                 curX += 104;
@@ -13083,11 +13250,22 @@ namespace ZenQOffice.UI
 
                 Rectangle zInBtn = new Rectangle(curX, 68, 80, 26);
                 DrawInteractiveButton(g, zInBtn, false, 3);
-                g.DrawString("🔍+ Phóng to", btnFont, Brushes.Black, curX + 4, 72);
+                DrawLucideSearch(g, curX + 4, 73, Color.FromArgb(59, 58, 57));
+                using (Pen pPlus = new Pen(Color.FromArgb(16, 110, 190), 1.3f))
+                {
+                    g.DrawLine(pPlus, curX + 13.2f, 76.2f, curX + 13.2f, 80.2f);
+                    g.DrawLine(pPlus, curX + 11.2f, 78.2f, curX + 15.2f, 78.2f);
+                }
+                g.DrawString("Phóng to", btnFont, Brushes.Black, curX + 22, 72);
 
                 Rectangle zOutBtn = new Rectangle(curX, 96, 80, 26);
                 DrawInteractiveButton(g, zOutBtn, false, 3);
-                g.DrawString("🔍- Thu nhỏ", btnFont, Brushes.Black, curX + 4, 100);
+                DrawLucideSearch(g, curX + 4, 101, Color.FromArgb(59, 58, 57));
+                using (Pen pMinus = new Pen(Color.FromArgb(16, 110, 190), 1.3f))
+                {
+                    g.DrawLine(pMinus, curX + 11.2f, 106.2f, curX + 15.2f, 106.2f);
+                }
+                g.DrawString("Thu nhỏ", btnFont, Brushes.Black, curX + 22, 100);
                 curX += 84;
 
                 g.DrawString("Thu phóng", labelFont, Brushes.Gray, curX - 85, 137);
@@ -13125,15 +13303,18 @@ namespace ZenQOffice.UI
                 // ==================== Group 2: Công cụ (Tools) ====================
                 Rectangle pivotBtn = new Rectangle(112, 69, 146, 20);
                 DrawInteractiveButton(g, pivotBtn, false, 3);
-                g.DrawString("📊 Tổng hợp PivotTable", btnFont, Brushes.Black, 114, 71);
+                DrawPivotTableVector(g, 115, 72, 16, 14);
+                g.DrawString("Tổng hợp PivotTable", btnFont, Brushes.Black, 134, 71);
 
                 Rectangle dupBtn = new Rectangle(112, 91, 146, 20);
                 DrawInteractiveButton(g, dupBtn, false, 3);
-                g.DrawString("🗑 Xóa mục trùng lặp", btnFont, Brushes.Black, 114, 93);
+                DrawDeleteCellsIcon(g, 114, 93);
+                g.DrawString("Xóa mục trùng lặp", btnFont, Brushes.Black, 134, 93);
 
                 Rectangle rangeBtn = new Rectangle(112, 113, 146, 20);
                 DrawInteractiveButton(g, rangeBtn, false, 3);
-                g.DrawString("⊞ Chuyển thành Vùng ô", btnFont, Brushes.Black, 114, 115);
+                DrawGridIcon(g, 115, 116, 14, 13, Color.FromArgb(16, 110, 190));
+                g.DrawString("Chuyển thành Vùng ô", btnFont, Brushes.Black, 134, 115);
 
                 g.DrawString("Công cụ", grpFont, Brushes.DimGray, 162, 137);
                 g.DrawLine(divPen, 264, 68, 264, 150);
@@ -13305,242 +13486,295 @@ namespace ZenQOffice.UI
 
         private void DrawVAlignVector(Graphics g, float x, float y, int vAlign, Color col)
         {
-            using (Pen pBar = new Pen(col, 1.25f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Pen pLine = new Pen(Color.FromArgb(120, 125, 132), 1.0f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
+            using (Pen pLine = new Pen(Color.FromArgb(105, 105, 105), 1.0f))
             {
-                float ox = x + 4f;
-                float oy = y + 5.5f;
-                float w = 13f;
+                float ox = x + 4.0f;
+                float oy = y + 5.0f;
+                float w = 13.0f;
                 if (vAlign == 0) // Top Align
                 {
-                    g.DrawLine(pBar, ox, oy, ox + w, oy);
-                    g.DrawLine(pLine, ox + 2f, oy + 4f, ox + w - 2f, oy + 4f);
-                    g.DrawLine(pLine, ox + 3.5f, oy + 7.5f, ox + w - 3.5f, oy + 7.5f);
+                    g.DrawLine(pLine, ox, oy, ox + w, oy);
+                    g.DrawLine(pLine, ox, oy + 3.0f, ox + 8.5f, oy + 3.0f);
+                    g.DrawLine(pLine, ox, oy + 6.0f, ox + w, oy + 6.0f);
                 }
                 else if (vAlign == 1) // Middle Align
                 {
-                    g.DrawLine(pBar, ox, oy + 4.5f, ox + w, oy + 4.5f);
-                    g.DrawLine(pLine, ox + 2f, oy + 1f, ox + w - 2f, oy + 1f);
-                    g.DrawLine(pLine, ox + 2f, oy + 8f, ox + w - 2f, oy + 8f);
+                    g.DrawLine(pLine, ox, oy + 3.0f, ox + w, oy + 3.0f);
+                    g.DrawLine(pLine, ox, oy + 6.0f, ox + 8.5f, oy + 6.0f);
+                    g.DrawLine(pLine, ox, oy + 9.0f, ox + w, oy + 9.0f);
                 }
                 else // Bottom Align
                 {
-                    g.DrawLine(pBar, ox, oy + 9f, ox + w, oy + 9f);
-                    g.DrawLine(pLine, ox + 2f, oy + 5.5f, ox + w - 2f, oy + 5.5f);
-                    g.DrawLine(pLine, ox + 3.5f, oy + 2f, ox + w - 3.5f, oy + 2f);
+                    g.DrawLine(pLine, ox, oy + 6.0f, ox + w, oy + 6.0f);
+                    g.DrawLine(pLine, ox, oy + 9.0f, ox + 8.5f, oy + 9.0f);
+                    g.DrawLine(pLine, ox, oy + 12.0f, ox + w, oy + 12.0f);
                 }
             }
         }
 
         private void DrawMergeCenterIcon(Graphics g, float x, float y, float w, float h, Color col)
         {
-            using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.1f) { LineJoin = LineJoin.Round })
-            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen pGrid = new Pen(Color.FromArgb(170, 168, 166), 1.0f))
+            using (Pen pBox = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawRectangle(p, x, y + 2, w, h - 4);
-                g.DrawLine(pArrow, x + 3, y + h / 2, x + w - 3, y + h / 2);
-                g.DrawLine(pArrow, x + 5, y + h / 2 - 2.5f, x + 3, y + h / 2);
-                g.DrawLine(pArrow, x + 5, y + h / 2 + 2.5f, x + 3, y + h / 2);
-                g.DrawLine(pArrow, x + w - 5, y + h / 2 - 2.5f, x + w - 3, y + h / 2);
-                g.DrawLine(pArrow, x + w - 5, y + h / 2 + 2.5f, x + w - 3, y + h / 2);
+                // Top and bottom unmerged cell dividers (2 columns)
+                g.DrawRectangle(pGrid, x, y, w, h);
+                g.DrawLine(pGrid, x + w / 2f, y, x + w / 2f, y + 3);
+                g.DrawLine(pGrid, x + w / 2f, y + h - 3, x + w / 2f, y + h);
+
+                // Merged center band
+                g.FillRectangle(Brushes.White, x, y + 3, w, h - 6);
+                g.DrawRectangle(pBox, x, y + 3, w, h - 6);
+
+                float cy = y + h / 2f;
+                g.DrawLine(pArrow, x + 2.5f, cy, x + w - 2.5f, cy);
+                g.DrawLine(pArrow, x + 4.5f, cy - 2.0f, x + 2.5f, cy);
+                g.DrawLine(pArrow, x + 4.5f, cy + 2.0f, x + 2.5f, cy);
+                g.DrawLine(pArrow, x + w - 4.5f, cy - 2.0f, x + w - 2.5f, cy);
+                g.DrawLine(pArrow, x + w - 4.5f, cy + 2.0f, x + w - 2.5f, cy);
             }
         }
 
         private void DrawWrapTextIcon(Graphics g, float x, float y, Color col)
         {
-            using (Pen pLine = new Pen(Color.FromArgb(89, 89, 89), 1.1f) { StartCap = LineCap.Flat, EndCap = LineCap.Flat })
-            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (Font f = new Font("Segoe UI", 6.2f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                // Top text line
-                g.DrawLine(pLine, x + 1, y + 3, x + 11, y + 3);
-                // Return arrow curving down to second line
-                g.DrawLine(pArrow, x + 12, y + 3, x + 15, y + 3);
-                g.DrawLine(pArrow, x + 15, y + 3, x + 15, y + 9);
-                g.DrawLine(pArrow, x + 15, y + 9, x + 7, y + 9);
-                // Arrowhead pointing left
-                g.DrawLine(pArrow, x + 9, y + 7, x + 6.5f, y + 9);
-                g.DrawLine(pArrow, x + 9, y + 11, x + 6.5f, y + 9);
-                // Bottom text line
-                g.DrawLine(pLine, x + 1, y + 9, x + 5, y + 9);
+                // Excel Wrap Text: "ab" on top, "c" on bottom, blue U-turn arrow wrapping from top-right to bottom
+                g.DrawString("ab", f, bTxt, x - 0.5f, y - 2.5f);
+                g.DrawString("c", f, bTxt, x - 0.5f, y + 4.5f);
+
+                g.DrawLine(pArrow, x + 10.5f, y + 3.0f, x + 14.5f, y + 3.0f);
+                g.DrawLine(pArrow, x + 14.5f, y + 3.0f, x + 14.5f, y + 10.0f);
+                g.DrawLine(pArrow, x + 14.5f, y + 10.0f, x + 6.5f, y + 10.0f);
+                g.DrawLine(pArrow, x + 8.8f, y + 8.0f, x + 6.5f, y + 10.0f);
+                g.DrawLine(pArrow, x + 8.8f, y + 12.0f, x + 6.5f, y + 10.0f);
             }
         }
 
         private void DrawCalcPaintBucket(Graphics g, float x, float y, Color activeBg)
         {
-            using (Pen pOutline = new Pen(Color.FromArgb(89, 89, 89), 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (SolidBrush bBody = new SolidBrush(Color.FromArgb(248, 248, 248)))
-            using (SolidBrush bPaint = new SolidBrush(activeBg != Color.Transparent && activeBg.A > 0 ? activeBg : Color.FromArgb(250, 204, 21)))
-            {
-                PointF[] bucket = new PointF[] {
-                    new PointF(x + 1.5f, y + 2.5f),
-                    new PointF(x + 11.5f, y + 2.5f),
-                    new PointF(x + 10f, y + 11f),
-                    new PointF(x + 3f, y + 11f)
-                };
-                g.FillPolygon(bBody, bucket);
-                g.DrawPolygon(pOutline, bucket);
-                g.DrawLine(pOutline, x + 1.5f, y + 2.5f, x + 11.5f, y + 2.5f);
-                g.DrawArc(pOutline, x + 3.5f, y - 0.5f, 6f, 4f, 180, 180);
-                g.FillEllipse(bPaint, x + 10.5f, y + 6f, 3f, 4.5f);
-                DrawDropdownChevron(g, x + 16f, y + 7f, Color.FromArgb(110, 110, 110));
+            Color barColor = (activeBg != Color.Transparent && activeBg.A > 0)
+                ? activeBg : Color.FromArgb(255, 242, 0);
+            Color strokeColor = Color.FromArgb(59, 58, 57);
 
-                using (SolidBrush bBar = new SolidBrush(activeBg != Color.Transparent && activeBg.A > 0 ? activeBg : Color.FromArgb(250, 204, 21)))
-                {
-                    g.FillRectangle(bBar, x + 1, y + 15, 14, 3);
-                }
+            using (Pen pOutline = new Pen(strokeColor, 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bDrop = new SolidBrush(barColor))
+            {
+                // Top handle post
+                g.DrawLine(pOutline, x + 6.5f, y + 2.5f, x + 6.5f, y + 5.5f);
+
+                // Tilted diamond bucket body (exact Office Shading/Fill bucket)
+                PointF[] bucket = new PointF[] {
+                    new PointF(x + 6.5f, y + 3.8f),
+                    new PointF(x + 10.5f, y + 7.8f),
+                    new PointF(x + 6.5f, y + 11.8f),
+                    new PointF(x + 2.5f, y + 7.8f)
+                };
+                g.FillPolygon(Brushes.White, bucket);
+                g.DrawPolygon(pOutline, bucket);
+
+                // Horizontal paint level line inside bucket
+                g.DrawLine(pOutline, x + 3.2f, y + 8.2f, x + 9.8f, y + 8.2f);
+
+                // Paint drop on right spout
+                PointF[] drop = new PointF[] {
+                    new PointF(x + 11.8f, y + 7.2f),
+                    new PointF(x + 13.2f, y + 9.8f),
+                    new PointF(x + 11.8f, y + 11.2f),
+                    new PointF(x + 10.4f, y + 9.8f)
+                };
+                g.FillPolygon(bDrop, drop);
+                g.FillEllipse(bDrop, x + 10.4f, y + 9.0f, 2.8f, 2.6f);
+
+                // Bottom color bar (14x3.5px) aligned with Font Color
+                g.FillRectangle(bDrop, x + 1.0f, y + 14.0f, 14.0f, 3.5f);
             }
+
+            DrawDropdownChevron(g, x + 17.5f, y + 9.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawCalcFontColorBtn(Graphics g, float x, float y, Color activeTxt, Font boldFont)
         {
-            using (SolidBrush bA = new SolidBrush(Color.FromArgb(38, 38, 42)))
+            Color fcBarColor = (activeTxt != Color.Transparent && activeTxt.A > 0)
+                ? activeTxt : Color.FromArgb(232, 17, 35);
+            using (Font fRegA = new Font("Segoe UI", 9.0f, FontStyle.Regular))
+            using (SolidBrush bA = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (SolidBrush fcBar = new SolidBrush(fcBarColor))
             {
-                g.DrawString("A", boldFont, bA, x + 2, y + 1);
+                g.DrawString("A", fRegA, bA, x + 2.5f, y + 0.5f);
+                g.FillRectangle(fcBar, x + 1.0f, y + 14.0f, 14.0f, 3.5f);
             }
-            DrawDropdownChevron(g, x + 17f, y + 10f, Color.FromArgb(100, 116, 139));
-            using (SolidBrush fcBar = new SolidBrush(activeTxt != Color.Transparent && activeTxt.A > 0 ? activeTxt : Color.FromArgb(220, 38, 38)))
-            {
-                g.FillRectangle(fcBar, x + 2, y + 18, 14, 3);
-            }
+            DrawDropdownChevron(g, x + 17.5f, y + 9.0f, Color.FromArgb(96, 94, 92));
         }
 
         private void DrawDecimalIncIcon(Graphics g, float x, float y, Color col)
         {
-            using (Font f = new Font("Segoe UI", 6.8f, FontStyle.Bold))
-            using (Pen p = new Pen(col, 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Font f = new Font("Segoe UI", 5.5f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString(".0", f, Brushes.Black, x - 2, y - 2);
-                p.CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(2.2f, 2.2f);
-                g.DrawLine(p, x + 4, y + 9, x + 11, y + 9);
+                // Top: .0, Bottom: .00, Left: blue arrow ← pointing left
+                g.DrawString(".0", f, bTxt, x + 6.5f, y - 0.5f);
+                g.DrawString(".00", f, bTxt, x + 3.5f, y + 6.5f);
+                g.DrawLine(pArr, x + 6.0f, y + 4.5f, x + 1.0f, y + 4.5f);
+                g.DrawLine(pArr, x + 3.0f, y + 2.7f, x + 1.0f, y + 4.5f);
+                g.DrawLine(pArr, x + 3.0f, y + 6.3f, x + 1.0f, y + 4.5f);
             }
         }
 
         private void DrawDecimalDecIcon(Graphics g, float x, float y, Color col)
         {
-            using (Font f = new Font("Segoe UI", 6.8f, FontStyle.Bold))
-            using (Pen p = new Pen(col, 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Font f = new Font("Segoe UI", 5.5f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString(".00", f, Brushes.Black, x - 2, y - 2);
-                p.CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(2.2f, 2.2f);
-                g.DrawLine(p, x + 11, y + 9, x + 4, y + 9);
+                // Top: .00, Bottom: .0, Left: blue arrow → pointing right
+                g.DrawString(".00", f, bTxt, x + 3.5f, y - 0.5f);
+                g.DrawString(".0", f, bTxt, x + 6.5f, y + 6.5f);
+                g.DrawLine(pArr, x + 1.0f, y + 10.5f, x + 6.0f, y + 10.5f);
+                g.DrawLine(pArr, x + 4.0f, y + 8.7f, x + 6.0f, y + 10.5f);
+                g.DrawLine(pArr, x + 4.0f, y + 12.3f, x + 6.0f, y + 10.5f);
             }
         }
 
         private void DrawAutoSumIcon(Graphics g, float x, float y, int size, Color col)
         {
-            using (Font f = new Font("Segoe UI", 10.5f, FontStyle.Bold))
+            Color sigmaCol = (col == Color.Black) ? Color.FromArgb(16, 110, 190) : col;
+            using (Pen p = new Pen(sigmaCol, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
-                g.DrawString("∑", f, col.ToBrush(), x, y - 2);
+                float sx = x + 2.0f, sy = y + 2.0f, sw = size - 5.0f, sh = size - 4.0f;
+                PointF[] pts = new PointF[] {
+                    new PointF(sx + sw, sy + 1.5f),
+                    new PointF(sx + sw, sy),
+                    new PointF(sx, sy),
+                    new PointF(sx + sw * 0.55f, sy + sh * 0.5f),
+                    new PointF(sx, sy + sh),
+                    new PointF(sx + sw, sy + sh),
+                    new PointF(sx + sw, sy + sh - 1.5f)
+                };
+                g.DrawLines(p, pts);
             }
         }
 
         private void DrawSortFilterIcon(Graphics g, int x, int y, int size, Color col)
         {
-            using (Pen p = new Pen(col, 1.1f))
+            using (Pen p = new Pen(Color.FromArgb(96, 94, 92), 1.15f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bFill = new SolidBrush(Color.White))
+            using (SolidBrush bTop = new SolidBrush(Color.FromArgb(219, 234, 254)))
             {
                 PointF[] funnel = new PointF[] {
-                    new PointF(x, y), new PointF(x + size, y),
-                    new PointF(x + size * 0.6f, y + size * 0.55f),
-                    new PointF(x + size * 0.6f, y + size),
-                    new PointF(x + size * 0.4f, y + size * 0.8f),
-                    new PointF(x + size * 0.4f, y + size * 0.55f)
+                    new PointF(x + 1, y + 2),
+                    new PointF(x + size - 1, y + 2),
+                    new PointF(x + size * 0.62f, y + size * 0.52f),
+                    new PointF(x + size * 0.62f, y + size - 1),
+                    new PointF(x + size * 0.38f, y + size - 3),
+                    new PointF(x + size * 0.38f, y + size * 0.52f)
                 };
-                using (SolidBrush b = new SolidBrush(Color.FromArgb(40, col))) g.FillPolygon(b, funnel);
+                g.FillPolygon(bFill, funnel);
+                g.FillRectangle(bTop, x + 2, y + 2, size - 4, 3);
                 g.DrawPolygon(p, funnel);
             }
         }
 
         private void DrawSortFilterIconLarge(Graphics g, float x, float y)
         {
-            using (Font f = new Font("Segoe UI", 7.2f, FontStyle.Bold))
-            using (SolidBrush b = new SolidBrush(Color.FromArgb(2, 132, 199)))
-            using (Pen pArr = new Pen(Color.FromArgb(2, 132, 199), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (Pen pFunnel = new Pen(Color.FromArgb(75, 85, 99), 1.2f) { LineJoin = LineJoin.Round })
+            using (Font f = new Font("Segoe UI", 6.8f, FontStyle.Bold))
+            using (SolidBrush bA = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (SolidBrush bZ = new SolidBrush(Color.FromArgb(59, 58, 57)))
+            using (Pen pFunnel = new Pen(Color.FromArgb(96, 94, 92), 1.15f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bTop = new SolidBrush(Color.FromArgb(226, 232, 240)))
             {
-                g.DrawString("A", f, b, x, y - 2);
-                g.DrawString("Z", f, b, x, y + 8);
-                pArr.CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(2f, 2f);
-                g.DrawLine(pArr, x + 8, y + 1, x + 8, y + 18);
+                // Left: A stacked over Z
+                g.DrawString("A", f, bA, x - 1.0f, y - 1.5f);
+                g.DrawString("Z", f, bZ, x - 1.0f, y + 7.5f);
 
+                // Right: Crisp Excel filter funnel
                 PointF[] funnel = new PointF[] {
-                    new PointF(x + 11, y + 2),
-                    new PointF(x + 20, y + 2),
-                    new PointF(x + 17, y + 9),
-                    new PointF(x + 17, y + 17),
-                    new PointF(x + 14, y + 17),
-                    new PointF(x + 14, y + 9)
+                    new PointF(x + 8.5f, y + 2.5f),
+                    new PointF(x + 21.5f, y + 2.5f),
+                    new PointF(x + 16.5f, y + 9.5f),
+                    new PointF(x + 16.5f, y + 17.5f),
+                    new PointF(x + 13.5f, y + 16.0f),
+                    new PointF(x + 13.5f, y + 9.5f)
                 };
+                g.FillPolygon(Brushes.White, funnel);
+                g.FillRectangle(bTop, x + 9.5f, y + 2.5f, 11.0f, 2.5f);
                 g.DrawPolygon(pFunnel, funnel);
             }
         }
 
         private void DrawFindSelectIconLarge(Graphics g, float x, float y)
         {
-            using (Pen pLens = new Pen(Color.FromArgb(75, 85, 99), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (Pen pHandle = new Pen(Color.FromArgb(55, 65, 81), 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            using (SolidBrush bGlass = new SolidBrush(Color.FromArgb(224, 242, 254)))
+            // Authentic Office Find & Select magnifying glass (handle bottom-left, crisp blue-tinted lens top-right)
+            using (Pen pLens = new Pen(Color.FromArgb(59, 58, 57), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen pHandle = new Pen(Color.FromArgb(59, 58, 57), 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bGlass = new SolidBrush(Color.FromArgb(219, 234, 254)))
+            using (Pen pInner = new Pen(Color.FromArgb(16, 110, 190), 1.0f))
             {
-                g.FillEllipse(bGlass, x + 1, y + 1, 12, 12);
-                g.DrawEllipse(pLens, x + 1, y + 1, 12, 12);
-                g.DrawLine(pHandle, x + 10, y + 10, x + 17, y + 17);
-                using (Pen pGlint = new Pen(Color.White, 1.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                    g.DrawArc(pGlint, x + 3, y + 3, 8, 8, 180, 80);
+                g.DrawLine(pHandle, x + 8.5f, y + 10.5f, x + 2.5f, y + 16.5f);
+                g.FillEllipse(bGlass, x + 6.5f, y + 1.0f, 12.0f, 12.0f);
+                g.DrawEllipse(pLens, x + 6.5f, y + 1.0f, 12.0f, 12.0f);
+                g.DrawArc(pInner, x + 8.5f, y + 3.0f, 8.0f, 8.0f, 190, 85);
             }
         }
 
         private void DrawConditionalFormatIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 18;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (SolidBrush bRed1 = new SolidBrush(Color.FromArgb(248, 113, 113)))
-            using (SolidBrush bRed2 = new SolidBrush(Color.FromArgb(252, 165, 165)))
-            using (SolidBrush bBlue = new SolidBrush(Color.FromArgb(147, 197, 253)))
+            float w = 22f, h = 17f;
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(180, 178, 176), 1.0f))
+            using (SolidBrush bRed = new SolidBrush(Color.FromArgb(248, 113, 113)))
+            using (SolidBrush bBlue = new SolidBrush(Color.FromArgb(96, 165, 250)))
             {
                 g.FillRectangle(Brushes.White, x, y, w, h);
-                // Heatmap middle column cells
-                g.FillRectangle(bRed1, x + 7, y, 7, 6);
-                g.FillRectangle(bRed2, x + 7, y + 6, 7, 6);
-                g.FillRectangle(bBlue, x + 7, y + 12, 7, 6);
 
-                g.DrawRectangle(pGrid, x, y, w, h);
-                g.DrawLine(pThin, x + 7, y, x + 7, y + h);
-                g.DrawLine(pThin, x + 14, y, x + 14, y + h);
-                g.DrawLine(pThin, x, y + 6, x + w, y + 6);
-                g.DrawLine(pThin, x, y + 12, x + w, y + 12);
+                // Excel Conditional Formatting colored cells (coral-red & sky-blue)
+                g.FillRectangle(bRed, x + 8, y + 1, 6, 5);
+                g.FillRectangle(bBlue, x + 15, y + 1, 6, 5);
+                g.FillRectangle(bRed, x + 15, y + 6, 6, 5);
+                g.FillRectangle(bBlue, x + 8, y + 11, 6, 5);
+
+                g.DrawLine(pGrid, x + 7, y, x + 7, y + h);
+                g.DrawLine(pGrid, x + 14, y, x + 14, y + h);
+                g.DrawLine(pGrid, x, y + 6, x + w, y + 6);
+                g.DrawLine(pGrid, x, y + 11, x + w, y + 11);
+                g.DrawRectangle(pBorder, x, y, w, h);
             }
         }
 
         private void DrawFormatTableIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 18;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (SolidBrush bHead = new SolidBrush(Color.FromArgb(37, 99, 235)))
-            using (SolidBrush bAlt = new SolidBrush(Color.FromArgb(239, 246, 255)))
+            float w = 22f, h = 17f;
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(180, 178, 176), 1.0f))
+            using (SolidBrush bHead = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (SolidBrush bAlt = new SolidBrush(Color.FromArgb(219, 234, 254)))
             {
                 g.FillRectangle(Brushes.White, x, y, w, h);
                 g.FillRectangle(bHead, x, y, w, 5);
-                g.FillRectangle(bAlt, x, y + 9, w, 4);
+                g.FillRectangle(bAlt, x + 1, y + 10, w - 2, 4);
 
-                g.DrawRectangle(pGrid, x, y, w, h);
-                g.DrawLine(pThin, x, y + 5, x + w, y + 5);
-                g.DrawLine(pThin, x, y + 9, x + w, y + 9);
-                g.DrawLine(pThin, x, y + 13, x + w, y + 13);
-                g.DrawLine(pThin, x + 7, y + 5, x + 7, y + h);
-                g.DrawLine(pThin, x + 14, y + 5, x + 14, y + h);
+                g.DrawLine(pGrid, x, y + 5, x + w, y + 5);
+                g.DrawLine(pGrid, x, y + 10, x + w, y + 10);
+                g.DrawLine(pGrid, x, y + 14, x + w, y + 14);
+                g.DrawLine(pGrid, x + 7, y + 5, x + 7, y + h);
+                g.DrawLine(pGrid, x + 14, y + 5, x + 14, y + h);
+                g.DrawRectangle(pBorder, x, y, w, h);
 
-                // Elegant diagonal paintbrush
-                using (Pen pWood = new Pen(Color.FromArgb(180, 83, 9), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                using (Pen pFerr = new Pen(Color.FromArgb(156, 163, 175), 1.5f))
-                using (SolidBrush bTip = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                // Slanted Office artist paintbrush overlapping bottom-right
+                using (Pen pHandle = new Pen(Color.FromArgb(196, 118, 12), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (Pen pFerr = new Pen(Color.FromArgb(96, 94, 92), 1.8f))
+                using (SolidBrush bTip = new SolidBrush(Color.FromArgb(16, 110, 190)))
                 {
-                    g.DrawLine(pWood, x + w + 1, y - 1, x + w - 4, y + 7);
-                    g.DrawLine(pFerr, x + w - 4, y + 7, x + w - 6, y + 10);
+                    g.DrawLine(pHandle, x + w + 2, y + 3, x + w - 4, y + 11);
+                    g.DrawLine(pFerr, x + w - 4, y + 11, x + w - 6, y + 13.5f);
                     PointF[] tip = new PointF[] {
-                        new PointF(x + w - 6, y + 10),
-                        new PointF(x + w - 9, y + 14),
-                        new PointF(x + w - 4, y + 12)
+                        new PointF(x + w - 6, y + 13),
+                        new PointF(x + w - 10, y + 17.5f),
+                        new PointF(x + w - 4.5f, y + 15.5f)
                     };
                     g.FillPolygon(bTip, tip);
                 }
@@ -13549,41 +13783,48 @@ namespace ZenQOffice.UI
 
         private void DrawInsertCellsIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 16;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (SolidBrush bBlueCol = new SolidBrush(Color.FromArgb(191, 219, 254)))
-            using (SolidBrush bIndicator = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(170, 168, 166), 1.0f))
+            using (Pen pBlue = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (SolidBrush bBlueTint = new SolidBrush(Color.FromArgb(219, 234, 254)))
             {
-                g.FillRectangle(Brushes.White, x, y + 2, w, h);
-                g.FillRectangle(bBlueCol, x, y + 2, 7, h);
+                // Left 3-row cell stack
+                g.FillRectangle(Brushes.White, x, y + 1, 9, 16);
+                g.DrawLine(pGrid, x, y + 6, x + 9, y + 6);
+                g.DrawLine(pGrid, x, y + 11, x + 9, y + 11);
+                g.DrawRectangle(pBorder, x, y + 1, 9, 16);
 
-                g.DrawRectangle(pGrid, x, y + 2, w, h);
-                g.DrawLine(pThin, x + 7, y + 2, x + 7, y + 2 + h);
-                g.DrawLine(pThin, x + 14, y + 2, x + 14, y + 2 + h);
-                g.DrawLine(pThin, x, y + 2 + h / 2, x + w, y + 2 + h / 2);
+                // Highlighted middle row & inserted cell on right with blue ← arrow
+                g.FillRectangle(bBlueTint, x + 1, y + 6, 8, 5);
+                g.DrawRectangle(pBlue, x, y + 6, 9, 5);
 
-                // Clean small insert tab indicator at top of column
-                g.FillRectangle(bIndicator, x + 1, y, 5, 3);
+                // Arrow ← pointing into the row
+                g.DrawLine(pBlue, x + 19, y + 8.5f, x + 12, y + 8.5f);
+                g.DrawLine(pBlue, x + 14.5f, y + 6.2f, x + 12, y + 8.5f);
+                g.DrawLine(pBlue, x + 14.5f, y + 10.8f, x + 12, y + 8.5f);
             }
         }
 
         private void DrawDeleteCellsIcon(Graphics g, float x, float y)
         {
-            float w = 20, h = 16;
-            using (Pen pGrid = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { LineJoin = LineJoin.Round })
-            using (Pen pThin = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
-            using (Pen pRed = new Pen(Color.FromArgb(239, 68, 68), 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pGrid = new Pen(Color.FromArgb(170, 168, 166), 1.0f))
+            using (Pen pRed = new Pen(Color.FromArgb(220, 38, 38), 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bRedTint = new SolidBrush(Color.FromArgb(254, 226, 226)))
             {
-                g.FillRectangle(Brushes.White, x, y + 2, w, h);
-                g.DrawRectangle(pGrid, x, y + 2, w, h);
-                g.DrawLine(pThin, x + 7, y + 2, x + 7, y + 2 + h);
-                g.DrawLine(pThin, x + 14, y + 2, x + 14, y + 2 + h);
-                g.DrawLine(pThin, x, y + 2 + h / 2, x + w, y + 2 + h / 2);
+                // Left 3-row cell stack
+                g.FillRectangle(Brushes.White, x, y + 1, 9, 16);
+                g.DrawLine(pGrid, x, y + 6, x + 9, y + 6);
+                g.DrawLine(pGrid, x, y + 11, x + 9, y + 11);
+                g.DrawRectangle(pBorder, x, y + 1, 9, 16);
 
-                // Thin elegant red cross in middle column
-                g.DrawLine(pRed, x + 8.5f, y + 5.5f, x + 12.5f, y + 13.5f);
-                g.DrawLine(pRed, x + 12.5f, y + 5.5f, x + 8.5f, y + 13.5f);
+                // Highlighted middle row being deleted
+                g.FillRectangle(bRedTint, x + 1, y + 6, 8, 5);
+                g.DrawRectangle(new Pen(Color.FromArgb(220, 38, 38), 1.0f), x, y + 6, 9, 5);
+
+                // Crisp red × on the right
+                g.DrawLine(pRed, x + 12.5f, y + 5.5f, x + 18.5f, y + 11.5f);
+                g.DrawLine(pRed, x + 18.5f, y + 5.5f, x + 12.5f, y + 11.5f);
             }
         }
 
@@ -13874,22 +14115,82 @@ namespace ZenQOffice.UI
 
         private void DrawNewSlideCardVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.NewSlide, new Rectangle(x, y, w, h), Math.Min(w - 6, 32), Math.Min(h - 6, 26));
+            float sx = x + (w - 28f) / 2f;
+            float sy = y + (h - 20f) / 2f + 1f;
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (Pen pBox = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+            using (SolidBrush bTitle = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            using (SolidBrush bSub = new SolidBrush(Color.FromArgb(241, 245, 249)))
+            {
+                // White slide card (26x19)
+                g.FillRectangle(Brushes.White, sx + 2, sy + 2, 26, 19);
+                g.FillRectangle(bTitle, sx + 5, sy + 5, 20, 3.5f);
+                g.FillRectangle(bSub, sx + 5, sy + 10.5f, 9, 7.5f);
+                g.DrawRectangle(pBox, sx + 5, sy + 10.5f, 9, 7.5f);
+                g.FillRectangle(bSub, sx + 16, sy + 10.5f, 9, 7.5f);
+                g.DrawRectangle(pBox, sx + 16, sy + 10.5f, 9, 7.5f);
+                g.DrawRectangle(pBorder, sx + 2, sy + 2, 26, 19);
+
+                // Sparkle/Plus badge at top-left (authentic Office New Slide sun/plus burst)
+                float bx = sx + 3.5f, by = sy + 3.5f;
+                g.FillEllipse(Brushes.White, bx - 4.5f, by - 4.5f, 9f, 9f);
+                using (Pen pSun = new Pen(Color.FromArgb(234, 88, 12), 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (Pen pGold = new Pen(Color.FromArgb(245, 158, 11), 1.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    g.DrawLine(pGold, bx - 2.5f, by - 2.5f, bx + 2.5f, by + 2.5f);
+                    g.DrawLine(pGold, bx + 2.5f, by - 2.5f, bx - 2.5f, by + 2.5f);
+                    g.DrawLine(pSun, bx - 3.5f, by, bx + 3.5f, by);
+                    g.DrawLine(pSun, bx, by - 3.5f, bx, by + 3.5f);
+                }
+            }
         }
 
         private void DrawSlideLayoutVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            FluentIconRenderer.DrawGlyph(g, '\uF158', new Rectangle(x, y, w, h), col, 13f);
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (SolidBrush bTop = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            using (Pen pBox = new Pen(Color.FromArgb(130, 138, 150), 1.0f))
+            {
+                g.FillRectangle(Brushes.White, x, y, 15, 12);
+                g.DrawRectangle(pBorder, x, y, 15, 12);
+                g.FillRectangle(bTop, x + 2, y + 2, 11, 2.5f);
+                g.DrawRectangle(pBox, x + 2, y + 6, 5, 4);
+                g.DrawRectangle(pBox, x + 8, y + 6, 5, 4);
+            }
         }
 
         private void DrawResetVector(Graphics g, int cx, int cy, int r, Color col)
         {
-            FluentIconRenderer.DrawGlyph(g, '\uE777', new Rectangle(cx - 7, cy - 7, 14, 14), col, 12f);
+            float sx = cx - 7f, sy = cy - 6f;
+            using (Pen pSlide = new Pen(Color.FromArgb(140, 138, 136), 1.0f))
+            using (Pen pArrow = new Pen(Color.FromArgb(16, 110, 190), 1.25f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            {
+                // Mini slide behind on right
+                g.FillRectangle(Brushes.White, sx + 3, sy + 1, 11, 9);
+                g.DrawRectangle(pSlide, sx + 3, sy + 1, 11, 9);
+
+                // Crisp blue circular reset arrow on left-bottom
+                g.DrawArc(pArrow, sx, sy + 2.5f, 8.5f, 8.5f, 200, 290);
+                g.DrawLine(pArrow, sx + 1.0f, sy + 5.0f, sx + 0.5f, sy + 2.2f);
+                g.DrawLine(pArrow, sx + 1.0f, sy + 5.0f, sx + 3.8f, sy + 4.5f);
+            }
         }
 
         private void DrawDuplicateVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            FluentIconRenderer.DrawGlyph(g, '\uE8C8', new Rectangle(x, y, w, h), col, 13f);
+            using (Pen pBorder = new Pen(Color.FromArgb(96, 94, 92), 1.0f))
+            using (SolidBrush bHdr = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            {
+                // Back slide
+                g.FillRectangle(Brushes.White, x, y - 1, 10, 8);
+                g.FillRectangle(bHdr, x + 1, y, 8, 2);
+                g.DrawRectangle(pBorder, x, y - 1, 10, 8);
+
+                // Front slide
+                g.FillRectangle(Brushes.White, x + 4, y + 3, 10, 8);
+                g.FillRectangle(bHdr, x + 5, y + 4, 8, 2);
+                g.DrawRectangle(pBorder, x + 4, y + 3, 10, 8);
+            }
         }
 
         private void DrawAlignVector(Graphics g, int x, int y, int w, int h, int align, Color col)
@@ -13921,20 +14222,68 @@ namespace ZenQOffice.UI
                 if (type == ShapeType.TextBox)
                 {
                     Rectangle r = new Rectangle(x + 1, y + 1, w - 3, h - 3);
-                    g.DrawRectangle(p, r);
-                    using (Font f = new Font("Segoe UI", 7.0f, FontStyle.Bold))
-                    using (SolidBrush b = new SolidBrush(strokeCol))
+                    using (Pen pBox = new Pen(Color.FromArgb(140, 138, 136), 1.0f))
                     {
-                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                        g.DrawString("A", f, b, new RectangleF(r.X, r.Y, r.Width, r.Height), sf);
+                        g.FillRectangle(Brushes.White, r);
+                        g.DrawRectangle(pBox, r);
                     }
-                    // 4 corner handles characteristic of PowerPoint text box
-                    using (SolidBrush hb = new SolidBrush(strokeCol))
+                    using (Font f = new Font("Segoe UI", 6.5f, FontStyle.Bold))
+                    using (SolidBrush b = new SolidBrush(strokeCol))
+                    using (Pen pLines = new Pen(Color.FromArgb(140, 138, 136), 1.0f))
                     {
-                        g.FillRectangle(hb, r.Left - 1, r.Top - 1, 3, 3);
-                        g.FillRectangle(hb, r.Right - 2, r.Top - 1, 3, 3);
-                        g.FillRectangle(hb, r.Left - 1, r.Bottom - 2, 3, 3);
-                        g.FillRectangle(hb, r.Right - 2, r.Bottom - 2, 3, 3);
+                        g.DrawString("A", f, b, r.X + 0.5f, r.Y - 1.0f);
+                        g.DrawLine(pLines, r.X + 7.5f, r.Y + 4.0f, r.Right - 2.0f, r.Y + 4.0f);
+                        g.DrawLine(pLines, r.X + 2.5f, r.Y + 8.0f, r.Right - 2.0f, r.Y + 8.0f);
+                    }
+                }
+                else if (type == ShapeType.Lightning)
+                {
+                    PointF[] bolt = new PointF[] {
+                        new PointF(x + w * 0.55f, y + 1),
+                        new PointF(x + 2, y + h * 0.55f),
+                        new PointF(x + w * 0.48f, y + h * 0.55f),
+                        new PointF(x + w * 0.38f, y + h - 1),
+                        new PointF(x + w - 2, y + h * 0.42f),
+                        new PointF(x + w * 0.52f, y + h * 0.42f)
+                    };
+                    g.DrawPolygon(p, bolt);
+                }
+                else if (type == ShapeType.Heart)
+                {
+                    float cx = x + w / 2f;
+                    using (GraphicsPath hp = new GraphicsPath())
+                    {
+                        hp.AddBezier(cx, y + h - 2, x + 1, y + h * 0.62f, x + 1, y + 2, cx, y + 4.5f);
+                        hp.AddBezier(cx, y + 4.5f, x + w - 1, y + 2, x + w - 1, y + h * 0.62f, cx, y + h - 2);
+                        g.DrawPath(p, hp);
+                    }
+                }
+                else if (type == ShapeType.Cloud)
+                {
+                    g.DrawArc(p, x + 1, y + 5, 5, 5, 90, 190);
+                    g.DrawArc(p, x + 3.5f, y + 2, 6.5f, 6, 180, 180);
+                    g.DrawArc(p, x + 8.5f, y + 4.5f, 5.5f, 5.5f, 250, 200);
+                    g.DrawLine(p, x + 3.5f, y + 10, x + 11.5f, y + 10);
+                }
+                else if (type == ShapeType.Sun)
+                {
+                    float cx = x + w / 2f, cy = y + h / 2f;
+                    g.DrawEllipse(p, cx - 3.2f, cy - 3.2f, 6.4f, 6.4f);
+                    for (int i = 0; i < 8; i++)
+                    {
+                        double a = i * Math.PI / 4.0;
+                        g.DrawLine(p, cx + (float)(4.4 * Math.Cos(a)), cy + (float)(4.4 * Math.Sin(a)),
+                                      cx + (float)(6.0 * Math.Cos(a)), cy + (float)(6.0 * Math.Sin(a)));
+                    }
+                }
+                else if (type == ShapeType.Moon)
+                {
+                    using (GraphicsPath mp = new GraphicsPath())
+                    {
+                        mp.AddArc(x + 2, y + 1.5f, w - 4, h - 3, 65, 230);
+                        mp.AddArc(x + 5, y + 2.5f, w - 6, h - 5, 275, -190);
+                        mp.CloseFigure();
+                        g.DrawPath(p, mp);
                     }
                 }
                 else if (type == ShapeType.Line)
@@ -14621,6 +14970,218 @@ namespace ZenQOffice.UI
             menu.Show(parentForm != null ? parentForm.PointToScreen(screenPos) : screenPos);
         }
 
+        private void DrawSlidesColumnsIcon(Graphics g, float x, float y, Color col, Color chevronCol)
+        {
+            using (Pen pLine = new Pen(col, 1.0f))
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    float ly = y + 3.0f + i * 3.0f;
+                    g.DrawLine(pLine, x + 1.0f, ly, x + 6.0f, ly);
+                    g.DrawLine(pLine, x + 8.5f, ly, x + 13.5f, ly);
+                }
+            }
+            DrawDropdownChevron(g, x + 17.5f, y + 7.5f, chevronCol);
+        }
+
+        private void DrawSlidesTextDirectionIcon(Graphics g, float x, float y, Color col, Color arrowCol)
+        {
+            using (Font f = new Font("Segoe UI", 5.8f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(col))
+            using (Pen pArr = new Pen(arrowCol, 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            {
+                g.DrawString("A", f, bTxt, x - 0.5f, y - 1.0f);
+                g.DrawString("B", f, bTxt, x - 0.5f, y + 6.0f);
+                // Vertical down arrow ↓ on right
+                g.DrawLine(pArr, x + 10.5f, y + 1.5f, x + 10.5f, y + 13.0f);
+                g.DrawLine(pArr, x + 8.3f, y + 10.5f, x + 10.5f, y + 13.0f);
+                g.DrawLine(pArr, x + 12.7f, y + 10.5f, x + 10.5f, y + 13.0f);
+            }
+        }
+
+        private void DrawSlidesAlignTextVertIcon(Graphics g, float x, float y, Color col, Color arrowCol)
+        {
+            using (Pen pLine = new Pen(col, 1.0f))
+            using (Pen pArr = new Pen(arrowCol, 1.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            {
+                // Top and bottom frame lines
+                g.DrawLine(pLine, x + 1.0f, y + 1.5f, x + 13.5f, y + 1.5f);
+                g.DrawLine(pLine, x + 1.0f, y + 13.5f, x + 13.5f, y + 13.5f);
+                // Middle text lines on right
+                g.DrawLine(pLine, x + 6.5f, y + 6.0f, x + 13.0f, y + 6.0f);
+                g.DrawLine(pLine, x + 6.5f, y + 9.0f, x + 11.5f, y + 9.0f);
+                // Vertical double arrow ↕ on left
+                g.DrawLine(pArr, x + 3.2f, y + 3.5f, x + 3.2f, y + 11.5f);
+                g.DrawLine(pArr, x + 1.6f, y + 5.3f, x + 3.2f, y + 3.5f);
+                g.DrawLine(pArr, x + 4.8f, y + 5.3f, x + 3.2f, y + 3.5f);
+                g.DrawLine(pArr, x + 1.6f, y + 9.7f, x + 3.2f, y + 11.5f);
+                g.DrawLine(pArr, x + 4.8f, y + 9.7f, x + 3.2f, y + 11.5f);
+            }
+        }
+
+        private void DrawSlidesSmartArtMiniIcon(Graphics g, float x, float y, Color col, Color accentGreen)
+        {
+            using (SolidBrush bGreen = new SolidBrush(accentGreen))
+            using (Pen pBox = new Pen(col, 1.0f))
+            using (Pen pArr = new Pen(Color.FromArgb(16, 110, 190), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                // Left green block + right stacked diagram nodes
+                g.FillRectangle(bGreen, x + 1.0f, y + 2.5f, 4.5f, 10.0f);
+                g.DrawRectangle(pBox, x + 1.0f, y + 2.5f, 4.5f, 10.0f);
+
+                g.FillRectangle(Brushes.White, x + 8.0f, y + 2.5f, 5.5f, 4.0f);
+                g.DrawRectangle(pBox, x + 8.0f, y + 2.5f, 5.5f, 4.0f);
+
+                g.FillRectangle(Brushes.White, x + 8.0f, y + 8.5f, 5.5f, 4.0f);
+                g.DrawRectangle(pBox, x + 8.0f, y + 8.5f, 5.5f, 4.0f);
+
+                g.DrawLine(pArr, x + 5.5f, y + 7.5f, x + 8.0f, y + 4.5f);
+                g.DrawLine(pArr, x + 5.5f, y + 7.5f, x + 8.0f, y + 10.5f);
+            }
+        }
+
+        private void DrawSlidesArrangeLargeIcon(Graphics g, float x, float y, Color col, Color frontBlue)
+        {
+            using (Pen pBack = new Pen(col, 1.0f))
+            using (SolidBrush bFront = new SolidBrush(Color.FromArgb(219, 234, 254)))
+            using (Pen pFront = new Pen(frontBlue, 1.2f))
+            {
+                // Back square (top-right, white with dark border)
+                g.FillRectangle(Brushes.White, x + 7.0f, y + 1.0f, 12.0f, 12.0f);
+                g.DrawRectangle(pBack, x + 7.0f, y + 1.0f, 12.0f, 12.0f);
+
+                // Front square (bottom-left, crisp Office blue tint & border)
+                g.FillRectangle(bFront, x + 1.0f, y + 6.0f, 12.0f, 12.0f);
+                g.DrawRectangle(pFront, x + 1.0f, y + 6.0f, 12.0f, 12.0f);
+            }
+        }
+
+        private void DrawSlidesQuickStylesLargeIcon(Graphics g, float x, float y, Color col, Color accentBlue)
+        {
+            using (Pen pBack = new Pen(Color.FromArgb(140, 138, 136), 1.0f))
+            using (SolidBrush bMid = new SolidBrush(Color.FromArgb(254, 215, 170)))
+            using (Pen pMid = new Pen(Color.FromArgb(210, 71, 38), 1.0f))
+            using (SolidBrush bFront = new SolidBrush(Color.White))
+            using (Pen pFront = new Pen(accentBlue, 1.2f))
+            using (Font fAb = new Font("Segoe UI", 6.2f, FontStyle.Bold))
+            using (SolidBrush bTxt = new SolidBrush(accentBlue))
+            {
+                // 3 cascading style cards (back, middle orange, front blue "Ab")
+                g.FillRectangle(Brushes.White, x + 1.0f, y + 1.0f, 12.0f, 10.0f);
+                g.DrawRectangle(pBack, x + 1.0f, y + 1.0f, 12.0f, 10.0f);
+
+                g.FillRectangle(bMid, x + 4.0f, y + 4.0f, 12.0f, 10.0f);
+                g.DrawRectangle(pMid, x + 4.0f, y + 4.0f, 12.0f, 10.0f);
+
+                g.FillRectangle(bFront, x + 7.0f, y + 7.0f, 13.0f, 11.0f);
+                g.DrawRectangle(pFront, x + 7.0f, y + 7.0f, 13.0f, 11.0f);
+                g.DrawString("Ab", fAb, bTxt, x + 7.2f, y + 7.0f);
+            }
+        }
+
+        private void DrawSlidesShapeFillIcon(Graphics g, float x, float y, Color strokeCol, Color barColor)
+        {
+            using (Pen pOutline = new Pen(strokeCol, 1.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bDrop = new SolidBrush(barColor))
+            {
+                g.DrawLine(pOutline, x + 6.0f, y + 1.5f, x + 6.0f, y + 4.2f);
+                PointF[] bucket = new PointF[] {
+                    new PointF(x + 6.0f, y + 2.8f),
+                    new PointF(x + 9.8f, y + 6.5f),
+                    new PointF(x + 6.0f, y + 10.2f),
+                    new PointF(x + 2.2f, y + 6.5f)
+                };
+                g.FillPolygon(Brushes.White, bucket);
+                g.DrawPolygon(pOutline, bucket);
+                g.DrawLine(pOutline, x + 3.0f, y + 7.0f, x + 9.0f, y + 7.0f);
+
+                PointF[] drop = new PointF[] {
+                    new PointF(x + 11.2f, y + 6.0f),
+                    new PointF(x + 12.5f, y + 8.5f),
+                    new PointF(x + 11.2f, y + 9.8f),
+                    new PointF(x + 9.9f, y + 8.5f)
+                };
+                g.FillPolygon(bDrop, drop);
+                g.FillRectangle(bDrop, x + 1.0f, y + 12.2f, 13.0f, 3.0f);
+            }
+        }
+
+        private void DrawSlidesShapeOutlineIcon(Graphics g, float x, float y, Color strokeCol, Color barColor)
+        {
+            using (Pen pOutline = new Pen(strokeCol, 1.0f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bDark = new SolidBrush(strokeCol))
+            using (SolidBrush bBar = new SolidBrush(barColor))
+            {
+                // Angled pencil above color bar
+                PointF[] barrel = new PointF[] {
+                    new PointF(x + 4.8f, y + 7.2f),
+                    new PointF(x + 9.8f, y + 2.2f),
+                    new PointF(x + 12.2f, y + 4.6f),
+                    new PointF(x + 7.2f, y + 9.6f)
+                };
+                g.FillPolygon(Brushes.White, barrel);
+                g.DrawPolygon(pOutline, barrel);
+
+                PointF[] tip = new PointF[] {
+                    new PointF(x + 2.5f, y + 10.2f),
+                    new PointF(x + 4.8f, y + 7.2f),
+                    new PointF(x + 7.2f, y + 9.6f)
+                };
+                g.FillPolygon(bDark, tip);
+                g.FillRectangle(bBar, x + 1.0f, y + 12.2f, 13.0f, 3.0f);
+            }
+        }
+
+        private void DrawSlidesShapeEffectsIcon(Graphics g, float x, float y, Color strokeCol, Color glowCol)
+        {
+            using (Pen pGlow = new Pen( Color.FromArgb(140, glowCol), 2.2f) { LineJoin = LineJoin.Round })
+            using (Pen pBox = new Pen(glowCol, 1.1f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bFill = new SolidBrush(Color.FromArgb(219, 234, 254)))
+            {
+                // Glowing 3D isometric hexagon/cube matching Office Shape Effects
+                PointF[] hex = new PointF[] {
+                    new PointF(x + 7.5f, y + 1.5f),
+                    new PointF(x + 13.0f, y + 4.5f),
+                    new PointF(x + 13.0f, y + 10.5f),
+                    new PointF(x + 7.5f, y + 13.5f),
+                    new PointF(x + 2.0f, y + 10.5f),
+                    new PointF(x + 2.0f, y + 4.5f)
+                };
+                g.DrawPolygon(pGlow, hex);
+                g.FillPolygon(bFill, hex);
+                g.DrawPolygon(pBox, hex);
+                g.DrawLine(pBox, x + 2.0f, y + 4.5f, x + 7.5f, y + 7.5f);
+                g.DrawLine(pBox, x + 13.0f, y + 4.5f, x + 7.5f, y + 7.5f);
+                g.DrawLine(pBox, x + 7.5f, y + 7.5f, x + 7.5f, y + 13.5f);
+            }
+        }
+
+        private void DrawSlidesProjectorLargeIcon(Graphics g, float x, float y)
+        {
+            using (Pen pFrame = new Pen(Color.FromArgb(96, 94, 92), 1.15f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush bHeader = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            using (SolidBrush bPlay = new SolidBrush(Color.FromArgb(16, 124, 65)))
+            {
+                // Top projector roller bar
+                g.DrawLine(pFrame, x + 1.0f, y + 2.0f, x + 23.0f, y + 2.0f);
+                // Screen body
+                g.FillRectangle(Brushes.White, x + 2.5f, y + 2.0f, 19.0f, 14.0f);
+                g.FillRectangle(bHeader, x + 2.5f, y + 2.0f, 19.0f, 3.0f);
+                g.DrawRectangle(pFrame, x + 2.5f, y + 2.0f, 19.0f, 14.0f);
+                // Tripod legs at bottom
+                g.DrawLine(pFrame, x + 12.0f, y + 16.0f, x + 12.0f, y + 20.5f);
+                g.DrawLine(pFrame, x + 12.0f, y + 17.5f, x + 7.5f, y + 21.0f);
+                g.DrawLine(pFrame, x + 12.0f, y + 17.5f, x + 16.5f, y + 21.0f);
+                // Play triangle inside screen
+                PointF[] play = new PointF[] {
+                    new PointF(x + 9.5f, y + 6.5f),
+                    new PointF(x + 15.5f, y + 9.8f),
+                    new PointF(x + 9.5f, y + 13.0f)
+                };
+                g.FillPolygon(bPlay, play);
+            }
+        }
+
         private void DrawPowerPointTabHome(Graphics g, int width, SlidesView slidesView)
         {
             using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
@@ -14630,33 +15191,37 @@ namespace ZenQOffice.UI
             using (Font tinyFont = new Font("Segoe UI", 6.5f, FontStyle.Regular))
             using (SolidBrush darkBrush = new SolidBrush(Color.FromArgb(31, 41, 55)))
             {
+                g.SmoothingMode = SmoothingMode.HighQuality;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-                Color neutralIcon = Color.FromArgb(55, 65, 81);
+                Color neutralIcon = Color.FromArgb(59, 58, 57);
                 Color pptAccent = Color.FromArgb(210, 71, 38);
+                Color officeBlue = Color.FromArgb(16, 110, 190);
+                Color chevronCol = Color.FromArgb(96, 94, 92);
                 bool hasSelection = (slidesView != null && slidesView.SelectedShape != null);
-                Color disabledCol = Color.FromArgb(160, 165, 175);
-                using (SolidBrush disabledBrush = new SolidBrush(disabledCol))
+                Color disabledCol = Color.FromArgb(115, 120, 128);
+                using (SolidBrush disabledBrush = new SolidBrush(Color.FromArgb(100, 106, 115)))
                 {
                     // ==================== Group 1: Clipboard (Bảng tạm) (X: 14 to 204) ====================
                     Rectangle pasteBox = new Rectangle(14, 68, 52, 62);
                     DrawInteractiveButton(g, pasteBox, false, 4);
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Paste, new Rectangle(14, 70, 52, 34), 30, neutralIcon, pptAccent);
-                    g.DrawString("Dán ▾", btnFont, darkBrush, 22, 107);
+                    DrawPasteIconLarge(g, 22, 70);
+                    g.DrawString("Dán", btnFont, darkBrush, 24, 107);
+                    DrawDropdownChevron(g, 48, 112, chevronCol);
 
                     Rectangle cutBox = new Rectangle(72, 68, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, cutBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Cut, 76, 70, 16, 16, hasSelection ? neutralIcon : disabledCol);
+                    DrawCutIcon(g, 76, 71, neutralIcon);
                     g.DrawString("Cắt", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 70);
 
                     Rectangle copyBox = new Rectangle(72, 89, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, copyBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Copy, 76, 91, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Chép", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 91);
+                    DrawCopyIcon(g, 76, 92, neutralIcon);
+                    g.DrawString("Sao chép", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 91);
 
                     Rectangle fmtBox = new Rectangle(72, 110, 128, 20);
                     if (hasSelection) DrawInteractiveButton(g, fmtBox, false, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.FormatPainter, 76, 112, 16, 16, hasSelection ? neutralIcon : disabledCol, hasSelection ? pptAccent : disabledCol);
-                    g.DrawString("Chổi", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 112);
+                    DrawFormatPainterIcon(g, 76, 112, neutralIcon);
+                    g.DrawString("Chép định dạng", btnFont, hasSelection ? darkBrush : disabledBrush, 98, 112);
 
                     g.DrawString("Bảng tạm", labelFont, Brushes.Gray, 72, 137);
                     BtnSlidesClipboardLauncherBounds = new Rectangle(188, 134, 14, 14);
@@ -14667,56 +15232,58 @@ namespace ZenQOffice.UI
                     // ==================== Group 2: Slides (X: 212 to 374) ====================
                     Rectangle newSlideBox = new Rectangle(212, 68, 64, 62);
                     DrawInteractiveButton(g, newSlideBox, false, 4);
-                    DrawNewSlideCardVector(g, 212, 68, 64, 34);
-                    g.DrawString("Slide Mới", boldFont, darkBrush, 217, 107);
+                    DrawNewSlideCardVector(g, 212, 69, 64, 32);
+                    g.DrawString("Slide mới", btnFont, darkBrush, 218, 106);
+                    DrawDropdownChevron(g, 241, 121, chevronCol);
 
                     Rectangle layoutBox = new Rectangle(280, 68, 92, 20);
                     DrawInteractiveButton(g, layoutBox, false, 3);
-                    DrawSlideLayoutVector(g, 283, 72, 14, 12, neutralIcon);
-                    g.DrawString("Bố cục ▾", btnFont, darkBrush, 302, 70);
+                    DrawSlideLayoutVector(g, 283, 72, 15, 12, neutralIcon);
+                    g.DrawString("Bố cục", btnFont, darkBrush, 302, 70);
+                    DrawDropdownChevron(g, 344, 77, chevronCol);
 
                     Rectangle resetBox = new Rectangle(280, 89, 92, 20);
                     DrawInteractiveButton(g, resetBox, false, 3);
-                    DrawResetVector(g, 289, 98, 5, neutralIcon);
+                    DrawResetVector(g, 290, 99, 5, neutralIcon);
                     g.DrawString("Đặt lại", btnFont, darkBrush, 302, 90);
 
                     Rectangle dupBox = new Rectangle(280, 110, 92, 20);
                     DrawInteractiveButton(g, dupBox, false, 3);
-                    DrawDuplicateVector(g, 284, 114, 13, 11, neutralIcon);
-                    g.DrawString("Nhân bản", btnFont, darkBrush, 302, 110);
+                    DrawDuplicateVector(g, 283, 114, 14, 11, neutralIcon);
+                    g.DrawString("Nhân bản", btnFont, darkBrush, 302, 111);
 
                     g.DrawString("Trang chiếu", labelFont, Brushes.Gray, 260, 137);
                     g.DrawLine(Pens.LightGray, 378, 68, 378, 148);
 
                     // ==================== Group 3: Font (X: 384 to 640) ====================
-                    string currFont = hasSelection ? slidesView.SelectedShape.FontName : SelectedFont;
-                    float currSize = hasSelection ? slidesView.SelectedShape.FontSize : FontSize;
+                    string currFont = (hasSelection && !string.IsNullOrEmpty(slidesView.SelectedShape.FontName)) ? slidesView.SelectedShape.FontName : (!string.IsNullOrEmpty(SelectedFont) ? SelectedFont : "Calibri");
+                    float currSize = (hasSelection && slidesView.SelectedShape.FontSize > 0) ? slidesView.SelectedShape.FontSize : (FontSize > 0 ? FontSize : 18f);
 
                     Rectangle fontCombo = new Rectangle(384, 68, 120, 24);
-                    g.FillRectangle(hasSelection ? Brushes.White : Brushes.WhiteSmoke, fontCombo);
+                    g.FillRectangle(Brushes.White, fontCombo);
                     using (Pen pBorder = new Pen(Color.FromArgb(203, 213, 225), 1f)) g.DrawRectangle(pBorder, fontCombo);
                     if (hasSelection) DrawInteractiveButton(g, fontCombo, false, 3);
                     g.DrawString(currFont.Length > 13 ? (currFont.Substring(0, 12) + "…") : currFont, btnFont, hasSelection ? darkBrush : disabledBrush, 388, 71);
-                    DrawDropdownChevron(g, 488, 78, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawDropdownChevron(g, 490, 78, chevronCol);
 
                     Rectangle sizeCombo = new Rectangle(508, 68, 44, 24);
-                    g.FillRectangle(hasSelection ? Brushes.White : Brushes.WhiteSmoke, sizeCombo);
+                    g.FillRectangle(Brushes.White, sizeCombo);
                     using (Pen pBorder = new Pen(Color.FromArgb(203, 213, 225), 1f)) g.DrawRectangle(pBorder, sizeCombo);
                     if (hasSelection) DrawInteractiveButton(g, sizeCombo, false, 3);
                     g.DrawString(currSize.ToString("0"), btnFont, hasSelection ? darkBrush : disabledBrush, 512, 71);
-                    DrawDropdownChevron(g, 536, 78, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawDropdownChevron(g, 538, 78, chevronCol);
 
                     Rectangle aIncBox = new Rectangle(556, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, aIncBox, false, 2);
-                    DrawLucideAIncrease(g, 557, 70, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideAIncrease(g, 559, 71, neutralIcon);
 
                     Rectangle aDecBox = new Rectangle(582, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, aDecBox, false, 2);
-                    DrawLucideADecrease(g, 583, 70, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideADecrease(g, 586, 71, neutralIcon);
 
                     Rectangle clearFmtBox = new Rectangle(608, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, clearFmtBox, false, 2);
-                    DrawLucideClearFormatting(g, 609, 70);
+                    DrawLucideClearFormatting(g, 611, 71);
 
                     // Font style buttons row 2 (Y: 96) - Authentic Office 365 Typography Toolbar
                     bool isB = hasSelection ? slidesView.SelectedShape.Bold : IsBold;
@@ -14725,79 +15292,60 @@ namespace ZenQOffice.UI
                     bool isS = hasSelection ? slidesView.SelectedShape.HasTextShadow : false;
                     bool isStrike = hasSelection ? slidesView.SelectedShape.Strikethrough : false;
 
-                    // Force crisp text rendering for small font icons
                     var prevHint = g.TextRenderingHint;
                     g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-                    // 1. Bold (B) — Segoe UI 10.5pt Bold, absolute positioned
+                    // 1. Bold (B)
                     Rectangle bBox = new Rectangle(384, 96, 22, 24);
                     if (hasSelection) DrawInteractiveButton(g, bBox, isB, 2);
-                    Color bCol = !hasSelection ? disabledCol : (isB ? pptAccent : neutralIcon);
-                    using (Font fBold = new Font("Segoe UI", 10.5f, FontStyle.Bold))
-                    using (SolidBrush brB = new SolidBrush(bCol))
-                    {
-                        g.DrawString("B", fBold, brB, bBox.X + 3.5f, bBox.Y + 2f);
-                    }
+                    DrawLucideBold(g, bBox.X + 2, bBox.Y + 3, isB ? pptAccent : neutralIcon);
 
-                    // 2. Italic (I) — Georgia 11pt Italic (exact Office 365 serif I with horizontal bars)
+                    // 2. Italic (I) — Crisp serifed Italic 'I'
                     Rectangle iBox = new Rectangle(407, 96, 22, 24);
                     if (hasSelection) DrawInteractiveButton(g, iBox, isI, 2);
-                    Color iCol = !hasSelection ? disabledCol : (isI ? pptAccent : neutralIcon);
-                    using (Font fItalic = new Font("Georgia", 11.0f, FontStyle.Italic))
-                    using (SolidBrush brI = new SolidBrush(iCol))
-                    {
-                        g.DrawString("I", fItalic, brI, iBox.X + 5f, iBox.Y + 1.5f);
-                    }
+                    DrawLucideItalic(g, iBox.X + 2, iBox.Y + 3, isI ? pptAccent : neutralIcon);
 
-                    // 3. Underline (U) — Segoe UI 10.5pt + thin underline bar
+                    // 3. Underline (U)
                     Rectangle uBox = new Rectangle(430, 96, 22, 24);
                     if (hasSelection) DrawInteractiveButton(g, uBox, isU, 2);
-                    Color uCol = !hasSelection ? disabledCol : (isU ? pptAccent : neutralIcon);
-                    using (Font fU = new Font("Segoe UI", 10.5f, FontStyle.Regular))
+                    Color uCol = isU ? pptAccent : neutralIcon;
+                    using (Font fU = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                     using (SolidBrush brU = new SolidBrush(uCol))
-                    using (Pen penU = new Pen(uCol, 1.1f))
+                    using (Pen penU = new Pen(uCol, 1.15f))
                     {
-                        g.DrawString("U", fU, brU, uBox.X + 4f, uBox.Y + 1f);
-                        g.DrawLine(penU, uBox.X + 4f, uBox.Y + 18f, uBox.X + 16f, uBox.Y + 18f);
+                        g.DrawString("U", fU, brU, uBox.X + 4.5f, uBox.Y + 3.5f);
+                        g.DrawLine(penU, uBox.X + 6.0f, uBox.Y + 17.0f, uBox.X + 14.0f, uBox.Y + 17.0f);
                     }
 
-                    // 4. Text Shadow (S) — "S" with subtle shadow offset
+                    // 4. Text Shadow (S)
                     Rectangle sBox = new Rectangle(453, 96, 22, 24);
                     if (hasSelection) DrawInteractiveButton(g, sBox, isS, 2);
-                    Color sCol = !hasSelection ? disabledCol : (isS ? pptAccent : neutralIcon);
-                    using (Font fS = new Font("Segoe UI", 11.0f, FontStyle.Regular))
-                    using (SolidBrush brShadow = new SolidBrush(!hasSelection ? Color.FromArgb(30, 140, 150, 160) : Color.FromArgb(80, 130, 140, 150)))
+                    Color sCol = isS ? pptAccent : neutralIcon;
+                    using (Font fS = new Font("Segoe UI", 8.8f, FontStyle.Bold))
+                    using (SolidBrush brShadow = new SolidBrush(Color.FromArgb(95, 120, 130, 145)))
                     using (SolidBrush brS = new SolidBrush(sCol))
                     {
-                        g.DrawString("S", fS, brShadow, sBox.X + 4.5f, sBox.Y + 3f);
-                        g.DrawString("S", fS, brS, sBox.X + 3.5f, sBox.Y + 2f);
+                        g.DrawString("S", fS, brShadow, sBox.X + 5.8f, sBox.Y + 4.2f);
+                        g.DrawString("S", fS, brS, sBox.X + 4.5f, sBox.Y + 3.0f);
                     }
 
-                    // 5. Strikethrough (ab) — "ab" with horizontal line through
+                    // 5. Strikethrough (ab)
                     Rectangle strikeBox = new Rectangle(476, 96, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, strikeBox, isStrike, 2);
-                    Color strikeCol = !hasSelection ? disabledCol : (isStrike ? pptAccent : neutralIcon);
-                    using (Font fAb = new Font("Segoe UI", 9.0f, FontStyle.Regular))
-                    using (SolidBrush brAb = new SolidBrush(strikeCol))
-                    using (Pen penStrike = new Pen(strikeCol, 1.0f))
-                    {
-                        g.DrawString("ab", fAb, brAb, strikeBox.X + 2f, strikeBox.Y + 3f);
-                        float strikeY = strikeBox.Y + 11.5f;
-                        g.DrawLine(penStrike, strikeBox.X + 2f, strikeY, strikeBox.X + 20f, strikeY);
-                    }
+                    DrawLucideStrikethrough(g, strikeBox.X + 3, strikeBox.Y + 3, isStrike ? pptAccent : neutralIcon);
 
                     // 6. Character Spacing (AV ▾)
                     Rectangle spacingBox = new Rectangle(501, 96, 29, 24);
                     if (hasSelection) DrawInteractiveButton(g, spacingBox, false, 2);
-                    DrawFluentCharacterSpacing(g, spacingBox.X, spacingBox.Y, hasSelection ? neutralIcon : disabledCol, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawFluentCharacterSpacing(g, spacingBox.X, spacingBox.Y, neutralIcon, chevronCol);
 
                     // 7. Change Case (Aa ▾)
                     Rectangle caseBox = new Rectangle(531, 96, 28, 24);
                     if (hasSelection) DrawInteractiveButton(g, caseBox, false, 2);
-                    DrawFluentChangeCase(g, caseBox.X, caseBox.Y, hasSelection ? neutralIcon : disabledCol, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawFluentChangeCase(g, caseBox.X, caseBox.Y, neutralIcon, chevronCol);
 
                     // 8. Vertical Divider
-                    using (Pen dividerPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                    using (Pen dividerPen = new Pen(Color.FromArgb(225, 223, 221), 1f))
                     {
                         g.DrawLine(dividerPen, 563, 100, 563, 116);
                     }
@@ -14807,15 +15355,15 @@ namespace ZenQOffice.UI
                     if (hasSelection) DrawInteractiveButton(g, highlightBox, false, 2);
                     Color hlColor = (hasSelection && slidesView.SelectedShape.HasHighlight && slidesView.SelectedShape.HighlightColor != 0)
                         ? Color.FromArgb(slidesView.SelectedShape.HighlightColor)
-                        : Color.FromArgb(255, 235, 59);
-                    DrawFluentHighlighter(g, highlightBox.X, highlightBox.Y, hasSelection ? neutralIcon : disabledCol, hasSelection ? hlColor : disabledCol, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                        : Color.FromArgb(255, 242, 0);
+                    DrawFluentHighlighter(g, highlightBox.X + 1, highlightBox.Y + 1, neutralIcon, hlColor, chevronCol);
 
                     // 10. Font Color (A ▾)
                     Rectangle fontColorBox = new Rectangle(603, 96, 33, 24);
                     if (hasSelection) DrawInteractiveButton(g, fontColorBox, false, 2);
                     int curTc = hasSelection ? slidesView.SelectedShape.TextColor : 0;
-                    Color curCol = (curTc != 0) ? Color.FromArgb((curTc >> 16) & 0xFF, (curTc >> 8) & 0xFF, curTc & 0xFF) : pptAccent;
-                    DrawFluentFontColor(g, fontColorBox.X, fontColorBox.Y, hasSelection ? neutralIcon : disabledCol, hasSelection ? curCol : disabledCol, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    Color curCol = (curTc != 0) ? Color.FromArgb((curTc >> 16) & 0xFF, (curTc >> 8) & 0xFF, curTc & 0xFF) : Color.FromArgb(232, 17, 35);
+                    DrawFluentFontColor(g, fontColorBox.X + 1, fontColorBox.Y + 1, neutralIcon, curCol, chevronCol);
 
                     g.TextRenderingHint = prevHint;
 
@@ -14828,83 +15376,82 @@ namespace ZenQOffice.UI
                     // ==================== Group 4: Paragraph (X: 648 to 914) ====================
                     TextAlignment currAlign = hasSelection ? slidesView.SelectedShape.Alignment : TextAlignment.Left;
 
-                    // Subgrid 1 (Left 5 cols x 2 rows):
                     // Row 1: Bullets ▾, Numbering ▾, | , Dec Indent, Inc Indent, | , Line Spacing ▾
                     Rectangle bulletsBox = new Rectangle(648, 68, 32, 24);
                     if (hasSelection) DrawInteractiveButton(g, bulletsBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Bullets, 650, 72, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    DrawDropdownChevron(g, 669, 78, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawListBulletedIcon(g, 651, 73, neutralIcon);
+                    DrawDropdownChevron(g, 670, 78, chevronCol);
 
                     Rectangle numBox = new Rectangle(682, 68, 32, 24);
                     if (hasSelection) DrawInteractiveButton(g, numBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Numbering, 684, 72, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    DrawDropdownChevron(g, 703, 78, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawListNumberedIcon(g, 685, 73, neutralIcon);
+                    DrawDropdownChevron(g, 704, 78, chevronCol);
 
-                    using (Pen dividerPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                    using (Pen dividerPen = new Pen(Color.FromArgb(225, 223, 221), 1f))
                     {
                         g.DrawLine(dividerPen, 717, 72, 717, 88);
                     }
 
                     Rectangle decIndentBox = new Rectangle(720, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, decIndentBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.IndentDecrease, 724, 72, 16, 16, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideOutdent(g, 724, 73, neutralIcon);
 
                     Rectangle incIndentBox = new Rectangle(746, 68, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, incIndentBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.IndentIncrease, 750, 72, 16, 16, hasSelection ? neutralIcon : disabledCol);
+                    DrawLucideIndent(g, 750, 73, neutralIcon);
 
-                    using (Pen dividerPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                    using (Pen dividerPen = new Pen(Color.FromArgb(225, 223, 221), 1f))
                     {
                         g.DrawLine(dividerPen, 773, 72, 773, 88);
                     }
 
                     Rectangle lineSpacingBox = new Rectangle(776, 68, 30, 24);
                     if (hasSelection) DrawInteractiveButton(g, lineSpacingBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.LineSpacing, 778, 72, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    DrawDropdownChevron(g, 796, 78, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawLucideLineSpacing(g, 779, 69, neutralIcon);
 
                     // Row 2: Align Left, Align Center, Align Right, Justify, | , Columns ▾
                     Rectangle leftAlign = new Rectangle(648, 96, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, leftAlign, currAlign == TextAlignment.Left, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignLeft, 652, 100, 16, 16, !hasSelection ? disabledCol : ((currAlign == TextAlignment.Left) ? pptAccent : neutralIcon));
+                    DrawAlignmentIcon(g, 649, 96, 0, (hasSelection && currAlign == TextAlignment.Left) ? pptAccent : neutralIcon);
 
                     Rectangle centerAlign = new Rectangle(674, 96, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, centerAlign, currAlign == TextAlignment.Center, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignCenter, 678, 100, 16, 16, !hasSelection ? disabledCol : ((currAlign == TextAlignment.Center) ? pptAccent : neutralIcon));
+                    DrawAlignmentIcon(g, 675, 96, 1, (hasSelection && currAlign == TextAlignment.Center) ? pptAccent : neutralIcon);
 
                     Rectangle rightAlign = new Rectangle(700, 96, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, rightAlign, currAlign == TextAlignment.Right, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignRight, 704, 100, 16, 16, !hasSelection ? disabledCol : ((currAlign == TextAlignment.Right) ? pptAccent : neutralIcon));
+                    DrawAlignmentIcon(g, 701, 96, 2, (hasSelection && currAlign == TextAlignment.Right) ? pptAccent : neutralIcon);
 
                     Rectangle justifyAlign = new Rectangle(726, 96, 24, 24);
                     if (hasSelection) DrawInteractiveButton(g, justifyAlign, currAlign == TextAlignment.Justify, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignJustify, 730, 100, 16, 16, !hasSelection ? disabledCol : ((currAlign == TextAlignment.Justify) ? pptAccent : neutralIcon));
+                    DrawAlignmentIcon(g, 727, 96, 3, (hasSelection && currAlign == TextAlignment.Justify) ? pptAccent : neutralIcon);
 
-                    using (Pen dividerPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+                    using (Pen dividerPen = new Pen(Color.FromArgb(225, 223, 221), 1f))
                     {
                         g.DrawLine(dividerPen, 753, 100, 753, 116);
                     }
 
                     Rectangle columnsBox = new Rectangle(756, 96, 30, 24);
                     if (hasSelection) DrawInteractiveButton(g, columnsBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Columns, 758, 100, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    DrawDropdownChevron(g, 776, 106, hasSelection ? Color.FromArgb(100, 116, 139) : disabledCol);
+                    DrawSlidesColumnsIcon(g, 759, 100, Color.FromArgb(105, 105, 105), chevronCol);
 
                     // Subgrid 2 (Right 3 stacked rows): Text Direction, Align Text, Convert to SmartArt
                     Rectangle textDirBox = new Rectangle(810, 68, 104, 20);
                     if (hasSelection) DrawInteractiveButton(g, textDirBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.TextDirection, 812, 70, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Hướng chữ ▾", tinyFont, hasSelection ? darkBrush : disabledBrush, 830, 71);
+                    DrawSlidesTextDirectionIcon(g, 813, 71, neutralIcon, officeBlue);
+                    g.DrawString("Hướng chữ", miniFont, hasSelection ? darkBrush : disabledBrush, 830, 71);
+                    DrawDropdownChevron(g, 886, 77, chevronCol);
 
                     Rectangle alignTextVertBox = new Rectangle(810, 89, 104, 20);
                     if (hasSelection) DrawInteractiveButton(g, alignTextVertBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignTextVertical, 812, 91, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Căn văn bản ▾", tinyFont, hasSelection ? darkBrush : disabledBrush, 830, 92);
+                    DrawSlidesAlignTextVertIcon(g, 813, 91, Color.FromArgb(105, 105, 105), officeBlue);
+                    g.DrawString("Căn văn bản", miniFont, hasSelection ? darkBrush : disabledBrush, 830, 92);
+                    DrawDropdownChevron(g, 892, 98, chevronCol);
 
                     Rectangle convertSmartArtBox = new Rectangle(810, 110, 104, 20);
                     if (hasSelection) DrawInteractiveButton(g, convertSmartArtBox, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ConvertSmartArt, 812, 112, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Sang SmartArt ▾", tinyFont, hasSelection ? darkBrush : disabledBrush, 830, 113);
+                    DrawSlidesSmartArtMiniIcon(g, 813, 112, neutralIcon, Color.FromArgb(16, 124, 65));
+                    g.DrawString("Sang SmartArt", miniFont, hasSelection ? darkBrush : disabledBrush, 830, 113);
 
                     g.DrawString("Đoạn", labelFont, Brushes.Gray, 760, 137);
                     BtnSlidesParaLauncherBounds = new Rectangle(900, 134, 14, 14);
@@ -14921,7 +15468,7 @@ namespace ZenQOffice.UI
                         new ShapeType[] { ShapeType.Hexagon, ShapeType.Octagon, ShapeType.Pentagon, ShapeType.Cross, ShapeType.Shield, ShapeType.Banner },
                         new ShapeType[] { ShapeType.Parallelogram, ShapeType.Trapezoid, ShapeType.Smiley, ShapeType.Starburst, ShapeType.Arch, ShapeType.Flower }
                     };
-                    int sRow = Math.Max(0, Math.Min(allShapeRows.Length - 3, slidesView.ShapeGalleryScrollRow));
+                    int sRow = Math.Max(0, Math.Min(allShapeRows.Length - 3, slidesView != null ? slidesView.ShapeGalleryScrollRow : 0));
                     Rectangle shapesGalleryRect = new Rectangle(922, 68, 136, 56);
 
                     using (SolidBrush whiteB = new SolidBrush(Color.White))
@@ -14976,35 +15523,40 @@ namespace ZenQOffice.UI
                     // Arrange Button (X: 1062, Y: 68, W: 46, H: 54)
                     Rectangle btnArrange = new Rectangle(1062, 68, 46, 54);
                     if (hasSelection) DrawInteractiveButton(g, btnArrange, false, 3);
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Arrange, new Rectangle(1062, 69, 46, 26), 26, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Sắp xếp ▾", labelFont, hasSelection ? darkBrush : disabledBrush, 1064, 98);
+                    DrawSlidesArrangeLargeIcon(g, 1075, 73, neutralIcon, officeBlue);
+                    g.DrawString("Sắp xếp", labelFont, hasSelection ? darkBrush : disabledBrush, 1066, 98);
+                    DrawDropdownChevron(g, 1082, 112, chevronCol);
 
                     // Quick Styles Button (X: 1110, Y: 68, W: 46, H: 54)
                     Rectangle btnQuickStyles = new Rectangle(1110, 68, 46, 54);
                     if (hasSelection) DrawInteractiveButton(g, btnQuickStyles, false, 3);
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.QuickStyles, new Rectangle(1110, 69, 46, 26), 26, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Kiểu ▾", labelFont, hasSelection ? darkBrush : disabledBrush, 1118, 98);
+                    DrawSlidesQuickStylesLargeIcon(g, 1122, 73, neutralIcon, officeBlue);
+                    g.DrawString("Kiểu", labelFont, hasSelection ? darkBrush : disabledBrush, 1122, 98);
+                    DrawDropdownChevron(g, 1130, 112, chevronCol);
 
                     // Format buttons 3-stack (Tô màu, Viền hình, Hiệu ứng) (X: 1158 to 1252, W: 94)
                     int curFill = hasSelection ? slidesView.SelectedShape.FillColor : 0;
-                    Color fillSwatch = (curFill != 0) ? Color.FromArgb((curFill >> 16) & 0xFF, (curFill >> 8) & 0xFF, curFill & 0xFF) : Color.FromArgb(0, 120, 212);
+                    Color fillSwatch = (curFill != 0) ? Color.FromArgb((curFill >> 16) & 0xFF, (curFill >> 8) & 0xFF, curFill & 0xFF) : officeBlue;
                     int curBdr = hasSelection ? slidesView.SelectedShape.StrokeColor : 0;
-                    Color bdrSwatch = (curBdr != 0) ? Color.FromArgb((curBdr >> 16) & 0xFF, (curBdr >> 8) & 0xFF, curBdr & 0xFF) : Color.FromArgb(71, 85, 105);
+                    Color bdrSwatch = (curBdr != 0) ? Color.FromArgb((curBdr >> 16) & 0xFF, (curBdr >> 8) & 0xFF, curBdr & 0xFF) : Color.FromArgb(210, 71, 38);
 
                     Rectangle btnFill = new Rectangle(1158, 68, 94, 20);
                     if (hasSelection) DrawInteractiveButton(g, btnFill, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeFill, 1160, 70, 16, 16, hasSelection ? neutralIcon : disabledCol, hasSelection ? fillSwatch : disabledCol);
-                    g.DrawString("Tô màu ▾", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 71);
+                    DrawSlidesShapeFillIcon(g, 1161, 70, neutralIcon, fillSwatch);
+                    g.DrawString("Tô màu", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 71);
+                    DrawDropdownChevron(g, 1222, 77, chevronCol);
 
                     Rectangle btnLine = new Rectangle(1158, 89, 94, 20);
                     if (hasSelection) DrawInteractiveButton(g, btnLine, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeOutline, 1160, 91, 16, 16, hasSelection ? neutralIcon : disabledCol, hasSelection ? bdrSwatch : disabledCol);
-                    g.DrawString("Viền hình ▾", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 92);
+                    DrawSlidesShapeOutlineIcon(g, 1161, 91, neutralIcon, bdrSwatch);
+                    g.DrawString("Viền hình", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 92);
+                    DrawDropdownChevron(g, 1230, 98, chevronCol);
 
                     Rectangle btnEffects = new Rectangle(1158, 110, 94, 20);
                     if (hasSelection) DrawInteractiveButton(g, btnEffects, false, 2);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeEffects, 1160, 112, 16, 16, hasSelection ? neutralIcon : disabledCol);
-                    g.DrawString("Hiệu ứng ▾", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 113);
+                    DrawSlidesShapeEffectsIcon(g, 1161, 112, neutralIcon, officeBlue);
+                    g.DrawString("Hiệu ứng", miniFont, hasSelection ? darkBrush : disabledBrush, 1180, 113);
+                    DrawDropdownChevron(g, 1228, 119, chevronCol);
 
                     g.DrawString("Vẽ", labelFont, Brushes.Gray, 1085, 137);
                     BtnSlidesDrawingLauncherBounds = new Rectangle(1238, 134, 14, 14);
@@ -15015,9 +15567,9 @@ namespace ZenQOffice.UI
                     // ==================== Group 6: Fullscreen Presentation (X: 1262 to 1340) ====================
                     Rectangle btnF5 = new Rectangle(1262, 68, 76, 62);
                     DrawInteractiveButton(g, btnF5, false, 4);
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideShowFromBeginning, new Rectangle(1262, 72, 76, 24), 26, neutralIcon);
-                    g.DrawString("Trình chiếu", boldFont, darkBrush, 1266, 98);
-                    g.DrawString("(Từ đầu F5)", labelFont, Brushes.Gray, 1269, 112);
+                    DrawSlidesProjectorLargeIcon(g, 1288, 72);
+                    g.DrawString("Trình chiếu", boldFont, darkBrush, 1268, 98);
+                    g.DrawString("(Từ đầu F5)", labelFont, Brushes.Gray, 1271, 112);
 
                     g.DrawString("Trình chiếu", labelFont, Brushes.Gray, 1276, 137);
                     g.DrawLine(Pens.LightGray, 1344, 68, 1344, 148);
@@ -15028,47 +15580,53 @@ namespace ZenQOffice.UI
         #region PowerPoint Insert Tab Vector Icons
         private void DrawPptTableVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Table, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 20));
+            DrawExcelTableVector(g, x + (w - 24) / 2, y + (h - 20) / 2, 24, 20);
         }
 
         private void DrawPptPictureVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Picture, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 20));
+            float px = x + (w - 22f) / 2f, py = y + (h - 18f) / 2f;
+            using (Pen pFrame = new Pen(Color.FromArgb(51, 65, 85), 1.3f) { LineJoin = LineJoin.Round })
+            using (SolidBrush bSun = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            {
+                g.FillRectangle(Brushes.White, px, py, 22, 18);
+                g.DrawRectangle(pFrame, px, py, 22, 18);
+                g.FillEllipse(bSun, px + 14, py + 3.5f, 3.5f, 3.5f);
+                g.DrawLines(pFrame, new PointF[] { new PointF(px + 2.5f, py + 15f), new PointF(px + 8.5f, py + 8.5f), new PointF(px + 13.5f, py + 13.5f), new PointF(px + 16.5f, py + 10.5f), new PointF(px + 19.5f, py + 15f) });
+            }
         }
 
         private void DrawPptCameraVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Camera, new Rectangle(x, y, w, h), Math.Min(w, 20), Math.Min(h, 16));
+            DrawCameraVector(g, x, y, w, h, Color.FromArgb(59, 58, 57));
         }
 
         private void DrawPptPhotoAlbumVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.PhotoAlbum, new Rectangle(x, y, w, h), Math.Min(w, 20), Math.Min(h, 16));
+            DrawPhotoAlbumVector(g, x, y, w, h, Color.FromArgb(59, 58, 57));
         }
 
         private void DrawPptShapesGroupVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Shapes, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 20));
+            DrawIllustrationsVector(g, x + (w - 22) / 2, y + (h - 20) / 2, 22, 20);
         }
 
         private void DrawPptIconsVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Icons, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawIconsVector(g, x + (w - 20) / 2, y + (h - 20) / 2, 20, 20, Color.FromArgb(210, 71, 38));
         }
 
         private void DrawPptElementsVector(Graphics g, int x, int y, int w, int h)
         {
             int cx = x + w / 2;
             int cy = y + h / 2;
-            using (SolidBrush b1 = new SolidBrush(Color.FromArgb(59, 130, 246)))
-            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(234, 88, 12)))
-            using (SolidBrush b3 = new SolidBrush(Color.FromArgb(16, 185, 129)))
-            using (SolidBrush b4 = new SolidBrush(Color.FromArgb(168, 85, 247)))
+            using (Pen p = new Pen(Color.FromArgb(51, 65, 85), 1.4f) { LineJoin = LineJoin.Round })
+            using (SolidBrush acc = new SolidBrush(Color.FromArgb(37, 99, 235)))
             {
-                g.FillEllipse(b1, cx - 11, cy - 11, 10, 10);
-                g.FillRectangle(b2, cx + 1, cy - 11, 9, 9);
-                g.FillPolygon(b3, new PointF[] { new PointF(cx - 6, cy + 9), new PointF(cx - 11, cy + 1), new PointF(cx - 1, cy + 1) });
-                g.FillPolygon(b4, new PointF[] { new PointF(cx + 6, cy + 1), new PointF(cx + 11, cy + 5), new PointF(cx + 6, cy + 10), new PointF(cx + 1, cy + 5) });
+                g.DrawEllipse(p, cx - 10, cy - 10, 8, 8);
+                g.DrawRectangle(p, cx + 1, cy - 10, 8, 8);
+                g.DrawPolygon(p, new PointF[] { new PointF(cx - 6, cy + 1), new PointF(cx - 10, cy + 9), new PointF(cx - 2, cy + 9) });
+                g.FillPolygon(acc, new PointF[] { new PointF(cx + 5, cy + 1), new PointF(cx + 9, cy + 5), new PointF(cx + 5, cy + 9), new PointF(cx + 1, cy + 5) });
             }
         }
 
@@ -15118,17 +15676,14 @@ namespace ZenQOffice.UI
         {
             int cx = x + w / 2;
             int cy = y + h / 2;
-            using (SolidBrush b1 = new SolidBrush(Color.FromArgb(239, 68, 68)))
-            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(245, 158, 11)))
-            using (SolidBrush b3 = new SolidBrush(Color.FromArgb(16, 185, 129)))
-            using (SolidBrush b4 = new SolidBrush(Color.FromArgb(59, 130, 246)))
-            using (Pen p = new Pen(Color.FromArgb(100, 116, 139), 1.2f))
+            using (Pen p = new Pen(Color.FromArgb(51, 65, 85), 1.4f))
+            using (SolidBrush b1 = new SolidBrush(Color.FromArgb(51, 65, 85)))
+            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(37, 99, 235)))
             {
                 g.DrawEllipse(p, cx - 10, cy - 9, 20, 18);
-                g.FillEllipse(b1, cx - 6, cy - 5, 5, 5);
-                g.FillEllipse(b2, cx + 1, cy - 6, 5, 5);
-                g.FillEllipse(b3, cx - 4, cy + 1, 5, 5);
-                g.FillEllipse(b4, cx + 2, cy, 5, 5);
+                g.FillEllipse(b1, cx - 5, cy - 4, 3.5f, 3.5f);
+                g.FillEllipse(b2, cx + 1, cy - 5, 3.5f, 3.5f);
+                g.FillEllipse(b1, cx - 3, cy + 1, 3.5f, 3.5f);
             }
         }
 
@@ -15180,67 +15735,78 @@ namespace ZenQOffice.UI
 
         private void DrawPpt3DModelVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Model3D, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            Draw3DModelVector(g, x + (w - 20) / 2, y + (h - 20) / 2, 20, 20, Color.FromArgb(16, 110, 190));
         }
 
         private void DrawPptSmartArtVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SmartArt, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 20));
+            DrawSmartArtVector(g, x + (w - 24) / 2, y + (h - 20) / 2, 24, 20);
         }
 
         private void DrawPptChartVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Chart, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawChartVector(g, x + (w - 22) / 2, y + (h - 20) / 2, 22, 20);
         }
 
         private void DrawPptLinkVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Link, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 18));
+            DrawLinkVector(g, x + (w - 22) / 2, y + (h - 18) / 2, 22, 18);
         }
 
         private void DrawPptCommentVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Comment, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 18));
+            DrawCommentVector(g, x + (w - 22) / 2, y + (h - 18) / 2, 22, 18, Color.FromArgb(16, 110, 190));
         }
 
         private void DrawPptTextBoxVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.TextBox, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawTextBoxVector(g, x + (w - 22) / 2, y + (h - 18) / 2, 22, 18, Color.FromArgb(59, 58, 57));
         }
 
         private void DrawPptHeaderFooterVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.HeaderFooter, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawHeaderFooterVector(g, x + (w - 20) / 2, y + (h - 20) / 2, 20, 20, Color.FromArgb(16, 110, 190));
         }
 
         private void DrawPptWordArtVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.WordArt, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawTextWordArtVector(g, x + (w - 22) / 2, y + (h - 20) / 2, 22, 20);
         }
 
         private void DrawPptEquationVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Equation, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            using (Font f = new Font("Cambria Math", 14.0f, FontStyle.Bold))
+            using (SolidBrush b = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            {
+                g.DrawString("π", f, b, x + (w - 18) / 2f, y + (h - 22) / 2f);
+            }
         }
 
         private void DrawPptSymbolsVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Symbol, new Rectangle(x, y, w, h), Math.Min(w, 22), Math.Min(h, 20));
+            DrawSymbolsOmegaVector(g, x + (w - 22) / 2, y + (h - 20) / 2, 22);
         }
 
         private void DrawPptVideoVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Video, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 18));
+            float vx = x + (w - 22f) / 2f, vy = y + (h - 16f) / 2f;
+            using (Pen p = new Pen(Color.FromArgb(59, 58, 57), 1.2f))
+            using (SolidBrush bPlay = new SolidBrush(Color.FromArgb(16, 110, 190)))
+            {
+                g.FillRectangle(Brushes.White, vx, vy, 22, 16);
+                g.DrawRectangle(p, vx, vy, 22, 16);
+                g.FillPolygon(bPlay, new PointF[] { new PointF(vx + 8.5f, vy + 4), new PointF(vx + 15.5f, vy + 8), new PointF(vx + 8.5f, vy + 12) });
+            }
         }
 
         private void DrawPptAudioVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Audio, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 18));
+            DrawAudioVector(g, x + (w - 22) / 2, y + (h - 18) / 2, 22, 18, Color.FromArgb(16, 110, 190));
         }
 
         private void DrawPptScreenRecordVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ScreenRecord, new Rectangle(x, y, w, h), Math.Min(w, 24), Math.Min(h, 20));
+            DrawScreenRecordVector(g, x + (w - 24) / 2, y + (h - 18) / 2, 24, 18, Color.FromArgb(59, 58, 57));
         }
         #endregion
 
@@ -15311,6 +15877,12 @@ namespace ZenQOffice.UI
                 DrawInteractiveButton(g, shpBox, false, 4);
                 DrawPptShapesGroupVector(g, curX, 70, 56, 24);
                 g.DrawString("Hình khối ▾", btnFont, darkBrush, new RectangleF(shpBox.X - 2, 96, shpBox.Width + 4, 26), sfCenter);
+                curX += 60;
+
+                Rectangle icnBox = new Rectangle(curX, 68, 56, 56);
+                DrawInteractiveButton(g, icnBox, false, 4);
+                DrawPptIconsVector(g, icnBox.X + (icnBox.Width - 24) / 2, 71, 24, 24);
+                g.DrawString("Biểu tượng ▾", btnFont, darkBrush, new RectangleF(icnBox.X - 2, 96, icnBox.Width + 4, 26), sfCenter);
                 curX += 60;
 
                 Rectangle saBox = new Rectangle(curX, 68, 56, 56);
@@ -15826,15 +16398,26 @@ namespace ZenQOffice.UI
 
                     bool is169 = slidesView.Presentation.IsWidescreen;
                     DrawInteractiveButton(g, btn169, is169, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.SlideSize, btn169.X + 6, btn169.Y + 2, 14, 14, is169 ? Color.FromArgb(210, 71, 38) : Color.FromArgb(75, 85, 99));
+                    using (Pen szP = new Pen(is169 ? Color.FromArgb(210, 71, 38) : Color.FromArgb(75, 85, 99), 1.3f))
+                    {
+                        g.DrawRectangle(szP, btn169.X + 6, btn169.Y + 4, 14, 10);
+                    }
                     g.DrawString("16:9 Rộng", labelFont, is169 ? Brushes.DarkRed : Brushes.Black, btn169.X + 24, btn169.Y + 3);
 
                     DrawInteractiveButton(g, btn43, !is169, 3);
-                    WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.SlideSize, btn43.X + 6, btn43.Y + 2, 14, 14, !is169 ? Color.FromArgb(210, 71, 38) : Color.FromArgb(75, 85, 99));
+                    using (Pen szP = new Pen(!is169 ? Color.FromArgb(210, 71, 38) : Color.FromArgb(75, 85, 99), 1.3f))
+                    {
+                        g.DrawRectangle(szP, btn43.X + 7, btn43.Y + 4, 12, 10);
+                    }
                     g.DrawString("4:3 Chuẩn", labelFont, !is169 ? Brushes.DarkRed : Brushes.Black, btn43.X + 24, btn43.Y + 3);
 
                     DrawInteractiveButton(g, btnCustomSize, false, 3);
-                    g.DrawString("📐 Tùy cỡ...", labelFont, Brushes.Black, btnCustomSize.X + 12, btnCustomSize.Y + 3);
+                    using (Pen szP = new Pen(Color.FromArgb(59, 58, 57), 1.2f))
+                    {
+                        g.DrawRectangle(szP, btnCustomSize.X + 6, btnCustomSize.Y + 4, 14, 10);
+                        g.DrawLine(szP, btnCustomSize.X + 8, btnCustomSize.Y + 9, btnCustomSize.X + 18, btnCustomSize.Y + 9);
+                    }
+                    g.DrawString("Tùy cỡ...", labelFont, Brushes.Black, btnCustomSize.X + 24, btnCustomSize.Y + 3);
 
                     x += 100;
                     g.DrawLine(Pens.LightGray, x + 2, 68, x + 2, 148);
@@ -15846,7 +16429,7 @@ namespace ZenQOffice.UI
                     DrawInteractiveButton(g, btnFmtBg, isFmtBgOpen, 3);
 
                     // Draw Paint Bucket Vector Icon
-                    WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.FormatBackground, new Rectangle(btnFmtBg.X, btnFmtBg.Y + 6, btnFmtBg.Width, 20), 20, Color.FromArgb(51, 65, 85), Color.FromArgb(210, 71, 38));
+                    DrawSlidesShapeFillIcon(g, btnFmtBg.X + btnFmtBg.Width / 2 - 9, btnFmtBg.Y + 6, Color.FromArgb(59, 58, 57), Color.FromArgb(210, 71, 38));
                     g.DrawString("Định dạng", labelFont, Brushes.Black, btnFmtBg.X + 16, btnFmtBg.Y + 28);
                     g.DrawString("Nền", boldFont, Brushes.Black, btnFmtBg.X + 30, btnFmtBg.Y + 40);
 
@@ -15921,7 +16504,7 @@ namespace ZenQOffice.UI
                 // ⭐ Preview button
                 Rectangle btnPrev = new Rectangle(12, 68, 60, 62);
                 DrawInteractiveButton(g, btnPrev, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.TransitionPreview, new Rectangle(12, 70, 60, 24), 22, 22);
+                DrawStarVector(g, 42, 82, 10, Color.FromArgb(245, 158, 11));
                 g.DrawString("Xem trước", labelFont, Brushes.Black, 14, 110);
 
                 g.DrawLine(Pens.LightGray, 78, 68, 78, 148);
@@ -16071,7 +16654,7 @@ namespace ZenQOffice.UI
 
                 Rectangle btnApplyAll = new Rectangle(tx, 98, 126, 26);
                 DrawInteractiveButton(g, btnApplyAll, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ApplyToAll, btnApplyAll.X + 6, btnApplyAll.Y + 4, 18, 18);
+                DrawStarVector(g, btnApplyAll.X + 15, btnApplyAll.Y + 13, 6, Color.FromArgb(245, 158, 11));
                 g.DrawString("Áp dụng tất cả", labelFont, Brushes.Navy, btnApplyAll.X + 28, btnApplyAll.Y + 6);
 
                 tx += 136;
@@ -16090,7 +16673,7 @@ namespace ZenQOffice.UI
                 Rectangle btnPrev = new Rectangle(12, 68, 62, 62);
                 DrawInteractiveButton(g, btnPrev, false, 4);
                 Color prevStarCol = hasAnimations ? Color.FromArgb(245, 158, 11) : Color.FromArgb(190, 195, 200);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.AnimationPreview, new Rectangle(btnPrev.X, 70, btnPrev.Width, 24), 22, 22, prevStarCol, prevStarCol);
+                DrawStarVector(g, btnPrev.X + btnPrev.Width / 2, 82, 10, prevStarCol);
                 g.DrawString("Xem trước", labelFont, hasAnimations ? Brushes.Black : Brushes.Gray, 15, 110);
 
                 g.DrawLine(Pens.LightGray, 80, 68, 80, 148);
@@ -16149,7 +16732,7 @@ namespace ZenQOffice.UI
                 DrawInteractiveButton(g, btnEffectOpts, false, 4);
 
                 Color optIconCol = hasAnimOptions ? Color.FromArgb(37, 99, 235) : Color.FromArgb(195, 200, 205);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.EffectOptions, new Rectangle(btnEffectOpts.X, 70, btnEffectOpts.Width, 24), 22, 22, optIconCol, optIconCol);
+                DrawSlidesShapeEffectsIcon(g, btnEffectOpts.X + btnEffectOpts.Width / 2 - 8, 74, Color.FromArgb(59, 58, 57), optIconCol);
                 g.DrawString("Tùy chọn\nhiệu ứng ▾", labelFont, hasAnimOptions ? Brushes.Black : Brushes.Gray, new RectangleF(btnEffectOpts.X, btnEffectOpts.Y + 30, btnEffectOpts.Width, 30), new StringFormat { Alignment = StringAlignment.Center });
                 ax += 98;
 
@@ -16161,7 +16744,14 @@ namespace ZenQOffice.UI
                 DrawInteractiveButton(g, btnAddAnim, false, 4);
 
                 Color addStarCol = hasSelectedShape ? Color.FromArgb(34, 197, 94) : Color.FromArgb(195, 200, 205);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.AddAnimation, new Rectangle(btnAddAnim.X, 70, btnAddAnim.Width, 24), 24, 24, addStarCol, addStarCol);
+                DrawStarVector(g, btnAddAnim.X + btnAddAnim.Width / 2 - 2, 82, 10, addStarCol);
+                using (Pen plusP = new Pen(hasSelectedShape ? Color.FromArgb(21, 128, 61) : Color.Gray, 1.8f))
+                {
+                    int px = btnAddAnim.X + btnAddAnim.Width / 2 + 8;
+                    int py = 76;
+                    g.DrawLine(plusP, px - 3, py, px + 3, py);
+                    g.DrawLine(plusP, px, py - 3, px, py + 3);
+                }
 
                 g.DrawString("Thêm Hoạt Họa ▾", boldFont, hasSelectedShape ? Brushes.Black : Brushes.Gray, btnAddAnim.X + 4, 110);
                 ax += 110;
@@ -16171,7 +16761,15 @@ namespace ZenQOffice.UI
                 bool isPaneOpen = (slidesView != null && slidesView.SidebarPanel == SidebarPanelType.AnimationPane && slidesView.IsSidebarOpen);
                 DrawInteractiveButton(g, btnAnimPane, isPaneOpen, 4);
 
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.AnimationPane, new Rectangle(btnAnimPane.X, 70, btnAnimPane.Width, 24), 24, 20, isPaneOpen ? Color.FromArgb(37, 99, 235) : Color.FromArgb(210, 71, 38));
+                using (Pen paneP = new Pen(isPaneOpen ? Color.FromArgb(37, 99, 235) : Color.FromArgb(59, 58, 57), 1.3f))
+                using (SolidBrush barB = new SolidBrush(Color.FromArgb(210, 71, 38)))
+                {
+                    int pbx = btnAnimPane.X + btnAnimPane.Width / 2 - 11;
+                    g.DrawRectangle(paneP, pbx, 73, 22, 18);
+                    g.FillRectangle(barB, pbx + 3, 76, 10, 3);
+                    g.FillRectangle(barB, pbx + 6, 81, 12, 3);
+                    g.FillRectangle(barB, pbx + 4, 86, 8, 3);
+                }
 
                 g.DrawString("Khung Hoạt Họa", boldFont, isPaneOpen ? Brushes.RoyalBlue : Brushes.Black, btnAnimPane.X + 6, 110);
                 ax += 118;
@@ -16189,7 +16787,7 @@ namespace ZenQOffice.UI
                 g.FillRectangle(isTimingEnabled ? Brushes.White : Brushes.GhostWhite, rTrigger);
                 g.DrawRectangle(Pens.Silver, rTrigger);
                 string trigStr = (selAnim != null)
-                    ? ((selAnim.Trigger == AnimationTrigger.OnClick) ? "🖱️ Khi nhấp" : ((selAnim.Trigger == AnimationTrigger.WithPrevious) ? "⏱️ Cùng trước" : "⏳ Sau trước"))
+                    ? (!string.IsNullOrEmpty(selAnim.TriggerShapeId) ? "⚡ Bấm hình" : ((selAnim.Trigger == AnimationTrigger.OnClick) ? "🖱️ Khi nhấp" : ((selAnim.Trigger == AnimationTrigger.WithPrevious) ? "⏱️ Cùng trước" : "⏳ Sau trước")))
                     : "🖱️ Khi nhấp";
                 g.DrawString(trigStr, labelFont, timingTextBrush, rTrigger.X + 4, rTrigger.Y + 2);
                 g.DrawString("▾", labelFont, isTimingEnabled ? Brushes.Gray : Brushes.LightGray, rTrigger.Right - 12, rTrigger.Y + 2);
@@ -16272,7 +16870,7 @@ namespace ZenQOffice.UI
                 // 1. From Beginning (F5)
                 Rectangle btnF5 = new Rectangle(curX, 68, 74, 62);
                 DrawInteractiveButton(g, btnF5, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideShowFromBeginning, new Rectangle(btnF5.X, 70, btnF5.Width, 26), 28, 22);
+                DrawSlidesProjectorLargeIcon(g, btnF5.X + btnF5.Width / 2 - 12, 71);
                 g.DrawString("Từ đầu", boldFont, Brushes.Black, new RectangleF(btnF5.X, 99, btnF5.Width, 16), sfCenter);
                 g.DrawString("(F5)", smallFont, Brushes.DimGray, new RectangleF(btnF5.X, 114, btnF5.Width, 14), sfCenter);
                 curX += 78;
@@ -16280,7 +16878,7 @@ namespace ZenQOffice.UI
                 // 2. From Current Slide (Shift+F5)
                 Rectangle btnCur = new Rectangle(curX, 68, 86, 62);
                 DrawInteractiveButton(g, btnCur, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideShowFromCurrent, new Rectangle(btnCur.X, 70, btnCur.Width, 26), 28, 22);
+                DrawSlidesProjectorLargeIcon(g, btnCur.X + btnCur.Width / 2 - 12, 71);
                 g.DrawString("Từ trang này", labelFont, Brushes.Black, new RectangleF(btnCur.X, 99, btnCur.Width, 16), sfCenter);
                 g.DrawString("(Shift+F5)", smallFont, Brushes.DimGray, new RectangleF(btnCur.X, 114, btnCur.Width, 14), sfCenter);
                 curX += 90;
@@ -16288,7 +16886,7 @@ namespace ZenQOffice.UI
                 // 3. Custom Slide Show ▾
                 Rectangle btnCustom = new Rectangle(curX, 68, 84, 62);
                 DrawInteractiveButton(g, btnCustom, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.CustomSlideShow, new Rectangle(btnCustom.X, 70, btnCustom.Width, 26), 28, 22);
+                DrawSlidesProjectorLargeIcon(g, btnCustom.X + btnCustom.Width / 2 - 12, 71);
                 g.DrawString("Tùy chỉnh ▾", labelFont, Brushes.Black, new RectangleF(btnCustom.X, 99, btnCustom.Width, 16), sfCenter);
                 g.DrawString("Custom Show", smallFont, Brushes.DimGray, new RectangleF(btnCustom.X, 114, btnCustom.Width, 14), sfCenter);
                 curX += 88;
@@ -16303,7 +16901,13 @@ namespace ZenQOffice.UI
                 // 4. Set Up Slide Show
                 Rectangle btnSetUp = new Rectangle(curX, 68, 76, 62);
                 DrawInteractiveButton(g, btnSetUp, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SetUpSlideShow, new Rectangle(btnSetUp.X, 70, btnSetUp.Width, 26), 28, 22);
+                using (Pen setP = new Pen(Color.FromArgb(59, 58, 57), 1.3f))
+                using (SolidBrush gearB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                {
+                    int sx = btnSetUp.X + btnSetUp.Width / 2 - 11;
+                    g.DrawRectangle(setP, sx, 73, 20, 14);
+                    g.FillEllipse(gearB, sx + 14, 81, 8, 8);
+                }
                 g.DrawString("Thiết lập", labelFont, Brushes.Black, new RectangleF(btnSetUp.X, 99, btnSetUp.Width, 16), sfCenter);
                 g.DrawString("Trình chiếu", smallFont, Brushes.DimGray, new RectangleF(btnSetUp.X, 114, btnSetUp.Width, 14), sfCenter);
                 curX += 80;
@@ -16312,7 +16916,13 @@ namespace ZenQOffice.UI
                 bool isSlideHidden = slidesView != null && slidesView.ActiveSlide != null && slidesView.ActiveSlide.IsHidden;
                 Rectangle btnHide = new Rectangle(curX, 68, 64, 62);
                 DrawInteractiveButton(g, btnHide, isSlideHidden, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.HideSlide, new Rectangle(btnHide.X, 70, btnHide.Width, 26), 26, 22, isSlideHidden ? Color.FromArgb(220, 38, 38) : (Color?)null);
+                using (Pen hideP = new Pen(Color.FromArgb(59, 58, 57), 1.3f))
+                using (Pen slashP = new Pen(Color.FromArgb(220, 38, 38), 1.8f))
+                {
+                    int hx = btnHide.X + btnHide.Width / 2 - 11;
+                    g.DrawRectangle(hideP, hx, 74, 22, 16);
+                    g.DrawLine(slashP, hx - 2, 91, hx + 24, 73);
+                }
                 g.DrawString("Ẩn Slide", labelFont, isSlideHidden ? Brushes.Firebrick : Brushes.Black, new RectangleF(btnHide.X, 99, btnHide.Width, 16), sfCenter);
                 g.DrawString(isSlideHidden ? "(Đang ẩn)" : "(Hide)", smallFont, isSlideHidden ? Brushes.Firebrick : Brushes.DimGray, new RectangleF(btnHide.X, 114, btnHide.Width, 14), sfCenter);
                 curX += 68;
@@ -16320,7 +16930,13 @@ namespace ZenQOffice.UI
                 // 6. Rehearse Timings
                 Rectangle btnRehearse = new Rectangle(curX, 68, 76, 62);
                 DrawInteractiveButton(g, btnRehearse, slidesView != null && slidesView.IsRehearsingTimings, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.RehearseTimings, new Rectangle(btnRehearse.X, 70, btnRehearse.Width, 26), 26, 22);
+                using (Pen clkP = new Pen(Color.FromArgb(37, 99, 235), 1.5f))
+                {
+                    int rcx = btnRehearse.X + btnRehearse.Width / 2;
+                    g.DrawEllipse(clkP, rcx - 9, 73, 18, 18);
+                    g.DrawLine(clkP, rcx, 82, rcx, 76);
+                    g.DrawLine(clkP, rcx, 82, rcx + 5, 82);
+                }
                 g.DrawString("Tập dượt", labelFont, Brushes.Black, new RectangleF(btnRehearse.X, 99, btnRehearse.Width, 16), sfCenter);
                 g.DrawString("Thời gian", smallFont, Brushes.DimGray, new RectangleF(btnRehearse.X, 114, btnRehearse.Width, 14), sfCenter);
                 curX += 80;
@@ -16328,7 +16944,7 @@ namespace ZenQOffice.UI
                 // 7. Record Slide Show ▾
                 Rectangle btnRecord = new Rectangle(curX, 68, 80, 62);
                 DrawInteractiveButton(g, btnRecord, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.RecordSlideShow, new Rectangle(btnRecord.X, 70, btnRecord.Width, 26), 26, 22);
+                DrawPptScreenRecordVector(g, btnRecord.X + btnRecord.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Ghi hình ▾", labelFont, Brushes.Black, new RectangleF(btnRecord.X, 99, btnRecord.Width, 16), sfCenter);
                 g.DrawString("Record", smallFont, Brushes.DimGray, new RectangleF(btnRecord.X, 114, btnRecord.Width, 14), sfCenter);
                 curX += 84;
@@ -16417,7 +17033,7 @@ namespace ZenQOffice.UI
                 // 1. Record from Beginning (F5)
                 Rectangle btnRecBeg = new Rectangle(curX, 68, 76, 62);
                 DrawInteractiveButton(g, btnRecBeg, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.RecordSlideShow, new Rectangle(btnRecBeg.X, 70, btnRecBeg.Width, 26), 28, 22, Color.FromArgb(220, 38, 38));
+                DrawPptScreenRecordVector(g, btnRecBeg.X + btnRecBeg.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Từ đầu", boldFont, darkBrush, new RectangleF(btnRecBeg.X, 99, btnRecBeg.Width, 16), sfCenter);
                 g.DrawString("(F5)", smallFont, Brushes.DimGray, new RectangleF(btnRecBeg.X, 114, btnRecBeg.Width, 14), sfCenter);
                 curX += 80;
@@ -16425,7 +17041,7 @@ namespace ZenQOffice.UI
                 // 2. Record from Current Slide (Shift+F5)
                 Rectangle btnRecCur = new Rectangle(curX, 68, 86, 62);
                 DrawInteractiveButton(g, btnRecCur, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.RecordSlideShow, new Rectangle(btnRecCur.X, 70, btnRecCur.Width, 26), 28, 22, Color.FromArgb(220, 38, 38));
+                DrawPptScreenRecordVector(g, btnRecCur.X + btnRecCur.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Từ trang này", btnFont, darkBrush, new RectangleF(btnRecCur.X, 99, btnRecCur.Width, 16), sfCenter);
                 g.DrawString("(Shift+F5)", smallFont, Brushes.DimGray, new RectangleF(btnRecCur.X, 114, btnRecCur.Width, 14), sfCenter);
                 curX += 90;
@@ -16439,7 +17055,7 @@ namespace ZenQOffice.UI
                 // 3. Screenshot
                 Rectangle btnSnip = new Rectangle(curX, 68, 72, 62);
                 DrawInteractiveButton(g, btnSnip, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Picture, new Rectangle(btnSnip.X, 70, btnSnip.Width, 26), 26, 22);
+                DrawPptCameraVector(g, btnSnip.X + btnSnip.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Chụp ảnh", btnFont, darkBrush, new RectangleF(btnSnip.X, 99, btnSnip.Width, 16), sfCenter);
                 g.DrawString("Màn hình", smallFont, Brushes.DimGray, new RectangleF(btnSnip.X, 114, btnSnip.Width, 14), sfCenter);
                 curX += 76;
@@ -16447,7 +17063,7 @@ namespace ZenQOffice.UI
                 // 4. Screen Recording
                 Rectangle btnScreenRec = new Rectangle(curX, 68, 76, 62);
                 DrawInteractiveButton(g, btnScreenRec, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ScreenRecord, new Rectangle(btnScreenRec.X, 70, btnScreenRec.Width, 26), 26, 22, Color.FromArgb(220, 38, 38));
+                DrawPptScreenRecordVector(g, btnScreenRec.X + btnScreenRec.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Ghi video", btnFont, darkBrush, new RectangleF(btnScreenRec.X, 99, btnScreenRec.Width, 16), sfCenter);
                 g.DrawString("Màn hình", smallFont, Brushes.DimGray, new RectangleF(btnScreenRec.X, 114, btnScreenRec.Width, 14), sfCenter);
                 curX += 80;
@@ -16455,12 +17071,12 @@ namespace ZenQOffice.UI
                 // 5. Video & Audio 2-stack
                 Rectangle btnVid = new Rectangle(curX, 68, 90, 28);
                 DrawInteractiveButton(g, btnVid, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Video, btnVid.X + 6, btnVid.Y + 6, 16, 16);
+                DrawPptVideoVector(g, btnVid.X + 4, btnVid.Y + 5, 18, 18);
                 g.DrawString("Chèn Video", btnFont, darkBrush, btnVid.X + 26, btnVid.Y + 6);
 
                 Rectangle btnAud = new Rectangle(curX, 100, 90, 28);
                 DrawInteractiveButton(g, btnAud, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Audio, btnAud.X + 6, btnAud.Y + 6, 16, 16);
+                DrawPptAudioVector(g, btnAud.X + 4, btnAud.Y + 5, 18, 18);
                 g.DrawString("Chèn Audio", btnFont, darkBrush, btnAud.X + 26, btnAud.Y + 6);
                 curX += 94;
 
@@ -16478,7 +17094,8 @@ namespace ZenQOffice.UI
 
                 Rectangle btnClearTimings = new Rectangle(curX, 112, 150, 20);
                 DrawInteractiveButton(g, btnClearTimings, false, 2);
-                g.DrawString("🗑️ Xóa thời gian đã ghi ▾", smallFont, darkBrush, btnClearTimings.X + 4, btnClearTimings.Y + 2);
+                DrawEraserIconMini(g, btnClearTimings.X + 4, btnClearTimings.Y + 2);
+                g.DrawString("Xóa thời gian đã ghi ▾", smallFont, darkBrush, btnClearTimings.X + 22, btnClearTimings.Y + 2);
                 curX += 156;
 
                 g.DrawString("Thời gian", groupFont, Brushes.Gray, new RectangleF(g3Start, 137, curX - g3Start, 14), sfCenter);
@@ -16490,7 +17107,7 @@ namespace ZenQOffice.UI
                 // 6. Export to Video
                 Rectangle btnExpVid = new Rectangle(curX, 68, 86, 62);
                 DrawInteractiveButton(g, btnExpVid, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Video, new Rectangle(btnExpVid.X, 70, btnExpVid.Width, 26), 28, 22, Color.FromArgb(16, 185, 129));
+                DrawPptVideoVector(g, btnExpVid.X + btnExpVid.Width / 2 - 12, 71, 24, 22);
                 g.DrawString("Xuất Video", boldFont, darkBrush, new RectangleF(btnExpVid.X, 99, btnExpVid.Width, 16), sfCenter);
                 g.DrawString("(MP4 / AVI)", smallFont, Brushes.DimGray, new RectangleF(btnExpVid.X, 114, btnExpVid.Width, 14), sfCenter);
                 curX += 90;
@@ -16498,7 +17115,7 @@ namespace ZenQOffice.UI
                 // 7. Save as Show
                 Rectangle btnSaveShow = new Rectangle(curX, 68, 86, 62);
                 DrawInteractiveButton(g, btnSaveShow, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideShowFromBeginning, new Rectangle(btnSaveShow.X, 70, btnSaveShow.Width, 26), 26, 22, pptAccent);
+                DrawSlidesProjectorLargeIcon(g, btnSaveShow.X + btnSaveShow.Width / 2 - 12, 71);
                 g.DrawString("Lưu Bài Giảng", btnFont, darkBrush, new RectangleF(btnSaveShow.X, 99, btnSaveShow.Width, 16), sfCenter);
                 g.DrawString("(.ppsx Show)", smallFont, Brushes.DimGray, new RectangleF(btnSaveShow.X, 114, btnSaveShow.Width, 14), sfCenter);
                 curX += 90;
@@ -16543,29 +17160,56 @@ namespace ZenQOffice.UI
                     
                     // Vector View Mode Icons
                     Color iconCol = isSel ? Color.FromArgb(210, 71, 38) : Color.FromArgb(51, 65, 85);
-                    if (i == 0) // Soạn thảo (Normal view)
+                    int vx = vBox.X + vBox.Width / 2 - 11;
+                    int vy = 73;
+                    using (Pen vp = new Pen(iconCol, 1.3f))
+                    using (SolidBrush accB = new SolidBrush(Color.FromArgb(210, 71, 38)))
                     {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.NormalView, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
-                    }
-                    else if (i == 1) // Dàn bài (Outline)
-                    {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.OutlineView, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
-                    }
-                    else if (i == 2) // Lưới Slide (Slide Sorter)
-                    {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideSorter, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
-                    }
-                    else if (i == 3) // Ghi chú (Notes Page)
-                    {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.NotesPane, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
-                    }
-                    else if (i == 4) // Chế độ Đọc (Reading View)
-                    {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ReadingView, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
-                    }
-                    else if (i == 5) // Slide Master
-                    {
-                        WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideMaster, new Rectangle(vBox.X, 70, vBox.Width, 26), 24, 20, iconCol);
+                        if (i == 0) // Soạn thảo (Normal view)
+                        {
+                            g.FillRectangle(Brushes.White, vx, vy, 22, 16);
+                            g.DrawRectangle(vp, vx, vy, 22, 16);
+                            g.DrawLine(vp, vx + 7, vy, vx + 7, vy + 16);
+                            g.FillRectangle(accB, vx + 2, vy + 2, 3, 3);
+                            g.FillRectangle(accB, vx + 2, vy + 7, 3, 3);
+                        }
+                        else if (i == 1) // Dàn bài (Outline)
+                        {
+                            g.FillRectangle(Brushes.White, vx, vy, 22, 16);
+                            g.DrawRectangle(vp, vx, vy, 22, 16);
+                            g.DrawLine(vp, vx + 3, vy + 4, vx + 12, vy + 4);
+                            g.DrawLine(vp, vx + 6, vy + 8, vx + 18, vy + 8);
+                            g.DrawLine(vp, vx + 6, vy + 12, vx + 16, vy + 12);
+                        }
+                        else if (i == 2) // Lưới Slide (Slide Sorter)
+                        {
+                            g.DrawRectangle(vp, vx, vy, 9, 6);
+                            g.DrawRectangle(vp, vx + 12, vy, 9, 6);
+                            g.DrawRectangle(vp, vx, vy + 9, 9, 6);
+                            g.DrawRectangle(vp, vx + 12, vy + 9, 9, 6);
+                        }
+                        else if (i == 3) // Ghi chú (Notes Page)
+                        {
+                            g.FillRectangle(Brushes.White, vx + 3, vy, 16, 17);
+                            g.DrawRectangle(vp, vx + 3, vy, 16, 17);
+                            g.FillRectangle(accB, vx + 5, vy + 2, 12, 6);
+                            g.DrawLine(vp, vx + 5, vy + 11, vx + 16, vy + 11);
+                            g.DrawLine(vp, vx + 5, vy + 14, vx + 14, vy + 14);
+                        }
+                        else if (i == 4) // Chế độ Đọc (Reading View)
+                        {
+                            g.FillRectangle(Brushes.White, vx, vy + 1, 10, 14);
+                            g.FillRectangle(Brushes.White, vx + 10, vy + 1, 10, 14);
+                            g.DrawRectangle(vp, vx, vy + 1, 10, 14);
+                            g.DrawRectangle(vp, vx + 10, vy + 1, 10, 14);
+                        }
+                        else if (i == 5) // Slide Master
+                        {
+                            g.FillRectangle(Brushes.White, vx, vy, 22, 16);
+                            g.DrawRectangle(vp, vx, vy, 22, 16);
+                            g.FillRectangle(accB, vx, vy, 22, 4);
+                            g.DrawRectangle(vp, vx + 3, vy + 6, 16, 7);
+                        }
                     }
 
                     using (SolidBrush textB = new SolidBrush(isSel ? Color.FromArgb(210, 71, 38) : Color.FromArgb(31, 41, 55)))
@@ -16651,7 +17295,7 @@ namespace ZenQOffice.UI
                 int g1Start = curX;
                 Rectangle tplBox = new Rectangle(curX, 68, 64, 62);
                 DrawInteractiveButton(g, tplBox, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.SlideLayout, new Rectangle(tplBox.X, 70, tplBox.Width, 26), 26, neutralIcon, pptAccent);
+                DrawSlideLayoutVector(g, tplBox.X + tplBox.Width / 2 - 9, 73, 18, 18, neutralIcon);
                 g.DrawString("Mẫu slide ▾", btnFont, darkBrush, new RectangleF(tplBox.X - 2, 100, tplBox.Width + 4, 24), sfCenter);
                 curX += 68;
 
@@ -16663,7 +17307,7 @@ namespace ZenQOffice.UI
                 int gShapesStart = curX;
                 Rectangle elemBox = new Rectangle(curX, 68, 68, 62);
                 DrawInteractiveButton(g, elemBox, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Shapes, new Rectangle(elemBox.X, 70, elemBox.Width, 26), 26, neutralIcon, pptAccent);
+                DrawPptShapesGroupVector(g, elemBox.X + elemBox.Width / 2 - 12, 71, 24, 24);
                 g.DrawString("Hình dạng ▾", btnFont, darkBrush, new RectangleF(elemBox.X - 2, 100, elemBox.Width + 4, 24), sfCenter);
                 curX += 72;
 
@@ -16675,7 +17319,7 @@ namespace ZenQOffice.UI
                 int gGraphicsStart = curX;
                 Rectangle iconBox = new Rectangle(curX, 68, 64, 62);
                 DrawInteractiveButton(g, iconBox, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Icons, new Rectangle(iconBox.X, 70, iconBox.Width, 26), 24, neutralIcon, pptAccent);
+                DrawPptIconsVector(g, iconBox.X + iconBox.Width / 2 - 12, 71, 24, 24);
                 g.DrawString("Đồ họa ▾", btnFont, darkBrush, new RectangleF(iconBox.X - 2, 100, iconBox.Width + 4, 24), sfCenter);
                 curX += 68;
 
@@ -16687,7 +17331,7 @@ namespace ZenQOffice.UI
                 int gImagesStart = curX;
                 Rectangle imgBox = new Rectangle(curX, 68, 64, 62);
                 DrawInteractiveButton(g, imgBox, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Picture, new Rectangle(imgBox.X, 70, imgBox.Width, 26), 26, neutralIcon, pptAccent);
+                DrawPptPictureVector(g, imgBox.X + imgBox.Width / 2 - 12, 71, 24, 24);
                 g.DrawString("Hình ảnh ▾", btnFont, darkBrush, new RectangleF(imgBox.X - 2, 100, imgBox.Width + 4, 24), sfCenter);
                 curX += 68;
 
@@ -16721,7 +17365,7 @@ namespace ZenQOffice.UI
                 int gBrandStart = curX;
                 Rectangle brandBox = new Rectangle(curX, 68, 68, 62);
                 DrawInteractiveButton(g, brandBox, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.ShapeFill, new Rectangle(brandBox.X, 70, brandBox.Width, 26), 26, neutralIcon, pptAccent);
+                DrawSlidesShapeFillIcon(g, brandBox.X + brandBox.Width / 2 - 8, 74, neutralIcon, pptAccent);
                 g.DrawString("Bảng màu ▾", btnFont, darkBrush, new RectangleF(brandBox.X - 2, 100, brandBox.Width + 4, 24), sfCenter);
                 curX += 72;
 
@@ -16817,13 +17461,13 @@ namespace ZenQOffice.UI
                 Rectangle fillBtn = new Rectangle(curX, 68, 106, 24);
                 DrawInteractiveButton(g, fillBtn, false, 3);
                 Color curFill = Color.FromArgb(255, Color.FromArgb(shape.FillColor));
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeFill, fillBtn.X + 4, fillBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), curFill);
+                DrawSlidesShapeFillIcon(g, fillBtn.X + 4, fillBtn.Y + 4, Color.FromArgb(59, 58, 57), curFill);
                 g.DrawString("Tô màu ô ▾", btnFont, Brushes.Black, fillBtn.X + 24, fillBtn.Y + 3);
 
                 Rectangle borderBtn = new Rectangle(curX, 94, 106, 24);
                 DrawInteractiveButton(g, borderBtn, false, 3);
                 Color curStroke = Color.FromArgb(255, Color.FromArgb(shape.StrokeColor));
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.Table, borderBtn.X + 4, borderBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), curStroke);
+                DrawLucideBorders(g, borderBtn.X + 4, borderBtn.Y + 4, Color.FromArgb(59, 58, 57));
                 g.DrawString("Viền ô ▾", btnFont, Brushes.Black, borderBtn.X + 24, borderBtn.Y + 3);
 
                 curX += 114;
@@ -16834,7 +17478,7 @@ namespace ZenQOffice.UI
                 // ==================== Group 3: Định dạng Chữ (Font & Text Formatting) ====================
                 Rectangle textColBtn = new Rectangle(curX, 68, 86, 25);
                 DrawInteractiveButton(g, textColBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.FontColor, textColBtn.X + 4, textColBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(210, 71, 38));
+                DrawFluentFontColor(g, textColBtn.X + 4, textColBtn.Y + 4, Color.FromArgb(59, 58, 57), Color.FromArgb(210, 71, 38), Color.FromArgb(96, 94, 92));
                 g.DrawString("Màu chữ ▾", btnFont, Brushes.Black, textColBtn.X + 24, textColBtn.Y + 3);
 
                 Rectangle boldBtn = new Rectangle(curX, 96, 40, 25);
@@ -16883,17 +17527,27 @@ namespace ZenQOffice.UI
                 // ==================== Group 5: Xóa (Delete) ====================
                 Rectangle delRowBtn = new Rectangle(curX, 68, 78, 25);
                 DrawInteractiveButton(g, delRowBtn, false, 3);
-                g.DrawString("❌ Xóa Hàng", btnFont, Brushes.DarkRed, curX + 4, 72);
+                using (Pen xp = new Pen(Color.FromArgb(196, 43, 28), 1.6f))
+                {
+                    g.DrawLine(xp, curX + 5, 76, curX + 13, 84);
+                    g.DrawLine(xp, curX + 13, 76, curX + 5, 84);
+                }
+                g.DrawString("Xóa Hàng", btnFont, Brushes.DarkRed, curX + 18, 72);
 
                 Rectangle delColBtn = new Rectangle(curX, 96, 78, 25);
                 DrawInteractiveButton(g, delColBtn, false, 3);
-                g.DrawString("❌ Xóa Cột", btnFont, Brushes.DarkRed, curX + 4, 100);
+                using (Pen xp = new Pen(Color.FromArgb(196, 43, 28), 1.6f))
+                {
+                    g.DrawLine(xp, curX + 5, 104, curX + 13, 112);
+                    g.DrawLine(xp, curX + 13, 104, curX + 5, 112);
+                }
+                g.DrawString("Xóa Cột", btnFont, Brushes.DarkRed, curX + 18, 100);
 
                 Rectangle delTableBtn = new Rectangle(curX + 82, 68, 86, 53);
                 DrawInteractiveButton(g, delTableBtn, false, 4);
-                g.DrawString("🗑️", boldFont, Brushes.DarkRed, curX + 90, 82);
-                g.DrawString("Xóa Bảng", boldFont, Brushes.DarkRed, curX + 110, 77);
-                g.DrawString("Delete", labelFont, Brushes.Gray, curX + 110, 95);
+                DrawDiscardIconVector(g, curX + 86, 78, 20, 20);
+                g.DrawString("Xóa Bảng", boldFont, Brushes.DarkRed, curX + 108, 77);
+                g.DrawString("Delete", labelFont, Brushes.Gray, curX + 108, 95);
 
                 curX += 176;
                 g.DrawString("Thao tác Xóa", labelFont, Brushes.Gray, curX - 164, 137);
@@ -17043,44 +17697,23 @@ namespace ZenQOffice.UI
 
         private void DrawAutoBgWandVector(Graphics g, int x, int y, int w, int h)
         {
-            // Thân đũa phép AI ma thuật màu tím Cyberpunk
-            using (Pen wandPen = new Pen(Color.FromArgb(147, 51, 234), 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen wandPen = new Pen(Color.FromArgb(51, 65, 85), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
                 g.DrawLine(wandPen, x + 3, y + h - 3, x + w - 7, y + 7);
             }
-            // Đầu đũa phép màu vàng sáng
-            using (SolidBrush tipB = new SolidBrush(Color.FromArgb(250, 204, 21)))
-            {
-                g.FillEllipse(tipB, x + w - 9, y + 5, 5, 5);
-            }
-            // Ngôi sao phát sáng Cyberpunk Cyan & Yellow
-            DrawStarVector(g, x + w - 4, y + 4, 5, Color.FromArgb(6, 182, 212));
-            DrawStarVector(g, x + 5, y + 6, 3, Color.FromArgb(245, 158, 11));
-            DrawStarVector(g, x + w - 5, y + h - 7, 3, Color.FromArgb(168, 85, 247));
+            DrawStarVector(g, x + w - 5, y + 5, 4, Color.FromArgb(37, 99, 235));
+            DrawStarVector(g, x + 6, y + 6, 3, Color.FromArgb(100, 116, 139));
         }
 
         private void DrawChromaKeyPenVector(Graphics g, int x, int y, int w, int h)
         {
-            // Vòng tròn mẫu màu phông xanh CapCut (Chroma Green & Cyan)
-            using (SolidBrush chromaB = new SolidBrush(Color.FromArgb(34, 197, 94)))
-            using (Pen borderP = new Pen(Color.FromArgb(22, 101, 52), 1.2f))
+            using (Pen borderP = new Pen(Color.FromArgb(51, 65, 85), 1.4f))
+            using (SolidBrush dotB = new SolidBrush(Color.FromArgb(37, 99, 235)))
             {
-                g.FillEllipse(chromaB, x + 2, y + h - 12, 10, 10);
-                g.DrawEllipse(borderP, x + 2, y + h - 12, 10, 10);
+                g.DrawEllipse(borderP, x + 2, y + h - 11, 9, 9);
+                g.FillEllipse(dotB, x + 4, y + h - 9, 5, 5);
+                g.DrawLine(borderP, x + 8, y + h - 7, x + w - 4, y + 5);
             }
-
-            // Cây bút hút màu CapCut (Eyedropper Pen) màu xanh ngọc Electric
-            using (Pen penP = new Pen(Color.FromArgb(14, 165, 233), 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                g.DrawLine(penP, x + 6, y + h - 7, x + w - 4, y + 4);
-            }
-            // Nắp/bóng hút màu trên đỉnh
-            using (SolidBrush topB = new SolidBrush(Color.FromArgb(2, 132, 199)))
-            {
-                g.FillEllipse(topB, x + w - 7, y + 2, 6, 6);
-            }
-            // Giọt màu lơ lửng
-            DrawStarVector(g, x + w - 2, y + 8, 3, Color.FromArgb(16, 185, 129));
         }
 
         private void DrawRefineBgVector(Graphics g, int x, int y, int w, int h)
@@ -17095,12 +17728,36 @@ namespace ZenQOffice.UI
 
         private void DrawSunVector(Graphics g, int cx, int cy, int size, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.PictureCorrections, cx - size / 2, cy - size / 2, size, size, Color.FromArgb(51, 65, 85), col);
+            using (Pen p = new Pen(col, 1.5f))
+            using (SolidBrush b = new SolidBrush(Color.FromArgb(254, 240, 138)))
+            {
+                int r = size / 4;
+                g.FillEllipse(b, cx - r, cy - r, r * 2, r * 2);
+                g.DrawEllipse(p, cx - r, cy - r, r * 2, r * 2);
+                for (int i = 0; i < 8; i++)
+                {
+                    double ang = i * Math.PI / 4.0;
+                    float x1 = cx + (float)(Math.Cos(ang) * (r + 2));
+                    float y1 = cy + (float)(Math.Sin(ang) * (r + 2));
+                    float x2 = cx + (float)(Math.Cos(ang) * (r + 4.5));
+                    float y2 = cy + (float)(Math.Sin(ang) * (r + 4.5));
+                    g.DrawLine(p, x1, y1, x2, y2);
+                }
+            }
         }
 
         private void DrawPaletteVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.PictureColor, x, y, w, h, Color.FromArgb(51, 65, 85), col);
+            using (Pen p = new Pen(Color.FromArgb(59, 58, 57), 1.3f))
+            using (SolidBrush b1 = new SolidBrush(col))
+            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(210, 71, 38)))
+            using (SolidBrush b3 = new SolidBrush(Color.FromArgb(16, 185, 129)))
+            {
+                g.DrawEllipse(p, x + 1, y + 1, w - 2, h - 2);
+                g.FillEllipse(b1, x + 3, y + 4, 3, 3);
+                g.FillEllipse(b2, x + 7, y + 3, 3, 3);
+                g.FillEllipse(b3, x + 8, y + 7, 3, 3);
+            }
         }
 
         private void DrawArtisticWandVector(Graphics g, int x, int y, int w, int h, Color col)
@@ -17157,7 +17814,7 @@ namespace ZenQOffice.UI
 
         private void DrawBorderVector(Graphics g, int x, int y, int w, int h, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.PictureBorder, x, y, w, h, Color.FromArgb(51, 65, 85), col);
+            DrawSlidesShapeOutlineIcon(g, x, y - 1, Color.FromArgb(59, 58, 57), col);
         }
 
         private void DrawLayoutGridVector(Graphics g, int x, int y, int w, int h, Color col)
@@ -17190,7 +17847,15 @@ namespace ZenQOffice.UI
 
         private void DrawCropVector(Graphics g, int cx, int cy, int size, Color col)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.PictureCrop, cx - size / 2, cy - size / 2, size, size, col);
+            int x = cx - size / 2;
+            int y = cy - size / 2;
+            using (Pen p = new Pen(col, 1.6f))
+            {
+                g.DrawLine(p, x + 4, y + 1, x + 4, y + size - 4);
+                g.DrawLine(p, x + 4, y + size - 4, x + size - 1, y + size - 4);
+                g.DrawLine(p, x + 1, y + 4, x + size - 4, y + 4);
+                g.DrawLine(p, x + size - 4, y + 4, x + size - 4, y + size - 1);
+            }
         }
 
         private void DrawPictureStyleThumbnail(Graphics g, Rectangle r, int styleIdx, Image img)
@@ -17261,7 +17926,12 @@ namespace ZenQOffice.UI
 
         private void DrawRemoveBgVector(Graphics g, int x, int y, int w, int h)
         {
-            WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.RemoveBackground, x, y, w, h, Color.FromArgb(51, 65, 85), Color.FromArgb(210, 71, 38));
+            DrawPptPictureVector(g, x, y, w, h);
+            using (Pen slashP = new Pen(Color.FromArgb(220, 38, 38), 1.8f))
+            {
+                g.DrawLine(slashP, x + w - 8, y + h - 8, x + w - 2, y + h - 2);
+                g.DrawLine(slashP, x + w - 2, y + h - 8, x + w - 8, y + h - 2);
+            }
         }
 
         private void DrawPowerPointTabPictureFormat(Graphics g, int width, SlidesView slidesView)
@@ -17374,23 +18044,23 @@ namespace ZenQOffice.UI
                 // ==================== Group 4: Sắp xếp (Arrange) ====================
                 Rectangle bFwdBtn = new Rectangle(curX, 68, 88, 24);
                 DrawInteractiveButton(g, bFwdBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.BringForward, bFwdBtn.X + 4, bFwdBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(16, 185, 129));
+                DrawLayerFwdVector(g, bFwdBtn.X + 4, bFwdBtn.Y + 5, Color.FromArgb(37, 99, 235));
                 g.DrawString("Lên trước", btnFont, Brushes.Black, bFwdBtn.X + 22, bFwdBtn.Y + 3);
 
                 Rectangle sBwdBtn = new Rectangle(curX, 94, 88, 24);
                 DrawInteractiveButton(g, sBwdBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.SendBackward, sBwdBtn.X + 4, sBwdBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(239, 68, 68));
+                DrawLayerBwdVector(g, sBwdBtn.X + 4, sBwdBtn.Y + 5, Color.FromArgb(75, 85, 99));
                 g.DrawString("Ra sau", btnFont, Brushes.Black, sBwdBtn.X + 22, sBwdBtn.Y + 3);
 
                 Rectangle alignBtn = new Rectangle(curX, 120, 88, 24);
                 DrawInteractiveButton(g, alignBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignObjects, alignBtn.X + 4, alignBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(37, 99, 235));
+                DrawAlignVector(g, alignBtn.X + 4, alignBtn.Y + 6, 12, 10, 0, Color.FromArgb(37, 99, 235));
                 g.DrawString("Căn chỉnh ▾", btnFont, Brushes.Black, alignBtn.X + 18, alignBtn.Y + 3);
                 curX += 92;
 
                 Rectangle rotBtn = new Rectangle(curX, 68, 84, 24);
                 DrawInteractiveButton(g, rotBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ResetSlide, rotBtn.X + 4, rotBtn.Y + 4, 16, 16, Color.FromArgb(217, 119, 6));
+                DrawRotateVector(g, rotBtn.X + 4, rotBtn.Y + 5, Color.FromArgb(217, 119, 6));
                 g.DrawString("Xoay 90°", btnFont, Brushes.Black, rotBtn.X + 18, rotBtn.Y + 3);
 
                 Rectangle flipHBtn = new Rectangle(curX, 94, 84, 24);
@@ -17474,152 +18144,372 @@ namespace ZenQOffice.UI
             using (Font boldFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (Font miniFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
             using (Font valFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-            using (SolidBrush darkBrush = new SolidBrush(Color.FromArgb(31, 41, 55)))
+            using (SolidBrush darkBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush purpleBrush = new SolidBrush(Color.FromArgb(124, 58, 237)))
             using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             {
                 g.SmoothingMode = SmoothingMode.HighQuality;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-                Color neutralIcon = Color.FromArgb(55, 65, 81);
-                Color pptAccent = Color.FromArgb(210, 71, 38);
-
+                Color fluentPurple = Color.FromArgb(124, 58, 237);
+                Color slateIcon = Color.FromArgb(51, 65, 85);
                 int curX = 14;
 
-                // ==================== Group 1: Thay đổi Đồ họa (Change Graphic) ====================
+                // ==================== Group 1: Công cụ Đồ họa & AI (Graphic Edit Bar) ====================
                 int g1Start = curX;
-                Rectangle chgGraphicBtn = new Rectangle(curX, 68, 76, 54);
-                DrawInteractiveButton(g, chgGraphicBtn, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Icons, new Rectangle(chgGraphicBtn.X, 70, chgGraphicBtn.Width, 24), 22, neutralIcon, pptAccent);
-                g.DrawString("Đổi đồ họa ▾", btnFont, darkBrush, new RectangleF(chgGraphicBtn.X - 2, 98, chgGraphicBtn.Width + 4, 22), sfCenter);
-                curX += 80;
 
-                Rectangle convBtn = new Rectangle(curX, 68, 94, 54);
-                DrawInteractiveButton(g, convBtn, false, 4);
-                WpfSlideIconRenderer.DrawIconCentered(g, SlideIconKind.Shapes, new Rectangle(convBtn.X, 70, convBtn.Width, 24), 22, neutralIcon, pptAccent);
-                g.DrawString("Rã thành Hình", btnFont, darkBrush, new RectangleF(convBtn.X - 2, 98, convBtn.Width + 4, 22), sfCenter);
-                curX += 98;
+                // 1.1 Chỉnh sửa (Opens Graphic Editor Sidebar: Khớp định dạng & Bộ lọc)
+                bool isEditPaneOpen = slidesView.IsSidebarOpen && slidesView.SidebarPanel == SidebarPanelType.GraphicEditor;
+                Rectangle editBtn = new Rectangle(curX, 68, 66, 54);
+                DrawInteractiveButton(g, editBtn, isEditPaneOpen, 5);
+                DrawEditSlidersVector(g, editBtn.X + editBtn.Width / 2 - 11, 72, 22, 22, fluentPurple);
+                g.DrawString("Chỉnh sửa", isEditPaneOpen ? boldFont : btnFont, isEditPaneOpen ? purpleBrush : darkBrush, new RectangleF(editBtn.X - 2, 98, editBtn.Width + 4, 22), sfCenter);
+                curX += 70;
 
-                g.DrawString("Thay đổi", labelFont, Brushes.Gray, new RectangleF(g1Start, 137, curX - g1Start, 14), sfCenter);
-                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
-                curX += 8;
+                // 1.2 Thay thế ▾ (Replace Graphic)
+                Rectangle repBtn = new Rectangle(curX, 68, 66, 54);
+                DrawInteractiveButton(g, repBtn, false, 5);
+                DrawReplaceGraphicVector(g, repBtn.X + repBtn.Width / 2 - 11, 72, 22, 22, Color.FromArgb(37, 99, 235));
+                g.DrawString("Thay thế ▾", btnFont, darkBrush, new RectangleF(repBtn.X - 2, 98, repBtn.Width + 4, 22), sfCenter);
+                curX += 70;
 
-                // ==================== Group 2: Kiểu Đồ họa (Graphic Styles) ====================
-                int g2Start = curX;
-                Color[] styleColors = new Color[] {
-                    Color.FromArgb(37, 99, 235),
-                    Color.FromArgb(220, 38, 38),
-                    Color.FromArgb(16, 185, 129),
-                    Color.FromArgb(245, 158, 11),
-                    Color.FromArgb(107, 114, 128)
-                };
-                for (int i = 0; i < styleColors.Length; i++)
-                {
-                    Rectangle styleBox = new Rectangle(curX + i * 36, 68, 32, 54);
-                    DrawInteractiveButton(g, styleBox, false, 4);
-                    using (SolidBrush fillB = new SolidBrush(styleColors[i]))
-                    {
-                        g.FillEllipse(fillB, styleBox.X + 6, styleBox.Y + 8, 20, 20);
-                    }
-                    using (Pen p = new Pen(Color.FromArgb(203, 213, 225), 1f))
-                    {
-                        g.DrawEllipse(p, styleBox.X + 6, styleBox.Y + 8, 20, 20);
-                    }
-                    g.DrawString("Kiểu " + (i + 1), labelFont, darkBrush, new RectangleF(styleBox.X - 2, styleBox.Y + 34, styleBox.Width + 4, 16), sfCenter);
-                }
-                curX += styleColors.Length * 36 + 4;
-
-                // Mini stack: Tô màu đồ họa ▾, Viền đồ họa ▾, Hiệu ứng ▾
-                Rectangle fillBtn = new Rectangle(curX, 68, 120, 24);
-                DrawInteractiveButton(g, fillBtn, false, 3);
-                DrawPaletteVector(g, fillBtn.X + 6, fillBtn.Y + 5, 14, 14, Color.FromArgb(37, 99, 235));
-                g.DrawString("Tô màu Đồ họa ▾", btnFont, darkBrush, fillBtn.X + 24, fillBtn.Y + 3);
-
-                Rectangle outlineBtn = new Rectangle(curX, 94, 120, 24);
-                DrawInteractiveButton(g, outlineBtn, false, 3);
-                DrawBorderVector(g, outlineBtn.X + 6, outlineBtn.Y + 5, 14, 14, Color.FromArgb(210, 71, 38));
-                g.DrawString("Viền Đồ họa ▾", btnFont, darkBrush, outlineBtn.X + 24, outlineBtn.Y + 3);
-
-                Rectangle fxBtn = new Rectangle(curX, 120, 120, 24);
-                DrawInteractiveButton(g, fxBtn, false, 3);
-                DrawSparkleVector(g, fxBtn.X + 6, fxBtn.Y + 5, 11, Color.FromArgb(245, 158, 11));
-                g.DrawString("Hiệu ứng ▾", btnFont, darkBrush, fxBtn.X + 24, fxBtn.Y + 3);
-                curX += 124;
-
-                g.DrawString("Kiểu Đồ họa", labelFont, Brushes.Gray, new RectangleF(g2Start, 137, curX - g2Start, 14), sfCenter);
-                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
-                curX += 8;
-
-                // ==================== Group 3: Sắp xếp (Arrange) ====================
-                int g3Start = curX;
-                Rectangle bFwd = new Rectangle(curX, 68, 96, 18);
-                DrawInteractiveButton(g, bFwd, false, 2);
-                DrawLayerFwdVector(g, bFwd.X + 4, bFwd.Y + 3, Color.FromArgb(37, 99, 235));
-                g.DrawString("Đưa lên trên ▾", miniFont, darkBrush, bFwd.X + 18, bFwd.Y + 1);
-
-                Rectangle sBwd = new Rectangle(curX, 88, 96, 18);
-                DrawInteractiveButton(g, sBwd, false, 2);
-                DrawLayerBwdVector(g, sBwd.X + 4, sBwd.Y + 3, Color.FromArgb(75, 85, 99));
-                g.DrawString("Đưa ra sau ▾", miniFont, darkBrush, sBwd.X + 18, sBwd.Y + 1);
-
-                Rectangle selPane = new Rectangle(curX, 108, 96, 18);
-                DrawInteractiveButton(g, selPane, false, 2);
-                DrawSelectionPaneVector(g, selPane.X + 4, selPane.Y + 3, Color.FromArgb(16, 185, 129));
-                g.DrawString("Ngăn Lựa chọn", miniFont, darkBrush, selPane.X + 18, selPane.Y + 1);
-
-                Rectangle alignBox = new Rectangle(curX + 100, 68, 88, 18);
-                DrawInteractiveButton(g, alignBox, false, 2);
-                DrawAlignVector(g, alignBox.X + 4, alignBox.Y + 4, 12, 10, 0, Color.FromArgb(37, 99, 235));
-                g.DrawString("Căn chỉnh ▾", miniFont, darkBrush, alignBox.X + 18, alignBox.Y + 1);
-
-                Rectangle grpBox = new Rectangle(curX + 100, 88, 88, 18);
-                DrawInteractiveButton(g, grpBox, false, 2);
-                DrawGroupVector(g, grpBox.X + 4, grpBox.Y + 3, Color.FromArgb(75, 85, 99));
-                g.DrawString("Nhóm ▾", miniFont, darkBrush, grpBox.X + 18, grpBox.Y + 1);
-
-                Rectangle rotBox = new Rectangle(curX + 100, 108, 88, 18);
-                DrawInteractiveButton(g, rotBox, false, 2);
-                DrawRotateVector(g, rotBox.X + 4, rotBox.Y + 3, Color.FromArgb(234, 179, 8));
-                g.DrawString("Xoay ▾", miniFont, darkBrush, rotBox.X + 18, rotBox.Y + 1);
-                curX += 194;
-
-                g.DrawString("Sắp xếp", labelFont, Brushes.Gray, new RectangleF(g3Start, 137, curX - g3Start, 14), sfCenter);
-                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
-                curX += 8;
-
-                // ==================== Group 4: Kích thước & Cắt (Size & Crop) ====================
-                int g4Start = curX;
-                Rectangle cropBtn = new Rectangle(curX, 68, 64, 54);
-                DrawInteractiveButton(g, cropBtn, false, 4);
-                DrawCropVector(g, cropBtn.X + 20, cropBtn.Y + 6, 20, Color.FromArgb(37, 99, 235));
-                g.DrawString("Cắt ▾", btnFont, darkBrush, new RectangleF(cropBtn.X - 2, 98, cropBtn.Width + 4, 22), sfCenter);
+                // 1.3 Xóa nền (AI Background Removal with Crown badge)
+                Rectangle bgRemBtn = new Rectangle(curX, 68, 64, 54);
+                DrawInteractiveButton(g, bgRemBtn, slidesView.IsRemovingBackground, 5);
+                DrawAiRemoveBgVector(g, bgRemBtn.X + bgRemBtn.Width / 2 - 11, 72, 22, 22);
+                g.DrawString("Xóa nền", btnFont, darkBrush, new RectangleF(bgRemBtn.X - 2, 98, bgRemBtn.Width + 4, 22), sfCenter);
                 curX += 68;
 
-                Rectangle hLabel = new Rectangle(curX, 68, 124, 25);
-                DrawInteractiveButton(g, hLabel, false, 3);
-                g.DrawString("↕ Cao:", btnFont, Brushes.DimGray, hLabel.X + 4, hLabel.Y + 4);
-                string hStr = (shape.Transform.Height * 0.0264583f).ToString("0.00") + " cm";
-                g.DrawString(hStr, valFont, Brushes.Navy, hLabel.X + 42, hLabel.Y + 3);
-                Rectangle hUp = new Rectangle(hLabel.Right - 20, hLabel.Y + 1, 18, 11);
-                Rectangle hDn = new Rectangle(hLabel.Right - 20, hLabel.Y + 12, 18, 11);
-                DrawInteractiveButton(g, hUp, false, 1);
-                DrawInteractiveButton(g, hDn, false, 1);
-                g.DrawString("▲", labelFont, Brushes.Black, hUp.X + 3, hUp.Y - 2);
-                g.DrawString("▼", labelFont, Brushes.Black, hDn.X + 3, hDn.Y - 2);
+                // 1.4 Xóa ảnh (Delete Graphic)
+                Rectangle delBtn = new Rectangle(curX, 68, 56, 54);
+                DrawInteractiveButton(g, delBtn, false, 5);
+                DrawTrashVector(g, delBtn.X + delBtn.Width / 2 - 10, 72, 20, 20, Color.FromArgb(220, 38, 38));
+                g.DrawString("Xóa ảnh", btnFont, darkBrush, new RectangleF(delBtn.X - 2, 98, delBtn.Width + 4, 22), sfCenter);
+                curX += 60;
 
-                Rectangle wLabel = new Rectangle(curX, 96, 124, 25);
-                DrawInteractiveButton(g, wLabel, false, 3);
-                g.DrawString("↔ Rộng:", btnFont, Brushes.DimGray, wLabel.X + 4, wLabel.Y + 4);
-                string wStr = (shape.Transform.Width * 0.0264583f).ToString("0.00") + " cm";
-                g.DrawString(wStr, valFont, Brushes.Navy, wLabel.X + 42, wLabel.Y + 3);
-                Rectangle wUp = new Rectangle(wLabel.Right - 20, wLabel.Y + 1, 18, 11);
-                Rectangle wDn = new Rectangle(wLabel.Right - 20, wLabel.Y + 12, 18, 11);
-                DrawInteractiveButton(g, wUp, false, 1);
-                DrawInteractiveButton(g, wDn, false, 1);
-                g.DrawString("▲", labelFont, Brushes.Black, wUp.X + 3, wUp.Y - 2);
-                g.DrawString("▼", labelFont, Brushes.Black, wDn.X + 3, wDn.Y - 2);
-                curX += 130;
+                g.DrawString("Công cụ & AI", labelFont, Brushes.Gray, new RectangleF(g1Start, 137, curX - g1Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
 
-                g.DrawString("Kích thước", labelFont, Brushes.Gray, new RectangleF(g4Start, 137, curX - g4Start, 14), sfCenter);
+                // ==================== Group 2: Màu phát hiện (Auto-Detected Colors - Color Swatches) ====================
+                int g2Start = curX;
+                var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 5);
+                int swCount = Math.Min(5, detectedColors.Count);
+                bool isColorPaneOpen = slidesView.IsSidebarOpen && slidesView.SidebarPanel == SidebarPanelType.ColorPalettePicker;
+
+                for (int i = 0; i < swCount; i++)
+                {
+                    bool isSlotActive = isColorPaneOpen && slidesView.ActiveColorPickerTarget == ColorPickerTarget.GraphicColor && slidesView.SelectedGraphicColorIndex == i;
+                    Rectangle swBox = new Rectangle(curX, 68, 34, 54);
+                    DrawInteractiveButton(g, swBox, isSlotActive, 5);
+                    Rectangle circleRect = new Rectangle(swBox.X + 5, swBox.Y + 6, 24, 24);
+                    using (SolidBrush cb = new SolidBrush(detectedColors[i]))
+                    {
+                        g.FillEllipse(cb, circleRect);
+                    }
+                    using (Pen cp = new Pen(isSlotActive ? fluentPurple : Color.FromArgb(203, 213, 225), isSlotActive ? 2.0f : 1.4f))
+                    {
+                        g.DrawEllipse(cp, circleRect);
+                    }
+                    using (Pen innerRing = new Pen(Color.FromArgb(140, 255, 255, 255), 1.0f))
+                    {
+                        g.DrawEllipse(innerRing, circleRect.X + 1, circleRect.Y + 1, circleRect.Width - 2, circleRect.Height - 2);
+                    }
+                    g.DrawString("Màu " + (i + 1), miniFont, isSlotActive ? purpleBrush : darkBrush, new RectangleF(swBox.X - 2, 98, swBox.Width + 4, 20), sfCenter);
+                    curX += 36;
+                }
+
+                // Custom Color (+) / Gradient Recolor Button
+                Rectangle addColBox = new Rectangle(curX, 68, 44, 54);
+                DrawInteractiveButton(g, addColBox, isColorPaneOpen && slidesView.GraphicColorSubTab == 1, 5);
+                DrawColorWheelVector(g, addColBox.X + 10, addColBox.Y + 6, 24, 24);
+                g.DrawString("Đổi màu", miniFont, isColorPaneOpen ? purpleBrush : darkBrush, new RectangleF(addColBox.X - 4, 98, addColBox.Width + 8, 20), sfCenter);
+                curX += 48;
+
+                // Mini stack: Đặt lại màu & Rã thành Hình
+                Rectangle resetColBtn = new Rectangle(curX, 68, 86, 25);
+                DrawInteractiveButton(g, resetColBtn, false, 4);
+                DrawRotateVector(g, resetColBtn.X + 5, resetColBtn.Y + 5, Color.FromArgb(100, 116, 139));
+                g.DrawString("Đặt lại gốc", miniFont, darkBrush, resetColBtn.X + 21, resetColBtn.Y + 5);
+
+                Rectangle ungrpSvgBtn = new Rectangle(curX, 97, 86, 25);
+                DrawInteractiveButton(g, ungrpSvgBtn, false, 4);
+                DrawPptShapesGroupVector(g, ungrpSvgBtn.X + 4, ungrpSvgBtn.Y + 4, 15, 15);
+                g.DrawString("Rã Vector", miniFont, darkBrush, ungrpSvgBtn.X + 21, ungrpSvgBtn.Y + 5);
+                curX += 90;
+
+                g.DrawString($"Màu phát hiện ({detectedColors.Count})", labelFont, Brushes.Gray, new RectangleF(g2Start, 137, curX - g2Start, 14), sfCenter);
+                g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
+                curX += 8;
+
+                // ==================== Group 3: Viền, Bo góc, Cắt, Lật & Độ mờ (Graphic Popovers) ====================
+                int g4Start = curX;
+
+                // 3.1 Stack: Viền & Bo góc (Popover Sliders - NO text dropdowns)
+                Rectangle strokeBtn = new Rectangle(curX, 68, 84, 25);
+                DrawInteractiveButton(g, strokeBtn, shape.StrokeWidth > 0, 4);
+                DrawStrokeLinesVector(g, strokeBtn.X + 6, strokeBtn.Y + 5, 14, 14, slateIcon);
+                g.DrawString("Viền", miniFont, darkBrush, strokeBtn.X + 24, strokeBtn.Y + 5);
+
+                Rectangle cornerBtn = new Rectangle(curX, 97, 84, 25);
+                DrawInteractiveButton(g, cornerBtn, shape.CornerRadius > 0, 4);
+                DrawCornerRadiusVector(g, cornerBtn.X + 6, cornerBtn.Y + 5, 14, 14, slateIcon);
+                g.DrawString("Bo góc", miniFont, darkBrush, cornerBtn.X + 24, cornerBtn.Y + 5);
+                curX += 88;
+
+                // 3.2 Cắt (Crop - Centered Icon!)
+                Rectangle cropBtn = new Rectangle(curX, 68, 52, 54);
+                DrawInteractiveButton(g, cropBtn, slidesView.IsCropping, 5);
+                DrawCropVector(g, cropBtn.X + cropBtn.Width / 2, cropBtn.Y + 18, 20, slidesView.IsCropping ? fluentPurple : slateIcon);
+                g.DrawString("Cắt", slidesView.IsCropping ? boldFont : btnFont, slidesView.IsCropping ? purpleBrush : darkBrush, new RectangleF(cropBtn.X - 2, 98, cropBtn.Width + 4, 22), sfCenter);
+                curX += 56;
+
+                // 3.3 Lật (Flip Popover Button)
+                bool isFlipped = shape.Transform.FlipHorizontal || shape.Transform.FlipVertical;
+                Rectangle flipBtn = new Rectangle(curX, 68, 56, 54);
+                DrawInteractiveButton(g, flipBtn, isFlipped, 5);
+                DrawFlipVector(g, flipBtn.X + flipBtn.Width / 2 - 10, 72, 20, 20, true, isFlipped ? fluentPurple : Color.FromArgb(37, 99, 235));
+                g.DrawString("Lật", isFlipped ? boldFont : btnFont, isFlipped ? purpleBrush : darkBrush, new RectangleF(flipBtn.X - 2, 98, flipBtn.Width + 4, 22), sfCenter);
+                curX += 60;
+
+                // 3.4 Độ mờ (Transparency Popover Slider)
+                int opPct = (int)Math.Round(Math.Max(0f, Math.Min(1f, shape.FillOpacity)) * 100f);
+                Rectangle transBtn = new Rectangle(curX, 68, 76, 54);
+                DrawInteractiveButton(g, transBtn, opPct < 100, 5);
+                DrawOpacityGridVector(g, transBtn.X + transBtn.Width / 2 - 11, 72, 22, 22);
+                g.DrawString($"Độ mờ {opPct}%", miniFont, opPct < 100 ? purpleBrush : darkBrush, new RectangleF(transBtn.X - 4, 98, transBtn.Width + 8, 22), sfCenter);
+                curX += 80;
+
+                g.DrawString("Biến đổi & Độ trong suốt", labelFont, Brushes.Gray, new RectangleF(g4Start, 137, curX - g4Start, 14), sfCenter);
+            }
+        }
+
+        private void DrawEditSlidersVector(Graphics g, int x, int y, int w, int h, Color accent)
+        {
+            using (Pen trackP = new Pen(Color.FromArgb(71, 85, 105), 1.7f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (SolidBrush whiteB = new SolidBrush(Color.White))
+            using (Pen knobP = new Pen(accent, 1.8f))
+            {
+                int y1 = y + 5, y2 = y + 11, y3 = y + 17;
+                g.DrawLine(trackP, x + 2, y1, x + w - 2, y1);
+                g.DrawLine(trackP, x + 2, y2, x + w - 2, y2);
+                g.DrawLine(trackP, x + 2, y3, x + w - 2, y3);
+
+                g.FillEllipse(whiteB, x + 12, y1 - 3, 6, 6);
+                g.DrawEllipse(knobP, x + 12, y1 - 3, 6, 6);
+
+                g.FillEllipse(whiteB, x + 5, y2 - 3, 6, 6);
+                g.DrawEllipse(knobP, x + 5, y2 - 3, 6, 6);
+
+                g.FillEllipse(whiteB, x + 13, y3 - 3, 6, 6);
+                g.DrawEllipse(knobP, x + 13, y3 - 3, 6, 6);
+            }
+        }
+
+        private void DrawReplaceGraphicVector(Graphics g, int x, int y, int w, int h, Color accent)
+        {
+            using (Pen frameP = new Pen(Color.FromArgb(71, 85, 105), 1.6f))
+            using (Pen arrowP = new Pen(accent, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                g.DrawRectangle(frameP, x + 2, y + 2, 12, 11);
+                g.DrawRectangle(frameP, x + 8, y + 9, 12, 11);
+                // Curved swap arrows
+                g.DrawArc(arrowP, x + 13, y + 2, 6, 6, -90, 120);
+                g.DrawArc(arrowP, x + 2, y + 14, 6, 6, 90, 120);
+            }
+        }
+
+        private void DrawAiRemoveBgVector(Graphics g, int x, int y, int w, int h)
+        {
+            // Checkerboard half + Person/Subject silhouette + Gold Crown
+            using (SolidBrush checkB = new SolidBrush(Color.FromArgb(203, 213, 225)))
+            {
+                for (int r = 0; r < 4; r++)
+                {
+                    for (int c = 0; c < 2; c++)
+                    {
+                        if ((r + c) % 2 == 0) g.FillRectangle(checkB, x + 2 + c * 4, y + 4 + r * 4, 4, 4);
+                    }
+                }
+            }
+            using (Pen frameP = new Pen(Color.FromArgb(71, 85, 105), 1.5f))
+            {
+                g.DrawRectangle(frameP, x + 2, y + 4, 16, 16);
+            }
+            using (SolidBrush subjB = new SolidBrush(Color.FromArgb(124, 58, 237)))
+            {
+                g.FillEllipse(subjB, x + 8, y + 7, 6, 6);
+                g.FillPie(subjB, x + 5, y + 13, 12, 12, 180, 180);
+            }
+            // Mini Gold Crown on top-right
+            using (SolidBrush goldB = new SolidBrush(Color.FromArgb(245, 158, 11)))
+            {
+                PointF[] crown = new PointF[] {
+                    new PointF(x + 14, y + 6),
+                    new PointF(x + 14, y + 1),
+                    new PointF(x + 16.5f, y + 3.5f),
+                    new PointF(x + 18.5f, y + 0.5f),
+                    new PointF(x + 20.5f, y + 3.5f),
+                    new PointF(x + 23, y + 1),
+                    new PointF(x + 23, y + 6)
+                };
+                g.FillPolygon(goldB, crown);
+            }
+        }
+
+        private void DrawTrashVector(Graphics g, int x, int y, int w, int h, Color col)
+        {
+            using (Pen p = new Pen(col, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                g.DrawLine(p, x + 3, y + 5, x + w - 3, y + 5);
+                g.DrawRectangle(p, x + 7, y + 2, w - 14, 3);
+                g.DrawRectangle(p, x + 5, y + 5, w - 10, h - 7);
+                g.DrawLine(p, x + 8, y + 8, x + 8, y + h - 5);
+                g.DrawLine(p, x + w - 8, y + 8, x + w - 8, y + h - 5);
+            }
+        }
+
+        private void DrawColorWheelVector(Graphics g, int x, int y, int w, int h)
+        {
+            using (Pen ringP = new Pen(Color.FromArgb(51, 65, 85), 1.6f))
+            using (Pen plusP = new Pen(Color.FromArgb(37, 99, 235), 1.6f))
+            {
+                g.DrawEllipse(ringP, x + 2, y + 2, w - 4, h - 4);
+                int cx = x + w / 2, cy = y + h / 2;
+                g.DrawLine(plusP, cx - 4, cy, cx + 4, cy);
+                g.DrawLine(plusP, cx, cy - 4, cx, cy + 4);
+            }
+        }
+
+        private void DrawStyleMatchVector(Graphics g, int x, int y, int w, int h, Color accent)
+        {
+            // Sticker silhouette card with sparkle
+            using (SolidBrush sh = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                g.FillEllipse(sh, x + 2, y + 3, 18, 18);
+            using (SolidBrush wb = new SolidBrush(Color.White))
+            using (Pen bp = new Pen(accent, 1.5f))
+            {
+                g.FillEllipse(wb, x + 1, y + 2, 18, 18);
+                g.DrawEllipse(bp, x + 1, y + 2, 18, 18);
+            }
+            using (SolidBrush innerB = new SolidBrush(accent))
+            {
+                g.FillEllipse(innerB, x + 5, y + 6, 10, 10);
+            }
+            DrawSparkleVector(g, x + 14, y, 9, Color.FromArgb(245, 158, 11));
+        }
+
+        private void DrawFilterCirclesVector(Graphics g, int x, int y, int w, int h)
+        {
+            // 3 overlapping RGB/CMYK translucent filter circles clean style
+            using (SolidBrush b1 = new SolidBrush(Color.FromArgb(185, 244, 63, 94)))
+            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(185, 59, 130, 246)))
+            using (SolidBrush b3 = new SolidBrush(Color.FromArgb(185, 234, 179, 8)))
+            {
+                g.FillEllipse(b1, x + 5, y + 1, 12, 12);
+                g.FillEllipse(b2, x + 1, y + 8, 12, 12);
+                g.FillEllipse(b3, x + 9, y + 8, 12, 12);
+            }
+        }
+
+        private void DrawStrokeLinesVector(Graphics g, int x, int y, int w, int h, Color col)
+        {
+            using (Pen p1 = new Pen(col, 1.0f))
+            using (Pen p2 = new Pen(col, 2.0f))
+            using (Pen p3 = new Pen(col, 3.2f))
+            {
+                g.DrawLine(p1, x + 1, y + 3, x + w - 1, y + 3);
+                g.DrawLine(p2, x + 1, y + 7, x + w - 1, y + 7);
+                g.DrawLine(p3, x + 1, y + 12, x + w - 1, y + 12);
+            }
+        }
+
+        private void DrawCornerRadiusVector(Graphics g, int x, int y, int w, int h, Color col)
+        {
+            using (Pen p = new Pen(col, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen dashP = new Pen(Color.FromArgb(148, 163, 184), 1.2f) { DashStyle = DashStyle.Dot })
+            {
+                g.DrawArc(p, x + 2, y + 2, (w - 4) * 2, (h - 4) * 2, 180, 90);
+                g.DrawLine(dashP, x + 2, y + 2, x + w - 2, y + 2);
+                g.DrawLine(dashP, x + 2, y + 2, x + 2, y + h - 2);
+            }
+        }
+
+        private void DrawFlipVector(Graphics g, int x, int y, int w, int h, bool horizontal, Color accent)
+        {
+            using (SolidBrush b1 = new SolidBrush(accent))
+            using (Pen p2 = new Pen(Color.FromArgb(71, 85, 105), 1.3f))
+            using (Pen axisP = new Pen(Color.FromArgb(148, 163, 184), 1.0f) { DashStyle = DashStyle.Dot })
+            {
+                if (horizontal)
+                {
+                    int midX = x + w / 2;
+                    g.DrawLine(axisP, midX, y, midX, y + h);
+                    PointF[] leftTri = { new PointF(midX - 2, y + 2), new PointF(x + 1, y + h - 2), new PointF(midX - 2, y + h - 2) };
+                    PointF[] rightTri = { new PointF(midX + 2, y + 2), new PointF(x + w - 1, y + h - 2), new PointF(midX + 2, y + h - 2) };
+                    g.FillPolygon(b1, leftTri);
+                    g.DrawPolygon(p2, rightTri);
+                }
+                else
+                {
+                    int midY = y + h / 2;
+                    g.DrawLine(axisP, x, midY, x + w, midY);
+                    PointF[] topTri = { new PointF(x + 2, midY - 2), new PointF(x + w - 2, y + 1), new PointF(x + w - 2, midY - 2) };
+                    PointF[] botTri = { new PointF(x + 2, midY + 2), new PointF(x + w - 2, y + h - 1), new PointF(x + w - 2, midY + 2) };
+                    g.FillPolygon(b1, topTri);
+                    g.DrawPolygon(p2, botTri);
+                }
+            }
+        }
+
+        private void DrawOpacityGridVector(Graphics g, int x, int y, int w, int h)
+        {
+            int cols = 4, rows = 4;
+            int cell = 4;
+            int sx = x + (w - cols * cell) / 2;
+            int sy = y + (h - rows * cell) / 2;
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    if ((r + c) % 2 == 0)
+                    {
+                        int alpha = 255 - c * 55;
+                        using (SolidBrush b = new SolidBrush(Color.FromArgb(alpha, 51, 65, 85)))
+                        {
+                            g.FillRectangle(b, sx + c * cell, sy + r * cell, cell, cell);
+                        }
+                    }
+                }
+            }
+            using (Pen borderP = new Pen(Color.FromArgb(148, 163, 184), 1.2f))
+            {
+                g.DrawRectangle(borderP, sx, sy, cols * cell, rows * cell);
+            }
+        }
+
+        private void DrawAnimateVector(Graphics g, int x, int y, int w, int h, Color accent)
+        {
+            // Motion trail circles + main circle clean style's "Chuyển động" icon
+            using (Pen trail1 = new Pen(Color.FromArgb(90, accent), 1.4f))
+            using (Pen trail2 = new Pen(Color.FromArgb(160, accent), 1.5f))
+            using (SolidBrush mainB = new SolidBrush(accent))
+            {
+                g.DrawEllipse(trail1, x + 1, y + 6, 10, 10);
+                g.DrawEllipse(trail2, x + 5, y + 4, 12, 12);
+                g.FillEllipse(mainB, x + 9, y + 2, 12, 12);
+            }
+        }
+
+        private void DrawPositionLayersVector(Graphics g, int x, int y, int w, int h, Color col)
+        {
+            using (SolidBrush topB = new SolidBrush(Color.FromArgb(37, 99, 235)))
+            using (Pen layerP = new Pen(col, 1.5f) { LineJoin = LineJoin.Round })
+            {
+                PointF[] topDiamond = { new PointF(x + w / 2f, y + 2), new PointF(x + w - 2, y + 7), new PointF(x + w / 2f, y + 12), new PointF(x + 2, y + 7) };
+                g.FillPolygon(topB, topDiamond);
+                g.DrawLines(layerP, new PointF[] { new PointF(x + 2, y + 12), new PointF(x + w / 2f, y + 17), new PointF(x + w - 2, y + 12) });
+                g.DrawLines(layerP, new PointF[] { new PointF(x + 2, y + 16), new PointF(x + w / 2f, y + 21), new PointF(x + w - 2, y + 16) });
             }
         }
 
@@ -17629,20 +18519,24 @@ namespace ZenQOffice.UI
             ShapeNode shape = slidesView.SelectedShape;
 
             using (Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
-            using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font boldFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-            using (Font valFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            using (Font btnFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (Font boldFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+            using (Font valFont = new Font("Segoe UI", 8.8f, FontStyle.Bold))
+            using (SolidBrush darkBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush slateBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
             {
+                Color slateIcon = Color.FromArgb(51, 65, 85);
+                Color accentCol = Color.FromArgb(37, 99, 235);
                 int curX = 14;
 
-                // ==================== Group 1: Chèn Hình vẽ (Insert Shapes) ====================
-                // Quick Shapes palette: 2 rows of 6 mini icons (X: 12..156)
-                ShapeType[] quick1 = new ShapeType[] { ShapeType.TextBox, ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Leaf, ShapeType.Flower };
-                ShapeType[] quick2 = new ShapeType[] { ShapeType.LuxuryHexagon, ShapeType.Gem, ShapeType.Shield, ShapeType.Banner, ShapeType.Heart, ShapeType.Star };
+                // ==================== Group 1: Chèn Hình vẽ & Đỉnh (Insert Shapes & Points) ====================
+                // Quick Shapes palette: 2 rows of 6 monochrome-slate icons (X: 14..158)
+                ShapeType[] quick1 = new ShapeType[] { ShapeType.TextBox, ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Triangle, ShapeType.Diamond };
+                ShapeType[] quick2 = new ShapeType[] { ShapeType.Pentagon, ShapeType.Hexagon, ShapeType.Octagon, ShapeType.Star, ShapeType.Heart, ShapeType.Banner };
 
                 Rectangle quickBox = new Rectangle(curX, 68, quick1.Length * 24, 53);
                 using (SolidBrush bgB = new SolidBrush(Color.White))
-                using (Pen bdrP = new Pen(Color.FromArgb(218, 220, 224), 1.0f))
+                using (Pen bdrP = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
                 {
                     g.FillRectangle(bgB, quickBox);
                     g.DrawRectangle(bdrP, quickBox);
@@ -17651,54 +18545,53 @@ namespace ZenQOffice.UI
                 for (int i = 0; i < quick1.Length; i++)
                 {
                     Rectangle r1 = new Rectangle(curX + i * 24, 68, 24, 26);
-                    bool hov1 = IsHovering(r1);
-                    if (hov1)
+                    if (IsHovering(r1))
                     {
-                        using (SolidBrush hb = new SolidBrush(Color.FromArgb(232, 239, 248)))
+                        using (SolidBrush hb = new SolidBrush(Color.FromArgb(241, 245, 249)))
                             g.FillRectangle(hb, r1);
                     }
-                    DrawShapeIconVector(g, r1.X + 3, r1.Y + 3, 18, 20, quick1[i], Color.FromArgb(210, 71, 38));
+                    DrawShapeIconVector(g, r1.X + 3, r1.Y + 3, 18, 20, quick1[i], slateIcon);
 
                     Rectangle r2 = new Rectangle(curX + i * 24, 94, 24, 27);
-                    bool hov2 = IsHovering(r2);
-                    if (hov2)
+                    if (IsHovering(r2))
                     {
-                        using (SolidBrush hb = new SolidBrush(Color.FromArgb(232, 239, 248)))
+                        using (SolidBrush hb = new SolidBrush(Color.FromArgb(241, 245, 249)))
                             g.FillRectangle(hb, r2);
                     }
-                    DrawShapeIconVector(g, r2.X + 3, r2.Y + 4, 18, 19, quick2[i], Color.FromArgb(210, 71, 38));
+                    DrawShapeIconVector(g, r2.X + 3, r2.Y + 4, 18, 19, quick2[i], slateIcon);
                 }
                 curX += quick1.Length * 24 + 4;
 
-                // Mini stack next to palette (X: 160..248)
-                Rectangle editShapeBtn = new Rectangle(curX, 68, 88, 25);
-                DrawInteractiveButton(g, editShapeBtn, false, 3);
-                DrawEditShapeIconVector(g, editShapeBtn.X + 4, editShapeBtn.Y + 4, 16, 16, Color.FromArgb(210, 71, 38));
-                g.DrawString("Sửa hình ▾", btnFont, Brushes.Black, editShapeBtn.X + 22, editShapeBtn.Y + 4);
+                // Direct "Sửa điểm" (Edit Points) & "Đổi hình ▾" (X: 162..250)
+                bool isEditingPts = slidesView.IsEditingShapePoints && slidesView.EditingPointsShape == shape;
+                Rectangle editPtsBtn = new Rectangle(curX, 68, 88, 25);
+                DrawInteractiveButton(g, editPtsBtn, isEditingPts, 3);
+                DrawEditShapeIconVector(g, editPtsBtn.X + 5, editPtsBtn.Y + 4, 15, 15, isEditingPts ? accentCol : slateIcon);
+                g.DrawString("Sửa điểm", isEditingPts ? boldFont : btnFont, darkBrush, editPtsBtn.X + 23, editPtsBtn.Y + 4);
 
-                Rectangle tbBtn = new Rectangle(curX, 96, 88, 25);
-                DrawInteractiveButton(g, tbBtn, false, 3);
-                DrawShapeIconVector(g, tbBtn.X + 4, tbBtn.Y + 4, 16, 16, ShapeType.TextBox, Color.FromArgb(37, 99, 235));
-                g.DrawString("Hộp chữ", btnFont, Brushes.Black, tbBtn.X + 22, tbBtn.Y + 4);
+                Rectangle changeShpBtn = new Rectangle(curX, 96, 88, 25);
+                DrawInteractiveButton(g, changeShpBtn, false, 3);
+                DrawReplaceGraphicVector(g, changeShpBtn.X + 4, changeShpBtn.Y + 3, 16, 16, slateIcon);
+                g.DrawString("Đổi hình ▾", btnFont, darkBrush, changeShpBtn.X + 23, changeShpBtn.Y + 4);
 
-                // Nút Hợp nhất Hình dạng (Merge Shapes ▾)
+                // Nút Hợp nhất Hình dạng (Merge Shapes ▾) (X: 254..346)
                 int selCount = (slidesView.SelectedShapeIndices != null) ? slidesView.SelectedShapeIndices.Count : 0;
                 if (selCount < 1 && slidesView.SelectedShapeIndex >= 0) selCount = 1;
                 bool canMerge = selCount >= 2;
 
-                Rectangle mergeBtn = new Rectangle(curX + 92, 68, 96, 53);
+                Rectangle mergeBtn = new Rectangle(curX + 92, 68, 92, 53);
                 DrawInteractiveButton(g, mergeBtn, false, 4);
-                DrawMergeShapesIconVector(g, mergeBtn.X + 6, mergeBtn.Y + 15, 20, 20, canMerge ? Color.FromArgb(210, 71, 38) : Color.FromArgb(160, 160, 160));
-                g.DrawString("Hợp nhất", btnFont, canMerge ? Brushes.Black : Brushes.Gray, mergeBtn.X + 28, mergeBtn.Y + 10);
-                g.DrawString("Hình dạng ▾", labelFont, canMerge ? Brushes.DimGray : Brushes.LightGray, mergeBtn.X + 28, mergeBtn.Y + 28);
+                DrawMergeShapesIconVector(g, mergeBtn.X + 6, mergeBtn.Y + 15, 20, 20, canMerge ? slateIcon : Color.FromArgb(160, 160, 160));
+                g.DrawString("Hợp nhất", btnFont, canMerge ? darkBrush : Brushes.Gray, mergeBtn.X + 28, mergeBtn.Y + 10);
+                g.DrawString("Hình dạng ▾", labelFont, canMerge ? slateBrush : Brushes.LightGray, mergeBtn.X + 28, mergeBtn.Y + 28);
 
-                curX += 190;
-                g.DrawString("Chèn Hình vẽ", labelFont, Brushes.Gray, curX - 185, 137);
+                curX += 188;
+                g.DrawString("Hình vẽ & Đỉnh", labelFont, Brushes.Gray, curX - 185, 137);
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
                 curX += 8;
 
-                // ==================== Group 2: Kiểu Hình dạng (Shape Styles) ====================
-                // 4 Style Preset Cards (X: curX..curX + 144)
+                // ==================== Group 2: Kiểu Hình dạng & Canva Sliders ====================
+                // 4 Style Preset Cards (X: 358..502)
                 int presetW = 32;
                 for (int pIdx = 0; pIdx < 4; pIdx++)
                 {
@@ -17706,93 +18599,86 @@ namespace ZenQOffice.UI
                     DrawInteractiveButton(g, pBox, false, 4);
 
                     Rectangle inner = new Rectangle(pBox.X + 3, pBox.Y + 3, pBox.Width - 6, pBox.Height - 6);
-                    if (pIdx == 0) // White with green outline
+                    if (pIdx == 0)
                     {
-                        using (Pen gp = new Pen(Color.FromArgb(34, 197, 94), 1.5f))
+                        using (Pen gp = new Pen(Color.FromArgb(100, 116, 139), 1.4f))
                         {
                             g.FillRectangle(Brushes.White, inner);
                             g.DrawRectangle(gp, inner);
                         }
-                        g.DrawString("Abc", btnFont, Brushes.DarkGreen, inner.X + 2, inner.Y + 12);
+                        g.DrawString("Abc", btnFont, darkBrush, inner.X + 1, inner.Y + 12);
                     }
-                    else if (pIdx == 1) // Dark Slate
+                    else if (pIdx == 1)
                     {
                         using (SolidBrush db = new SolidBrush(Color.FromArgb(30, 41, 59)))
                         {
                             g.FillRectangle(db, inner);
                         }
-                        g.DrawString("Abc", btnFont, Brushes.White, inner.X + 2, inner.Y + 12);
+                        g.DrawString("Abc", btnFont, Brushes.White, inner.X + 1, inner.Y + 12);
                     }
-                    else if (pIdx == 2) // Theme Blue
+                    else if (pIdx == 2)
                     {
                         using (SolidBrush bb = new SolidBrush(Color.FromArgb(37, 99, 235)))
                         {
                             g.FillRectangle(bb, inner);
                         }
-                        g.DrawString("Abc", btnFont, Brushes.White, inner.X + 2, inner.Y + 12);
+                        g.DrawString("Abc", btnFont, Brushes.White, inner.X + 1, inner.Y + 12);
                     }
-                    else if (pIdx == 3) // Coral Orange
+                    else if (pIdx == 3)
                     {
-                        using (SolidBrush ob = new SolidBrush(Color.FromArgb(234, 88, 12)))
+                        using (SolidBrush ob = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        using (Pen op = new Pen(Color.FromArgb(37, 99, 235), 1.4f))
                         {
                             g.FillRectangle(ob, inner);
+                            g.DrawRectangle(op, inner);
                         }
-                        g.DrawString("Abc", btnFont, Brushes.White, inner.X + 2, inner.Y + 12);
+                        g.DrawString("Abc", btnFont, darkBrush, inner.X + 1, inner.Y + 12);
                     }
                 }
                 curX += 4 * (presetW + 4) + 4;
 
-                // Shape Actions Stack (3 rows)
+                // Column 1 (X: 506..598): Màu tô ▾ | Viền hình (Canva Stroke Popover) | Bo góc (Canva Corner Popover)
                 Rectangle fillBtn = new Rectangle(curX, 68, 92, 24);
                 DrawInteractiveButton(g, fillBtn, false, 3);
                 Color fCol = Color.FromArgb(255, Color.FromArgb(shape.FillColor));
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeFill, fillBtn.X + 4, fillBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), fCol);
-                g.DrawString("Màu tô ▾", btnFont, Brushes.Black, fillBtn.X + 22, fillBtn.Y + 3);
+                DrawSlidesShapeFillIcon(g, fillBtn.X + 4, fillBtn.Y + 4, slateIcon, fCol);
+                g.DrawString("Màu tô ▾", btnFont, darkBrush, fillBtn.X + 22, fillBtn.Y + 3);
 
-                Rectangle outlineBtn = new Rectangle(curX, 94, 92, 24);
-                DrawInteractiveButton(g, outlineBtn, false, 3);
-                Color sCol = Color.FromArgb(255, Color.FromArgb(shape.StrokeColor));
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeOutline, outlineBtn.X + 4, outlineBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), sCol);
-                g.DrawString("Viền hình ▾", btnFont, Brushes.Black, outlineBtn.X + 22, outlineBtn.Y + 3);
+                Rectangle strokePopBtn = new Rectangle(curX, 94, 92, 24);
+                DrawInteractiveButton(g, strokePopBtn, shape.StrokeWidth > 0, 3);
+                DrawStrokeLinesVector(g, strokePopBtn.X + 4, strokePopBtn.Y + 5, 14, 14, slateIcon);
+                g.DrawString("Viền hình", btnFont, darkBrush, strokePopBtn.X + 22, strokePopBtn.Y + 3);
 
-                Rectangle fxBtn = new Rectangle(curX, 120, 92, 24);
-                DrawInteractiveButton(g, fxBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ShapeEffects, fxBtn.X + 4, fxBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(245, 158, 11));
-                g.DrawString("Hiệu ứng ▾", btnFont, Brushes.Black, fxBtn.X + 22, fxBtn.Y + 3);
+                Rectangle cornerPopBtn = new Rectangle(curX, 120, 92, 24);
+                DrawInteractiveButton(g, cornerPopBtn, shape.CornerRadius > 0, 3);
+                DrawCornerRadiusVector(g, cornerPopBtn.X + 4, cornerPopBtn.Y + 5, 14, 14, slateIcon);
+                g.DrawString("Bo góc", btnFont, darkBrush, cornerPopBtn.X + 22, cornerPopBtn.Y + 3);
 
                 curX += 96;
 
-                // Nút Làm mờ / Độ trong suốt (Opacity) & Lật gương nhanh
+                // Column 2 (X: 602..698): Độ mờ (Canva Transparency Slider) | Đổ bóng (Shadow Slider) | Hiệu ứng ▾
+                int opPercent = (int)Math.Round(shape.FillOpacity * 100f);
                 Rectangle opacityBtn = new Rectangle(curX, 68, 96, 24);
-                DrawInteractiveButton(g, opacityBtn, false, 3);
-                int opPercent = (int)(shape.FillOpacity * 100f);
-                using (SolidBrush opB = new SolidBrush(Color.FromArgb((int)(shape.FillOpacity * 255), 59, 130, 246)))
-                using (Pen opP = new Pen(Color.FromArgb(37, 99, 235), 1.2f))
-                {
-                    g.FillEllipse(opB, opacityBtn.X + 5, opacityBtn.Y + 5, 13, 13);
-                    g.DrawEllipse(opP, opacityBtn.X + 5, opacityBtn.Y + 5, 13, 13);
-                }
-                g.DrawString("Mờ: " + opPercent + "% ▾", btnFont, Brushes.Black, opacityBtn.X + 20, opacityBtn.Y + 3);
+                DrawInteractiveButton(g, opacityBtn, opPercent < 100, 3);
+                DrawOpacityGridVector(g, opacityBtn.X + 4, opacityBtn.Y + 3, 16, 16);
+                g.DrawString("Độ mờ " + opPercent + "%", btnFont, darkBrush, opacityBtn.X + 22, opacityBtn.Y + 3);
 
-                Rectangle opPlusBtn = new Rectangle(curX, 94, 46, 24);
-                DrawInteractiveButton(g, opPlusBtn, false, 3);
-                g.DrawString("Mờ +", labelFont, Brushes.Black, opPlusBtn.X + 6, opPlusBtn.Y + 4);
+                Rectangle shadowBtn = new Rectangle(curX, 94, 96, 24);
+                DrawInteractiveButton(g, shadowBtn, shape.HasShadow, 3);
+                DrawSlidesShapeEffectsIcon(g, shadowBtn.X + 4, shadowBtn.Y + 4, slateIcon, accentCol);
+                g.DrawString("Đổ bóng", btnFont, darkBrush, shadowBtn.X + 22, shadowBtn.Y + 3);
 
-                Rectangle opMinusBtn = new Rectangle(curX + 48, 94, 48, 24);
-                DrawInteractiveButton(g, opMinusBtn, false, 3);
-                g.DrawString("Đặc -", labelFont, Brushes.Black, opMinusBtn.X + 6, opMinusBtn.Y + 4);
-
-                Rectangle flipQuickBtn = new Rectangle(curX, 120, 96, 24);
-                DrawInteractiveButton(g, flipQuickBtn, false, 3);
-                g.DrawString("⇄ Lật gương", btnFont, Brushes.DarkBlue, flipQuickBtn.X + 8, flipQuickBtn.Y + 3);
+                Rectangle fxBtn = new Rectangle(curX, 120, 96, 24);
+                DrawInteractiveButton(g, fxBtn, false, 3);
+                DrawSparkleVector(g, fxBtn.X + 5, fxBtn.Y + 6, 12, slateIcon);
+                g.DrawString("Hiệu ứng ▾", btnFont, darkBrush, fxBtn.X + 22, fxBtn.Y + 3);
 
                 curX += 100;
-                g.DrawString("Kiểu Hình dạng", labelFont, Brushes.Gray, curX - 195, 137);
+                g.DrawString("Kiểu & Bo góc Canva", labelFont, Brushes.Gray, curX - 210, 137);
                 g.DrawLine(Pens.LightGray, curX, 68, curX, 148);
                 curX += 8;
 
                 // ==================== Group 3: Kiểu Chữ Nghệ thuật (WordArt Styles) ====================
-                // 3 WordArt Cards
                 int waW = 28;
                 for (int wIdx = 0; wIdx < 3; wIdx++)
                 {
@@ -17803,7 +18689,7 @@ namespace ZenQOffice.UI
                     {
                         if (wIdx == 0)
                         {
-                            g.DrawString("A", waFont, Brushes.Black, waBox.X + 3, waBox.Y + 8);
+                            g.DrawString("A", waFont, darkBrush, waBox.X + 3, waBox.Y + 8);
                         }
                         else if (wIdx == 1)
                         {
@@ -17814,13 +18700,11 @@ namespace ZenQOffice.UI
                         }
                         else if (wIdx == 2)
                         {
-                            using (Pen oPen = new Pen(Color.FromArgb(234, 88, 12), 1.4f))
+                            using (Pen oPen = new Pen(slateIcon, 1.4f))
+                            using (GraphicsPath wp = new GraphicsPath())
                             {
-                                using (GraphicsPath wp = new GraphicsPath())
-                                {
-                                    wp.AddString("A", FontFamily.GenericSansSerif, (int)FontStyle.Bold, 18f, new Point(waBox.X + 3, waBox.Y + 10), StringFormat.GenericDefault);
-                                    g.DrawPath(oPen, wp);
-                                }
+                                wp.AddString("A", FontFamily.GenericSansSerif, (int)FontStyle.Bold, 18f, new Point(waBox.X + 3, waBox.Y + 10), StringFormat.GenericDefault);
+                                g.DrawPath(oPen, wp);
                             }
                         }
                     }
@@ -17830,21 +18714,21 @@ namespace ZenQOffice.UI
                 // WordArt Actions Stack (3 rows)
                 Rectangle tFillBtn = new Rectangle(curX, 68, 92, 24);
                 DrawInteractiveButton(g, tFillBtn, false, 3);
-                g.DrawString("A", boldFont, Brushes.Navy, tFillBtn.X + 5, tFillBtn.Y + 3);
-                g.DrawString("Màu chữ ▾", btnFont, Brushes.Black, tFillBtn.X + 18, tFillBtn.Y + 3);
+                g.DrawString("A", boldFont, darkBrush, tFillBtn.X + 5, tFillBtn.Y + 3);
+                g.DrawString("Màu chữ ▾", btnFont, darkBrush, tFillBtn.X + 18, tFillBtn.Y + 3);
 
                 Rectangle tOutlineBtn = new Rectangle(curX, 94, 92, 24);
                 DrawInteractiveButton(g, tOutlineBtn, false, 3);
-                using (Pen op = new Pen(Color.DarkOrange, 1.4f))
+                using (Pen op = new Pen(slateIcon, 1.3f))
                 {
                     g.DrawRectangle(op, tOutlineBtn.X + 5, tOutlineBtn.Y + 5, 11, 11);
                 }
-                g.DrawString("Viền chữ ▾", btnFont, Brushes.Black, tOutlineBtn.X + 18, tOutlineBtn.Y + 3);
+                g.DrawString("Viền chữ ▾", btnFont, darkBrush, tOutlineBtn.X + 18, tOutlineBtn.Y + 3);
 
                 Rectangle tFxBtn = new Rectangle(curX, 120, 92, 24);
                 DrawInteractiveButton(g, tFxBtn, false, 3);
-                DrawStarVector(g, tFxBtn.X + 10, tFxBtn.Y + 12, 4, Color.FromArgb(139, 92, 246));
-                g.DrawString("Hiệu ứng ▾", btnFont, Brushes.Black, tFxBtn.X + 18, tFxBtn.Y + 3);
+                DrawStarVector(g, tFxBtn.X + 10, tFxBtn.Y + 12, 4, slateIcon);
+                g.DrawString("Hiệu ứng ▾", btnFont, darkBrush, tFxBtn.X + 18, tFxBtn.Y + 3);
 
                 curX += 96;
                 g.DrawString("Chữ Nghệ thuật", labelFont, Brushes.Gray, curX - 145, 137);
@@ -17854,35 +18738,35 @@ namespace ZenQOffice.UI
                 // ==================== Group 4: Sắp xếp (Arrange) ====================
                 Rectangle bFwdBtn = new Rectangle(curX, 68, 88, 24);
                 DrawInteractiveButton(g, bFwdBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.BringForward, bFwdBtn.X + 4, bFwdBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(16, 185, 129));
-                g.DrawString("Lên trước", btnFont, Brushes.Black, bFwdBtn.X + 22, bFwdBtn.Y + 3);
+                DrawLayerFwdVector(g, bFwdBtn.X + 4, bFwdBtn.Y + 5, slateIcon);
+                g.DrawString("Lên trước", btnFont, darkBrush, bFwdBtn.X + 22, bFwdBtn.Y + 3);
 
                 Rectangle sBwdBtn = new Rectangle(curX, 94, 88, 24);
                 DrawInteractiveButton(g, sBwdBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.SendBackward, sBwdBtn.X + 4, sBwdBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(239, 68, 68));
-                g.DrawString("Ra sau", btnFont, Brushes.Black, sBwdBtn.X + 22, sBwdBtn.Y + 3);
+                DrawLayerBwdVector(g, sBwdBtn.X + 4, sBwdBtn.Y + 5, slateIcon);
+                g.DrawString("Ra sau", btnFont, darkBrush, sBwdBtn.X + 22, sBwdBtn.Y + 3);
 
                 Rectangle alignBtn = new Rectangle(curX, 120, 88, 24);
                 DrawInteractiveButton(g, alignBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.AlignObjects, alignBtn.X + 4, alignBtn.Y + 4, 16, 16, Color.FromArgb(55, 65, 81), Color.FromArgb(37, 99, 235));
-                g.DrawString("Căn chỉnh ▾", btnFont, Brushes.Black, alignBtn.X + 22, alignBtn.Y + 3);
+                DrawAlignVector(g, alignBtn.X + 4, alignBtn.Y + 6, 12, 10, 0, slateIcon);
+                g.DrawString("Căn chỉnh ▾", btnFont, darkBrush, alignBtn.X + 22, alignBtn.Y + 3);
 
                 curX += 92;
 
                 Rectangle rotBtn = new Rectangle(curX, 68, 84, 24);
                 DrawInteractiveButton(g, rotBtn, false, 3);
-                WpfSlideIconRenderer.DrawIcon(g, SlideIconKind.ResetSlide, rotBtn.X + 4, rotBtn.Y + 4, 16, 16, Color.FromArgb(217, 119, 6));
-                g.DrawString("Xoay 90°", btnFont, Brushes.Black, rotBtn.X + 22, rotBtn.Y + 3);
+                DrawRotateVector(g, rotBtn.X + 4, rotBtn.Y + 5, slateIcon);
+                g.DrawString("Xoay 90°", btnFont, darkBrush, rotBtn.X + 22, rotBtn.Y + 3);
 
                 Rectangle flipHBtn = new Rectangle(curX, 94, 84, 24);
                 DrawInteractiveButton(g, flipHBtn, false, 3);
-                g.DrawString("⇄", boldFont, Brushes.DarkBlue, flipHBtn.X + 4, flipHBtn.Y + 2);
-                g.DrawString("Lật ngang", btnFont, Brushes.Black, flipHBtn.X + 20, flipHBtn.Y + 3);
+                g.DrawString("⇄", boldFont, slateBrush, flipHBtn.X + 4, flipHBtn.Y + 2);
+                g.DrawString("Lật ngang", btnFont, darkBrush, flipHBtn.X + 20, flipHBtn.Y + 3);
 
                 Rectangle flipVBtn = new Rectangle(curX, 120, 84, 24);
                 DrawInteractiveButton(g, flipVBtn, false, 3);
-                g.DrawString("⇅", boldFont, Brushes.DarkBlue, flipVBtn.X + 4, flipVBtn.Y + 2);
-                g.DrawString("Lật dọc", btnFont, Brushes.Black, flipVBtn.X + 20, flipVBtn.Y + 3);
+                g.DrawString("⇅", boldFont, slateBrush, flipVBtn.X + 4, flipVBtn.Y + 2);
+                g.DrawString("Lật dọc", btnFont, darkBrush, flipVBtn.X + 20, flipVBtn.Y + 3);
 
                 curX += 88;
                 g.DrawString("Sắp xếp", labelFont, Brushes.Gray, curX - 110, 137);
@@ -17890,32 +18774,29 @@ namespace ZenQOffice.UI
                 curX += 8;
 
                 // ==================== Group 5: Kích thước (Size) ====================
-                // Height Spin Box
                 Rectangle hLabel = new Rectangle(curX, 68, 130, 34);
                 DrawInteractiveButton(g, hLabel, false, 3);
-                g.DrawString("↕ Cao:", btnFont, Brushes.DimGray, hLabel.X + 4, hLabel.Y + 8);
+                g.DrawString("↕ Cao:", btnFont, slateBrush, hLabel.X + 4, hLabel.Y + 8);
                 string hStr = (shape.Transform.Height * 0.0264583f).ToString("0.00") + " cm";
-                g.DrawString(hStr, valFont, Brushes.Navy, hLabel.X + 42, hLabel.Y + 7);
-                // Spin buttons ▲ ▼
+                g.DrawString(hStr, valFont, darkBrush, hLabel.X + 42, hLabel.Y + 7);
                 Rectangle hUp = new Rectangle(hLabel.Right - 22, hLabel.Y + 2, 20, 14);
                 Rectangle hDn = new Rectangle(hLabel.Right - 22, hLabel.Y + 18, 20, 14);
                 DrawInteractiveButton(g, hUp, false, 2);
                 DrawInteractiveButton(g, hDn, false, 2);
-                g.DrawString("▲", labelFont, Brushes.Black, hUp.X + 4, hUp.Y - 1);
-                g.DrawString("▼", labelFont, Brushes.Black, hDn.X + 4, hDn.Y - 1);
+                g.DrawString("▲", labelFont, slateBrush, hUp.X + 4, hUp.Y - 1);
+                g.DrawString("▼", labelFont, slateBrush, hDn.X + 4, hDn.Y - 1);
 
-                // Width Spin Box
                 Rectangle wLabel = new Rectangle(curX, 106, 130, 34);
                 DrawInteractiveButton(g, wLabel, false, 3);
-                g.DrawString("↔ Rộng:", btnFont, Brushes.DimGray, wLabel.X + 4, wLabel.Y + 8);
+                g.DrawString("↔ Rộng:", btnFont, slateBrush, wLabel.X + 4, wLabel.Y + 8);
                 string wStr = (shape.Transform.Width * 0.0264583f).ToString("0.00") + " cm";
-                g.DrawString(wStr, valFont, Brushes.Navy, wLabel.X + 46, wLabel.Y + 7);
+                g.DrawString(wStr, valFont, darkBrush, wLabel.X + 46, wLabel.Y + 7);
                 Rectangle wUp = new Rectangle(wLabel.Right - 22, wLabel.Y + 2, 20, 14);
                 Rectangle wDn = new Rectangle(wLabel.Right - 22, wLabel.Y + 18, 20, 14);
                 DrawInteractiveButton(g, wUp, false, 2);
                 DrawInteractiveButton(g, wDn, false, 2);
-                g.DrawString("▲", labelFont, Brushes.Black, wUp.X + 4, wUp.Y - 1);
-                g.DrawString("▼", labelFont, Brushes.Black, wDn.X + 4, wDn.Y - 1);
+                g.DrawString("▲", labelFont, slateBrush, wUp.X + 4, wUp.Y - 1);
+                g.DrawString("▼", labelFont, slateBrush, wDn.X + 4, wDn.Y - 1);
 
                 curX += 134;
                 g.DrawString("Kích thước", labelFont, Brushes.Gray, curX - 85, 137);
@@ -18568,13 +19449,12 @@ namespace ZenQOffice.UI
 
         private void DrawColorWashVector(Graphics g, int x, int y, int size, Color c)
         {
-            using (SolidBrush b1 = new SolidBrush(Color.FromArgb(180, 59, 130, 246)))
-            using (SolidBrush b2 = new SolidBrush(Color.FromArgb(180, 239, 68, 68)))
-            using (SolidBrush b3 = new SolidBrush(Color.FromArgb(180, 234, 179, 8)))
+            using (Pen p1 = new Pen(Color.FromArgb(51, 65, 85), 1.3f))
+            using (Pen p2 = new Pen(Color.FromArgb(37, 99, 235), 1.3f))
             {
-                g.FillEllipse(b1, x, y, size * 0.65f, size * 0.65f);
-                g.FillEllipse(b2, x + size * 0.35f, y, size * 0.65f, size * 0.65f);
-                g.FillEllipse(b3, x + size * 0.18f, y + size * 0.35f, size * 0.65f, size * 0.65f);
+                g.DrawEllipse(p1, x, y, size * 0.62f, size * 0.62f);
+                g.DrawEllipse(p1, x + size * 0.35f, y, size * 0.62f, size * 0.62f);
+                g.DrawEllipse(p2, x + size * 0.18f, y + size * 0.35f, size * 0.62f, size * 0.62f);
             }
         }
 
@@ -19438,7 +20318,7 @@ namespace ZenQOffice.UI
 
                         // Quick Styles Gallery (X: 730..)
                         int styleX = 730;
-                        string[] styleNames = new string[] { "Normal", "No Spacing", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle" };
+                        string[] styleNames = StyleGalleryNames;
                         int rWidth = parentForm != null ? parentForm.ClientSize.Width : 1280;
                         int cardW = 68;
                         int maxCardsPossible = Math.Max(2, (rWidth - 155 - styleX - 16) / cardW);
@@ -19737,16 +20617,27 @@ namespace ZenQOffice.UI
                                 HeaderFooterDropDownForm dlg = new HeaderFooterDropDownForm(pt, true);
                                 dlg.OnPresetSelected = (preset) =>
                                 {
+                                    writerView.ActiveShape = null;
+                                    writerView.ActiveChart = null;
                                     writerView.CurrentHeaderPreset = preset;
                                     writerView.IsEditingHeaderFooter = true;
                                     writerView.IsEditingHeaderMode = true;
+                                    writerView.IsHeaderTextSelected = false;
+                                    if (preset == HeaderFooterPreset.Blank) writerView.EnsureActiveHeaderRunsInitialized();
+                                    writerView.HeaderCursorCharIndex = writerView.GetCurrentHeaderText().Length;
                                     ActiveRibbonTab = 9;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
                                 dlg.OnEditClicked = () =>
                                 {
+                                    writerView.ActiveShape = null;
+                                    writerView.ActiveChart = null;
+                                    if (writerView.CurrentHeaderPreset == HeaderFooterPreset.None) writerView.CurrentHeaderPreset = HeaderFooterPreset.Blank;
                                     writerView.IsEditingHeaderFooter = true;
                                     writerView.IsEditingHeaderMode = true;
+                                    writerView.IsHeaderTextSelected = false;
+                                    if (writerView.CurrentHeaderPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveHeaderRunsInitialized();
+                                    writerView.HeaderCursorCharIndex = writerView.GetCurrentHeaderText().Length;
                                     ActiveRibbonTab = 9;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
@@ -19754,6 +20645,11 @@ namespace ZenQOffice.UI
                                 {
                                     writerView.CurrentHeaderPreset = HeaderFooterPreset.None;
                                     writerView.HeaderText = "";
+                                    writerView.HeaderEvenText = "";
+                                    writerView.HeaderTitleText = "";
+                                    if (writerView.HeaderRuns != null) writerView.HeaderRuns.Clear();
+                                    if (writerView.HeaderEvenRuns != null) writerView.HeaderEvenRuns.Clear();
+                                    writerView.HeaderCursorCharIndex = 0;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
                                 dlg.Show();
@@ -19763,16 +20659,27 @@ namespace ZenQOffice.UI
                                 HeaderFooterDropDownForm dlg = new HeaderFooterDropDownForm(pt, false);
                                 dlg.OnPresetSelected = (preset) =>
                                 {
+                                    writerView.ActiveShape = null;
+                                    writerView.ActiveChart = null;
                                     writerView.CurrentFooterPreset = preset;
                                     writerView.IsEditingHeaderFooter = true;
                                     writerView.IsEditingHeaderMode = false;
+                                    writerView.IsHeaderTextSelected = false;
+                                    if (preset == HeaderFooterPreset.Blank) writerView.EnsureActiveFooterRunsInitialized();
+                                    writerView.FooterCursorCharIndex = writerView.GetCurrentFooterText().Length;
                                     ActiveRibbonTab = 9;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
                                 dlg.OnEditClicked = () =>
                                 {
+                                    writerView.ActiveShape = null;
+                                    writerView.ActiveChart = null;
+                                    if (writerView.CurrentFooterPreset == HeaderFooterPreset.None) writerView.CurrentFooterPreset = HeaderFooterPreset.Blank;
                                     writerView.IsEditingHeaderFooter = true;
                                     writerView.IsEditingHeaderMode = false;
+                                    writerView.IsHeaderTextSelected = false;
+                                    if (writerView.CurrentFooterPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveFooterRunsInitialized();
+                                    writerView.FooterCursorCharIndex = writerView.GetCurrentFooterText().Length;
                                     ActiveRibbonTab = 9;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
@@ -19780,6 +20687,11 @@ namespace ZenQOffice.UI
                                 {
                                     writerView.CurrentFooterPreset = HeaderFooterPreset.None;
                                     writerView.FooterText = "";
+                                    writerView.FooterEvenText = "";
+                                    if (writerView.FooterRuns != null) writerView.FooterRuns.Clear();
+                                    if (writerView.FooterEvenRuns != null) writerView.FooterEvenRuns.Clear();
+                                    writerView.ShowPageNumbers = false;
+                                    writerView.FooterCursorCharIndex = 0;
                                     if (parentForm != null) parentForm.Invalidate();
                                 };
                                 dlg.Show();
@@ -21352,9 +22264,43 @@ namespace ZenQOffice.UI
                         {
                             Point pt = parentForm != null ? parentForm.PointToScreen(new Point(16, 132)) : new Point(16, 132);
                             HeaderFooterDropDownForm dlg = new HeaderFooterDropDownForm(pt, true);
-                            dlg.OnPresetSelected = (preset) => { writerView.CurrentHeaderPreset = preset; writerView.IsEditingHeaderFooter = true; writerView.IsEditingHeaderMode = true; ActiveRibbonTab = 9; if (parentForm != null) parentForm.Invalidate(); };
-                            dlg.OnEditClicked = () => { writerView.IsEditingHeaderFooter = true; writerView.IsEditingHeaderMode = true; ActiveRibbonTab = 9; if (parentForm != null) parentForm.Invalidate(); };
-                            dlg.OnRemoveClicked = () => { writerView.CurrentHeaderPreset = HeaderFooterPreset.None; writerView.HeaderText = ""; if (parentForm != null) parentForm.Invalidate(); };
+                            dlg.OnPresetSelected = (preset) =>
+                            {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                writerView.CurrentHeaderPreset = preset;
+                                writerView.IsEditingHeaderFooter = true;
+                                writerView.IsEditingHeaderMode = true;
+                                writerView.IsHeaderTextSelected = false;
+                                if (preset == HeaderFooterPreset.Blank) writerView.EnsureActiveHeaderRunsInitialized();
+                                writerView.HeaderCursorCharIndex = writerView.GetCurrentHeaderText().Length;
+                                ActiveRibbonTab = 9;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            dlg.OnEditClicked = () =>
+                            {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                if (writerView.CurrentHeaderPreset == HeaderFooterPreset.None) writerView.CurrentHeaderPreset = HeaderFooterPreset.Blank;
+                                writerView.IsEditingHeaderFooter = true;
+                                writerView.IsEditingHeaderMode = true;
+                                writerView.IsHeaderTextSelected = false;
+                                if (writerView.CurrentHeaderPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveHeaderRunsInitialized();
+                                writerView.HeaderCursorCharIndex = writerView.GetCurrentHeaderText().Length;
+                                ActiveRibbonTab = 9;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            dlg.OnRemoveClicked = () =>
+                            {
+                                writerView.CurrentHeaderPreset = HeaderFooterPreset.None;
+                                writerView.HeaderText = "";
+                                writerView.HeaderEvenText = "";
+                                writerView.HeaderTitleText = "";
+                                if (writerView.HeaderRuns != null) writerView.HeaderRuns.Clear();
+                                if (writerView.HeaderEvenRuns != null) writerView.HeaderEvenRuns.Clear();
+                                writerView.HeaderCursorCharIndex = 0;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
                             dlg.Show();
                             return true;
                         }
@@ -21362,9 +22308,43 @@ namespace ZenQOffice.UI
                         {
                             Point pt = parentForm != null ? parentForm.PointToScreen(new Point(84, 132)) : new Point(84, 132);
                             HeaderFooterDropDownForm dlg = new HeaderFooterDropDownForm(pt, false);
-                            dlg.OnPresetSelected = (preset) => { writerView.CurrentFooterPreset = preset; writerView.IsEditingHeaderFooter = true; writerView.IsEditingHeaderMode = false; ActiveRibbonTab = 9; if (parentForm != null) parentForm.Invalidate(); };
-                            dlg.OnEditClicked = () => { writerView.IsEditingHeaderFooter = true; writerView.IsEditingHeaderMode = false; ActiveRibbonTab = 9; if (parentForm != null) parentForm.Invalidate(); };
-                            dlg.OnRemoveClicked = () => { writerView.CurrentFooterPreset = HeaderFooterPreset.None; writerView.FooterText = ""; if (parentForm != null) parentForm.Invalidate(); };
+                            dlg.OnPresetSelected = (preset) =>
+                            {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                writerView.CurrentFooterPreset = preset;
+                                writerView.IsEditingHeaderFooter = true;
+                                writerView.IsEditingHeaderMode = false;
+                                writerView.IsHeaderTextSelected = false;
+                                if (preset == HeaderFooterPreset.Blank) writerView.EnsureActiveFooterRunsInitialized();
+                                writerView.FooterCursorCharIndex = writerView.GetCurrentFooterText().Length;
+                                ActiveRibbonTab = 9;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            dlg.OnEditClicked = () =>
+                            {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                if (writerView.CurrentFooterPreset == HeaderFooterPreset.None) writerView.CurrentFooterPreset = HeaderFooterPreset.Blank;
+                                writerView.IsEditingHeaderFooter = true;
+                                writerView.IsEditingHeaderMode = false;
+                                writerView.IsHeaderTextSelected = false;
+                                if (writerView.CurrentFooterPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveFooterRunsInitialized();
+                                writerView.FooterCursorCharIndex = writerView.GetCurrentFooterText().Length;
+                                ActiveRibbonTab = 9;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
+                            dlg.OnRemoveClicked = () =>
+                            {
+                                writerView.CurrentFooterPreset = HeaderFooterPreset.None;
+                                writerView.FooterText = "";
+                                writerView.FooterEvenText = "";
+                                if (writerView.FooterRuns != null) writerView.FooterRuns.Clear();
+                                if (writerView.FooterEvenRuns != null) writerView.FooterEvenRuns.Clear();
+                                writerView.ShowPageNumbers = false;
+                                writerView.FooterCursorCharIndex = 0;
+                                if (parentForm != null) parentForm.Invalidate();
+                            };
                             dlg.Show();
                             return true;
                         }
@@ -21380,28 +22360,43 @@ namespace ZenQOffice.UI
                             if (y >= 68 && y <= 88) // Ngày & Giờ
                             {
                                 string dtStr = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
-                                if (writerView.IsEditingHeaderMode)
-                                    writerView.HeaderTitleText = dtStr;
+                                if (writerView.IsEditingHeaderFooter)
+                                {
+                                    foreach (char ch in dtStr) writerView.HandleChar(ch);
+                                }
                                 else
+                                {
                                     writerView.InsertText(dtStr);
+                                }
                                 if (parentForm != null) parentForm.Invalidate();
                                 return true;
                             }
                             else if (y >= 88 && y <= 108) // Thông tin tài liệu
                             {
                                 string infoStr = "Tài liệu ZENQ OFFICE - Tác giả: Người dùng";
-                                if (writerView.IsEditingHeaderMode)
-                                    writerView.HeaderTitleText = infoStr;
+                                if (writerView.IsEditingHeaderFooter)
+                                {
+                                    foreach (char ch in infoStr) writerView.HandleChar(ch);
+                                }
                                 else
+                                {
                                     writerView.InsertText(infoStr);
+                                }
                                 if (parentForm != null) parentForm.Invalidate();
                                 return true;
                             }
                             else if (y >= 108 && y <= 128) // Phần nhanh
                             {
-                                writerView.InsertText("[Trường Thông Tin Nhanh]");
+                                string qpStr = "[Trường Thông Tin Nhanh]";
+                                if (writerView.IsEditingHeaderFooter)
+                                {
+                                    foreach (char ch in qpStr) writerView.HandleChar(ch);
+                                }
+                                else
+                                {
+                                    writerView.InsertText(qpStr);
+                                }
                                 if (parentForm != null) parentForm.Invalidate();
-                            if (parentForm != null) parentForm.Invalidate();
                                 return true;
                             }
                         }
@@ -21433,16 +22428,28 @@ namespace ZenQOffice.UI
                         {
                             if (y >= 68 && y <= 88) // Đến Đầu trang
                             {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                if (writerView.CurrentHeaderPreset == HeaderFooterPreset.None) writerView.CurrentHeaderPreset = HeaderFooterPreset.Blank;
                                 writerView.IsEditingHeaderFooter = true;
                                 writerView.IsEditingHeaderMode = true;
+                                writerView.IsHeaderTextSelected = false;
+                                if (writerView.CurrentHeaderPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveHeaderRunsInitialized();
+                                writerView.HeaderCursorCharIndex = writerView.GetCurrentHeaderText().Length;
                                 writerView.ScrollY = 0;
                                 if (parentForm != null) parentForm.Invalidate();
                                 return true;
                             }
                             else if (y >= 88 && y <= 108) // Đến Chân trang
                             {
+                                writerView.ActiveShape = null;
+                                writerView.ActiveChart = null;
+                                if (writerView.CurrentFooterPreset == HeaderFooterPreset.None) writerView.CurrentFooterPreset = HeaderFooterPreset.Blank;
                                 writerView.IsEditingHeaderFooter = true;
                                 writerView.IsEditingHeaderMode = false;
+                                writerView.IsHeaderTextSelected = false;
+                                if (writerView.CurrentFooterPreset == HeaderFooterPreset.Blank) writerView.EnsureActiveFooterRunsInitialized();
+                                writerView.FooterCursorCharIndex = writerView.GetCurrentFooterText().Length;
                                 if (parentForm != null) parentForm.Invalidate();
                                 return true;
                             }
@@ -24126,34 +25133,68 @@ namespace ZenQOffice.UI
             if (slidesView == null || slidesView.SelectedShape == null) return false;
             ShapeNode shape = slidesView.SelectedShape;
 
-            // Group 1: Thay đổi Đồ họa (Change Graphic)
-            if (x >= 14 && x <= 90 && y >= 68 && y <= 122)
+            int curX = 14;
+
+            // ==================== Group 1: Công cụ & AI ====================
+            // 1.1 Chỉnh sửa (Opens/Toggles Graphic Editor Sidebar)
+            if (x >= curX && x <= curX + 66 && y >= 68 && y <= 122)
             {
+                if (slidesView.IsSidebarOpen && slidesView.SidebarPanel == SidebarPanelType.GraphicEditor)
+                {
+                    slidesView.IsSidebarOpen = false;
+                }
+                else
+                {
+                    slidesView.SidebarPanel = SidebarPanelType.GraphicEditor;
+                    slidesView.IsSidebarOpen = true;
+                    slidesView.SidebarScrollY = 0;
+                }
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            curX += 70;
+
+            // 1.2 Thay thế ▾ (Replace Graphic)
+            if (x >= curX && x <= curX + 66 && y >= 68 && y <= 122)
+            {
+                int menuX = curX;
                 ContextMenuStrip chgMenu = new ContextMenuStrip();
                 chgMenu.RenderMode = ToolStripRenderMode.System;
-                chgMenu.Items.Add("📁 Từ tệp (File)...", null, (s, e) =>
+                chgMenu.Items.Add("🎨 Từ kho Đồ họa & Biểu tượng...", null, (s, e) =>
+                {
+                    slidesView.OpenGraphicsDrawer();
+                    if (parentForm != null) parentForm.Invalidate();
+                });
+                chgMenu.Items.Add("📁 Từ tệp trên máy tính...", null, (s, e) =>
                 {
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
                         ofd.Filter = "Tệp Đồ họa (*.svg;*.png;*.jpg;*.jpeg;*.emf)|*.svg;*.png;*.jpg;*.jpeg;*.emf|Tất cả tệp (*.*)|*.*";
-                        ofd.Title = "Chọn tệp đồ họa mới";
+                        ofd.Title = "Chọn tệp đồ họa thay thế";
                         if (ofd.ShowDialog(parentForm) == DialogResult.OK)
                         {
                             slidesView.SaveUndoState();
                             try
                             {
+                                shape.CachedDetectedColors = null;
+                                shape.OriginalRasterBitmap = null;
                                 if (ofd.FileName.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                                 {
                                     shape.ImagePath = ofd.FileName;
                                     shape.IsSvg = true;
                                     shape.IsGraphic = true;
+                                    shape.OriginalSvgContent = System.IO.File.ReadAllText(ofd.FileName);
+                                    shape.SvgContent = shape.OriginalSvgContent;
                                     shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(ofd.FileName, 1600, 1600);
                                 }
                                 else
                                 {
                                     shape.ImagePath = ofd.FileName;
+                                    shape.IsSvg = false;
                                     shape.CachedImage = Image.FromFile(ofd.FileName);
                                 }
+                                shape.InvalidateDisplayCache();
+                                if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
                                 if (parentForm != null) parentForm.Invalidate();
                             }
                             catch (Exception ex)
@@ -24163,36 +25204,93 @@ namespace ZenQOffice.UI
                         }
                     }
                 });
-                chgMenu.Items.Add("🎨 Từ kho Đồ họa & Biểu tượng...", null, (s, e) =>
-                {
-                    slidesView.OpenGraphicsDrawer();
-                    if (parentForm != null) parentForm.Invalidate();
-                });
                 chgMenu.Items.Add("📋 Từ Bảng tạm (Clipboard)", null, (s, e) =>
                 {
                     if (Clipboard.ContainsImage())
                     {
                         slidesView.SaveUndoState();
+                        shape.CachedDetectedColors = null;
+                        shape.OriginalRasterBitmap = null;
                         shape.CachedImage = Clipboard.GetImage();
+                        shape.InvalidateDisplayCache();
+                        if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
                         if (parentForm != null) parentForm.Invalidate();
                     }
                 });
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(14, 124)) : new Point(14, 124);
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(menuX, 124)) : new Point(menuX, 124);
                 chgMenu.Show(pt);
                 return true;
             }
-            if (x >= 94 && x <= 188 && y >= 68 && y <= 122)
+            curX += 70;
+
+            // 1.3 Xóa nền (AI Background Removal)
+            if (x >= curX && x <= curX + 64 && y >= 68 && y <= 122)
+            {
+                slidesView.AutoRemoveBackgroundDirect(shape);
+                shape.CachedDetectedColors = null;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            curX += 68;
+
+            // 1.4 Xóa ảnh (Delete Graphic)
+            if (x >= curX && x <= curX + 56 && y >= 68 && y <= 122)
+            {
+                slidesView.SaveUndoState();
+                if (slidesView.ActiveSlide != null && slidesView.SelectedShapeIndex >= 0 && slidesView.SelectedShapeIndex < slidesView.ActiveSlide.Shapes.Count)
+                {
+                    slidesView.ActiveSlide.Shapes.RemoveAt(slidesView.SelectedShapeIndex);
+                    slidesView.SelectedShapeIndex = -1;
+                    if (slidesView.SelectedShapeIndices != null) slidesView.SelectedShapeIndices.Clear();
+                    slidesView.ActiveSlide.IsThumbnailDirty = true;
+                }
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            curX += 60 + 8;
+
+            // ==================== Group 2: Màu phát hiện (Auto-Detected Colors) ====================
+            var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 5);
+            int swCount = Math.Min(5, detectedColors.Count);
+            for (int i = 0; i < swCount; i++)
+            {
+                if (x >= curX && x <= curX + 34 && y >= 68 && y <= 122)
+                {
+                    slidesView.OpenColorPicker(ColorPickerTarget.GraphicColor, i, false);
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                curX += 36;
+            }
+
+            // Custom Color Wheel / Gradient Button -> Opens Color & Gradient Sidebar
+            if (x >= curX && x <= curX + 44 && y >= 68 && y <= 122)
+            {
+                slidesView.OpenColorPicker(ColorPickerTarget.GraphicColor, 0, true);
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            curX += 48;
+
+            // Mini stack: Đặt lại gốc & Rã Vector
+            if (x >= curX && x <= curX + 86 && y >= 68 && y <= 93)
+            {
+                slidesView.SaveUndoState();
+                SvgRasterizer.ResetGraphicToOriginal(shape);
+                if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
+                if (parentForm != null) parentForm.Invalidate();
+                return true;
+            }
+            if (x >= curX && x <= curX + 86 && y >= 97 && y <= 122)
             {
                 slidesView.SaveUndoState();
                 string xml = shape.SvgContent;
                 if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
                 {
-                    xml = System.IO.File.ReadAllText(shape.ImagePath);
-                    shape.OriginalSvgContent = xml;
-                    shape.SvgContent = xml;
+                    try { xml = System.IO.File.ReadAllText(shape.ImagePath); } catch { }
                 }
                 var newShapes = SvgRasterizer.ConvertSvgToShapes(xml, shape.Transform.X, shape.Transform.Y, shape.Transform.Width, shape.Transform.Height);
-                if (newShapes != null && newShapes.Count > 0)
+                if (newShapes != null && newShapes.Count > 0 && slidesView.ActiveSlide != null)
                 {
                     int idx = slidesView.ActiveSlide.Shapes.IndexOf(shape);
                     if (idx >= 0)
@@ -24201,419 +25299,56 @@ namespace ZenQOffice.UI
                         slidesView.ActiveSlide.Shapes.InsertRange(idx, newShapes);
                         slidesView.SelectedShapeIndex = idx;
                         slidesView.ActiveSlide.IsThumbnailDirty = true;
-                        MessageBox.Show(parentForm, $"Đã rã đồ họa thành {newShapes.Count} hình khối vector độc lập thành công!", "Rã Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-                }
-                else
-                {
-                    shape.IsGraphic = false;
-                    shape.IsSvg = false;
-                    if (shape.Type == ShapeType.Image) shape.Type = ShapeType.Rectangle;
-                    MessageBox.Show(parentForm, "Đã chuyển đổi đồ họa sang hình khối vector độc lập!", "Chuyển Đổi Thành Hình Dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
+            curX += 90 + 8;
 
-            // Group 2: Kiểu Đồ họa
-            Color[] styleColors = new Color[] {
-                Color.FromArgb(37, 99, 235),  // Kiểu 1: Blue
-                Color.FromArgb(220, 38, 38),  // Kiểu 2: Red
-                Color.FromArgb(16, 185, 129), // Kiểu 3: Green
-                Color.FromArgb(245, 158, 11), // Kiểu 4: Amber
-                Color.FromArgb(71, 85, 105)   // Kiểu 5: Slate
-            };
-            for (int i = 0; i < styleColors.Length; i++)
+            // ==================== Group 3: Viền, Bo góc, Cắt, Lật & Độ mờ (Graphic Popovers) ====================
+            // 3.1 Stack: Viền & Bo góc
+            if (x >= curX && x <= curX + 84 && y >= 68 && y <= 93)
             {
-                int bx = 196 + i * 36;
-                if (x >= bx && x <= bx + 32 && y >= 68 && y <= 122)
-                {
-                    slidesView.SaveUndoState();
-                    Color chosen = styleColors[i];
-                    shape.FillColor = chosen.ToArgb();
-
-                    string xml = shape.SvgContent;
-                    if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
-                    {
-                        xml = System.IO.File.ReadAllText(shape.ImagePath);
-                        shape.OriginalSvgContent = xml;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(xml))
-                    {
-                        shape.SvgContent = SvgRasterizer.RecolorSvgWithThemeColor(xml, chosen);
-                        Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
-                        if (sharpBmp != null)
-                        {
-                            shape.CachedImage = sharpBmp;
-                            shape.InvalidateDisplayCache();
-                        }
-                    }
-                    else if (shape.CachedImage != null)
-                    {
-                        Bitmap recolored = SvgRasterizer.ApplySolidColorRecolor((Bitmap)shape.CachedImage, chosen);
-                        if (recolored != null)
-                        {
-                            shape.CachedImage = recolored;
-                            shape.InvalidateDisplayCache();
-                        }
-                    }
-
-                    if (parentForm != null) parentForm.Invalidate();
-                    return true;
-                }
-            }
-
-            if (x >= 380 && x <= 500 && y >= 68 && y <= 92) // Tô màu Đồ họa ▾
-            {
-                ContextMenuStrip fillMenu = new ContextMenuStrip();
-                fillMenu.RenderMode = ToolStripRenderMode.System;
-
-                // 1. Chọn màu tô chủ đề
-                fillMenu.Items.Add("🎨 Màu Chủ đề (Theme Color)...", null, (s, e) =>
-                {
-                    using (ColorDialog cd = new ColorDialog())
-                    {
-                        cd.Color = Color.FromArgb(shape.FillColor != 0 ? shape.FillColor : Color.FromArgb(37, 99, 235).ToArgb());
-                        if (cd.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            slidesView.SaveUndoState();
-                            Color chosen = cd.Color;
-                            shape.FillColor = chosen.ToArgb();
-
-                            string xml = shape.SvgContent;
-                            if (string.IsNullOrWhiteSpace(xml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
-                            {
-                                xml = System.IO.File.ReadAllText(shape.ImagePath);
-                                shape.OriginalSvgContent = xml;
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(xml))
-                            {
-                                shape.SvgContent = SvgRasterizer.RecolorSvgWithThemeColor(xml, chosen);
-                                Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
-                                if (sharpBmp != null)
-                                {
-                                    shape.CachedImage = sharpBmp;
-                                    shape.InvalidateDisplayCache();
-                                }
-                            }
-                            else if (shape.CachedImage != null)
-                            {
-                                Bitmap recolored = SvgRasterizer.ApplySolidColorRecolor((Bitmap)shape.CachedImage, chosen);
-                                if (recolored != null)
-                                {
-                                    shape.CachedImage = recolored;
-                                    shape.InvalidateDisplayCache();
-                                }
-                            }
-
-                            if (parentForm != null) parentForm.Invalidate();
-                        }
-                    }
-                });
-
-                // 2. Nhận diện các màu trong đồ họa (SVG Color Palette)
-                string curXml = shape.SvgContent;
-                if (string.IsNullOrWhiteSpace(curXml) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
-                {
-                    curXml = System.IO.File.ReadAllText(shape.ImagePath);
-                    shape.OriginalSvgContent = curXml;
-                    shape.SvgContent = curXml;
-                }
-                var detectedColors = SvgRasterizer.ExtractColorsFromSvg(curXml ?? "");
-
-                ToolStripMenuItem paletteItem = new ToolStripMenuItem($"🔍 Bảng màu phát hiện ({detectedColors.Count} màu)...");
-                if (detectedColors.Count > 0)
-                {
-                    int maxColors = Math.Min(16, detectedColors.Count);
-                    for (int ci = 0; ci < maxColors; ci++)
-                    {
-                        Color capturedColor = detectedColors[ci];
-                        Bitmap colorIcon = new Bitmap(16, 16);
-                        using (Graphics gI = Graphics.FromImage(colorIcon))
-                        {
-                            using (SolidBrush b = new SolidBrush(capturedColor)) gI.FillRectangle(b, 1, 1, 14, 14);
-                            using (Pen p = new Pen(Color.FromArgb(160, 174, 192), 1f)) gI.DrawRectangle(p, 1, 1, 13, 13);
-                        }
-                        ToolStripMenuItem cItem = new ToolStripMenuItem($"Màu #{capturedColor.R:X2}{capturedColor.G:X2}{capturedColor.B:X2}", colorIcon, (s, e) =>
-                        {
-                            using (ColorDialog cd = new ColorDialog())
-                            {
-                                cd.Color = capturedColor;
-                                if (cd.ShowDialog(parentForm) == DialogResult.OK)
-                                {
-                                    slidesView.SaveUndoState();
-                                    Color newC = cd.Color;
-                                    string sourceXml = shape.SvgContent ?? curXml;
-                                    shape.SvgContent = SvgRasterizer.ReplaceColorInSvg(sourceXml, capturedColor, newC);
-                                    Bitmap sharpBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent, 1600, 1600);
-                                    if (sharpBmp != null)
-                                    {
-                                        shape.CachedImage = sharpBmp;
-                                        shape.InvalidateDisplayCache();
-                                    }
-                                    if (parentForm != null) parentForm.Invalidate();
-                                }
-                            }
-                        });
-                        paletteItem.DropDownItems.Add(cItem);
-                    }
-                }
-                else
-                {
-                    paletteItem.DropDownItems.Add(new ToolStripMenuItem("Không phát hiện mã màu XML (Hình bitmap)") { Enabled = false });
-                }
-                fillMenu.Items.Add(paletteItem);
-
-                // 3. Trộn màu Gradient (Gradient Blend)
-                ToolStripMenuItem gradItem = new ToolStripMenuItem("🌊 Trộn màu Gradient (Gradient Blend)");
-                var gradPresets = new[]
-                {
-                    new { Name = "🌅 Hoàng hôn ấm áp (Sunset)", C1 = Color.FromArgb(255, 241, 118), C2 = Color.FromArgb(240, 98, 146) },
-                    new { Name = "🌊 Đại dương Xanh (Ocean)", C1 = Color.FromArgb(56, 189, 248), C2 = Color.FromArgb(2, 132, 199) },
-                    new { Name = "🍃 Rừng Nhiệt đới (Emerald)", C1 = Color.FromArgb(52, 211, 153), C2 = Color.FromArgb(5, 150, 105) },
-                    new { Name = "👑 Hoàng gia Tím (Purple)", C1 = Color.FromArgb(192, 132, 252), C2 = Color.FromArgb(126, 34, 206) },
-                    new { Name = "⚡ Cyber Neon", C1 = Color.FromArgb(0, 240, 255), C2 = Color.FromArgb(224, 64, 251) },
-                    new { Name = "✨ Vàng Champagne (Golden)", C1 = Color.FromArgb(253, 230, 138), C2 = Color.FromArgb(245, 158, 11) },
-                    new { Name = "🌌 Đêm Huyền bí (Midnight)", C1 = Color.FromArgb(49, 46, 129), C2 = Color.FromArgb(67, 56, 202) },
-                    new { Name = "❄️ Băng tuyết Bạc hà (Mint)", C1 = Color.FromArgb(153, 246, 228), C2 = Color.FromArgb(20, 184, 166) }
-                };
-
-                foreach (var gp in gradPresets)
-                {
-                    var capturedGp = gp;
-                    gradItem.DropDownItems.Add(capturedGp.Name, null, (s, e) =>
-                    {
-                        slidesView.SaveUndoState();
-                        Bitmap baseBmp = (Bitmap)shape.CachedImage;
-                        if (baseBmp == null && !string.IsNullOrEmpty(shape.ImagePath))
-                        {
-                            baseBmp = SvgRasterizer.RenderSvgToBitmap(shape.SvgContent ?? shape.ImagePath, 1600, 1600);
-                        }
-                        if (baseBmp != null)
-                        {
-                            Bitmap blended = SvgRasterizer.ApplyGradientBlendToBitmap(baseBmp, capturedGp.C1, capturedGp.C2, 90f);
-                            if (blended != null)
-                            {
-                                shape.CachedImage = blended;
-                                shape.HasGradientFill = true;
-                                shape.FillColor = capturedGp.C1.ToArgb();
-                                shape.GradientColor2 = capturedGp.C2.ToArgb();
-                                shape.GradientAngle = 90f;
-                                shape.InvalidateDisplayCache();
-                            }
-                        }
-                        if (parentForm != null) parentForm.Invalidate();
-                    });
-                }
-
-                gradItem.DropDownItems.Add(new ToolStripSeparator());
-                gradItem.DropDownItems.Add("🎨 Tùy chọn 2 màu Gradient...", null, (s, e) =>
-                {
-                    Color c1 = Color.FromArgb(37, 99, 235);
-                    Color c2 = Color.FromArgb(245, 158, 11);
-                    using (ColorDialog cd1 = new ColorDialog { Color = c1 })
-                    {
-                        if (cd1.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            c1 = cd1.Color;
-                            using (ColorDialog cd2 = new ColorDialog { Color = c2 })
-                            {
-                                if (cd2.ShowDialog(parentForm) == DialogResult.OK)
-                                {
-                                    c2 = cd2.Color;
-                                    slidesView.SaveUndoState();
-                                    Bitmap baseBmp = (Bitmap)shape.CachedImage;
-                                    if (baseBmp != null)
-                                    {
-                                        Bitmap blended = SvgRasterizer.ApplyGradientBlendToBitmap(baseBmp, c1, c2, 90f);
-                                        if (blended != null)
-                                        {
-                                            shape.CachedImage = blended;
-                                            shape.HasGradientFill = true;
-                                            shape.FillColor = c1.ToArgb();
-                                            shape.GradientColor2 = c2.ToArgb();
-                                            shape.GradientAngle = 90f;
-                                            shape.InvalidateDisplayCache();
-                                        }
-                                    }
-                                    if (parentForm != null) parentForm.Invalidate();
-                                }
-                            }
-                        }
-                    }
-                });
-
-                fillMenu.Items.Add(gradItem);
-
-                // 4. Khôi phục màu gốc
-                fillMenu.Items.Add(new ToolStripSeparator());
-                fillMenu.Items.Add("🔄 Đặt lại màu gốc của Đồ họa", null, (s, e) =>
-                {
-                    slidesView.SaveUndoState();
-                    string orig = shape.OriginalSvgContent;
-                    if (string.IsNullOrWhiteSpace(orig) && !string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
-                    {
-                        orig = System.IO.File.ReadAllText(shape.ImagePath);
-                    }
-                    if (!string.IsNullOrWhiteSpace(orig))
-                    {
-                        shape.SvgContent = orig;
-                        shape.CachedImage = SvgRasterizer.RenderSvgToBitmap(orig, 1600, 1600);
-                    }
-                    else if (!string.IsNullOrEmpty(shape.ImagePath) && System.IO.File.Exists(shape.ImagePath))
-                    {
-                        shape.CachedImage = Image.FromFile(shape.ImagePath);
-                    }
-                    shape.HasGradientFill = false;
-                    shape.InvalidateDisplayCache();
-                    if (parentForm != null) parentForm.Invalidate();
-                });
-
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(380, 94)) : new Point(380, 94);
-                fillMenu.Show(pt);
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(curX, 95)) : new Point(curX, 95);
+                var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Stroke, shape, slidesView, parentForm);
+                pop.Show(parentForm);
                 return true;
             }
-
-            if (x >= 380 && x <= 500 && y >= 94 && y <= 118) // Viền Đồ họa ▾
+            if (x >= curX && x <= curX + 84 && y >= 97 && y <= 122)
             {
-                ContextMenuStrip outlineMenu = new ContextMenuStrip();
-                outlineMenu.RenderMode = ToolStripRenderMode.System;
-
-                outlineMenu.Items.Add("🎨 Màu viền (Outline Color)...", null, (s, e) =>
-                {
-                    using (ColorDialog cd = new ColorDialog())
-                    {
-                        cd.Color = Color.FromArgb(shape.StrokeColor != 0 ? shape.StrokeColor : Color.FromArgb(37, 99, 235).ToArgb());
-                        if (cd.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            slidesView.SaveUndoState();
-                            shape.StrokeColor = cd.Color.ToArgb();
-                            if (shape.StrokeWidth <= 0) shape.StrokeWidth = 2.0f;
-                            if (parentForm != null) parentForm.Invalidate();
-                        }
-                    }
-                });
-
-                ToolStripMenuItem widthItem = new ToolStripMenuItem("📏 Độ dày viền");
-                float[] widths = new float[] { 1f, 1.5f, 2f, 3f, 4.5f, 6f };
-                foreach (float w in widths)
-                {
-                    float cw = w;
-                    widthItem.DropDownItems.Add($"{cw} pt", null, (s, e) =>
-                    {
-                        slidesView.SaveUndoState();
-                        shape.StrokeWidth = cw;
-                        if (shape.StrokeColor == 0) shape.StrokeColor = Color.FromArgb(37, 99, 235).ToArgb();
-                        if (parentForm != null) parentForm.Invalidate();
-                    });
-                }
-                outlineMenu.Items.Add(widthItem);
-
-                outlineMenu.Items.Add(new ToolStripSeparator());
-                outlineMenu.Items.Add("🚫 Không viền", null, (s, e) =>
-                {
-                    slidesView.SaveUndoState();
-                    shape.StrokeWidth = 0f;
-                    shape.StrokeColor = Color.Transparent.ToArgb();
-                    if (parentForm != null) parentForm.Invalidate();
-                });
-
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(380, 120)) : new Point(380, 120);
-                outlineMenu.Show(pt);
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(curX, 124)) : new Point(curX, 124);
+                var pop = new GraphicPopoverForm(pt, GraphicPopoverType.CornerRadius, shape, slidesView, parentForm);
+                pop.Show(parentForm);
                 return true;
             }
+            curX += 88;
 
-            if (x >= 380 && x <= 500 && y >= 120 && y <= 144) // Hiệu ứng ▾
-            {
-                ShowShapeEffectsMenu(slidesView, shape, parentForm, new Point(380, 144));
-                return true;
-            }
-
-            // Group 3: Sắp xếp (Arrange)
-            if (x >= 512 && x <= 608 && y >= 68 && y <= 86)
-            {
-                if (slidesView.ActiveSlide != null && slidesView.SelectedShapeIndex < slidesView.ActiveSlide.Shapes.Count - 1)
-                {
-                    slidesView.SaveUndoState();
-                    int idx = slidesView.SelectedShapeIndex;
-                    ShapeNode s1 = slidesView.ActiveSlide.Shapes[idx];
-                    slidesView.ActiveSlide.Shapes[idx] = slidesView.ActiveSlide.Shapes[idx + 1];
-                    slidesView.ActiveSlide.Shapes[idx + 1] = s1;
-                    slidesView.SelectedShapeIndex = idx + 1;
-                }
-                if (parentForm != null) parentForm.Invalidate();
-                return true;
-            }
-            if (x >= 512 && x <= 608 && y >= 88 && y <= 106)
-            {
-                if (slidesView.ActiveSlide != null && slidesView.SelectedShapeIndex > 0)
-                {
-                    slidesView.SaveUndoState();
-                    int idx = slidesView.SelectedShapeIndex;
-                    ShapeNode s1 = slidesView.ActiveSlide.Shapes[idx];
-                    slidesView.ActiveSlide.Shapes[idx] = slidesView.ActiveSlide.Shapes[idx - 1];
-                    slidesView.ActiveSlide.Shapes[idx - 1] = s1;
-                    slidesView.SelectedShapeIndex = idx - 1;
-                }
-                if (parentForm != null) parentForm.Invalidate();
-                return true;
-            }
-            if (x >= 512 && x <= 608 && y >= 108 && y <= 126)
-            {
-                slidesView.SidebarPanel = SidebarPanelType.SelectionPane;
-                slidesView.IsSidebarOpen = true;
-                if (parentForm != null) parentForm.Invalidate();
-                return true;
-            }
-            if (x >= 612 && x <= 700 && y >= 68 && y <= 86)
-            {
-                ContextMenuStrip alignMenu = new ContextMenuStrip();
-                alignMenu.RenderMode = ToolStripRenderMode.System;
-                alignMenu.Items.Add("Căn Trái", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = 0; if (parentForm != null) parentForm.Invalidate(); });
-                alignMenu.Items.Add("Căn Giữa ngang", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = (slidesView.Presentation.CanvasWidth - shape.Transform.Width) / 2f; if (parentForm != null) parentForm.Invalidate(); });
-                alignMenu.Items.Add("Căn Phải", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.X = slidesView.Presentation.CanvasWidth - shape.Transform.Width; if (parentForm != null) parentForm.Invalidate(); });
-                alignMenu.Items.Add(new ToolStripSeparator());
-                alignMenu.Items.Add("Căn Trên", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = 0; if (parentForm != null) parentForm.Invalidate(); });
-                alignMenu.Items.Add("Căn Giữa dọc", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = (slidesView.Presentation.CanvasHeight - shape.Transform.Height) / 2f; if (parentForm != null) parentForm.Invalidate(); });
-                alignMenu.Items.Add("Căn Dưới", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Y = slidesView.Presentation.CanvasHeight - shape.Transform.Height; if (parentForm != null) parentForm.Invalidate(); });
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(612, 86)) : new Point(612, 86);
-                alignMenu.Show(pt);
-                return true;
-            }
-            if (x >= 612 && x <= 700 && y >= 108 && y <= 126)
-            {
-                ContextMenuStrip rotMenu = new ContextMenuStrip();
-                rotMenu.RenderMode = ToolStripRenderMode.System;
-                rotMenu.Items.Add("Xoay phải 90°", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Rotation = (shape.Transform.Rotation + 90f) % 360f; if (parentForm != null) parentForm.Invalidate(); });
-                rotMenu.Items.Add("Xoay trái 90°", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.Rotation = (shape.Transform.Rotation + 270f) % 360f; if (parentForm != null) parentForm.Invalidate(); });
-                rotMenu.Items.Add("Lật dọc", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.FlipVertical = !shape.Transform.FlipVertical; if (parentForm != null) parentForm.Invalidate(); });
-                rotMenu.Items.Add("Lật ngang", null, (s, e) => { slidesView.SaveUndoState(); shape.Transform.FlipHorizontal = !shape.Transform.FlipHorizontal; if (parentForm != null) parentForm.Invalidate(); });
-                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(612, 126)) : new Point(612, 126);
-                rotMenu.Show(pt);
-                return true;
-            }
-
-            // Group 4: Kích thước & Cắt
-            if (x >= 708 && x <= 772 && y >= 68 && y <= 122)
+            // 3.2 Cắt (Crop)
+            if (x >= curX && x <= curX + 52 && y >= 68 && y <= 122)
             {
                 slidesView.ToggleCropMode();
                 if (parentForm != null) parentForm.Invalidate();
                 return true;
             }
-            if (x >= 776 && x <= 906 && y >= 68 && y <= 92)
+            curX += 56;
+
+            // 3.3 Lật (Flip Popover)
+            if (x >= curX && x <= curX + 56 && y >= 68 && y <= 122)
             {
-                slidesView.SaveUndoState();
-                shape.Transform.Height = Math.Max(20f, shape.Transform.Height + 25f);
-                if (parentForm != null) parentForm.Invalidate();
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(curX, 124)) : new Point(curX, 124);
+                var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Flip, shape, slidesView, parentForm);
+                pop.Show(parentForm);
                 return true;
             }
-            if (x >= 776 && x <= 906 && y >= 94 && y <= 118)
+            curX += 60;
+
+            // 3.4 Độ mờ (Transparency Popover Slider)
+            if (x >= curX && x <= curX + 76 && y >= 68 && y <= 122)
             {
-                slidesView.SaveUndoState();
-                shape.Transform.Width = Math.Max(20f, shape.Transform.Width + 25f);
-                if (parentForm != null) parentForm.Invalidate();
+                Point pt = parentForm != null ? parentForm.PointToScreen(new Point(curX, 124)) : new Point(curX, 124);
+                var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Transparency, shape, slidesView, parentForm);
+                pop.Show(parentForm);
                 return true;
             }
 
@@ -24853,7 +25588,7 @@ namespace ZenQOffice.UI
                         SelectedFont = font;
                         if (slidesView.SelectedShape != null)
                         {
-                            slidesView.SelectedShape.FontName = font;
+                            slidesView.SetSelectionFontName(font);
                         }
                         if (parentForm != null) parentForm.Invalidate();
                     };
@@ -24872,7 +25607,7 @@ namespace ZenQOffice.UI
                         FontSize = sz;
                         if (slidesView.SelectedShape != null)
                         {
-                            slidesView.SelectedShape.FontSize = sz;
+                            slidesView.SetSelectionFontSize(sz);
                         }
                         if (parentForm != null) parentForm.Invalidate();
                     };
@@ -24883,7 +25618,7 @@ namespace ZenQOffice.UI
                 else if (x >= 556 && x <= 580 && y >= 68 && y <= 92)
                 {
                     if (slidesView.SelectedShape == null) return true;
-                    slidesView.SelectedShape.FontSize = Math.Min(96f, slidesView.SelectedShape.FontSize + 4f);
+                    slidesView.AdjustSelectionFontSize(4f);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
@@ -24891,7 +25626,7 @@ namespace ZenQOffice.UI
                 else if (x >= 582 && x <= 606 && y >= 68 && y <= 92)
                 {
                     if (slidesView.SelectedShape == null) return true;
-                    slidesView.SelectedShape.FontSize = Math.Max(8f, slidesView.SelectedShape.FontSize - 4f);
+                    slidesView.AdjustSelectionFontSize(-4f);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
@@ -24900,16 +25635,7 @@ namespace ZenQOffice.UI
                 {
                     if (slidesView.SelectedShape != null)
                     {
-                        slidesView.SelectedShape.FontSize = 18f;
-                        slidesView.SelectedShape.Bold = false;
-                        slidesView.SelectedShape.Italic = false;
-                        slidesView.SelectedShape.Underline = false;
-                        slidesView.SelectedShape.Strikethrough = false;
-                        slidesView.SelectedShape.HasTextShadow = false;
-                        slidesView.SelectedShape.TextColor = (slidesView.SelectedShape.Type == ShapeType.TextBox) ? 0x0F172A : 0xFFFFFF;
-                        slidesView.SelectedShape.HasHighlight = false;
-                        slidesView.SelectedShape.HighlightColor = 0;
-                        slidesView.SelectedShape.CharacterSpacing = 0f;
+                        slidesView.ClearSelectionFormatting();
                         if (parentForm != null) parentForm.Invalidate();
                     }
                     return true;
@@ -24928,7 +25654,7 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            slidesView.SelectedShape.Bold = !slidesView.SelectedShape.Bold;
+                            slidesView.ToggleSelectionBold();
                         }
                     }
                     if (parentForm != null) parentForm.Invalidate();
@@ -24939,7 +25665,7 @@ namespace ZenQOffice.UI
                 {
                     if (slidesView.SelectedShape != null)
                     {
-                        slidesView.SelectedShape.Italic = !slidesView.SelectedShape.Italic;
+                        slidesView.ToggleSelectionItalic();
                     }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
@@ -24949,7 +25675,7 @@ namespace ZenQOffice.UI
                 {
                     if (slidesView.SelectedShape != null)
                     {
-                        slidesView.SelectedShape.Underline = !slidesView.SelectedShape.Underline;
+                        slidesView.ToggleSelectionUnderline();
                     }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
@@ -24969,7 +25695,7 @@ namespace ZenQOffice.UI
                 {
                     if (slidesView.SelectedShape != null)
                     {
-                        slidesView.SelectedShape.Strikethrough = !slidesView.SelectedShape.Strikethrough;
+                        slidesView.ToggleSelectionStrikethrough();
                     }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
@@ -25047,21 +25773,36 @@ namespace ZenQOffice.UI
                     }
                     return true;
                 }
-                // Màu dạ quang Highlighter ▾
+                // Màu dạ quang Highlighter ▾ (x: 568..601, y: 96..120)
                 else if (x >= 568 && x <= 601 && y >= 96 && y <= 120)
                 {
                     if (slidesView.SelectedShape == null) return true;
-                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(568, 120)) : new Point(568, 120);
                     Color curHl = (slidesView.SelectedShape.HasHighlight && slidesView.SelectedShape.HighlightColor != 0)
                         ? Color.FromArgb(slidesView.SelectedShape.HighlightColor)
                         : Color.FromArgb(255, 235, 59);
-                    ColorPaletteForm hlDlg = new ColorPaletteForm(pt, curHl, false);
+
+                    // Click phần bên trái icon để áp dụng màu dạ quang hiện tại ngay lập tức giống Writer/Word
+                    if (x <= 585 && curHl != Color.Transparent && curHl != Color.Empty)
+                    {
+                        slidesView.SetSelectionHighlightColor(curHl.ToArgb(), true);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
+                    }
+
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(568, 120)) : new Point(568, 120);
+                    ColorPaletteForm hlDlg = new ColorPaletteForm(pt, true);
                     hlDlg.OnColorSelected += (c) =>
                     {
                         if (slidesView.SelectedShape != null)
                         {
-                            slidesView.SelectedShape.HasHighlight = true;
-                            slidesView.SelectedShape.HighlightColor = c.ToArgb();
+                            if (c == Color.Transparent || c == Color.Empty)
+                            {
+                                slidesView.SetSelectionHighlightColor(0, false);
+                            }
+                            else
+                            {
+                                slidesView.SetSelectionHighlightColor(c.ToArgb(), true);
+                            }
                         }
                         if (parentForm != null) parentForm.Invalidate();
                     };
@@ -25086,9 +25827,19 @@ namespace ZenQOffice.UI
                             }
                             else
                             {
-                                slidesView.SelectedShape.TextColor = c.ToArgb() & 0xFFFFFF;
+                                slidesView.SetSelectionTextColor(c.ToArgb() & 0xFFFFFF);
                             }
                         }
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnMoreColorsRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextColor, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextColor, 0, true);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
@@ -25381,11 +26132,22 @@ namespace ZenQOffice.UI
                                 }
                                 else
                                 {
+                                    slidesView.SelectedShape.HasGradientFill = false;
                                     slidesView.SelectedShape.FillColor = c.ToArgb() & 0xFFFFFF;
                                     slidesView.SelectedShape.FillOpacity = 1.0f;
                                 }
                             }
                         }
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnMoreColorsRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeFill, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeFill, 0, true);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
@@ -25413,6 +26175,16 @@ namespace ZenQOffice.UI
                                 if (slidesView.SelectedShape.StrokeWidth <= 0) slidesView.SelectedShape.StrokeWidth = 1.5f;
                             }
                         }
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnMoreColorsRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeStroke, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeStroke, 0, false);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
@@ -25681,7 +26453,13 @@ namespace ZenQOffice.UI
                     popup.Show();
                     return true;
                 }
-                else if (x >= 356 && x <= 412 && y >= 68 && y <= 124) // SmartArt
+                else if (x >= 356 && x <= 412 && y >= 68 && y <= 124) // Biểu tượng ▾ (Icons)
+                {
+                    slidesView.OpenGraphicsDrawer();
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                else if (x >= 416 && x <= 472 && y >= 68 && y <= 124) // SmartArt
                 {
                     using (SmartArtGalleryForm saDlg = new SmartArtGalleryForm())
                     {
@@ -25693,7 +26471,7 @@ namespace ZenQOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 416 && x <= 472 && y >= 68 && y <= 124) // Biểu đồ ▾
+                else if (x >= 476 && x <= 532 && y >= 68 && y <= 124) // Biểu đồ ▾
                 {
                     using (InsertChartForm chartDlg = new InsertChartForm())
                     {
@@ -25706,20 +26484,37 @@ namespace ZenQOffice.UI
                     return true;
                 }
                 // ==================== Group 5: Liên kết & Nhận xét (Links & Comments) ====================
-                else if (x >= 484 && x <= 540 && y >= 68 && y <= 124) // Liên kết ▾
+                else if (x >= 544 && x <= 600 && y >= 68 && y <= 124) // Liên kết ▾
                 {
-                    string curText = (slidesView.SelectedShape != null && !string.IsNullOrEmpty(slidesView.SelectedShape.Text)) ? slidesView.SelectedShape.Text : "";
-                    using (InsertHyperlinkForm lnkDlg = new InsertHyperlinkForm(curText))
+                    if (y <= 95)
                     {
-                        if (lnkDlg.ShowDialog(parentForm) == DialogResult.OK)
-                        {
-                            slidesView.InsertHyperlink(lnkDlg.TargetUrl, lnkDlg.DisplayText);
-                        }
+                        slidesView.OpenHyperlinkDialog(parentForm);
+                        if (parentForm != null) parentForm.Invalidate();
+                        return true;
                     }
-                    if (parentForm != null) parentForm.Invalidate();
+                    ContextMenuStrip lnkMenu = new ContextMenuStrip();
+                    lnkMenu.Font = new Font("Segoe UI", 9.5f);
+                    lnkMenu.Items.Add("🔗 Chèn Liên kết & Nhảy Slide (Insert Hyperlink - Ctrl+K)...", null, (s, ev) =>
+                    {
+                        slidesView.OpenHyperlinkDialog(parentForm);
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    lnkMenu.Items.Add("⚡ Cài đặt Hành động & Âm thanh (Action Settings)...", null, (s, ev) =>
+                    {
+                        slidesView.OpenActionSettingsDialog(parentForm);
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    lnkMenu.Items.Add(new ToolStripSeparator());
+                    lnkMenu.Items.Add("🎯 Chèn Trắc nghiệm Tương tác (Interactive Quiz Slide)", null, (s, ev) =>
+                    {
+                        slidesView.InsertInteractiveQuizTemplate();
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    Point ptLnk = parentForm != null ? parentForm.PointToScreen(new Point(544, 126)) : Cursor.Position;
+                    lnkMenu.Show(ptLnk);
                     return true;
                 }
-                else if (x >= 544 && x <= 602 && y >= 68 && y <= 124) // Thu phóng ▾ (Zoom)
+                else if (x >= 604 && x <= 662 && y >= 68 && y <= 124) // Thu phóng ▾ (Zoom)
                 {
                     ContextMenuStrip zoomMenu = new ContextMenuStrip();
                     zoomMenu.Items.Add("🔍 Thu phóng Trang chiếu (Slide Zoom)...", null, (s, ev) =>
@@ -25761,24 +26556,24 @@ namespace ZenQOffice.UI
                         slidesView.InsertSummaryZoom();
                         if (parentForm != null) parentForm.Invalidate();
                     });
-                    Point ptZoom = parentForm != null ? parentForm.PointToScreen(new Point(544, 126)) : new Point(544, 126);
+                    Point ptZoom = parentForm != null ? parentForm.PointToScreen(new Point(604, 126)) : new Point(604, 126);
                     zoomMenu.Show(ptZoom);
                     return true;
                 }
-                else if (x >= 606 && x <= 662 && y >= 68 && y <= 124) // Bình luận
+                else if (x >= 666 && x <= 722 && y >= 68 && y <= 124) // Bình luận
                 {
                     slidesView.InsertComment("Ghi chú: Cần hoàn thiện nội dung trang này.");
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
                 // ==================== Group 6: Văn bản (Text) ====================
-                else if (x >= 674 && x <= 726 && y >= 68 && y <= 124) // Hộp chữ
+                else if (x >= 734 && x <= 786 && y >= 68 && y <= 124) // Hộp chữ
                 {
                     slidesView.StartShapeDrawMode(ShapeType.TextBox);
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                else if (x >= 730 && x <= 788 && y >= 68 && y <= 124) // Đầu & Chân
+                else if (x >= 790 && x <= 848 && y >= 68 && y <= 124) // Đầu & Chân
                 {
                     slidesView.InsertHeaderFooter();
                     if (parentForm != null) parentForm.Invalidate();
@@ -26361,9 +27156,37 @@ namespace ZenQOffice.UI
                             if (parentForm != null) parentForm.Invalidate();
                         });
                         trigMenu.Items.Add("⏳ Bắt đầu sau trước đó (Start After Previous)", null, (s, e) => {
+                            slidesView.SetSelectedAnimationTriggerShape("");
                             slidesView.SetSelectedAnimationTrigger(AnimationTrigger.AfterPrevious);
                             if (parentForm != null) parentForm.Invalidate();
                         });
+                        if (slidesView.ActiveSlide != null && slidesView.ActiveSlide.Shapes.Count > 0)
+                        {
+                            trigMenu.Items.Add(new ToolStripSeparator());
+                            ToolStripMenuItem miOnShape = new ToolStripMenuItem("⚡ Kích hoạt khi nhấp vào (Trigger On Click of) ▸");
+                            ToolStripMenuItem miClearTrig = new ToolStripMenuItem("Không dùng Trigger riêng (Theo trình tự Slide)", null, (s, e) => {
+                                slidesView.SetSelectedAnimationTriggerShape("");
+                                if (parentForm != null) parentForm.Invalidate();
+                            }) { Checked = string.IsNullOrEmpty(slidesView.SelectedAnimation.TriggerShapeId) };
+                            miOnShape.DropDownItems.Add(miClearTrig);
+                            miOnShape.DropDownItems.Add(new ToolStripSeparator());
+
+                            for (int sIdx = 0; sIdx < slidesView.ActiveSlide.Shapes.Count; sIdx++)
+                            {
+                                ShapeNode cand = slidesView.ActiveSlide.Shapes[sIdx];
+                                if (cand == null) continue;
+                                string candId = cand.Id;
+                                string candTitle = !string.IsNullOrEmpty(cand.Text)
+                                    ? (cand.Text.Length > 28 ? cand.Text.Substring(0, 28) + "..." : cand.Text)
+                                    : (!string.IsNullOrEmpty(cand.Name) ? cand.Name : ("Hình " + (sIdx + 1) + " (" + cand.Type + ")"));
+                                ToolStripMenuItem miShapeItem = new ToolStripMenuItem("🎯 " + candTitle, null, (s, e) => {
+                                    slidesView.SetSelectedAnimationTriggerShape(candId);
+                                    if (parentForm != null) parentForm.Invalidate();
+                                }) { Checked = (slidesView.SelectedAnimation.TriggerShapeId == candId) };
+                                miOnShape.DropDownItems.Add(miShapeItem);
+                            }
+                            trigMenu.Items.Add(miOnShape);
+                        }
                         Point pt = parentForm != null ? parentForm.PointToScreen(new Point(ax + 54, 92)) : new Point(ax + 54, 92);
                         trigMenu.Show(pt);
                     }
@@ -27369,20 +28192,12 @@ namespace ZenQOffice.UI
                         artMenu.Show(pt);
                         return true;
                     }
-                    // 5. Trong suốt ▾ (Transparency ▾) (X: 160..270, Y: 120..144)
+                    // 5. Trong suốt (Canva Transparency Popover Slider) (X: 160..270, Y: 120..144)
                     else if (x >= 160 && x <= 270 && y >= 120 && y <= 144)
                     {
-                        ContextMenuStrip transMenu = new ContextMenuStrip();
-                        transMenu.RenderMode = ToolStripRenderMode.System;
-                        transMenu.Items.Add("0% Trong suốt (100% Đặc)", null, (s, e) => { shape.FillOpacity = 1.0f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("15% Trong suốt", null, (s, e) => { shape.FillOpacity = 0.85f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("30% Trong suốt", null, (s, e) => { shape.FillOpacity = 0.70f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("50% Bán trong suốt", null, (s, e) => { shape.FillOpacity = 0.50f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("65% Trong suốt", null, (s, e) => { shape.FillOpacity = 0.35f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("80% Rất mờ", null, (s, e) => { shape.FillOpacity = 0.20f; if (parentForm != null) parentForm.Invalidate(); });
-                        transMenu.Items.Add("95% Gần trong suốt", null, (s, e) => { shape.FillOpacity = 0.05f; if (parentForm != null) parentForm.Invalidate(); });
                         Point pt = parentForm != null ? parentForm.PointToScreen(new Point(160, 144)) : new Point(160, 144);
-                        transMenu.Show(pt);
+                        var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Transparency, shape, slidesView, parentForm);
+                        pop.Show(parentForm);
                         return true;
                     }
                     // 6. Nén ảnh (Compress Pictures) (X: 274..382, Y: 68..92)
@@ -27805,12 +28620,12 @@ namespace ZenQOffice.UI
                         }
                     };
 
-                    // 1. Chèn Hình vẽ (Insert Shapes)
-                    // Quick Shapes Row 1 (X: 12..156, Y: 68..93)
-                    if (x >= 12 && x <= 156 && y >= 68 && y <= 93)
+                    // 1. Chèn Hình vẽ & Đỉnh (Insert Shapes & Edit Points)
+                    // Quick Shapes Row 1 (X: 14..158, Y: 68..93)
+                    if (x >= 14 && x <= 158 && y >= 68 && y <= 93)
                     {
-                        int qIdx = (x - 12) / 24;
-                        ShapeType[] quick1 = new ShapeType[] { ShapeType.TextBox, ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Leaf, ShapeType.Flower };
+                        int qIdx = (x - 14) / 24;
+                        ShapeType[] quick1 = new ShapeType[] { ShapeType.TextBox, ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Triangle, ShapeType.Diamond };
                         if (qIdx >= 0 && qIdx < quick1.Length)
                         {
                             slidesView.StartShapeDrawMode(quick1[qIdx]);
@@ -27818,11 +28633,11 @@ namespace ZenQOffice.UI
                         if (parentForm != null) parentForm.Invalidate();
                         return true;
                     }
-                    // Quick Shapes Row 2 (X: 12..156, Y: 96..121)
-                    else if (x >= 12 && x <= 156 && y >= 96 && y <= 121)
+                    // Quick Shapes Row 2 (X: 14..158, Y: 94..121)
+                    else if (x >= 14 && x <= 158 && y >= 94 && y <= 121)
                     {
-                        int qIdx = (x - 12) / 24;
-                        ShapeType[] quick2 = new ShapeType[] { ShapeType.LuxuryHexagon, ShapeType.Gem, ShapeType.Shield, ShapeType.Banner, ShapeType.Heart, ShapeType.Star };
+                        int qIdx = (x - 14) / 24;
+                        ShapeType[] quick2 = new ShapeType[] { ShapeType.Pentagon, ShapeType.Hexagon, ShapeType.Octagon, ShapeType.Star, ShapeType.Heart, ShapeType.Banner };
                         if (qIdx >= 0 && qIdx < quick2.Length)
                         {
                             slidesView.StartShapeDrawMode(quick2[qIdx]);
@@ -27830,88 +28645,44 @@ namespace ZenQOffice.UI
                         if (parentForm != null) parentForm.Invalidate();
                         return true;
                     }
-                // Sửa hình dạng ▾ (Edit Shape ▾: Change Shape + Edit Points) (X: 160..248, Y: 68..93)
+                // Sửa điểm trực tiếp (Direct Edit Points) (X: 160..248, Y: 68..93)
                 else if (x >= 160 && x <= 248 && y >= 68 && y <= 93)
                 {
-                    ContextMenuStrip editShapeMenu = new ContextMenuStrip();
-                    editShapeMenu.RenderMode = ToolStripRenderMode.System;
-                    editShapeMenu.Font = new Font("Segoe UI", 9f);
-                    editShapeMenu.ShowImageMargin = true;
-
-                    // 1. Đổi hình dạng ▾ (Change Shape) Submenu
-                    ToolStripMenuItem changeShapeSub = new ToolStripMenuItem("Đổi hình dạng (Change Shape)");
-
-                    // 1.1 Cây Cỏ & Tự Nhiên
-                    ToolStripMenuItem natureMenu = new ToolStripMenuItem("🌿 Cây Cỏ & Tự Nhiên (Botanical)");
-                    ShapeType[] natureTypes = new ShapeType[] { ShapeType.Leaf, ShapeType.Clover, ShapeType.Flower, ShapeType.Sprout, ShapeType.Sun, ShapeType.Cloud, ShapeType.Moon };
-                    string[] natureNames = new string[] { "Chiếc lá tự nhiên (Leaf)", "Cỏ 4 lá may mắn (Clover)", "Bông hoa 6 cánh (Flower)", "Mầm cây non (Sprout)", "Mặt trời (Sun)", "Đám mây (Cloud)", "Mặt trăng (Moon)" };
-                    for (int i = 0; i < natureTypes.Length; i++)
+                    if (slidesView.IsEditingShapePoints && slidesView.EditingPointsShape == shape)
                     {
-                        ShapeType st = natureTypes[i];
-                        ToolStripMenuItem mi = new ToolStripMenuItem(natureNames[i], null, (s, e) => { applyToSelectedShapes(shp => shp.Type = st); if (parentForm != null) parentForm.Invalidate(); });
-                        if (shape.Type == st) mi.Checked = true;
-                        natureMenu.DropDownItems.Add(mi);
+                        slidesView.EndEditShapePoints();
                     }
-                    changeShapeSub.DropDownItems.Add(natureMenu);
-
-                    // 1.2 Hình Học Sang Trọng & Huy Hiệu
-                    ToolStripMenuItem luxuryMenu = new ToolStripMenuItem("💎 Hình Học Sang Trọng (Luxury)");
-                    ShapeType[] luxuryTypes = new ShapeType[] { ShapeType.LuxuryHexagon, ShapeType.Hexagon, ShapeType.Gem, ShapeType.Shield, ShapeType.Banner, ShapeType.Starburst, ShapeType.Arch, ShapeType.Octagon, ShapeType.Pentagon, ShapeType.Heart };
-                    string[] luxuryNames = new string[] { "Ô Lục giác sang trọng (Luxury Hexagon)", "Lục giác đều (Hexagon)", "Viên đá quý (Gem Diamond)", "Huy hiệu khiên hoàng gia (Shield)", "Dải ruy băng (Banner)", "Huy chương 12 cánh (Starburst)", "Cổng vòm (Arch)", "Bát giác (Octagon)", "Ngũ giác (Pentagon)", "Hình trái tim (Heart)" };
-                    for (int i = 0; i < luxuryTypes.Length; i++)
+                    else
                     {
-                        ShapeType st = luxuryTypes[i];
-                        ToolStripMenuItem mi = new ToolStripMenuItem(luxuryNames[i], null, (s, e) => { applyToSelectedShapes(shp => shp.Type = st); if (parentForm != null) parentForm.Invalidate(); });
-                        if (shape.Type == st) mi.Checked = true;
-                        luxuryMenu.DropDownItems.Add(mi);
+                        slidesView.StartEditShapePoints(shape);
                     }
-                    changeShapeSub.DropDownItems.Add(luxuryMenu);
+                    if (parentForm != null) parentForm.Invalidate();
+                    return true;
+                }
+                // Đổi hình ▾ (Change Shape menu) (X: 160..248, Y: 96..121)
+                else if (x >= 160 && x <= 248 && y >= 96 && y <= 121)
+                {
+                    ContextMenuStrip changeMenu = new ContextMenuStrip();
+                    changeMenu.RenderMode = ToolStripRenderMode.System;
+                    changeMenu.Font = new Font("Segoe UI", 9f);
 
-                    // 1.3 Hình Khối Cơ Bản
-                    ToolStripMenuItem basicMenu = new ToolStripMenuItem("🔷 Hình khối cơ bản");
-                    ShapeType[] basicTypes = new ShapeType[] { ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Triangle, ShapeType.RightTriangle, ShapeType.Diamond, ShapeType.Parallelogram, ShapeType.Trapezoid, ShapeType.Cross, ShapeType.Donut, ShapeType.Cube, ShapeType.Can, ShapeType.TextBox };
-                    string[] basicNames = new string[] { "Hình chữ nhật", "Hình chữ nhật bo tròn", "Hình tròn / Elip", "Hình tam giác", "Tam giác vuông", "Hình thoi", "Hình bình hành", "Hình thang", "Dấu chữ thập", "Vành khuyên Donut", "Khối lập phương 3D", "Hình trụ Can", "Hộp văn bản" };
+                    ShapeType[] basicTypes = new ShapeType[] { ShapeType.Rectangle, ShapeType.RoundedRectangle, ShapeType.Ellipse, ShapeType.Triangle, ShapeType.RightTriangle, ShapeType.Diamond, ShapeType.Pentagon, ShapeType.Hexagon, ShapeType.Octagon, ShapeType.Star, ShapeType.Heart, ShapeType.Banner, ShapeType.Chevron, ShapeType.BlockArrowRight, ShapeType.Callout };
+                    string[] basicNames = new string[] { "Hình chữ nhật", "Chữ nhật bo tròn", "Hình tròn / Elip", "Tam giác đều", "Tam giác vuông", "Hình thoi", "Ngũ giác", "Lục giác", "Bát giác", "Ngôi sao", "Trái tim", "Dải băng rôn", "Mũi tên Chevron", "Mũi tên khối", "Hộp thoại Callout" };
                     for (int i = 0; i < basicTypes.Length; i++)
                     {
                         ShapeType st = basicTypes[i];
-                        ToolStripMenuItem mi = new ToolStripMenuItem(basicNames[i], null, (s, e) => { applyToSelectedShapes(shp => shp.Type = st); if (parentForm != null) parentForm.Invalidate(); });
+                        ToolStripMenuItem mi = new ToolStripMenuItem(basicNames[i], null, (s, e) => { applyToSelectedShapes(shp => { shp.Type = st; shp.InvalidateDisplayCache(); }); if (parentForm != null) parentForm.Invalidate(); });
                         if (shape.Type == st) mi.Checked = true;
-                        basicMenu.DropDownItems.Add(mi);
+                        changeMenu.Items.Add(mi);
                     }
-                    changeShapeSub.DropDownItems.Add(basicMenu);
-
-                    // 1.4 Mũi Tên & Ký Hiệu
-                    ToolStripMenuItem arrowMenu = new ToolStripMenuItem("➡️ Mũi Tên & Ký Hiệu (Arrows & Symbols)");
-                    ShapeType[] arrowTypes = new ShapeType[] { ShapeType.Arrow, ShapeType.Chevron, ShapeType.BlockArrowRight, ShapeType.BlockArrowLeft, ShapeType.BlockArrowUp, ShapeType.BlockArrowDown, ShapeType.Lightning, ShapeType.Callout, ShapeType.Smiley };
-                    string[] arrowNames = new string[] { "Mũi tên phải", "Mũi tên Chevron", "Khối mũi tên phải", "Khối mũi tên trái", "Khối mũi tên lên", "Khối mũi tên xuống", "Tia chớp", "Hộp thoại Callout", "Mặt cười Smiley" };
-                    for (int i = 0; i < arrowTypes.Length; i++)
-                    {
-                        ShapeType st = arrowTypes[i];
-                        ToolStripMenuItem mi = new ToolStripMenuItem(arrowNames[i], null, (s, e) => { applyToSelectedShapes(shp => shp.Type = st); if (parentForm != null) parentForm.Invalidate(); });
-                        if (shape.Type == st) mi.Checked = true;
-                        arrowMenu.DropDownItems.Add(mi);
-                    }
-                    changeShapeSub.DropDownItems.Add(arrowMenu);
-
-                    editShapeMenu.Items.Add(changeShapeSub);
-
-                    // 2. Chỉnh sửa điểm (Edit Points) - PowerPoint style
-                    ToolStripMenuItem editPointsItem = new ToolStripMenuItem("Chỉnh sửa điểm (Edit Points)", SlidesView.CreateEditPointsIcon(), (s, e) => {
+                    changeMenu.Items.Add(new ToolStripSeparator());
+                    changeMenu.Items.Add("Chỉnh sửa điểm (Edit Points)", SlidesView.CreateEditPointsIcon(), (s, e) => {
                         slidesView.StartEditShapePoints(shape);
                         if (parentForm != null) parentForm.Invalidate();
                     });
-                    editPointsItem.Enabled = (shape != null && shape.Type != ShapeType.Image && shape.Type != ShapeType.Table && shape.Type != ShapeType.Chart && shape.Type != ShapeType.Video && shape.Type != ShapeType.Audio);
-                    editShapeMenu.Items.Add(editPointsItem);
 
-                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(160, 96)) : new Point(160, 96);
-                    editShapeMenu.Show(pt);
-                    return true;
-                }
-                // Hộp chữ (Insert Text Box) (X: 160..248, Y: 96..121)
-                else if (x >= 160 && x <= 248 && y >= 96 && y <= 121)
-                {
-                    slidesView.StartShapeDrawMode(ShapeType.TextBox);
-                    if (parentForm != null) parentForm.Invalidate();
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(160, 122)) : new Point(160, 122);
+                    changeMenu.Show(pt);
                     return true;
                 }
                 // Hợp nhất Hình dạng ▾ (Merge Shapes) (X: 249..350, Y: 68..122)
@@ -28011,92 +28782,62 @@ namespace ZenQOffice.UI
                             }
                             else
                             {
+                                shp.HasGradientFill = false;
                                 shp.FillColor = c.ToArgb() & 0xFFFFFF;
                                 shp.FillOpacity = 1.0f;
                             }
                         });
                         if (parentForm != null) parentForm.Invalidate();
                     };
-                    colDlg.Show();
-                    return true;
-                }
-                // Viền hình (Shape Outline) (X: 508..600, Y: 94..118)
-                else if (x >= 508 && x <= 600 && y >= 94 && y <= 118)
-                {
-                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(508, 120)) : new Point(508, 120);
-                    int sc = shape.StrokeColor;
-                    Color curC = Color.FromArgb((sc >> 16) & 0xFF, (sc >> 8) & 0xFF, sc & 0xFF);
-                    ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
-                    colDlg.OnColorSelected += (c) =>
+                    colDlg.OnMoreColorsRequested += () =>
                     {
-                        applyToSelectedShapes(shp =>
-                        {
-                            if (c == Color.Transparent)
-                            {
-                                shp.StrokeWidth = 0.0f;
-                            }
-                            else
-                            {
-                                shp.StrokeColor = c.ToArgb() & 0xFFFFFF;
-                                if (shp.StrokeWidth <= 0) shp.StrokeWidth = 1.5f;
-                            }
-                        });
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeFill, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.ShapeFill, 0, true);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
                     return true;
                 }
-                // Hiệu ứng hình (Shape Effects) (X: 508..600, Y: 120..144)
-                else if (x >= 508 && x <= 600 && y >= 120 && y <= 144)
+                // Viền hình (Canva Stroke Style & Weight Popover) (X: 504..600, Y: 94..118)
+                else if (x >= 504 && x <= 600 && y >= 94 && y <= 118)
                 {
-                    ContextMenuStrip fxMenu = new ContextMenuStrip();
-                    fxMenu.RenderMode = ToolStripRenderMode.System;
-                    fxMenu.Items.Add("Nét liền (Solid)", null, (s, e) => { applyToSelectedShapes(shp => shp.DashStyle = DashStyle.Solid); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add("Nét đứt (Dashed)", null, (s, e) => { applyToSelectedShapes(shp => shp.DashStyle = DashStyle.Dash); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add("Nét chấm (Dotted)", null, (s, e) => { applyToSelectedShapes(shp => shp.DashStyle = DashStyle.Dot); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add(new ToolStripSeparator());
-                    fxMenu.Items.Add("Độ dày nét 1.0 pt", null, (s, e) => { applyToSelectedShapes(shp => shp.StrokeWidth = 1.0f); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add("Độ dày nét 2.0 pt", null, (s, e) => { applyToSelectedShapes(shp => shp.StrokeWidth = 2.0f); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add("Độ dày nét 3.5 pt", null, (s, e) => { applyToSelectedShapes(shp => shp.StrokeWidth = 3.5f); if (parentForm != null) parentForm.Invalidate(); });
-                    fxMenu.Items.Add("Không có viền", null, (s, e) => { applyToSelectedShapes(shp => shp.StrokeWidth = 0f); if (parentForm != null) parentForm.Invalidate(); });
-                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(508, 144)) : new Point(508, 144);
-                    fxMenu.Show(pt);
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(504, 120)) : new Point(504, 120);
+                    var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Stroke, shape, slidesView, parentForm);
+                    pop.Show(parentForm);
                     return true;
                 }
-                // Nút Làm mờ / Độ trong suốt (Opacity) (X: 604..700, Y: 68..92)
-                else if (x >= 604 && x <= 700 && y >= 68 && y <= 92)
+                // Bo góc (Canva Corner Rounding & Sides Popover) (X: 504..600, Y: 120..144)
+                else if (x >= 504 && x <= 600 && y >= 120 && y <= 144)
                 {
-                    ContextMenuStrip opMenu = new ContextMenuStrip();
-                    opMenu.RenderMode = ToolStripRenderMode.System;
-                    opMenu.Items.Add("100% Đặc (Opaque)", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 1.0f); if (parentForm != null) parentForm.Invalidate(); });
-                    opMenu.Items.Add("80% Hơi mờ", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 0.8f); if (parentForm != null) parentForm.Invalidate(); });
-                    opMenu.Items.Add("60% Bán trong suốt", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 0.6f); if (parentForm != null) parentForm.Invalidate(); });
-                    opMenu.Items.Add("40% Mờ (Translucent)", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 0.4f); if (parentForm != null) parentForm.Invalidate(); });
-                    opMenu.Items.Add("20% Rất mờ", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 0.2f); if (parentForm != null) parentForm.Invalidate(); });
-                    opMenu.Items.Add("0% Trong suốt (Transparent)", null, (s, e) => { applyToSelectedShapes(shp => shp.FillOpacity = 0.0f); if (parentForm != null) parentForm.Invalidate(); });
-                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(604, 94)) : new Point(604, 94);
-                    opMenu.Show(pt);
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(504, 146)) : new Point(504, 146);
+                    var pop = new GraphicPopoverForm(pt, GraphicPopoverType.CornerRadius, shape, slidesView, parentForm);
+                    pop.Show(parentForm);
                     return true;
                 }
-                // Nút Mờ + (X: 604..650, Y: 94..118)
-                else if (x >= 604 && x <= 650 && y >= 94 && y <= 118)
+                // Độ mờ (Canva Transparency Popover Slider) (X: 602..702, Y: 68..92)
+                else if (x >= 602 && x <= 702 && y >= 68 && y <= 92)
                 {
-                    applyToSelectedShapes(shp => shp.FillOpacity = Math.Max(0.0f, (float)Math.Round(shp.FillOpacity - 0.15f, 2)));
-                    if (parentForm != null) parentForm.Invalidate();
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(602, 94)) : new Point(602, 94);
+                    var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Transparency, shape, slidesView, parentForm);
+                    pop.Show(parentForm);
                     return true;
                 }
-                // Nút Đặc - (X: 652..700, Y: 94..118)
-                else if (x >= 652 && x <= 700 && y >= 94 && y <= 118)
+                // Đổ bóng (Shadow Blur & Offset Popover Slider) (X: 602..702, Y: 94..118)
+                else if (x >= 602 && x <= 702 && y >= 94 && y <= 118)
                 {
-                    applyToSelectedShapes(shp => shp.FillOpacity = Math.Min(1.0f, (float)Math.Round(shp.FillOpacity + 0.15f, 2)));
-                    if (parentForm != null) parentForm.Invalidate();
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(602, 120)) : new Point(602, 120);
+                    var pop = new GraphicPopoverForm(pt, GraphicPopoverType.Shadow, shape, slidesView, parentForm);
+                    pop.Show(parentForm);
                     return true;
                 }
-                // Nút Lật gương nhanh (X: 604..700, Y: 120..144)
-                else if (x >= 604 && x <= 700 && y >= 120 && y <= 144)
+                // Hiệu ứng hình ▾ (Shape Effects Menu) (X: 602..702, Y: 120..144)
+                else if (x >= 602 && x <= 702 && y >= 120 && y <= 144)
                 {
-                    applyToSelectedShapes(shp => shp.Transform.FlipHorizontal = !shp.Transform.FlipHorizontal);
-                    if (parentForm != null) parentForm.Invalidate();
+                    ShowShapeEffectsMenu(slidesView, shape, parentForm, new Point(602, 144));
                     return true;
                 }
                 // 3. WordArt Presets 1..3 (X: 710..807, Y: 68..122)
@@ -28120,7 +28861,7 @@ namespace ZenQOffice.UI
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
                 }
-                // Màu chữ (Text Fill) (X: 808..906, Y: 68..92)
+                    // Màu chữ (Text Fill) (X: 808..906, Y: 68..92)
                 else if (x >= 808 && x <= 906 && y >= 68 && y <= 92)
                 {
                     Point pt = parentForm != null ? parentForm.PointToScreen(new Point(808, 94)) : new Point(808, 94);
@@ -28132,6 +28873,7 @@ namespace ZenQOffice.UI
                         int chosenCol = c.ToArgb() & 0xFFFFFF;
                         applyToSelectedShapes(shp =>
                         {
+                            shp.HasTextGradient = false;
                             shp.TextColor = chosenCol;
                             if (shp.TextRuns != null)
                             {
@@ -28141,6 +28883,16 @@ namespace ZenQOffice.UI
                                 }
                             }
                         });
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnMoreColorsRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextColor, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextColor, 0, true);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
@@ -28150,7 +28902,7 @@ namespace ZenQOffice.UI
                 else if (x >= 808 && x <= 906 && y >= 94 && y <= 118)
                 {
                     Point pt = parentForm != null ? parentForm.PointToScreen(new Point(808, 120)) : new Point(808, 120);
-                    int tc = shape.TextColor;
+                    int tc = shape.HasTextOutline ? shape.TextOutlineColor : shape.TextColor;
                     Color curC = Color.FromArgb((tc >> 16) & 0xFF, (tc >> 8) & 0xFF, tc & 0xFF);
                     ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
                     colDlg.OnColorSelected += (c) =>
@@ -28158,18 +28910,64 @@ namespace ZenQOffice.UI
                         int chosenCol = c.ToArgb() & 0xFFFFFF;
                         applyToSelectedShapes(shp =>
                         {
-                            shp.TextColor = chosenCol;
-                            if (shp.TextRuns != null)
+                            if (c == Color.Transparent || c == Color.Empty)
                             {
-                                foreach (var tr in shp.TextRuns)
-                                {
-                                    tr.TextColor = chosenCol;
-                                }
+                                shp.HasTextOutline = false;
                             }
+                            else
+                            {
+                                shp.HasTextOutline = true;
+                                shp.TextOutlineColor = chosenCol;
+                                if (shp.TextOutlineWidth <= 0f) shp.TextOutlineWidth = 1.5f;
+                            }
+                            shp.InvalidateDisplayCache();
                         });
+                        if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
+                        slidesView.Invalidate();
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnMoreColorsRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextStroke, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    };
+                    colDlg.OnGradientRequested += () =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextStroke, 0, true);
                         if (parentForm != null) parentForm.Invalidate();
                     };
                     colDlg.Show();
+                    return true;
+                }
+                // Hiệu ứng chữ (Text Effects) (X: 808..906, Y: 120..144)
+                else if (x >= 808 && x <= 906 && y >= 120 && y <= 144)
+                {
+                    ContextMenuStrip fxMenu = new ContextMenuStrip();
+                    fxMenu.RenderMode = ToolStripRenderMode.System;
+                    ToolStripMenuItem strokeItem = new ToolStripMenuItem("Độ dày viền chữ");
+                    strokeItem.DropDownItems.Add("0.5 pt", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = true; shp.TextOutlineWidth = 0.5f; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    strokeItem.DropDownItems.Add("1.0 pt", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = true; shp.TextOutlineWidth = 1.0f; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    strokeItem.DropDownItems.Add("1.5 pt (Chuẩn)", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = true; shp.TextOutlineWidth = 1.5f; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    strokeItem.DropDownItems.Add("2.0 pt", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = true; shp.TextOutlineWidth = 2.0f; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    strokeItem.DropDownItems.Add("3.0 pt", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = true; shp.TextOutlineWidth = 3.0f; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    strokeItem.DropDownItems.Add(new ToolStripSeparator());
+                    strokeItem.DropDownItems.Add("Không có viền", null, (s, e) => { applyToSelectedShapes(shp => { shp.HasTextOutline = false; shp.InvalidateDisplayCache(); }); if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true; slidesView.Invalidate(); if (parentForm != null) parentForm.Invalidate(); });
+                    fxMenu.Items.Add(strokeItem);
+                    fxMenu.Items.Add(new ToolStripSeparator());
+                    fxMenu.Items.Add(shape.HasTextShadow ? "Tắt bóng đổ chữ" : "Bật bóng đổ chữ (Shadow)", null, (s, e) =>
+                    {
+                        applyToSelectedShapes(shp => { shp.HasTextShadow = !shp.HasTextShadow; shp.InvalidateDisplayCache(); });
+                        if (slidesView.ActiveSlide != null) slidesView.ActiveSlide.IsThumbnailDirty = true;
+                        slidesView.Invalidate();
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    fxMenu.Items.Add("Bảng màu viền chữ...", null, (s, e) =>
+                    {
+                        slidesView.OpenColorPicker(ColorPickerTarget.TextStroke, 0, false);
+                        if (parentForm != null) parentForm.Invalidate();
+                    });
+                    Point pt = parentForm != null ? parentForm.PointToScreen(new Point(808, 144)) : new Point(808, 144);
+                    fxMenu.Show(pt);
                     return true;
                 }
                 // 4. Sắp xếp: Lên trước (Bring Forward) (X: 910..1004, Y: 68..92)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -160,7 +160,7 @@ namespace ZenQOffice.Setup
                 {
                     if (cap != null)
                     {
-                        cap.SetValue("ApplicationName", "ZenQ Office Suite");
+                        cap.SetValue("ApplicationName", "ZenQ Office");
                         cap.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office");
                         using (RegistryKey fa = cap.CreateSubKey("FileAssociations"))
                         {
@@ -209,7 +209,7 @@ namespace ZenQOffice.Setup
                         string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
 
                         key.SetValue("DisplayName", "ZENQ OFFICE");
-                        key.SetValue("DisplayVersion", "5.7");
+                        key.SetValue("DisplayVersion", "5.8");
                         key.SetValue("Publisher", "NEXTGENEDUSPACE STUDIO");
                         key.SetValue("DisplayIcon", File.Exists(icoPath) ? icoPath : exePath);
                         key.SetValue("InstallLocation", installDir);

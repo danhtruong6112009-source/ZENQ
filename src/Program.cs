@@ -252,7 +252,7 @@ namespace ZenQOffice
                                 Transform = new Transform2D(400, 260, 560, 320),
                                 FillColor = 0x2563EB,
                                 TextColor = 0xFFFFFF,
-                                Text = "ZenQ Office\nChuẩn PowerPoint 365\nCăn giữa & Cách lề an toàn",
+                                Text = "ZenQ Office\nChuẩn ZenQ Slides\nCăn giữa & Cách lề an toàn",
                                 FontSize = 24f,
                                 Alignment = TextAlignment.Center,
                                 VerticalAlignment = VerticalTextAlignment.Middle

@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -45,8 +46,14 @@ namespace ZenQOffice.UI
         private TextBox txtInput;
         private AiSlashCommandPopup _slashPopup;
 
+        // Interactive Canvas Panel (100% Direct2D / DirectX 11)
+        private AiCanvasControl _canvasControl;
+        private AiCanvasQuizData _lastCanvasQuiz;
+        public bool IsCanvasOpen => _canvasControl != null && _canvasControl.Visible;
+
         // Thinking animation
         private Control _thinkingBubble;
+        private ThinkingBubbleControl _currentThinkingControl;
 
         private Rectangle _sendBtnRect;
         private bool _isSendHover = false;
@@ -348,7 +355,12 @@ namespace ZenQOffice.UI
                 if (curText.StartsWith("/"))
                 {
                     int spaceIdx = curText.IndexOf(' ');
-                    string prefix = spaceIdx > 0 ? curText.Substring(0, spaceIdx) : curText;
+                    if (spaceIdx >= 0)
+                    {
+                        if (_slashPopup != null && _slashPopup.Visible) _slashPopup.Close();
+                        return;
+                    }
+                    string prefix = curText;
                     var matchingCmds = AiSlashCommandEngine.FilterCommands(prefix);
                     if (matchingCmds.Count > 0)
                     {
@@ -549,41 +561,118 @@ namespace ZenQOffice.UI
             PerformCustomLayout();
         }
 
+        public void OpenCanvas(AiCanvasQuizData quiz)
+        {
+            if (quiz == null || quiz.Questions == null || quiz.Questions.Count == 0)
+            {
+                if (_lastCanvasQuiz != null && _lastCanvasQuiz.Questions != null && _lastCanvasQuiz.Questions.Count > 0)
+                {
+                    quiz = _lastCanvasQuiz;
+                }
+                else
+                {
+                    return;
+                }
+            }
+            _lastCanvasQuiz = quiz;
+            if (_canvasControl == null)
+            {
+                _canvasControl = new AiCanvasControl();
+                _canvasControl.CloseRequested += () => CloseCanvas();
+                _canvasControl.ExportToWriterRequested += (q) => ExportQuizToWriter(q);
+                this.Controls.Add(_canvasControl);
+            }
+            _canvasControl.LoadQuiz(quiz);
+            _canvasControl.Visible = true;
+            _canvasControl.BringToFront();
+
+            if (_appForm != null)
+            {
+                _appForm.PositionAiSidebar();
+                _appForm.Invalidate();
+            }
+            PerformCustomLayout();
+            this.Invalidate();
+        }
+
+        public void CloseCanvas()
+        {
+            if (_canvasControl != null)
+            {
+                _canvasControl.Visible = false;
+            }
+            if (_appForm != null)
+            {
+                _appForm.PositionAiSidebar();
+                _appForm.Invalidate();
+            }
+            PerformCustomLayout();
+            this.Invalidate();
+        }
+
+        public void ExportQuizToWriter(AiCanvasQuizData quiz)
+        {
+            if (quiz == null || _appForm == null) return;
+            string docText = AiCanvasParser.FormatQuizForWriter(quiz);
+            if (_appForm.Ribbon.CurrentMode != OfficeAppMode.Writer)
+            {
+                _appForm.SwitchAppMode(OfficeAppMode.Writer);
+            }
+            if (_appForm.WriterView != null)
+            {
+                _appForm.WriterView.InsertTextFromAI(docText);
+                _appForm.WriterView.Invalidate();
+                _appForm.Invalidate();
+                MessageBox.Show(
+                    string.Format("Đã nhập thành công {0} câu hỏi và đáp án chi tiết sang tài liệu Writer!", quiz.Questions.Count),
+                    "Xuất Đề Thi - ZenQ Writer",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+
         private void PerformCustomLayout()
         {
             int w = this.ClientSize.Width;
             int h = this.ClientSize.Height;
             if (w <= 0 || h <= 0) return;
 
+            int chatW = IsCanvasOpen ? 380 : w;
             int headerH = 80;
             int inputH = 54;
             int feedH = Math.Max(50, h - headerH - inputH);
 
             if (pnlHeader != null)
             {
-                pnlHeader.Bounds = new Rectangle(0, 0, w, headerH);
+                pnlHeader.Bounds = new Rectangle(0, 0, chatW, headerH);
                 if (cboKey != null) cboKey.Bounds = new Rectangle(12, 44, 120, 26);
-                if (cboModel != null) cboModel.Bounds = new Rectangle(138, 44, Math.Max(80, w - 150), 26);
-                if (btnSettings != null) btnSettings.Location = new Point(w - 116, 8);
-                if (btnHistory != null) btnHistory.Location = new Point(w - 88, 8);
-                if (btnNewChat != null) btnNewChat.Location = new Point(w - 60, 8);
-                if (btnClose != null) btnClose.Location = new Point(w - 32, 8);
+                if (cboModel != null) cboModel.Bounds = new Rectangle(138, 44, Math.Max(80, chatW - 150), 26);
+                if (btnSettings != null) btnSettings.Location = new Point(chatW - 116, 8);
+                if (btnHistory != null) btnHistory.Location = new Point(chatW - 88, 8);
+                if (btnNewChat != null) btnNewChat.Location = new Point(chatW - 60, 8);
+                if (btnClose != null) btnClose.Location = new Point(chatW - 32, 8);
             }
 
             if (pnlChatFeed != null)
             {
-                pnlChatFeed.Bounds = new Rectangle(0, headerH, w, feedH);
+                pnlChatFeed.Bounds = new Rectangle(0, headerH, chatW, feedH);
             }
 
             if (pnlInputContainer != null)
             {
-                pnlInputContainer.Bounds = new Rectangle(0, headerH + feedH, w, inputH);
+                pnlInputContainer.Bounds = new Rectangle(0, headerH + feedH, chatW, inputH);
                 if (pnlInputPill != null)
                 {
-                    pnlInputPill.Bounds = new Rectangle(10, 7, w - 20, 38);
+                    pnlInputPill.Bounds = new Rectangle(10, 7, chatW - 20, 38);
                     _sendBtnRect = new Rectangle(pnlInputPill.Width - 33, 5, 28, 28);
                     if (txtInput != null) txtInput.Bounds = new Rectangle(12, 10, Math.Max(50, pnlInputPill.Width - 52), 20);
                 }
+            }
+
+            if (_canvasControl != null && _canvasControl.Visible)
+            {
+                int canvasW = Math.Max(200, w - chatW);
+                _canvasControl.Bounds = new Rectangle(chatW, 0, canvasW, h);
             }
         }
 
@@ -749,7 +838,8 @@ namespace ZenQOffice.UI
 
                 if (tab.AiChatHistory == null)
                 {
-                    tab.AiChatHistory = new List<AiChatMessage>();
+                    var savedHist = AiChatHistoryManager.LoadHistory();
+                    tab.AiChatHistory = (savedHist != null && savedHist.Count > 0) ? savedHist : new List<AiChatMessage>();
                 }
             }
 
@@ -771,7 +861,20 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
-                        AddAiBubble(msg.Content);
+                        AiCanvasQuizData quizData = null;
+                        if (!string.IsNullOrEmpty(msg.CanvasQuizJson))
+                        {
+                            if (AiCanvasParser.TryParse(msg.CanvasQuizJson, out var p1)) quizData = p1;
+                        }
+                        if (quizData == null && !string.IsNullOrEmpty(msg.Content))
+                        {
+                            if (AiCanvasParser.TryParse(msg.Content, out var p2)) quizData = p2;
+                        }
+                        if (quizData != null)
+                        {
+                            _lastCanvasQuiz = quizData;
+                        }
+                        AddAiBubble(msg.Content, quizData);
                     }
                 }
                 pnlChatFeed.ResumeVirtualLayout();
@@ -1065,15 +1168,22 @@ namespace ZenQOffice.UI
             clean = Regex.Replace(clean, @"\[[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_:]*\][\s\S]*", "", RegexOptions.IgnoreCase);
             clean = Regex.Replace(clean, @"\[/?[A-Za-z0-9_]*(?:ACTION|GENOFFICE)[A-Za-z0-9_]*\]", "", RegexOptions.IgnoreCase);
 
-            // Strip JSON blocks with spell corrections, calc data (complete and streaming-incomplete)
+            // Strip markdown code fences containing JSON or canvas
+            clean = Regex.Replace(clean, @"```(?:json:canvas|canvas|json)?[\s\S]*?```", "", RegexOptions.IgnoreCase);
+            clean = Regex.Replace(clean, @"```(?:json:canvas|canvas|json)?[\s\S]*", "", RegexOptions.IgnoreCase);
+
+            // Strip :canvas blocks (whether enclosed or raw)
+            clean = Regex.Replace(clean, @":?canvas\s*\{[\s\S]*?\}", "", RegexOptions.IgnoreCase);
+            clean = Regex.Replace(clean, @":?canvas\s*\{[\s\S]*", "", RegexOptions.IgnoreCase);
+            clean = Regex.Replace(clean, @"^:?canvas\s*$", "", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+            // Strip JSON blocks containing quiz, corrections, calc data
+            clean = Regex.Replace(clean, @"\{[\s\r\n]*""(?:title|totalQuestions|questions|options)""[\s\S]*?\}", "", RegexOptions.IgnoreCase);
+            clean = Regex.Replace(clean, @"\{[\s\r\n]*""(?:title|totalQuestions|questions|options)""[\s\S]*", "", RegexOptions.IgnoreCase);
             clean = Regex.Replace(clean, @"\{[\s\S]*?""corrections""[\s\S]*?\}", "", RegexOptions.IgnoreCase);
             clean = Regex.Replace(clean, @"\{[\s\S]*?""corrections""[\s\S]*", "", RegexOptions.IgnoreCase);
             clean = Regex.Replace(clean, @"\{[\s\S]*?""original""[\s\S]*?""replacement""[\s\S]*?\}", "", RegexOptions.IgnoreCase);
             clean = Regex.Replace(clean, @"\{[\s\S]*?""original""[\s\S]*", "", RegexOptions.IgnoreCase);
-
-            // Strip markdown code fences containing JSON
-            clean = Regex.Replace(clean, @"```(?:json)?\s*\{[\s\S]*?\}\s*```", "", RegexOptions.IgnoreCase);
-            clean = Regex.Replace(clean, @"```(?:json)?\s*\{[\s\S]*", "", RegexOptions.IgnoreCase);
 
             // Strip raw JSON canvas structure if AI printed it directly
             clean = Regex.Replace(clean, @"\{[\s\r\n]*""(?:theme|style|background|elements|type)""[\s\S]*\}", "", RegexOptions.IgnoreCase);
@@ -1204,11 +1314,30 @@ namespace ZenQOffice.UI
                     }
                 };
                 
-                var detectedCorrs = AiActionEngine.ExtractSpellCorrections(textToInsert);
-                if (_appForm != null && _appForm.WriterView != null && _appForm.WriterView.PieceTable != null && detectedCorrs != null && detectedCorrs.Count > 0)
+                // ONLY detect corrections if user explicitly asked for proofreading/spellcheck or AI generated explicit diff/action tags
+                bool isSpellCheckRequested = !string.IsNullOrEmpty(_lastUserQuery) &&
+                    (_lastUserQuery.StartsWith("/check", StringComparison.OrdinalIgnoreCase) ||
+                     _lastUserQuery.StartsWith("/fix", StringComparison.OrdinalIgnoreCase) ||
+                     _lastUserQuery.IndexOf("chính tả", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     _lastUserQuery.IndexOf("sửa lỗi", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     _lastUserQuery.IndexOf("bắt lỗi", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     _lastUserQuery.IndexOf("proofread", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     _lastUserQuery.IndexOf("spell check", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                bool hasExplicitCorrectionTag = textToInsert.Contains("<replace") ||
+                                                textToInsert.Contains("<diff") ||
+                                                textToInsert.Contains("[GENOFFICE_ACTION:APPLY_SPELL_CORRECTIONS]") ||
+                                                textToInsert.Contains("\"corrections\"");
+
+                List<SpellCorrectionItem> detectedCorrs = null;
+                if (isSpellCheckRequested || hasExplicitCorrectionTag)
                 {
-                    string docTxt = _appForm.WriterView.PieceTable.GetText();
-                    detectedCorrs = detectedCorrs.FindAll(c => !string.IsNullOrEmpty(c.Original) && docTxt.IndexOf(c.Original, StringComparison.OrdinalIgnoreCase) >= 0);
+                    detectedCorrs = AiActionEngine.ExtractSpellCorrections(textToInsert);
+                    if (_appForm != null && _appForm.WriterView != null && _appForm.WriterView.PieceTable != null && detectedCorrs != null && detectedCorrs.Count > 0)
+                    {
+                        string docTxt = _appForm.WriterView.PieceTable.GetText();
+                        detectedCorrs = detectedCorrs.FindAll(c => !string.IsNullOrEmpty(c.Original) && docTxt.IndexOf(c.Original, StringComparison.OrdinalIgnoreCase) >= 0);
+                    }
                 }
 
                 if (detectedCorrs != null && detectedCorrs.Count > 0 && _appForm != null && _appForm.WriterView != null)
@@ -1298,10 +1427,13 @@ namespace ZenQOffice.UI
         private bool _isAiStreaming = false;
         private bool _abortAiStream = false;
 
+        private string _lastUserQuery = "";
+
         private void SendMessageFromInput()
         {
             string query = txtInput.Text != null ? txtInput.Text.Trim() : "";
             if (string.IsNullOrEmpty(query) || query == _placeholderText) return;
+            _lastUserQuery = query;
             _isPlaceholderActive = false;
 
             _config = AiConfig.Load();
@@ -1414,10 +1546,11 @@ namespace ZenQOffice.UI
                 _currentProfile.SelectedModel = _currentProfile.SavedModels[0];
             }
 
-            // Hiện animation "Đang suy nghĩ..."
-            ShowThinkingBubble();
-
-            string promptToSend = BuildPromptWithDocumentContext(isSlash ? slashPrompt : query);
+            // Khởi tạo hoạt họa tìm kiếm / suy nghĩ phong cách Google Gemini
+            bool needWebSearch = AiWebSearchService.ShouldSearchWeb(query);
+            string searchKw = needWebSearch ? AiWebSearchService.ExtractSearchQuery(query) : "";
+            string initStatus = needWebSearch ? ("🔍 Đang tra cứu internet: " + searchKw + "...") : "✦ Đang suy nghĩ...";
+            ShowThinkingBubble(initStatus, needWebSearch);
 
             ActiveAiGeneration gen = new ActiveAiGeneration
             {
@@ -1447,7 +1580,6 @@ namespace ZenQOffice.UI
                     _pendingStreamChunk = "";
                 }
 
-                // Chá»‰ cáº­p nháº­t UI náº¿u Tab hiá»‡n táº¡i trÃ¹ng vá»›i Tab Ä‘ang táº¡o cÃ¢u tráº£ lá» i vÃ  panel Ä‘ang hiá»ƒn thá»‹
                 if (_currentTab == targetTab && _currentSessionId == targetSessionId && this.Visible && !this.IsDisposed)
                 {
                     if (gen.IsFirstChunk)
@@ -1464,7 +1596,40 @@ namespace ZenQOffice.UI
             };
             streamUiTimer.Start();
 
-            AiService.SendPromptStreamAsync(_config, promptToSend, (chunk) =>
+            Task.Run(async () =>
+            {
+                string basePrompt = isSlash ? slashPrompt : query;
+                string promptToSend = basePrompt;
+
+                if (needWebSearch && !string.IsNullOrWhiteSpace(searchKw))
+                {
+                    try
+                    {
+                        var webResults = await AiWebSearchService.SearchAsync(searchKw).ConfigureAwait(false);
+                        if (webResults != null && webResults.Count > 0)
+                        {
+                            string webContext = AiWebSearchService.FormatResultsForPrompt(searchKw, webResults);
+                            promptToSend = basePrompt + "\n\n" + webContext;
+                        }
+                    }
+                    catch { }
+
+                    if (this.IsHandleCreated && !this.IsDisposed)
+                    {
+                        try
+                        {
+                            this.BeginInvoke(new Action(() =>
+                            {
+                                UpdateThinkingBubbleStatus("✦ Đang phân tích ngữ liệu & khởi tạo Canvas...", false);
+                            }));
+                        }
+                        catch { }
+                    }
+                }
+
+                promptToSend = BuildPromptWithDocumentContext(promptToSend);
+
+                AiService.SendPromptStreamAsync(_config, promptToSend, (chunk) =>
             {
                 gen.FullResponseBuilder.Append(chunk);
                 lock (_streamLock)
@@ -1475,6 +1640,13 @@ namespace ZenQOffice.UI
             {
                 gen.IsCompleted = true;
                 string fullRaw = gen.FullResponseBuilder.Length > 0 ? gen.FullResponseBuilder.ToString() : (response.Text ?? "");
+
+                // Kiểm tra và bóc tách dữ liệu Canvas nếu có
+                AiCanvasQuizData detectedQuiz = null;
+                if (AiCanvasParser.TryParse(fullRaw, out detectedQuiz))
+                {
+                    _lastCanvasQuiz = detectedQuiz;
+                }
 
                 // Xử lý hành động AI tự động
                 AiActionResult actionResult = null;
@@ -1511,7 +1683,8 @@ namespace ZenQOffice.UI
                 }
 
                 // Báº¢O Ä áº¢M LÆ¯U Bá»€N Vá»®NG VÃ€O TAB & Lá»ŠCH Sá»¬ Ká»‚ Cáº¢ KHI PANEL Ä Ãƒ Ä Ã“NG HOáº¶C Ä Ãƒ CHUYá»‚N TAB
-                var modelMsg = new AiChatMessage { Role = "model", Content = finalSummaryMsg, Timestamp = DateTime.Now };
+                string quizJson = detectedQuiz != null ? detectedQuiz.ToJson() : null;
+                var modelMsg = new AiChatMessage { Role = "model", Content = finalSummaryMsg, CanvasQuizJson = quizJson, Timestamp = DateTime.Now };
                 if (targetTab != null)
                 {
                     if (targetTab.AiChatHistory == null) targetTab.AiChatHistory = new List<AiChatMessage>();
@@ -1549,10 +1722,15 @@ namespace ZenQOffice.UI
 
                                 if (this.Visible)
                                 {
+                                    if (detectedQuiz != null)
+                                    {
+                                        OpenCanvas(detectedQuiz);
+                                    }
+
                                     if (gen.IsFirstChunk)
                                     {
                                         HideThinkingBubble();
-                                        AddAiBubble(finalSummaryMsg);
+                                        AddAiBubble(finalSummaryMsg, detectedQuiz);
                                     }
                                     else
                                     {
@@ -1560,7 +1738,25 @@ namespace ZenQOffice.UI
                                         {
                                             _streamingAiLabel.Text = finalSummaryMsg;
                                         }
-                                        FinishAiStreamingBubble();
+                                        if (detectedQuiz != null)
+                                        {
+                                            if (_streamingAiRow != null)
+                                            {
+                                                pnlChatFeed.RemoveVirtualControl(_streamingAiRow);
+                                                _streamingAiRow = null;
+                                                _streamingAiBubble = null;
+                                                _streamingAiLabel = null;
+                                            }
+                                            AddAiBubble(finalSummaryMsg, detectedQuiz);
+                                        }
+                                        else
+                                        {
+                                            if (_streamingAiLabel != null)
+                                            {
+                                                _streamingAiLabel.Text = finalSummaryMsg;
+                                            }
+                                            FinishAiStreamingBubble();
+                                        }
                                     }
                                     ScrollToBottomForce();
                                 }
@@ -1588,6 +1784,7 @@ namespace ZenQOffice.UI
                     }
                 }
             }, targetTab != null ? targetTab.AiChatHistory : null, () => (gen.AbortRequested || _abortAiStream));
+            });
         }
 
         private bool IsUserAgreement(string q)
@@ -1639,20 +1836,21 @@ namespace ZenQOffice.UI
         /// <summary>
         /// Hiện animation "AI đang suy nghĩ..." chuẩn Breathing Light 100% KHÔNG giật/flicker.
         /// </summary>
-        private void ShowThinkingBubble()
+        private void ShowThinkingBubble(string statusText = "Đang suy nghĩ...", bool isSearch = false)
         {
             HideThinkingBubble();
 
             int feedW = pnlChatFeed.ClientSize.Width - 46;
             if (feedW <= 100) feedW = 320;
 
-            ThinkingBubbleControl bubble = new ThinkingBubbleControl();
+            ThinkingBubbleControl bubble = new ThinkingBubbleControl(statusText, isSearch);
             bubble.Location = new Point(2, 0);
+            _currentThinkingControl = bubble;
 
             Panel row = new Panel
             {
                 Width = feedW,
-                Height = 32,
+                Height = 38,
                 BackColor = Color.Transparent,
                 Margin = new Padding(2, 3, 2, 5)
             };
@@ -1661,6 +1859,15 @@ namespace ZenQOffice.UI
             _thinkingBubble = row;
             pnlChatFeed.AddVirtualControl(row);
             ScrollToBottomForce();
+        }
+
+        private void UpdateThinkingBubbleStatus(string statusText, bool isSearch = false)
+        {
+            if (_currentThinkingControl != null && !_currentThinkingControl.IsDisposed)
+            {
+                _currentThinkingControl.SetStatus(statusText, isSearch);
+                ScrollToBottomIfNear();
+            }
         }
 
         private void HideThinkingBubble()
@@ -1694,7 +1901,7 @@ namespace ZenQOffice.UI
         /// <summary>
         /// Tin nháº¯n AI â€” cÄƒn bÃªn TRÃ I, ná» n tráº¯ng viá» n xÃ¡m, kÃ¨m nÃºt hÃ nh Ä‘á»™ng chÃ¨n vÃ  ðŸ“‹ Sao chÃ©p.
         /// </summary>
-        private void AddAiBubble(string text)
+        private void AddAiBubble(string text, AiCanvasQuizData canvasQuiz = null)
         {
             int feedW = pnlChatFeed.ClientSize.Width - 46;
             if (feedW <= 100) feedW = 320;
@@ -1754,7 +1961,13 @@ namespace ZenQOffice.UI
                 {
                     MessageBox.Show(ex.ToString(), "ZENQ AI - Lỗi Chèn Text");
                 }
-            }, _appForm);
+            }, _appForm, canvasQuiz, () => {
+                var targetQuiz = canvasQuiz ?? _lastCanvasQuiz;
+                if (targetQuiz != null) OpenCanvas(targetQuiz);
+            }, (quiz) => {
+                var targetQuiz = quiz ?? _lastCanvasQuiz;
+                if (targetQuiz != null) ExportQuizToWriter(targetQuiz);
+            });
 
             pnlChatFeed.AddVirtualControl(bubble);
             ScrollToBottomForce();
@@ -1959,10 +2172,10 @@ namespace ZenQOffice.UI
             }
             else if (mode == OfficeAppMode.Writer && _appForm != null && _appForm.WriterView != null)
             {
-                string docText = _appForm.WriterView.PieceTable != null ? _appForm.WriterView.PieceTable.GetText() : "";
+                string docText = AiSlashCommandEngine.ExtractWriterTextWithFormatting(_appForm.WriterView, 45000);
                 string selText = _appForm.WriterView.GetSelectedText();
 
-                if (docText.Length > 35000) docText = docText.Substring(0, 35000) + "... [Đã rút gọn vì quá dài]";
+                if (docText.Length > 45000) docText = docText.Substring(0, 45000) + "... [Đã rút gọn vì quá dài]";
                 if (!string.IsNullOrWhiteSpace(docText))
                 {
                     sb.AppendLine("<document_context>");
@@ -2642,23 +2855,43 @@ namespace ZenQOffice.UI
     {
         private float _phase = 0f;
         private System.Windows.Forms.Timer _timer;
+        private string _statusText = "Đang suy nghĩ...";
+        private bool _isSearch = false;
 
-        public ThinkingBubbleControl()
+        public ThinkingBubbleControl(string initialStatus = "Đang suy nghĩ...", bool isSearch = false)
         {
+            _statusText = initialStatus ?? "Đang suy nghĩ...";
+            _isSearch = isSearch;
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
             this.BackColor = Color.Transparent;
-            this.Size = new Size(135, 32);
+            this.Font = new Font("Segoe UI", 9.2f, FontStyle.Regular);
+            UpdateBubbleWidth();
 
             _timer = new System.Windows.Forms.Timer();
-            _timer.Interval = 35; // ~30 FPS smooth breathing
+            _timer.Interval = 30; // ~33 FPS smooth wave
             _timer.Tick += (s, e) =>
             {
-                _phase += 0.08f;
+                _phase += 0.12f;
                 if (_phase > 62.83f) _phase = 0f;
                 this.Invalidate();
             };
             _timer.Start();
+        }
+
+        public void SetStatus(string statusText, bool isSearch = false)
+        {
+            _statusText = statusText ?? "Đang suy nghĩ...";
+            _isSearch = isSearch;
+            UpdateBubbleWidth();
+            this.Invalidate();
+        }
+
+        private void UpdateBubbleWidth()
+        {
+            int textW = TextRenderer.MeasureText(_statusText, this.Font).Width;
+            int totalW = Math.Max(140, 36 + textW + 36);
+            this.Size = new Size(totalW, 34);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -2668,33 +2901,57 @@ namespace ZenQOffice.UI
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            // 1. Khung bubble trắng viền xám mượt mà
+            // 1. Nền bubble bo tròn mềm mại phong cách Google Gemini
             Rectangle r = new Rectangle(0, 0, this.Width - 1, this.Height - 1);
-            using (GraphicsPath gp = RoundRect(r, 14))
+            using (GraphicsPath gp = RoundRect(r, 16))
             {
                 using (SolidBrush sb = new SolidBrush(Color.White))
                 {
                     g.FillPath(sb, gp);
                 }
-                using (Pen p = new Pen(Color.FromArgb(226, 232, 240), 1.2f))
+                Color borderColor = _isSearch ? Color.FromArgb(191, 219, 254) : Color.FromArgb(226, 232, 240);
+                using (Pen p = new Pen(borderColor, 1.2f))
                 {
                     g.DrawPath(p, gp);
                 }
             }
 
-            // 2. Hiệu ứng thở ánh sáng Breathing Glow cho Icon Sparkle ✦ và Text
-            float wave = (float)(Math.Sin(_phase) * 0.5 + 0.5); // 0.0 -> 1.0
-            int iconAlpha = (int)(130 + wave * 125); // 130 -> 255
-            int textAlpha = (int)(110 + wave * 125);
-
-            // Icon Sparkle ✦ bên trái (Fluent Icon Windows 11)
-            FluentIconRenderer.DrawGlyph(g, "/sparkle", new RectangleF(8, 8, 16, 16), Color.FromArgb(iconAlpha, 79, 70, 229), 13f);
-
-            // Text "Đang suy nghĩ..."
-            using (Font font = new Font("Segoe UI", 9f, FontStyle.Italic))
-            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(textAlpha, 71, 85, 105)))
+            // 2. Icon bên trái: Google Gemini Sparkle hoặc Search Icon
+            float wave = (float)(Math.Sin(_phase) * 0.5 + 0.5);
+            if (_isSearch)
             {
-                g.DrawString("Đang suy nghĩ...", font, textBrush, 29, 7);
+                int sAlpha = (int)(180 + wave * 75);
+                FluentIconRenderer.DrawGlyph(g, "/search", new RectangleF(10, 9, 16, 16), Color.FromArgb(sAlpha, 37, 99, 235), 12f);
+            }
+            else
+            {
+                // Gradient Gemini màu Xanh biển - Tím
+                int gR = (int)(66 + (147 - 66) * wave);
+                int gG = (int)(133 + (51 - 133) * wave);
+                int gB = (int)(244 + (234 - 244) * wave);
+                Color geminiColor = Color.FromArgb(Math.Min(255, Math.Max(0, gR)), Math.Min(255, Math.Max(0, gG)), Math.Min(255, Math.Max(0, gB)));
+                FluentIconRenderer.DrawGlyph(g, "/sparkle", new RectangleF(10, 9, 16, 16), geminiColor, 13f);
+            }
+
+            // 3. Văn bản trạng thái
+            int textX = 32;
+            using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
+            {
+                g.DrawString(_statusText, this.Font, textBrush, textX, 7);
+            }
+
+            // 4. Ba chấm nảy sóng sinh động (Jumping Dots Animation)
+            int dotsStartX = textX + TextRenderer.MeasureText(_statusText, this.Font).Width + 6;
+            for (int i = 0; i < 3; i++)
+            {
+                float dotWave = (float)Math.Sin(_phase * 1.5f - i * 0.8f);
+                float dotY = 17f - Math.Max(0f, dotWave * 3.5f);
+                int dotAlpha = (int)(120 + Math.Max(0f, dotWave) * 135);
+                Color dotColor = _isSearch ? Color.FromArgb(dotAlpha, 37, 99, 235) : Color.FromArgb(dotAlpha, 124, 58, 237);
+                using (SolidBrush dotBrush = new SolidBrush(dotColor))
+                {
+                    g.FillEllipse(dotBrush, dotsStartX + i * 7, dotY, 4.5f, 4.5f);
+                }
             }
         }
 
@@ -2722,17 +2979,14 @@ namespace ZenQOffice.UI
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) Stop();
+            if (disposing)
+            {
+                Stop();
+            }
             base.Dispose(disposing);
         }
     }
 
-    /// <summary>
-    /// FlowLayoutPanel kÃ©p vá»›i tÃ­nh nÄƒng ngÄƒn cháº·n WinForms tá»± Ä‘á»™ng giáº­t/kÃ©o thanh cuá»™n vá»  control con khi render.
-    /// </summary>
-        /// <summary>
-    /// FlowLayoutPanel kép với tính năng ngăn chặn WinForms tự động giật/kéo thanh cuộn về control con khi render.
-    /// </summary>
     public class VirtualChatFeedPanel : FlowLayoutPanel
     {
         [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -3044,11 +3298,22 @@ namespace ZenQOffice.UI
         private string _actionText;
         private OfficeAppMode _mode;
 
-        public AiChatBubbleControl(string text, int feedW, OfficeAppMode mode, Action<string> onInsert, AppForm appForm = null)
+        private AiCanvasQuizData _canvasQuiz;
+        private Action _onOpenCanvasAction;
+        private Action<AiCanvasQuizData> _onExportWriterAction;
+        private Rectangle _btnWriterQuizRect = Rectangle.Empty;
+        private Rectangle _btnOpenCanvasRect = Rectangle.Empty;
+        private bool _isWriterHover = false;
+        private bool _isOpenCanvasHover = false;
+
+        public AiChatBubbleControl(string text, int feedW, OfficeAppMode mode, Action<string> onInsert, AppForm appForm = null, AiCanvasQuizData canvasQuiz = null, Action onOpenCanvas = null, Action<AiCanvasQuizData> onExportWriter = null)
         {
             _text = text ?? "";
             _mode = mode;
             _onInsertAction = onInsert;
+            _canvasQuiz = canvasQuiz;
+            _onOpenCanvasAction = onOpenCanvas;
+            _onExportWriterAction = onExportWriter;
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             this.BackColor = Color.FromArgb(248, 250, 252);
@@ -3062,11 +3327,40 @@ namespace ZenQOffice.UI
             _bubbleW = Math.Max(46, Math.Min(maxBubbleW, txtSize.Width + padX * 2));
             _bubbleH = Math.Max(32, txtSize.Height + padY * 2);
 
-            _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((mode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản")));
-            _actionBtnRect = new Rectangle(8, _bubbleH + 6, 140, 22);
-            _copyBtnRect = new Rectangle(8 + 140 + 6, _bubbleH + 6, 80, 22);
+            if (_canvasQuiz != null)
+            {
 
-            this.Size = new Size(feedW, _bubbleH + 34);
+
+                if (feedW >= 390)
+                {
+                    _btnWriterQuizRect = new Rectangle(8, _bubbleH + 6, 175, 24);
+                    _btnOpenCanvasRect = new Rectangle(8 + 175 + 6, _bubbleH + 6, 95, 24);
+                    _copyBtnRect = new Rectangle(8 + 175 + 6 + 95 + 6, _bubbleH + 6, 85, 24);
+                    this.Size = new Size(feedW, _bubbleH + 36);
+    
+                }
+                else
+                {
+                    int wBtnW = Math.Max(120, Math.Min(175, feedW - 115));
+                    _btnWriterQuizRect = new Rectangle(8, _bubbleH + 6, wBtnW, 24);
+                    _btnOpenCanvasRect = new Rectangle(8 + wBtnW + 6, _bubbleH + 6, 95, 24);
+                    _copyBtnRect = new Rectangle(8, _bubbleH + 34, 85, 22);
+                    this.Size = new Size(feedW, _bubbleH + 62);
+                }
+                _bubbleW = Math.Max(_bubbleW, Math.Min(feedW - 16, Math.Max(_btnOpenCanvasRect.Right + 8, 300)));
+
+
+
+
+            }
+            else
+            {
+                _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((mode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản")));
+                _actionBtnRect = new Rectangle(8, _bubbleH + 6, 140, 22);
+                _copyBtnRect = new Rectangle(8 + 140 + 6, _bubbleH + 6, 80, 22);
+
+                this.Size = new Size(feedW, _bubbleH + 34);
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -3095,26 +3389,55 @@ namespace ZenQOffice.UI
             }
 
             // Chữ bên trong
-            Rectangle txtR = new Rectangle(4 + 14, 2 + 9, _bubbleW - 28, _bubbleH - 18);
+            int textH = _bubbleH - 18;
+            Rectangle txtR = new Rectangle(4 + 14, 2 + 9, _bubbleW - 28, Math.Max(16, textH));
             TextRenderer.DrawText(g, _text, this.Font, txtR, Color.FromArgb(15, 23, 42), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
 
-            // Nút Chèn
-            if (_isActionHover)
+            if (_canvasQuiz != null)
             {
-                using (GraphicsPath abp = RoundRect(_actionBtnRect, 6f))
+                // Nút "📄 Tạo file câu hỏi sang Writer"
+                Color wBtnBg = _isWriterHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(79, 70, 229);
+                using (GraphicsPath wPath = RoundRect(_btnWriterQuizRect, 6f))
+                using (SolidBrush wBg = new SolidBrush(wBtnBg))
+                using (Font bFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
-                    using (SolidBrush abb = new SolidBrush(Color.FromArgb(241, 245, 249)))
-                    {
-                        g.FillPath(abb, abp);
-                    }
+                    g.FillPath(wBg, wPath);
+                    TextRenderer.DrawText(g, "📄 Tạo file sang Writer", bFont, _btnWriterQuizRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                }
+
+                // Nút "🎨 Mở Canvas"
+                Color cBtnBg = _isOpenCanvasHover ? Color.FromArgb(224, 231, 255) : Color.FromArgb(238, 242, 255);
+                using (GraphicsPath cPath = RoundRect(_btnOpenCanvasRect, 6f))
+                using (SolidBrush cBg = new SolidBrush(cBtnBg))
+                using (Pen cPen = new Pen(Color.FromArgb(199, 210, 254), 1f))
+                using (Font bFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
+                {
+                    g.FillPath(cBg, cPath);
+                    g.DrawPath(cPen, cPath);
+                    TextRenderer.DrawText(g, "🎨 Mở Canvas", bFont, _btnOpenCanvasRect, Color.FromArgb(67, 56, 202), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
             }
-            char actGlyph = (_mode == OfficeAppMode.Slides) ? '\uE714' : ((_mode == OfficeAppMode.Calc) ? '\uE80A' : ((_mode == OfficeAppMode.Pdf) ? '\uE8C8' : '\uE70F'));
-            FluentIconRenderer.DrawGlyph(g, actGlyph, new RectangleF(_actionBtnRect.X + 4, _actionBtnRect.Y + 4, 14, 14), _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), 11f);
-            using (Font abf = new Font("Segoe UI", 8.2f))
+
+            // Nút Chèn (chỉ hiện khi không phải Canvas Quiz)
+            if (_canvasQuiz == null)
             {
-                Rectangle tr = new Rectangle(_actionBtnRect.X + 20, _actionBtnRect.Y, _actionBtnRect.Width - 20, _actionBtnRect.Height);
-                TextRenderer.DrawText(g, _actionText, abf, tr, _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                if (_isActionHover)
+                {
+                    using (GraphicsPath abp = RoundRect(_actionBtnRect, 6f))
+                    {
+                        using (SolidBrush abb = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                        {
+                            g.FillPath(abb, abp);
+                        }
+                    }
+                }
+                char actGlyph = (_mode == OfficeAppMode.Slides) ? '\uE714' : ((_mode == OfficeAppMode.Calc) ? '\uE80A' : ((_mode == OfficeAppMode.Pdf) ? '\uE8C8' : '\uE70F'));
+                FluentIconRenderer.DrawGlyph(g, actGlyph, new RectangleF(_actionBtnRect.X + 4, _actionBtnRect.Y + 4, 14, 14), _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), 11f);
+                using (Font abf = new Font("Segoe UI", 8.2f))
+                {
+                    Rectangle tr = new Rectangle(_actionBtnRect.X + 20, _actionBtnRect.Y, _actionBtnRect.Width - 20, _actionBtnRect.Height);
+                    TextRenderer.DrawText(g, _actionText, abf, tr, _isActionHover ? Color.FromArgb(67, 56, 202) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                }
             }
 
             // Nút Sao chép AI
@@ -3150,13 +3473,18 @@ namespace ZenQOffice.UI
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            bool actHover = _actionBtnRect.Contains(e.Location);
-            bool copHover = _copyBtnRect.Contains(e.Location);
-            if (actHover != _isActionHover || copHover != _isCopyHover)
+            bool actHover = !_actionBtnRect.IsEmpty && _actionBtnRect.Contains(e.Location);
+            bool copHover = !_copyBtnRect.IsEmpty && _copyBtnRect.Contains(e.Location);
+            bool wHover = !_btnWriterQuizRect.IsEmpty && _btnWriterQuizRect.Contains(e.Location);
+            bool cHover = !_btnOpenCanvasRect.IsEmpty && _btnOpenCanvasRect.Contains(e.Location);
+
+            if (actHover != _isActionHover || copHover != _isCopyHover || wHover != _isWriterHover || cHover != _isOpenCanvasHover)
             {
                 _isActionHover = actHover;
                 _isCopyHover = copHover;
-                this.Cursor = (actHover || copHover) ? Cursors.Hand : Cursors.Default;
+                _isWriterHover = wHover;
+                _isOpenCanvasHover = cHover;
+                this.Cursor = (actHover || copHover || wHover || cHover) ? Cursors.Hand : Cursors.Default;
                 Invalidate();
             }
         }
@@ -3164,7 +3492,21 @@ namespace ZenQOffice.UI
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (_actionBtnRect.Contains(e.Location) && _onInsertAction != null)
+            if (!_btnWriterQuizRect.IsEmpty && _btnWriterQuizRect.Contains(e.Location))
+            {
+                if (_onExportWriterAction != null && _canvasQuiz != null)
+                {
+                    _onExportWriterAction(_canvasQuiz);
+                }
+            }
+            else if (!_btnOpenCanvasRect.IsEmpty && _btnOpenCanvasRect.Contains(e.Location))
+            {
+                if (_onOpenCanvasAction != null)
+                {
+                    _onOpenCanvasAction();
+                }
+            }
+            else if (!_actionBtnRect.IsEmpty && _actionBtnRect.Contains(e.Location) && _onInsertAction != null)
             {
                 _onInsertAction(_text);
             }
@@ -3691,12 +4033,13 @@ namespace ZenQOffice.UI
                                     var dict = (Dictionary<string, object>)item;
                                     string role = dict.ContainsKey("role") ? dict["role"].ToString() : "user";
                                     string content = dict.ContainsKey("content") ? dict["content"].ToString() : "";
+                                    string canvasQuizJson = dict.ContainsKey("canvasQuizJson") ? dict["canvasQuizJson"]?.ToString() : null;
                                     DateTime ts = DateTime.Now;
                                     if (dict.ContainsKey("timestamp"))
                                     {
                                         DateTime.TryParse(dict["timestamp"].ToString(), out ts);
                                     }
-                                    messages.Add(new AiChatMessage { Role = role, Content = content, Timestamp = ts });
+                                    messages.Add(new AiChatMessage { Role = role, Content = content, CanvasQuizJson = canvasQuizJson, Timestamp = ts });
                                 }
                             }
                             return messages;
@@ -3725,6 +4068,10 @@ namespace ZenQOffice.UI
                         sb.Append("  {");
                         sb.Append("\"role\": \"").Append(EscapeJson(m.Role)).Append("\", ");
                         sb.Append("\"content\": \"").Append(EscapeJson(m.Content)).Append("\", ");
+                        if (!string.IsNullOrEmpty(m.CanvasQuizJson))
+                        {
+                            sb.Append("\"canvasQuizJson\": \"").Append(EscapeJson(m.CanvasQuizJson)).Append("\", ");
+                        }
                         sb.Append("\"timestamp\": \"").Append(m.Timestamp.ToString("o")).Append("\"");
                         sb.Append("}");
                         if (i < messages.Count - 1) sb.Append(",");
@@ -3779,12 +4126,13 @@ namespace ZenQOffice.UI
                                                 var mDict = (Dictionary<string, object>)mObj;
                                                 string role = mDict.ContainsKey("role") ? mDict["role"].ToString() : "user";
                                                 string content = mDict.ContainsKey("content") ? mDict["content"].ToString() : "";
+                                                string canvasQuizJson = mDict.ContainsKey("canvasQuizJson") ? mDict["canvasQuizJson"]?.ToString() : null;
                                                 DateTime ts = DateTime.Now;
                                                 if (mDict.ContainsKey("timestamp"))
                                                 {
                                                     DateTime.TryParse(mDict["timestamp"].ToString(), out ts);
                                                 }
-                                                session.Messages.Add(new AiChatMessage { Role = role, Content = content, Timestamp = ts });
+                                                session.Messages.Add(new AiChatMessage { Role = role, Content = content, CanvasQuizJson = canvasQuizJson, Timestamp = ts });
                                             }
                                         }
                                     }
@@ -3848,6 +4196,10 @@ namespace ZenQOffice.UI
                                 sb.Append("{");
                                 sb.Append("\"role\": \"").Append(EscapeJson(m.Role)).Append("\", ");
                                 sb.Append("\"content\": \"").Append(EscapeJson(m.Content)).Append("\", ");
+                                if (!string.IsNullOrEmpty(m.CanvasQuizJson))
+                                {
+                                    sb.Append("\"canvasQuizJson\": \"").Append(EscapeJson(m.CanvasQuizJson)).Append("\", ");
+                                }
                                 sb.Append("\"timestamp\": \"").Append(m.Timestamp.ToString("o")).Append("\"");
                                 sb.Append("}");
                                 if (j < s.Messages.Count - 1) sb.Append(", ");
