@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -136,7 +136,7 @@ namespace ZenQOffice.UI
             Label lblList = new Label { Text = "Danh mục tài liệu nguồn:", Location = new Point(16, 64), AutoSize = true };
             this.Controls.Add(lblList);
 
-            lstSources = new ListBox { Location = new Point(16, 86), Size = new Size(260, 310), BorderStyle = BorderStyle.FixedSingle };
+            lstSources = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 86), Size = new Size(260, 310), BorderStyle = BorderStyle.FixedSingle };
             lstSources.SelectedIndexChanged += LstSources_SelectedIndexChanged;
             this.Controls.Add(lstSources);
 
@@ -215,7 +215,7 @@ namespace ZenQOffice.UI
             Label lblStyle = new Label { Text = "Kiểu:", Location = new Point(12, 22), AutoSize = true };
             grpPreview.Controls.Add(lblStyle);
 
-            cboPreviewStyle = new ComboBox { Location = new Point(50, 19), Width = 110, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5f) };
+            cboPreviewStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(50, 19), Width = 110, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5f) };
             cboPreviewStyle.Items.AddRange(new object[] { "APA 7th", "IEEE", "MLA 9th", "Chicago", "Harvard" });
             cboPreviewStyle.SelectedIndex = 0;
             cboPreviewStyle.SelectedIndexChanged += (s, e) => UpdatePreview();
@@ -258,7 +258,7 @@ namespace ZenQOffice.UI
         {
             Label lbl = new Label { Text = label, Location = new Point(12, y + 2), Size = new Size(150, 20), Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
             grp.Controls.Add(lbl);
-            cb = new ComboBox { Location = new Point(170, y), Size = new Size(270, 22), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
+            cb = new ZenQOffice.UI.FluentComboBox { Location = new Point(170, y), Size = new Size(270, 22), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
             grp.Controls.Add(cb);
             y += 28;
         }
@@ -347,7 +347,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrEmpty(txtAuthor.Text.Trim()) && string.IsNullOrEmpty(txtTitle.Text.Trim()))
             {
-                MessageBox.Show("Vui lòng nhập Tác giả hoặc Tựa đề của nguồn trích dẫn!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập Tác giả hoặc Tựa đề của nguồn trích dẫn!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -375,13 +375,13 @@ namespace ZenQOffice.UI
 
             LoadSourceList();
             UpdatePreview();
-            MessageBox.Show("Đã lưu nguồn tài liệu tham khảo thành công!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu nguồn tài liệu tham khảo thành công!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void BtnDeleteSource_Click(object sender, EventArgs e)
         {
             if (_selectedSource == null || _writerView == null || _writerView.CitationSources == null) return;
-            if (MessageBox.Show("Bạn có chắc chắn muốn xóa nguồn này khỏi danh sách?", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (ZenQOffice.UI.FluentMessageBox.Show("Bạn có chắc chắn muốn xóa nguồn này khỏi danh sách?", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 _writerView.CitationSources.Remove(_selectedSource);
                 LoadSourceList();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -34,7 +34,7 @@ namespace ZenQOffice.UI
             Label lblType = new Label { Text = "Loại đồ thị nhỏ (Type):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblType);
 
-            cboType = new ComboBox { Location = new Point(180, 17), Size = new Size(235, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboType = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 17), Size = new Size(235, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboType.Items.AddRange(new object[] { "Đường (Line)", "Cột (Column)", "Thắng/Thua (Win/Loss)" });
             if (defaultType == "Column") cboType.SelectedIndex = 1;
             else if (defaultType == "WinLoss") cboType.SelectedIndex = 2;

@@ -1,0 +1,71 @@
+using System;
+using System.Drawing;
+using ZenQOffice.UI;
+using ZenQOffice.Core;
+class BackgroundRemovalTests {
+ static void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
+ [STAThread] static void Main() {
+  using var source = new Bitmap(40, 30);
+  using (var g = Graphics.FromImage(source)) { g.Clear(Color.White); g.FillRectangle(Brushes.DarkBlue, 10, 8, 20, 16); }
+  var mask = SlidesView.ComputeAutoBgMaskFromBitmap(source);
+  Check(mask[0,0] && !mask[20,15], "Background/subject separation");
+  using var result = SlidesView.CreateMaskedBitmapFromOriginal(source,mask);
+  Check(result.Size == source.Size, "Canvas size must stay unchanged");
+  Check(result.GetPixel(0,0).A == 0, "Removed background must be transparent");
+  Check(result.GetPixel(20,15).ToArgb() == source.GetPixel(20,15).ToArgb(), "Interior RGB and alpha must stay unchanged");
+  Check(result.GetPixel(10,15).A > 0 && result.GetPixel(10,15).A < 255, "Edge must have partial alpha");
+  source.SetPixel(20,15,Color.FromArgb(91,10,20,30));
+  using var alpha = SlidesView.CreateMaskedBitmapFromOriginal(source,mask);
+  Check(alpha.GetPixel(20,15).A == 91, "Preserve existing transparency");
+  var view = new SlidesView();
+  var shape = new ShapeNode { CachedImage = source, ImagePath = "old-source.png" };
+  shape.Transform.Width = 200; shape.Transform.Height = 150;
+  shape.CropLeft = 0.1f;
+  view.AutoRemoveBackgroundDirect(shape).GetAwaiter().GetResult();
+  Check(view.IsScanningActive && shape.ImagePath == "", "Do not reload original or defer result");
+  Check(shape.Transform.Width == 200 && shape.Transform.Height == 150 && shape.CropLeft == 0.1f, "Preserve frame and crop");
+  Check(source.GetPixel(0,0).A == 255, "Undo source must remain usable");
+  view.OriginalImageBeforeRemoval = (Image)source.Clone();
+  view.IsRemovingBackground = true;
+  typeof(SlidesView).GetField("_bgRemovalTarget", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(view, shape);
+  typeof(SlidesView).GetField("_bgOriginalPath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(view, "old-source.png");
+  view.AutoRemoveBackgroundDirect(shape).GetAwaiter().GetResult();
+  view.RecomputeAllStrokes(shape);
+  Check(((Bitmap)shape.CachedImage).GetPixel(0,0).A == 0, "Deleting last mark must retain automatic mask");
+  view.EndBackgroundRemoval(false);
+  Check(((Bitmap)shape.CachedImage).GetPixel(0,0).A == 255 && shape.ImagePath == "old-source.png", "Cancel restores session target even without current selection");
+  Check(view.OriginalImageBeforeRemoval == null && !view.IsRemovingBackground, "Session state must be cleared");
+  var gifShape = new ShapeNode { IsGifPlaying = true, NativeGifDelays = new[] { 40, 80, 120 }, NativeGifLastTick = 1000 };
+  SlidesView.AdvanceGifClock(gifShape, 1150);
+  Check(gifShape.NativeGifFrameIndex == 2 && gifShape.NativeGifLastTick == 1120, "GIF catches up without losing remainder");
+  SlidesView.AdvanceGifClock(gifShape, 1640);
+  Check(gifShape.NativeGifFrameIndex == 2 && gifShape.NativeGifLastTick == 1600, "GIF skips whole cycles correctly");
+  gifShape.IsGifPlaying = false;
+  SlidesView.AdvanceGifClock(gifShape, 2000);
+  Check(gifShape.NativeGifLastTick == 1600, "Paused GIF does not advance");
+  var decode = typeof(D2DGraphics).GetMethod("DecodeGif", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+  var decoded = decode.Invoke(null, new object[] { "tests/fixtures/playback.gif" });
+  var delays = (int[])decoded.GetType().GetField("Delays").GetValue(decoded);
+  var pixels = (byte[][])decoded.GetType().GetField("Pixels").GetValue(decoded);
+  Check(delays.Length == 3 && delays[0] == 40 && delays[1] == 80 && delays[2] == 120, "Decode actual GIF timing");
+  Check(pixels.Length == 3 && pixels[0][2] == 255 && pixels[2][0] == 255, "Decode distinct GIF frames");
+  view.Presentation = new PresentationRoot();
+  view.Presentation.Slides.Clear();
+  var gifSlide = new SlideNode();
+  gifSlide.Shapes.Add(gifShape);
+  view.Presentation.Slides.Add(gifSlide);
+  view.ActiveSlideIndex = 0;
+  view.SelectedShapeIndex = -1;
+  view.IsPresenting = true;
+  gifShape.Transform.X = 100; gifShape.Transform.Y = 100;
+  gifShape.Transform.Width = 200; gifShape.Transform.Height = 150;
+  view.GetPresenterSlideMetrics(800,600,out int sx,out int sy,out int sw,out int sh,out float scale);
+  view.UpdateGifHover(new Point(sx+(int)(200*scale), sy+(int)(175*scale)),800,600);
+  var bounds = (RectangleF)typeof(SlidesView).GetField("_gifControlBounds", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(view);
+  Check(view.TryToggleHoveredGif(Point.Round(new PointF(bounds.X+bounds.Width/2,bounds.Y+bounds.Height/2)),800,600), "Hover button handles click");
+  Check(gifShape.IsGifPlaying && view.SelectedShapeIndex == -1 && view.ActiveSlideIndex == 0, "Hover playback needs no selection or slide advance");
+  view.ClearGifHover();
+  Console.WriteLine("PASS: GIF timing, catch-up, pause, decoding and frame colors");
+  Console.WriteLine("PASS: segmentation, canvas, alpha, color, edge, frame, crop, source lifetime, stable publication");
+ }
+}

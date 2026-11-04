@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -532,7 +532,7 @@ namespace ZenQOffice.UI
                 AutoSize = true,
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
-            cboCategory = new ComboBox
+            cboCategory = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(16, 90),
                 Size = new Size(468, 24),
@@ -559,7 +559,7 @@ namespace ZenQOffice.UI
                 AutoSize = true,
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
-            lstFunctions = new ListBox
+            lstFunctions = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(16, 146),
                 Size = new Size(468, 140),

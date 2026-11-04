@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -162,7 +162,7 @@ namespace ZenQOffice.Core
     /// </summary>
     public static class AiActionEngine
     {
-        private static readonly Regex ActionRegex = new Regex(@"\[(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION):([A-Za-z0-9_]+)\]([\s\S]*?)(?:\[/(?:[A-Za-z0-9_]*GENOFFICE_ACTION|ACTION)\]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex ActionRegex = new Regex(@"\[(?:[A-Za-z0-9_]*ZENQ_ACTION|ACTION):([A-Za-z0-9_]+)\]([\s\S]*?)(?:\[/(?:[A-Za-z0-9_]*ZENQ_ACTION|ACTION)\]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static Dictionary<string, string> ParseXmlAttributes(string tagText)
         {
@@ -218,8 +218,10 @@ namespace ZenQOffice.Core
             List<string> summaries = new List<string>();
             bool anyExecuted = false;
 
-            // 1. Xử lý Calc (Bảng tính)
-            if (appForm.CalcView != null)
+            OfficeAppMode currentMode = appForm.Ribbon != null ? appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
+
+            // 1. Xử lý Calc (Bảng tính) - Chỉ chạy khi đang ở chế độ Calc
+            if (appForm.CalcView != null && currentMode == OfficeAppMode.Calc)
             {
                 var calc = appForm.CalcView;
                 var sheet = calc.CurrentSheet;
@@ -424,8 +426,8 @@ namespace ZenQOffice.Core
                 }
             }
 
-            // 2. Xử lý Slides (Tự do tạo slide bằng XML)
-            if (appForm.SlidesView != null)
+            // 2. Xử lý Slides (Tự do tạo slide bằng XML giàu Token, bố cục chuẩn Canva 1920x1080)
+            if (appForm.SlidesView != null && (currentMode == OfficeAppMode.Slides || rawAiResponse.IndexOf("<slide", StringComparison.OrdinalIgnoreCase) >= 0 || rawAiResponse.IndexOf("<create_slide", StringComparison.OrdinalIgnoreCase) >= 0))
             {
                 var slides = appForm.SlidesView;
                 var pres = slides.Presentation;
@@ -435,21 +437,84 @@ namespace ZenQOffice.Core
                 {
                     var sAttrs = ParseXmlAttributes(sm.Groups[1].Value);
                     string title = sAttrs.ContainsKey("title") ? sAttrs["title"] : (sAttrs.ContainsKey("tieu_de") ? sAttrs["tieu_de"] : "Slide mới");
-                    string bgStr = sAttrs.ContainsKey("background") ? sAttrs["background"] : (sAttrs.ContainsKey("bg") ? sAttrs["bg"] : (sAttrs.ContainsKey("nen") ? sAttrs["nen"] : "#0B0F19"));
+                    string bgStr = sAttrs.ContainsKey("background") ? sAttrs["background"] : (sAttrs.ContainsKey("bg") ? sAttrs["bg"] : (sAttrs.ContainsKey("nen") ? sAttrs["nen"] : ""));
+                    string themeStr = sAttrs.ContainsKey("theme") ? sAttrs["theme"] : (sAttrs.ContainsKey("style") ? sAttrs["style"] : "");
+                    string transStr = sAttrs.ContainsKey("transition") ? sAttrs["transition"] : (sAttrs.ContainsKey("trans") ? sAttrs["trans"] : (sAttrs.ContainsKey("chuyen_canh") ? sAttrs["chuyen_canh"] : ""));
+                    string modeStr = sAttrs.ContainsKey("mode") ? sAttrs["mode"] : (sAttrs.ContainsKey("action") ? sAttrs["action"] : "");
 
                     slides.SaveUndoState();
                     SlideNode newSlide = new SlideNode
                     {
                         Title = title,
                         Shapes = new List<ShapeNode>(),
-                        Transition = TransitionType.Fade,
-                        BgFillType = BackgroundFillType.Solid,
-                        BgColor = ParseColorExtended(bgStr, unchecked((int)0xFF0B0F19))
+                        Transition = TransitionType.Fade
                     };
 
+                    if (!string.IsNullOrEmpty(transStr))
+                    {
+                        newSlide.Transition = ParseTransitionType(transStr);
+                    }
+
+                    SlidePalette pal = ResolveThemePalette(!string.IsNullOrEmpty(themeStr) ? themeStr : "ModernBlue");
+                    if (bgStr.StartsWith("gradient:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = bgStr.Substring(9).Split(',');
+                        int c1 = ParseColorExtended(parts[0].Trim(), pal.Bg1);
+                        int c2 = parts.Length > 1 ? ParseColorExtended(parts[1].Trim(), pal.Bg2) : pal.Bg2;
+                        float angle = parts.Length > 2 ? (float)GetDoubleFromStr(parts[2].Trim(), 135) : 135f;
+                        newSlide.IsGradientBg = true;
+                        newSlide.BgFillType = BackgroundFillType.Gradient;
+                        newSlide.BgColor = c1;
+                        newSlide.BgColor2 = c2;
+                        newSlide.BgGradientAngle = angle;
+                        newSlide.BgGradientStops = new List<GradientStop>
+                        {
+                            new GradientStop(c1, 0.0f),
+                            new GradientStop(c2, 1.0f)
+                        };
+                    }
+                    else if (!string.IsNullOrEmpty(themeStr))
+                    {
+                        newSlide.IsGradientBg = true;
+                        newSlide.BgFillType = BackgroundFillType.Gradient;
+                        newSlide.BgColor = pal.Bg1;
+                        newSlide.BgColor2 = pal.Bg2;
+                        newSlide.BgGradientAngle = 135f;
+                        newSlide.BgGradientStops = new List<GradientStop>
+                        {
+                            new GradientStop(pal.Bg1, 0.0f),
+                            new GradientStop(pal.Bg2, 1.0f)
+                        };
+                    }
+                    else if (!string.IsNullOrEmpty(bgStr))
+                    {
+                        int col = ParseColorExtended(bgStr, unchecked((int)0xFF0B0F19));
+                        newSlide.IsGradientBg = false;
+                        newSlide.BgFillType = BackgroundFillType.Solid;
+                        newSlide.BgColor = col;
+                        newSlide.BgGradientStops = new List<GradientStop>
+                        {
+                            new GradientStop(col, 0.0f),
+                            new GradientStop(col, 1.0f)
+                        };
+                    }
+                    else
+                    {
+                        newSlide.IsGradientBg = true;
+                        newSlide.BgFillType = BackgroundFillType.Gradient;
+                        newSlide.BgColor = pal.Bg1;
+                        newSlide.BgColor2 = pal.Bg2;
+                        newSlide.BgGradientAngle = 135f;
+                        newSlide.BgGradientStops = new List<GradientStop>
+                        {
+                            new GradientStop(pal.Bg1, 0.0f),
+                            new GradientStop(pal.Bg2, 1.0f)
+                        };
+                    }
+
                     string inner = sm.Groups[2].Value;
-                    // Parse các thẻ con: <shape ... /> hoặc <text ...>...</text>
-                    var childMatches = Regex.Matches(inner, @"<(shape|text|hinh|chu)\b([^>]*)(?:>(.*?)</\1>|/?>)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                    // Parse đa dạng các thẻ con: <shape>, <text>, <card>, <badge>, <pill>, <line>, <divider>, <rect>, <circle>, <ellipse>
+                    var childMatches = Regex.Matches(inner, @"<(shape|text|hinh|chu|card|badge|pill|line|divider|rect|box|circle|ellipse|vector|icon|svg|image|img)\b([^>]*)(?:>(.*?)</\1>|/?>)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
                     int elemCount = 0;
                     foreach (Match cm in childMatches)
                     {
@@ -460,32 +525,88 @@ namespace ZenQOffice.Core
                         float w = (float)GetDoubleFromStr(cAttrs.ContainsKey("width") ? cAttrs["width"] : (cAttrs.ContainsKey("w") ? cAttrs["w"] : "400"), 400);
                         float h = (float)GetDoubleFromStr(cAttrs.ContainsKey("height") ? cAttrs["height"] : (cAttrs.ContainsKey("h") ? cAttrs["h"] : "180"), 180);
                         string text = cAttrs.ContainsKey("text") ? cAttrs["text"] : (cm.Groups[3].Success ? cm.Groups[3].Value.Trim() : "");
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            text = System.Net.WebUtility.HtmlDecode(text);
+                        }
 
-                        if (tag == "text" || tag == "chu")
+                        if (tag == "vector" || tag == "icon" || tag == "svg" || tag == "image" || tag == "img")
+                        {
+                            string vUrl = cAttrs.ContainsKey("url") ? cAttrs["url"] : (cAttrs.ContainsKey("src") ? cAttrs["src"] : (cAttrs.ContainsKey("id") ? cAttrs["id"] : (cAttrs.ContainsKey("path") ? cAttrs["path"] : (cAttrs.ContainsKey("name") ? cAttrs["name"] : ""))));
+                            string resolved = ResolveGraphicsUrl(vUrl);
+                            string vId = cAttrs.ContainsKey("id") ? cAttrs["id"] : Path.GetFileNameWithoutExtension(resolved);
+                            if (string.IsNullOrEmpty(vId)) vId = "vec_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+                            bool isSvg = resolved.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) || tag == "vector" || tag == "icon" || tag == "svg";
+                            Bitmap bmp = OnlineGraphicsManager.GetCachedOrDownloadImage(vId, resolved, 1600);
+                            string localCached = OnlineGraphicsManager.GetCachedImagePath(vId, resolved);
+
+                            var imgNode = new ShapeNode
+                            {
+                                Type = ShapeType.Image,
+                                IsSvg = isSvg,
+                                IsGraphic = isSvg,
+                                ImagePath = File.Exists(localCached) ? localCached : resolved,
+                                CachedImage = bmp,
+                                OriginalWidth = bmp != null ? bmp.Width : (int)w,
+                                OriginalHeight = bmp != null ? bmp.Height : (int)h,
+                                Transform = new Transform2D(x, y, w, h)
+                            };
+                            newSlide.Shapes.Add(imgNode);
+                            elemCount++;
+                        }
+                        else if (tag == "text" || tag == "chu")
                         {
                             float fSize = (float)GetDoubleFromStr(cAttrs.ContainsKey("font_size") ? cAttrs["font_size"] : (cAttrs.ContainsKey("size") ? cAttrs["size"] : "20"), 20);
-                            bool isBold = cAttrs.ContainsKey("bold") && (cAttrs["bold"] == "true" || cAttrs["bold"] == "1");
-                            int txtColor = ParseColorExtended(cAttrs.ContainsKey("color") ? cAttrs["color"] : "#FFFFFF", unchecked((int)0xFFFFFFFF));
-                            var txtNode = CreateCleanTextBox(text, "Segoe UI", fSize, isBold, txtColor, TextAlignment.Left, x, y, w, h);
+                            bool isBold = cAttrs.ContainsKey("bold") && (cAttrs["bold"].Equals("true", StringComparison.OrdinalIgnoreCase) || cAttrs["bold"] == "1");
+                            bool isItalic = cAttrs.ContainsKey("italic") && (cAttrs["italic"].Equals("true", StringComparison.OrdinalIgnoreCase) || cAttrs["italic"] == "1");
+                            int txtColor = ParseColorExtended(cAttrs.ContainsKey("color") ? cAttrs["color"] : (cAttrs.ContainsKey("text_color") ? cAttrs["text_color"] : "#FFFFFF"), unchecked((int)0xFFFFFFFF));
+                            
+                            TextAlignment align = TextAlignment.Left;
+                            string alignStr = cAttrs.ContainsKey("align") ? cAttrs["align"].ToLowerInvariant() : "";
+                            if (alignStr == "center" || alignStr == "giua") align = TextAlignment.Center;
+                            else if (alignStr == "right" || alignStr == "phai") align = TextAlignment.Right;
+
+                            var txtNode = CreateCleanTextBox(text, "Segoe UI", fSize, isBold, txtColor, align, x, y, w, h);
                             newSlide.Shapes.Add(txtNode);
                             elemCount++;
                         }
                         else
                         {
                             ShapeType shType = ShapeType.RoundedRectangle;
-                            string typeStr = cAttrs.ContainsKey("type") ? cAttrs["type"].ToLowerInvariant() : "";
-                            if (typeStr == "rectangle" || typeStr == "hinh_chu_nhat") shType = ShapeType.Rectangle;
-                            else if (typeStr == "circle" || typeStr == "ellipse" || typeStr == "hinh_tron") shType = ShapeType.Ellipse;
+                            if (tag == "card" || tag == "box") shType = ShapeType.RoundedRectangle;
+                            else if (tag == "badge" || tag == "pill") { shType = ShapeType.RoundedRectangle; if (h > 60) h = 42f; }
+                            else if (tag == "circle" || tag == "ellipse") shType = ShapeType.Ellipse;
+                            else if (tag == "rect" || tag == "rectangle") shType = ShapeType.Rectangle;
+                            else if (tag == "line" || tag == "divider") { shType = ShapeType.Rectangle; if (h > 10) h = 4f; }
+                            else
+                            {
+                                string typeStr = cAttrs.ContainsKey("type") ? cAttrs["type"].ToLowerInvariant() : "";
+                                if (typeStr == "rectangle" || typeStr == "hinh_chu_nhat") shType = ShapeType.Rectangle;
+                                else if (typeStr == "circle" || typeStr == "ellipse" || typeStr == "hinh_tron") shType = ShapeType.Ellipse;
+                                else if (typeStr == "triangle" || typeStr == "tam_giac") shType = ShapeType.Triangle;
+                                else shType = ShapeType.RoundedRectangle;
+                            }
 
-                            int fillColor = ParseColorExtended(cAttrs.ContainsKey("fill") ? cAttrs["fill"] : (cAttrs.ContainsKey("color") ? cAttrs["color"] : "#1E293B"), unchecked((int)0xFF1E293B));
+                            int fillColor = ParseColorExtended(cAttrs.ContainsKey("fill") ? cAttrs["fill"] : (cAttrs.ContainsKey("color") ? cAttrs["color"] : (cAttrs.ContainsKey("bg") ? cAttrs["bg"] : "#1E293B")), unchecked((int)0xFF1E293B));
                             int strokeColor = ParseColorExtended(cAttrs.ContainsKey("stroke") ? cAttrs["stroke"] : (cAttrs.ContainsKey("vien") ? cAttrs["vien"] : "#38BDF8"), unchecked((int)0xFF38BDF8));
-                            float strokeW = (float)GetDoubleFromStr(cAttrs.ContainsKey("stroke_width") ? cAttrs["stroke_width"] : "1.5", 1.5);
+                            float strokeW = (float)GetDoubleFromStr(cAttrs.ContainsKey("stroke_width") ? cAttrs["stroke_width"] : (cAttrs.ContainsKey("stroke_w") ? cAttrs["stroke_w"] : "1.5"), 1.5);
+                            float fillOpacity = (float)GetDoubleFromStr(cAttrs.ContainsKey("opacity") ? cAttrs["opacity"] : (cAttrs.ContainsKey("fill_opacity") ? cAttrs["fill_opacity"] : "1.0"), 1.0);
+
+                            if (cAttrs.ContainsKey("fill") && cAttrs["fill"].Equals("none", StringComparison.OrdinalIgnoreCase))
+                            {
+                                fillOpacity = 0.0f;
+                            }
+                            if (cAttrs.ContainsKey("stroke") && cAttrs["stroke"].Equals("none", StringComparison.OrdinalIgnoreCase))
+                            {
+                                strokeW = 0f;
+                            }
 
                             ShapeNode shp = new ShapeNode
                             {
                                 Type = shType,
                                 FillColor = fillColor,
-                                FillOpacity = 1.0f,
+                                FillOpacity = fillOpacity,
                                 StrokeColor = strokeColor,
                                 StrokeWidth = strokeW,
                                 Transform = new Transform2D(x, y, w, h),
@@ -496,18 +617,39 @@ namespace ZenQOffice.Core
                         }
                     }
 
-                    if (pres != null)
+                    bool isUpdate = modeStr.Equals("update", StringComparison.OrdinalIgnoreCase) || 
+                                    modeStr.Equals("current", StringComparison.OrdinalIgnoreCase) || 
+                                    modeStr.Equals("replace", StringComparison.OrdinalIgnoreCase);
+
+                    if (isUpdate && pres != null && pres.Slides.Count > 0)
+                    {
+                        int targetIdx = Math.Max(0, Math.Min(pres.Slides.Count - 1, slides.ActiveSlideIndex));
+                        var targetSlide = pres.Slides[targetIdx];
+                        targetSlide.Shapes.Clear();
+                        targetSlide.Shapes.AddRange(newSlide.Shapes);
+                        targetSlide.Title = newSlide.Title;
+                        targetSlide.BgFillType = newSlide.BgFillType;
+                        targetSlide.BgColor = newSlide.BgColor;
+                        targetSlide.BgColor2 = newSlide.BgColor2;
+                        targetSlide.IsGradientBg = newSlide.IsGradientBg;
+                        targetSlide.BgGradientAngle = newSlide.BgGradientAngle;
+                        targetSlide.BgGradientStops = newSlide.BgGradientStops;
+                        targetSlide.Transition = newSlide.Transition;
+                        summaries.Add(string.Format("🎨 Đã cập nhật lại nội dung Slide #{0} ('{1}') với {2} thành phần sắc nét chuẩn Canva", targetIdx + 1, title, elemCount));
+                        anyExecuted = true;
+                    }
+                    else if (pres != null)
                     {
                         pres.Slides.Add(newSlide);
                         slides.ActiveSlideIndex = pres.Slides.Count - 1;
-                        summaries.Add(string.Format("Đã tạo slide '{0}' với {1} thành phần", title, elemCount));
+                        summaries.Add(string.Format("🎨 Đã tạo slide '{0}' với {1} thành phần sắc nét chuẩn Canva", title, elemCount));
                         anyExecuted = true;
                     }
                 }
             }
 
-            // 3. Xử lý Writer (Chèn văn bản và thay thế từ)
-            if (appForm.WriterView != null)
+            // 3. Xử lý Writer (Chèn văn bản và thay thế từ) - Chỉ chạy khi đang ở chế độ Writer
+            if (appForm.WriterView != null && currentMode == OfficeAppMode.Writer)
             {
                 var writer = appForm.WriterView;
                 var insertMatches = Regex.Matches(rawAiResponse, @"<insert_text\b[^>]*>(.*?)</insert_text>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -609,8 +751,25 @@ namespace ZenQOffice.Core
             {
                 if (appForm != null && appForm.Ribbon != null)
                 {
-                    if (appForm.Ribbon.CurrentMode == OfficeAppMode.Slides)
+                    if (appForm.Ribbon.CurrentMode == OfficeAppMode.Slides || appForm.SlidesView != null)
                     {
+                        // 1. Check for raw JSON slide object or multi-slide { "slides": ... } or { "theme": ... }
+                        int jsonStart = rawAiResponse.IndexOf("{");
+                        int jsonEnd = rawAiResponse.LastIndexOf("}");
+                        if (jsonStart >= 0 && jsonEnd > jsonStart)
+                        {
+                            string jsonCandidate = rawAiResponse.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                            if (jsonCandidate.Contains("\"slides\"") || jsonCandidate.Contains("\"theme\"") || jsonCandidate.Contains("\"layout\"") || jsonCandidate.Contains("\"cards\""))
+                            {
+                                result.HasAction = true;
+                                result.ActionType = "GENERATE_SLIDE_CANVAS";
+                                ExecuteGenerateSlideCanvas(appForm, jsonCandidate, result);
+                                result.CleanUserMessage = rawAiResponse.Substring(0, jsonStart).Trim();
+                                if (string.IsNullOrEmpty(result.CleanUserMessage)) result.CleanUserMessage = result.ExecutionSummary;
+                                return result;
+                            }
+                        }
+
                         if (rawAiResponse.IndexOf("## Slide", StringComparison.OrdinalIgnoreCase) >= 0 ||
                             rawAiResponse.IndexOf("Slide 1", StringComparison.OrdinalIgnoreCase) >= 0 ||
                             rawAiResponse.IndexOf("**[Shape", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -790,7 +949,7 @@ namespace ZenQOffice.Core
             foreach (var line in lines)
             {
                 string l = line.Trim();
-                if (string.IsNullOrEmpty(l) || l.StartsWith("{") || l.StartsWith("}") || l.StartsWith("[GENOFFICE_ACTION")) continue;
+                if (string.IsNullOrEmpty(l) || l.StartsWith("{") || l.StartsWith("}") || l.StartsWith("[ZENQ_ACTION")) continue;
 
                 // Explicit indicators: "❌ từ_sai ➔ ✅ từ_đúng", "Từ sai: ... -> Sửa: ...", or explicit error prefixes
                 bool isCorrectionIndicator = l.StartsWith("❌") || l.StartsWith("Lỗi:") || l.StartsWith("Từ sai:") ||
@@ -1507,7 +1666,51 @@ namespace ZenQOffice.Core
             SlidePalette p = new SlidePalette();
             string s = (styleName ?? "").Trim();
 
-            if (s.IndexOf("TechDark", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("CyberMidnight", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("Dark", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("tối", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("đen", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (s.IndexOf("VietnamCrimsonGold", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("CrimsonGold", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("HaoKhi", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("DoHoaVietNam", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("LichSu", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Vietnam Crimson Gold: Đỏ nhung hoàng gia & Vàng Gold sang trọng (Chuẩn Canva)
+                p.Bg1 = 0x5C0606; p.Bg2 = 0x380000;
+                p.Primary = 0xF59E0B; p.Accent = 0xFBBF24;
+                p.TitleColor = 0xFFFFFF; p.SubtitleColor = 0xFDE68A; p.BodyColor = 0xFDF4E3;
+                p.CardBg = 0x420404; p.CardBorder = 0xD97706;
+                p.BadgeBg = 0x2E0202; p.BadgeFg = 0xFCD34D;
+                p.StatBg = 0x2A0202; p.StatBorder = 0xF59E0B; p.StatText = 0xFBBF24;
+                p.DarkTheme = true;
+            }
+            else if (s.IndexOf("CanvaLuxuryBlackGold", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("BlackGold", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("LuxuryDark", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Canva Luxury Black & Gold: Nền đen tuyền kim cương & Vàng gold ánh kim
+                p.Bg1 = 0x0A0A0A; p.Bg2 = 0x141414;
+                p.Primary = 0xD97706; p.Accent = 0xF59E0B;
+                p.TitleColor = 0xFFFFFF; p.SubtitleColor = 0xFDE68A; p.BodyColor = 0xE5E5E5;
+                p.CardBg = 0x171717; p.CardBorder = 0x78350F;
+                p.BadgeBg = 0x262626; p.BadgeFg = 0xFBBF24;
+                p.StatBg = 0x1F1F1F; p.StatBorder = 0xB45309; p.StatText = 0xF59E0B;
+                p.DarkTheme = true;
+            }
+            else if (s.IndexOf("CanvaPastelRose", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("PastelRose", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("PinkSweet", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("hồng", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Canva Pastel Rose: Hồng phấn & Tím pastel thanh lịch (Sự kiện 20/10, Thẩm mỹ)
+                p.Bg1 = 0xFFF1F5; p.Bg2 = 0xFFE4E6;
+                p.Primary = 0xBE185D; p.Accent = 0xDB2777;
+                p.TitleColor = 0x831843; p.SubtitleColor = 0x9D174D; p.BodyColor = 0x4C0519;
+                p.CardBg = 0xFFFFFF; p.CardBorder = 0xFBCFE8;
+                p.BadgeBg = 0xFCE7F3; p.BadgeFg = 0xBE185D;
+                p.StatBg = 0xFFF1F5; p.StatBorder = 0xF472B6; p.StatText = 0xBE185D;
+                p.DarkTheme = false;
+            }
+            else if (s.IndexOf("CanvaEcoGreen", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("EcoGreen", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Canva Eco Green: Xanh ngọc lục bảo rừng nhiệt đới & Du lịch sinh thái
+                p.Bg1 = 0x064E3B; p.Bg2 = 0x022C22;
+                p.Primary = 0x10B981; p.Accent = 0x34D399;
+                p.TitleColor = 0xFFFFFF; p.SubtitleColor = 0xA7F3D0; p.BodyColor = 0xECFDF5;
+                p.CardBg = 0x065F46; p.CardBorder = 0x059669;
+                p.BadgeBg = 0x022C22; p.BadgeFg = 0x6EE7B7;
+                p.StatBg = 0x044E3B; p.StatBorder = 0x10B981; p.StatText = 0x34D399;
+                p.DarkTheme = true;
+            }
+            else if (s.IndexOf("TechDark", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("CyberMidnight", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("Dark", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("tối", StringComparison.OrdinalIgnoreCase) >= 0 || s.IndexOf("đen", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 // TechDark: Midnight Navy & Cyan
                 p.Bg1 = 0x070D1B; p.Bg2 = 0x0F1B30;
@@ -1614,6 +1817,25 @@ namespace ZenQOffice.Core
             float canvasH = pres.CanvasHeight > 0 ? pres.CanvasHeight : 1080.0f;
 
             object parsedObj = JsonLite.Parse(payload);
+
+            // Handle Aspect Ratio & Canvas Resizing (16:9, 4:3, 1:1, 9:16)
+            if (parsedObj is Dictionary<string, object>)
+            {
+                var dRatio = (Dictionary<string, object>)parsedObj;
+                string ratio = GetString(dRatio, "aspectRatio", GetString(dRatio, "ratio", GetString(dRatio, "slideSize", ""))).ToLowerInvariant();
+                if (!string.IsNullOrEmpty(ratio))
+                {
+                    float newW = 1920f, newH = 1080f;
+                    if (ratio.Contains("4:3") || ratio.Contains("standard")) { newW = 1440f; newH = 1080f; }
+                    else if (ratio.Contains("1:1") || ratio.Contains("square") || ratio.Contains("vuong")) { newW = 1080f; newH = 1080f; }
+                    else if (ratio.Contains("9:16") || ratio.Contains("portrait") || ratio.Contains("doc") || ratio.Contains("story") || ratio.Contains("tiktok")) { newW = 1080f; newH = 1920f; }
+                    else if (ratio.Contains("16:9") || ratio.Contains("widescreen")) { newW = 1920f; newH = 1080f; }
+                    
+                    pres.SetCustomSlideSize(newW, newH);
+                    canvasW = newW;
+                    canvasH = newH;
+                }
+            }
             // Case 1: Direct List of Slide Objects [ { ... }, { ... } ]
             if (parsedObj is List<object>)
             {
@@ -1652,26 +1874,77 @@ namespace ZenQOffice.Core
                         string globalStyle = GetString(dict, "style", GetString(dict, "theme", "ModernBlue"));
                         SlidePalette globalPal = ResolveThemePalette(globalStyle);
 
-                        bool append = GetBool(dict, "append", false);
-                        if (!append)
+                        string action = GetString(dict, "action", GetString(dict, "mode", "")).ToUpperInvariant();
+                        bool isUpdateCurrent = (action == "UPDATE_CURRENT_SLIDE" || action == "CURRENT" || action == "REPLACE_CURRENT" || GetBool(dict, "updateCurrent", false));
+                        int insertIdx = GetInt(dict, "insertIndex", GetInt(dict, "targetSlide", GetInt(dict, "slideIndex", -1)));
+                        int afterIdx = GetInt(dict, "afterSlide", -1);
+                        if (afterIdx >= 0) insertIdx = afterIdx;
+                        bool isInsert = (action == "INSERT" || action == "INSERT_SLIDE" || insertIdx >= 0);
+                        bool append = GetBool(dict, "append", (action == "APPEND" || action == "APPEND_SLIDE" || action == "ADD_SLIDE"));
+
+                        if (isUpdateCurrent && pres.Slides.Count > 0)
+                        {
+                            int curIdx = Math.Max(0, Math.Min(pres.Slides.Count - 1, slides.ActiveSlideIndex));
+                            if (slideList.Count > 0 && slideList[0] is Dictionary<string, object>)
+                            {
+                                RenderSlideFromCanvasDict(pres.Slides[curIdx], (Dictionary<string, object>)slideList[0], globalPal, canvasW, canvasH);
+                            }
+                            appForm.Invalidate();
+                            result.ExecutionSummary = string.Format("🎨 AI đã cập nhật lại nội dung Slide hiện tại (Slide #{0}) theo phong cách Canva chuẩn mực!", curIdx + 1);
+                            return;
+                        }
+                        else if (isInsert)
+                        {
+                            int targetPos = (insertIdx > 0 && insertIdx <= pres.Slides.Count) ? (insertIdx - 1) : (insertIdx >= 0 ? insertIdx : slides.ActiveSlideIndex + 1);
+                            targetPos = Math.Max(0, Math.Min(pres.Slides.Count, targetPos));
+                            for (int i = 0; i < slideList.Count; i++)
+                            {
+                                if (slideList[i] is Dictionary<string, object>)
+                                {
+                                    SlideNode sNode = new SlideNode();
+                                    RenderSlideFromCanvasDict(sNode, (Dictionary<string, object>)slideList[i], globalPal, canvasW, canvasH);
+                                    pres.Slides.Insert(targetPos + i, sNode);
+                                }
+                            }
+                            slides.ActiveSlideIndex = targetPos;
+                            appForm.Invalidate();
+                            result.ExecutionSummary = string.Format("🎨 AI đã chèn thành công {0} Slide vào vị trí #{1}!", slideList.Count, targetPos + 1);
+                            return;
+                        }
+                        else if (append)
+                        {
+                            int startIdx = pres.Slides.Count;
+                            foreach (var sObj in slideList)
+                            {
+                                if (sObj is Dictionary<string, object>)
+                                {
+                                    SlideNode sNode = new SlideNode();
+                                    RenderSlideFromCanvasDict(sNode, (Dictionary<string, object>)sObj, globalPal, canvasW, canvasH);
+                                    pres.Slides.Add(sNode);
+                                }
+                            }
+                            slides.ActiveSlideIndex = startIdx;
+                            appForm.Invalidate();
+                            result.ExecutionSummary = string.Format("🎨 AI đã thêm thành công {0} Slide mới vào cuối bài thuyết trình!", slideList.Count);
+                            return;
+                        }
+                        else
                         {
                             pres.Slides.Clear();
-                        }
-
-                        foreach (var sObj in slideList)
-                        {
-                            if (sObj is Dictionary<string, object>)
+                            foreach (var sObj in slideList)
                             {
-                                SlideNode sNode = new SlideNode();
-                                RenderSlideFromCanvasDict(sNode, (Dictionary<string, object>)sObj, globalPal, canvasW, canvasH);
-                                pres.Slides.Add(sNode);
+                                if (sObj is Dictionary<string, object>)
+                                {
+                                    SlideNode sNode = new SlideNode();
+                                    RenderSlideFromCanvasDict(sNode, (Dictionary<string, object>)sObj, globalPal, canvasW, canvasH);
+                                    pres.Slides.Add(sNode);
+                                }
                             }
+                            slides.ActiveSlideIndex = 0;
+                            appForm.Invalidate();
+                            result.ExecutionSummary = string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh theo yêu cầu!", slideList.Count);
+                            return;
                         }
-
-                        slides.ActiveSlideIndex = 0;
-                        appForm.Invalidate();
-                        result.ExecutionSummary = string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh theo yêu cầu!", slideList.Count);
-                        return;
                     }
                 }
             }
@@ -1745,6 +2018,7 @@ namespace ZenQOffice.Core
                         cardElem["title"] = cs.Title;
                         cardElem["desc"] = cs.Description;
                         cardElem["stat"] = cs.StatNumber;
+                        cardElem["icon"] = cs.IconOrBadge;
                         cardElem["bounds"] = new List<object> { (double)cx, (double)cardTopY, (double)cardW, (double)cardH };
                         elemList.Add(cardElem);
                     }
@@ -1886,30 +2160,7 @@ namespace ZenQOffice.Core
             {
                 var elementsList = (List<object>)dict["elements"];
 
-                // Auto-clamp multi-column card shapes and textboxes if AI specified overly tall bounds (e.g. h=650px for 2-column or 3-column card layouts)
-                foreach (var elemObj in elementsList)
-                {
-                    if (elemObj is Dictionary<string, object>)
-                    {
-                        var elem = (Dictionary<string, object>)elemObj;
-                        if (elem.ContainsKey("bounds") && elem["bounds"] is List<object>)
-                        {
-                            var bList = (List<object>)elem["bounds"];
-                            if (bList.Count >= 4)
-                            {
-                                double wVal = Convert.ToDouble(bList[2], CultureInfo.InvariantCulture);
-                                double hVal = Convert.ToDouble(bList[3], CultureInfo.InvariantCulture);
-                                string sTypeStr = GetString(elem, "shapeType", GetString(elem, "shape", GetString(elem, "type", ""))).ToLowerInvariant();
-
-                                if ((sTypeStr == "roundedrectangle" || sTypeStr == "card" || sTypeStr == "shape" || sTypeStr == "rectangle" || sTypeStr == "textbox" || sTypeStr == "text" || sTypeStr == "body") && wVal <= 650.0 && hVal > 280.0)
-                                {
-                                    bList[3] = 240.0;
-                                }
-                            }
-                        }
-                    }
-                }
-
+                // Explicit element bounds belong to the design, including tall columns and whitespace.
                 List<Dictionary<string, object>> cards = new List<Dictionary<string, object>>();
                 float nextHeaderY = 90f;
 
@@ -2060,14 +2311,7 @@ namespace ZenQOffice.Core
                     int strokeCol = ParseColor(strokeStr, pal.CardBorder);
                     float strokeW = (float)GetDouble(elem, "strokeWidth", GetDouble(elem, "borderWidth", 1.2));
 
-                    if ((sType == ShapeType.RoundedRectangle || sType == ShapeType.Rectangle) && bounds.Height > 320f && !string.IsNullOrEmpty(rawText) && rawText.Length < 250)
-                    {
-                        int lines = rawText.Split('\n').Length;
-                        if (lines <= 5)
-                        {
-                            bounds.Height = Math.Min(bounds.Height, Math.Max(180f, 50f + (lines * 32f) + 40f));
-                        }
-                    }
+                    
 
                     var bgShape = new ShapeNode
                     {
@@ -2255,6 +2499,10 @@ namespace ZenQOffice.Core
                 };
                 targetSlide.Shapes.Add(tableShape);
             }
+            else if (type == "card" || type == "kpi" || type == "item")
+            { RenderCardElement(targetSlide,elem,pal,bounds); }
+            else if (type == "image" || type == "picture" || type == "photo" || type == "img" || type == "vector" || type == "svg" || type == "icon")
+            { RenderImageOrVectorElement(targetSlide,elem,pal,bounds,type); }
             else
             {
                 // Hình dạng tự do (40+ loại: Hexagon, LuxuryHexagon, Gem, Shield, Star, Diamond, Chevron, RoundedRectangle...)
@@ -2264,14 +2512,7 @@ namespace ZenQOffice.Core
                 float strokeW = (float)GetDouble(elem, "strokeWidth", GetDouble(elem, "borderWidth", 1.4));
 
                 string sText = GetString(elem, "text", GetString(elem, "content", ""));
-                if ((sType == ShapeType.RoundedRectangle || sType == ShapeType.Rectangle) && bounds.Height > 320f && !string.IsNullOrEmpty(sText) && sText.Length < 250)
-                {
-                    int lines = sText.Split('\n').Length;
-                    if (lines <= 5)
-                    {
-                        bounds.Height = Math.Min(bounds.Height, Math.Max(180f, 50f + (lines * 32f) + 40f));
-                    }
-                }
+                
 
                 string morphName = GetString(elem, "morphName", GetString(elem, "morphId", GetString(elem, "id", "")));
 
@@ -2302,6 +2543,158 @@ namespace ZenQOffice.Core
                     targetSlide.Shapes.Add(txtNode);
                 }
             }
+        }
+
+        
+        private static void RenderCardElement(SlideNode targetSlide, Dictionary<string, object> elem, SlidePalette pal, Transform2D bounds)
+        {
+            int fill = ParseColor(GetString(elem, "fill", GetString(elem, "fillColor", GetString(elem, "bg", ""))), pal.CardBg);
+            int stroke = ParseColor(GetString(elem, "stroke", GetString(elem, "strokeColor", GetString(elem, "border", ""))), pal.CardBorder);
+            float strokeW = (float)GetDouble(elem, "strokeWidth", 1.2);
+            string morphName = GetString(elem, "morphName", GetString(elem, "morphId", GetString(elem, "id", "")));
+
+            var cardBox = new ShapeNode
+            {
+                Type = ShapeType.RoundedRectangle,
+                FillColor = fill,
+                FillOpacity = (float)GetDouble(elem, "fillOpacity", 1.0),
+                StrokeColor = stroke,
+                StrokeWidth = strokeW,
+                CornerRadius = 18f,
+                HasShadow = true,
+                ShadowBlur = 18f,
+                ShadowOffsetX = 0f,
+                ShadowOffsetY = 8f,
+                ShadowOpacity = pal.DarkTheme ? 0.35f : 0.14f,
+                Transform = bounds,
+                MorphName = morphName
+            };
+
+            if (GetBool(elem, "glass", false) || GetBool(elem, "glassmorphism", false))
+            {
+                cardBox.HasGlassmorphism = true;
+                cardBox.GlassTintColor = pal.DarkTheme ? 0x1E293B : 0xFFFFFF;
+                cardBox.GlassTintOpacity = pal.DarkTheme ? 0.35f : 0.70f;
+                cardBox.GlassBorderOpacity = 0.45f;
+                cardBox.GlassBlurRadius = 22.0f;
+            }
+            targetSlide.Shapes.Add(cardBox);
+
+            float padX = 24f;
+            float padY = 20f;
+            float curY = bounds.Y + padY;
+            float contentW = bounds.Width - padX * 2f;
+
+            // 1. Icon / Vector
+            string iconUrlOrName = GetString(elem, "icon", GetString(elem, "vector", GetString(elem, "svg", "")));
+            if (!string.IsNullOrEmpty(iconUrlOrName))
+            {
+                string resolvedUrl = ResolveGraphicsUrl(iconUrlOrName);
+                string iconId = Path.GetFileNameWithoutExtension(resolvedUrl);
+                if (string.IsNullOrEmpty(iconId)) iconId = "icon_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+                float iconSize = 48f;
+                Bitmap iconBmp = OnlineGraphicsManager.GetCachedOrDownloadImage(iconId, resolvedUrl, 512);
+                string localCached = OnlineGraphicsManager.GetCachedImagePath(iconId, resolvedUrl);
+
+                var iconShape = new ShapeNode
+                {
+                    Type = ShapeType.Image,
+                    IsSvg = true,
+                    IsGraphic = true,
+                    ImagePath = File.Exists(localCached) ? localCached : resolvedUrl,
+                    CachedImage = iconBmp,
+                    Transform = new Transform2D(bounds.X + padX, curY, iconSize, iconSize),
+                    OriginalWidth = iconBmp != null ? iconBmp.Width : (int)iconSize,
+                    OriginalHeight = iconBmp != null ? iconBmp.Height : (int)iconSize
+                };
+                targetSlide.Shapes.Add(iconShape);
+                curY += iconSize + 14f;
+            }
+
+            // 2. Stat / Value (e.g., "99.9%", "+150M", "Top 1")
+            string stat = GetString(elem, "stat", GetString(elem, "value", ""));
+            if (!string.IsNullOrEmpty(stat))
+            {
+                var statNode = CreateCleanTextBox(stat, "Segoe UI", 30f, true, pal.StatText, TextAlignment.Left, bounds.X + padX, curY, contentW, 42f);
+                targetSlide.Shapes.Add(statNode);
+                curY += 44f;
+            }
+
+            // 3. Card Title
+            string title = GetString(elem, "title", "");
+            if (!string.IsNullOrEmpty(title))
+            {
+                var titleNode = CreateCleanTextBox(title, "Segoe UI", 20f, true, pal.TitleColor, TextAlignment.Left, bounds.X + padX, curY, contentW, 32f);
+                targetSlide.Shapes.Add(titleNode);
+                curY += 34f;
+            }
+
+            // 4. Card Description
+            string desc = GetString(elem, "desc", GetString(elem, "description", GetString(elem, "text", "")));
+            if (!string.IsNullOrEmpty(desc))
+            {
+                float remainH = Math.Max(40f, bounds.Height - (curY - bounds.Y) - padY);
+                var descNode = CreateCleanTextBox(desc, "Segoe UI", 16f, false, pal.BodyColor, TextAlignment.Left, bounds.X + padX, curY, contentW, remainH);
+                targetSlide.Shapes.Add(descNode);
+            }
+        }
+
+        private static void RenderImageOrVectorElement(SlideNode targetSlide, Dictionary<string, object> elem, SlidePalette pal, Transform2D bounds, string type)
+        {
+            string inlineSvg=GetString(elem,"svg",GetString(elem,"svgContent",""));
+            if(!string.IsNullOrWhiteSpace(inlineSvg))
+            {
+                int width=(int)Math.Clamp(bounds.Width,1,1920),height=(int)Math.Clamp(bounds.Height,1,1920);
+                var bitmap=SvgRasterizer.RenderSvgToBitmap(inlineSvg,width,height);
+                if(bitmap==null)throw new FormatException("Không thể dựng minh họa SVG của slide.");
+                targetSlide.Shapes.Add(new ShapeNode{Type=ShapeType.Image,IsSvg=true,IsGraphic=true,SvgContent=inlineSvg,OriginalSvgContent=inlineSvg,CachedImage=bitmap,OriginalWidth=bitmap.Width,OriginalHeight=bitmap.Height,Transform=bounds});
+                return;
+            }
+            string url = GetString(elem, "url", GetString(elem, "src", GetString(elem, "image", GetString(elem, "icon", GetString(elem, "vectorUrl", GetString(elem, "path", ""))))));
+            string resolvedUrl = ResolveGraphicsUrl(url);
+            string id = GetString(elem, "id", Path.GetFileNameWithoutExtension(resolvedUrl));
+            if (string.IsNullOrEmpty(id)) id = "img_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+            bool isSvg = resolvedUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) || type == "svg" || type == "vector" || type == "icon";
+            Bitmap bmp = OnlineGraphicsManager.GetCachedOrDownloadImage(id, resolvedUrl, 1600);
+            string localCached = OnlineGraphicsManager.GetCachedImagePath(id, resolvedUrl);
+
+            var imgNode = new ShapeNode
+            {
+                Type = ShapeType.Image,
+                IsSvg = isSvg,
+                IsGraphic = isSvg,
+                ImagePath = File.Exists(localCached) ? localCached : resolvedUrl,
+                CachedImage = bmp,
+                OriginalWidth = bmp != null ? bmp.Width : (int)bounds.Width,
+                OriginalHeight = bmp != null ? bmp.Height : (int)bounds.Height,
+                Transform = bounds
+            };
+            targetSlide.Shapes.Add(imgNode);
+        }
+
+        private static string ResolveGraphicsUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return "";
+            string u = url.Trim();
+            if (u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return u;
+            }
+
+            var foundItem = OnlineGraphicsManager.FindItem(u);
+            if (foundItem != null && !string.IsNullOrEmpty(foundItem.url))
+            {
+                return foundItem.url;
+            }
+
+            if (u.StartsWith("public/")) u = u.Substring(7);
+            if (!u.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && !u.Contains("."))
+            {
+                u += ".svg";
+            }
+            return "https://raw.githubusercontent.com/thedanh6112009-collab/zenq-graphics-api/main/public/" + u.TrimStart('/');
         }
 
         #endregion
@@ -2715,15 +3108,6 @@ namespace ZenQOffice.Core
         private static ShapeNode CreateCleanTextBox(string text, string fontName, float fontSize, bool bold, int textColor, TextAlignment align, float x, float y, float w, float h, VerticalTextAlignment vAlign = VerticalTextAlignment.Top, bool italic = false)
         {
             float finalH = h;
-            if (!string.IsNullOrEmpty(text) && text.Length < 350 && w <= 750f && h > 260f)
-            {
-                int lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length;
-                if (lines <= 5)
-                {
-                    finalH = Math.Min(h, Math.Max(120f, 24f + (lines * (fontSize * 1.45f)) + 24f));
-                }
-            }
-
             return new ShapeNode
             {
                 Type = ShapeType.TextBox,
@@ -2736,7 +3120,8 @@ namespace ZenQOffice.Core
                 Alignment = align,
                 VerticalAlignment = vAlign,
                 LineSpacing = 1.38f,
-                FillColor = 0x00FFFFFF, // Trong suốt 100%
+                HasFill = false, // Plain text has no shape fill; RGB colors do not encode transparency.
+                FillColor = 0xFFFFFF,
                 FillOpacity = 1.0f,
                 StrokeColor = 0x00FFFFFF, // Không viền
                 StrokeWidth = 0.0f,
@@ -2942,6 +3327,7 @@ namespace ZenQOffice.Core
             if (clean == "flythrough" || clean == "xuyenkhong") return TransitionType.FlyThrough;
 
             // Exclusive GenOffice (Ưu tiên phân biệt chính xác Chảy tràn và Thủy dịch)
+            if (clean.Contains("colorwipe") || clean.Contains("colourwipe") || clean.Contains("gatmau")) return TransitionType.GenOffice_ColorWipe;
             if (clean.Contains("smoothflow") || clean.Contains("chaytran") || clean == "flow") return TransitionType.GenOffice_SmoothFlow;
             if (clean.Contains("liquid") || clean.Contains("fluid") || clean.Contains("thuydich")) return TransitionType.GenOffice_LiquidFluid;
             if (clean.Contains("goldenribbon") || clean.Contains("ribbon") || clean.Contains("luavang")) return TransitionType.GenOffice_GoldenRibbon;

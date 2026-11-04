@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -162,7 +162,7 @@ namespace ZenQOffice.UI
             Label lblType = new Label { Text = "Kiểu đường chéo:", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
             this.Controls.Add(lblType);
 
-            cmbDiagonalType = new ComboBox
+            cmbDiagonalType = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(16, curY + 20),
@@ -177,7 +177,7 @@ namespace ZenQOffice.UI
             Label lblThick = new Label { Text = "Độ dày nét kẻ:", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(250, curY), AutoSize = true };
             this.Controls.Add(lblThick);
 
-            cmbThickness = new ComboBox
+            cmbThickness = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(250, curY + 20),

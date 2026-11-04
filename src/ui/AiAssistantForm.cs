@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -482,13 +482,13 @@ namespace ZenQOffice.UI
             string userPrompt = txtPrompt.Text.Trim();
             if (string.IsNullOrEmpty(userPrompt))
             {
-                MessageBox.Show("Vui lòng nhập yêu cầu của bạn trước khi gửi.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập yêu cầu của bạn trước khi gửi.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (_config == null || (_config.Provider != AiProviderType.Ollama && string.IsNullOrWhiteSpace(_config.ApiKey)))
             {
-                var dr = MessageBox.Show("Bạn chưa nhập API Key cho Trợ lý AI.\nBạn có muốn mở bảng Cấu hình để nhập API Key ngay không?", "ZENQ AI - Chưa có API Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                var dr = ZenQOffice.UI.FluentMessageBox.Show("Bạn chưa nhập API Key cho Trợ lý AI.\nBạn có muốn mở bảng Cấu hình để nhập API Key ngay không?", "ZENQ AI - Chưa có API Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (dr == DialogResult.Yes)
                 {
                     using (AiConfigDialog dlg = new AiConfigDialog())

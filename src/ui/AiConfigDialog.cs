@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -38,297 +38,56 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Cấu hình & Thiết lập Trợ lý AI - ZENQ AI";
-            this.Size = new Size(680, 680);
-            this.MinimumSize = new Size(680, 680);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.BackColor = Color.FromArgb(248, 250, 252);
-            this.Font = new Font("Segoe UI", 9.5f);
-
-            Panel pnlMain = new Panel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                Padding = new Padding(24)
-            };
-            this.Controls.Add(pnlMain);
-
-            int curY = 16;
-
-            // 1. Header Banner
-            Panel pnlHeader = new Panel
-            {
-                Location = new Point(20, curY),
-                Size = new Size(620, 70),
-                BackColor = Color.White
-            };
-            pnlHeader.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
-                using (GraphicsPath gp = CreateRoundedRectanglePath(new RectangleF(0.5f, 0.5f, pnlHeader.Width - 1f, pnlHeader.Height - 1f), 12f))
-                using (Pen bPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
-                {
-                    e.Graphics.DrawPath(bPen, gp);
-                }
-                using (SolidBrush barB = new SolidBrush(Color.FromArgb(99, 102, 241)))
-                {
-                    e.Graphics.FillRectangle(barB, 0, 0, 6, pnlHeader.Height);
-                }
-                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE781', new RectangleF(16, 12, 22, 22), Color.FromArgb(99, 102, 241), 18f);
-            };
-
-            Label lblTitle = new Label
-            {
-                Text = "Thiết lập Trí tuệ Nhân tạo - ZENQ AI Engine",
-                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(44, 12),
-                AutoSize = true
-            };
-            pnlHeader.Controls.Add(lblTitle);
-
-            Label lblSub = new Label
-            {
-                Text = "Hỗ trợ Google AI Studio (Gemini 3.7/3.6/3.5/2.5), Groq Cloud, OpenAI, DeepSeek, Ollama & Custom API",
-                Font = new Font("Segoe UI", 8.8f),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(44, 38),
-                AutoSize = true
-            };
-            pnlHeader.Controls.Add(lblSub);
-
-            pnlMain.Controls.Add(pnlHeader);
-            curY += 85;
-
-            // 2. Settings Group Card
-            Panel pnlCard = new Panel
-            {
-                Location = new Point(20, curY),
-                Size = new Size(620, 410),
-                BackColor = Color.White
-            };
-            pnlCard.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
-                using (GraphicsPath gp = CreateRoundedRectanglePath(new RectangleF(0.5f, 0.5f, pnlCard.Width - 1f, pnlCard.Height - 1f), 12f))
-                using (Pen bPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
-                {
-                    e.Graphics.DrawPath(bPen, gp);
-                }
-            };
-
-            int formY = 16;
-
-            // Field: Provider
-            Label lblProv = new Label { Text = "Nhà cung cấp AI (Provider):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblProv);
-            formY += 24;
-
-            cboProvider = new ComboBox
-            {
-                Location = new Point(20, formY),
-                Size = new Size(580, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10f)
-            };
-            foreach (AiProviderType p in Enum.GetValues(typeof(AiProviderType)))
-            {
-                cboProvider.Items.Add(AiConfig.GetProviderDisplayName(p));
+            Text = "Cài đặt trợ lý AI"; ClientSize = new Size(600, 610);
+            MinimumSize = new Size(560, 520); StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = false; MinimizeBox = false;
+            ShowInTaskbar = false; BackColor = Color.White; Font = new Font("Segoe UI", 9.5f);
+            AutoScaleMode = AutoScaleMode.Dpi; AutoScaleDimensions = new SizeF(96,96);
+            var shell = new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=3, Margin=Padding.Empty };
+            shell.RowStyles.Add(new RowStyle(SizeType.Absolute,76));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.Absolute,100));Controls.Add(shell);
+            var header=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24,14,24,8)};
+            header.Controls.Add(new Label{Text="Kết nối mô hình bạn muốn sử dụng cho ZenQ Office.",Dock=DockStyle.Bottom,Height=22,ForeColor=Color.FromArgb(100,110,125)});
+            header.Controls.Add(new Label{Text="Trợ lý AI",Dock=DockStyle.Top,Height=30,Font=new Font("Segoe UI",17,FontStyle.Bold),ForeColor=Color.FromArgb(28,37,52)});
+            shell.Controls.Add(header,0,0);
+            var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(24,4,24,8)};shell.Controls.Add(scroll,0,1);
+            var fields=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=Padding.Empty};fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));scroll.Controls.Add(fields);
+            Control Field(string label,Control input,int height=32) {
+                var group=new Panel{Dock=DockStyle.Fill,Height=height+29,Margin=new Padding(0,0,0,12)};
+                group.Controls.Add(new Label{Text=label,Dock=DockStyle.Top,Height=23,ForeColor=Color.FromArgb(65,75,90),Font=new Font("Segoe UI",9f)});
+                input.Dock=DockStyle.Bottom;input.Height=height;group.Controls.Add(input);return group;
             }
-            cboProvider.SelectedIndexChanged += CboProvider_SelectedIndexChanged;
-            pnlCard.Controls.Add(cboProvider);
-            formY += 42;
-
-            // Field: Model Name
-            Label lblModel = new Label { Text = "Tên Model (Model Name):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblModel);
-            formY += 24;
-
-            cboModel = new ComboBox
-            {
-                Location = new Point(20, formY),
-                Size = new Size(580, 30),
-                DropDownStyle = ComboBoxStyle.DropDown,
-                Font = new Font("Segoe UI", 10f)
-            };
-            pnlCard.Controls.Add(cboModel);
-            formY += 42;
-
-            // Field: API Key
-            Label lblKey = new Label { Text = "Chuỗi API Key (Mật mã API):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblKey);
-            formY += 24;
-
-            txtApiKey = new TextBox
-            {
-                Location = new Point(20, formY),
-                Size = new Size(520, 28),
-                Font = new Font("Segoe UI", 10f),
-                UseSystemPasswordChar = true
-            };
-            pnlCard.Controls.Add(txtApiKey);
-
-            btnToggleKey = new Button
-            {
-                Location = new Point(545, formY - 1),
-                Size = new Size(55, 30),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(241, 245, 249),
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE7B3', 16, 16, Color.FromArgb(71, 85, 105)),
-                Cursor = Cursors.Hand
-            };
-            btnToggleKey.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnToggleKey.Click += (s, e) =>
-            {
-                txtApiKey.UseSystemPasswordChar = !txtApiKey.UseSystemPasswordChar;
-                btnToggleKey.Image = FluentIconRenderer.GetGlyphBitmap(
-                    txtApiKey.UseSystemPasswordChar ? '\uE7B3' : '\uE890', 16, 16, Color.FromArgb(71, 85, 105));
-            };
-            pnlCard.Controls.Add(btnToggleKey);
-            formY += 42;
-
-            // Field: Custom Endpoint
-            Label lblEp = new Label { Text = "Đường dẫn Endpoint URL (Tùy chọn / Mặc định):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblEp);
-            formY += 24;
-
-            txtEndpoint = new TextBox
-            {
-                Location = new Point(20, formY),
-                Size = new Size(580, 28),
-                Font = new Font("Segoe UI", 9.5f)
-            };
-            pnlCard.Controls.Add(txtEndpoint);
-            formY += 42;
-
-            // Field: Temperature
-            Label lblTemp = new Label { Text = "Độ sáng tạo (Temperature):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblTemp);
-
-            lblTempValue = new Label { Text = "0.7", Location = new Point(560, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold), ForeColor = Color.FromArgb(99, 102, 241) };
-            pnlCard.Controls.Add(lblTempValue);
-            formY += 24;
-
-            trkTemp = new TrackBar
-            {
-                Location = new Point(15, formY),
-                Size = new Size(590, 45),
-                Minimum = 0,
-                Maximum = 15,
-                Value = 7,
-                TickFrequency = 1,
-                BackColor = Color.White
-            };
-            trkTemp.ValueChanged += (s, e) =>
-            {
-                float val = trkTemp.Value / 10.0f;
-                lblTempValue.Text = val.ToString("0.0");
-            };
-            pnlCard.Controls.Add(trkTemp);
-            formY += 44;
-
-            // Field: System Prompt
-            Label lblSys = new Label { Text = "Chỉ dẫn hệ thống (System Prompt):", Location = new Point(20, formY), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
-            pnlCard.Controls.Add(lblSys);
-            formY += 24;
-
-            txtSystemPrompt = new TextBox
-            {
-                Location = new Point(20, formY),
-                Size = new Size(580, 50),
-                Multiline = true,
-                ScrollBars = ScrollBars.Vertical,
-                Font = new Font("Segoe UI", 9f)
-            };
-            pnlCard.Controls.Add(txtSystemPrompt);
-
-            pnlMain.Controls.Add(pnlCard);
-            curY += 425;
-
-            // 3. Status Bar
-            lblStatus = new Label
-            {
-                Text = "Trạng thái: Chưa kiểm tra kết nối",
-                Location = new Point(22, curY),
-                Size = new Size(618, 30),
-                Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            pnlMain.Controls.Add(lblStatus);
-            curY += 36;
-
-            // 4. Action Buttons Footer
-            Panel pnlButtons = new Panel
-            {
-                Location = new Point(20, curY),
-                Size = new Size(620, 45)
-            };
-
-            btnTest = new Button
-            {
-                Text = "Kiểm tra kết nối",
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE945', 16, 16, Color.FromArgb(30, 41, 59)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0),
-                Location = new Point(0, 0),
-                Size = new Size(160, 40),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnTest.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnTest.Click += BtnTest_Click;
-            pnlButtons.Controls.Add(btnTest);
-
-            btnSave = new Button
-            {
-                Text = "Lưu & Kích hoạt",
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE74E', 16, 16, Color.White),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0),
-                Location = new Point(340, 0),
-                Size = new Size(160, 40),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(99, 102, 241),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnSave.FlatAppearance.BorderSize = 0;
-            btnSave.Click += BtnSave_Click;
-            pnlButtons.Controls.Add(btnSave);
-
-            btnClose = new Button
-            {
-                Text = "Đóng",
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 14, 14, Color.FromArgb(51, 65, 85)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0),
-                Location = new Point(510, 0),
-                Size = new Size(110, 40),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(226, 232, 240),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => this.Close();
-            pnlButtons.Controls.Add(btnClose);
-
-            pnlMain.Controls.Add(pnlButtons);
+            void Row(Control control,int height){int row=fields.RowCount++;fields.RowStyles.Add(new RowStyle(SizeType.Absolute,height));fields.Controls.Add(control,0,row);fields.SetColumnSpan(control,2);}
+            cboProvider=new FluentComboBox{DropDownStyle=ComboBoxStyle.DropDownList,IntegralHeight=false,MaxDropDownItems=8};
+            foreach(AiProviderType provider in Enum.GetValues(typeof(AiProviderType)))cboProvider.Items.Add(AiConfig.GetProviderDisplayName(provider));
+            cboModel=new FluentComboBox{DropDownStyle=ComboBoxStyle.DropDown,IntegralHeight=false,MaxDropDownItems=8};
+            fields.RowStyles.Add(new RowStyle(SizeType.Absolute,72));fields.RowCount=1;
+            var providerField=Field("Nhà cung cấp",cboProvider);providerField.Margin=new Padding(0,0,10,12);fields.Controls.Add(providerField,0,0);
+            fields.Controls.Add(Field("Mô hình",cboModel),1,0);
+            txtApiKey=new TextBox{BorderStyle=BorderStyle.None,UseSystemPasswordChar=true};
+            var keyBox=new SettingsInputFrame(txtApiKey);
+            btnToggleKey=new SettingsActionButton{Text="Hiện",Size=new Size(48,24),TabStop=true,AccessibleName="Hiện hoặc ẩn khóa API"};keyBox.Controls.Add(btnToggleKey);keyBox.Padding=new Padding(10,7,58,5);keyBox.Layout+=(s,e)=>btnToggleKey.SetBounds(Math.Max(0,keyBox.Width-54),4,48,24);
+            btnToggleKey.Click+=(s,e)=>{txtApiKey.UseSystemPasswordChar=!txtApiKey.UseSystemPasswordChar;btnToggleKey.Text=txtApiKey.UseSystemPasswordChar?"Hiện":"Ẩn";};
+            Row(Field("Khóa API",keyBox),72);
+            txtEndpoint=new TextBox{BorderStyle=BorderStyle.None,PlaceholderText="Dùng địa chỉ mặc định của nhà cung cấp"};
+            Row(Field("Địa chỉ API · tùy chọn",new SettingsInputFrame(txtEndpoint)),72);
+            var temperature=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,8)};
+            temperature.Controls.Add(new Label{Text="Độ sáng tạo",Location=new Point(0,0),AutoSize=true,ForeColor=Color.FromArgb(65,75,90)});
+            lblTempValue=new Label{Text="0.7",Dock=DockStyle.Right,Width=40,TextAlign=ContentAlignment.MiddleRight,ForeColor=Color.FromArgb(79,70,229)};temperature.Controls.Add(lblTempValue);
+            trkTemp=new TrackBar{Minimum=0,Maximum=15,Value=7,TickStyle=TickStyle.None,AutoSize=false,Height=28,Dock=DockStyle.Bottom,BackColor=Color.White};temperature.Controls.Add(trkTemp);
+            trkTemp.ValueChanged+=(s,e)=>lblTempValue.Text=(trkTemp.Value/10f).ToString("0.0");Row(temperature,58);
+            txtSystemPrompt=new TextBox{BorderStyle=BorderStyle.None,Multiline=true,ScrollBars=ScrollBars.Vertical,AcceptsReturn=true};
+            Row(Field("Chỉ dẫn hệ thống",new SettingsInputFrame(txtSystemPrompt),100),140);
+            var footer=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24,6,24,16),BackColor=Color.FromArgb(248,250,252)};shell.Controls.Add(footer,0,2);
+            lblStatus=new Label{Text="Chưa kiểm tra kết nối",Dock=DockStyle.Top,Height=30,ForeColor=Color.FromArgb(100,110,125),AutoEllipsis=true};footer.Controls.Add(lblStatus);
+            var actions=new TableLayoutPanel{Dock=DockStyle.Bottom,Height=36,ColumnCount=4,RowCount=1};
+            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,138));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,80));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,120));
+            btnTest=new SettingsActionButton{Text="Kiểm tra kết nối",Dock=DockStyle.Fill,Margin=Padding.Empty};btnTest.Click+=BtnTest_Click;
+            btnClose=new SettingsActionButton{Text="Đóng",Dock=DockStyle.Fill,Margin=new Padding(0,0,8,0),DialogResult=DialogResult.Cancel};btnClose.Click+=(s,e)=>Close();
+            btnSave=new SettingsActionButton{Text="Lưu thiết lập",Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty};btnSave.Click+=BtnSave_Click;
+            actions.Controls.Add(btnTest,0,0);actions.Controls.Add(btnClose,2,0);actions.Controls.Add(btnSave,3,0);footer.Controls.Add(actions);
+            CancelButton=btnClose; AcceptButton=btnSave;
+            cboProvider.SelectedIndexChanged+=CboProvider_SelectedIndexChanged;
+            Shown+=(s,e)=>{FluentUi.RoundWindow(this);btnClose.Focus();};
         }
 
         private void LoadConfigToUi()
@@ -489,13 +248,14 @@ namespace ZenQOffice.UI
                 activeProf.Temperature = temp;
 
                 if (activeProf.SavedModels == null) activeProf.SavedModels = new List<string>();
-                if (!string.IsNullOrEmpty(model) && !activeProf.SavedModels.Contains(model))
+                if (!string.IsNullOrEmpty(model) && AiKeyProfile.IsModelCompatible(prov, model) && !activeProf.SavedModels.Contains(model))
                 {
                     activeProf.SavedModels.Insert(0, model);
                 }
-                // Sanitize obsolete models
+                // Sanitize obsolete and incompatible models
                 activeProf.SavedModels.RemoveAll(m => m == "gemini-3.1-flash" || (prov == AiProviderType.GoogleAIStudio && (m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro")));
-                if (activeProf.SavedModels.Count == 0 && !string.IsNullOrEmpty(model))
+                activeProf.RemoveIncompatibleModels();
+                if (activeProf.SavedModels.Count == 0 && !string.IsNullOrEmpty(model) && AiKeyProfile.IsModelCompatible(prov, model))
                 {
                     activeProf.SavedModels.Add(model);
                 }
@@ -511,8 +271,10 @@ namespace ZenQOffice.UI
 
             AiService.SendPromptAsync(Config, "System check", "Xin chào! Trả lời 'OK' nếu kết nối hoạt động.", "", resp =>
             {
+                if(IsDisposed || Disposing || !IsHandleCreated) return;
                 this.BeginInvoke(new Action(() =>
                 {
+                    if(IsDisposed || Disposing) return;
                     btnTest.Enabled = true;
                     if (resp.Success)
                     {

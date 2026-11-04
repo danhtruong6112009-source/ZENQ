@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -206,7 +206,7 @@ namespace ZenQOffice.UI
 
             // ==================== 5. APPLY TO & BUTTONS ====================
             Label lblApply = new Label { Text = "Áp dụng vào:", Location = new Point(14, 265), AutoSize = true };
-            cboApplyTo = new ComboBox { Location = new Point(95, 262), Size = new Size(162, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboApplyTo = new ZenQOffice.UI.FluentComboBox { Location = new Point(95, 262), Size = new Size(162, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboApplyTo.Items.AddRange(new object[] { "Toàn bộ tài liệu (Whole document)", "Đoạn văn bản đã chọn", "Từ điểm này trở đi" });
             cboApplyTo.SelectedIndex = 0;
             Controls.Add(lblApply);

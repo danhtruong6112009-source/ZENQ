@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -161,7 +161,7 @@ namespace ZenQOffice.UI
             Panel cardUsb = CreateSectionCard("Ổ đĩa USB", '\uE88E', new Point(16, 216), new Size(608, 118));
             body.Controls.Add(cardUsb);
 
-            _cboUsbDrives = new ComboBox
+            _cboUsbDrives = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9f),
@@ -183,7 +183,7 @@ namespace ZenQOffice.UI
             btnOpenUsbFile.Click += (sender, e) => OpenSelectedUsbFile();
             cardUsb.Controls.Add(btnOpenUsbFile);
 
-            _lstUsbFiles = new ListBox
+            _lstUsbFiles = new ZenQOffice.UI.FluentListBox
             {
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(51, 65, 85),
@@ -403,7 +403,7 @@ namespace ZenQOffice.UI
             int idx = _cboUsbDrives.SelectedIndex;
             if (idx < 0 || idx >= drives.Count)
             {
-                MessageBox.Show("Chưa có ổ đĩa USB nào được kết nối.",
+                ZenQOffice.UI.FluentMessageBox.Show("Chưa có ổ đĩa USB nào được kết nối.",
                     "Sao lưu ra USB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -412,13 +412,13 @@ namespace ZenQOffice.UI
             string destPath, err;
             if (PeripheralDeviceManager.BackupFileToUsb(docPath, drives[idx].DriveLetter, out destPath, out err))
             {
-                MessageBox.Show("Đã sao lưu tài liệu tại:\n" + destPath,
+                ZenQOffice.UI.FluentMessageBox.Show("Đã sao lưu tài liệu tại:\n" + destPath,
                     "Sao lưu thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 RefreshUsbFilesList();
             }
             else
             {
-                MessageBox.Show(err ?? "Không thể sao lưu tệp ra USB.",
+                ZenQOffice.UI.FluentMessageBox.Show(err ?? "Không thể sao lưu tệp ra USB.",
                     "Sao lưu ra USB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -467,7 +467,7 @@ namespace ZenQOffice.UI
                     {
                         using (Bitmap raw = new Bitmap(ofd.FileName))
                         {
-                            DialogResult bwAsk = MessageBox.Show(
+                            DialogResult bwAsk = ZenQOffice.UI.FluentMessageBox.Show(
                                 "Chuyển ảnh sang chế độ Đen-Trắng độ tương phản cao?\n\n• Yes: Đen-Trắng (rõ chữ)\n• No: Giữ màu gốc",
                                 "Làm nét ảnh tài liệu",
                                 MessageBoxButtons.YesNo,
@@ -481,7 +481,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Không thể xử lý ảnh: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show("Không thể xử lý ảnh: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }

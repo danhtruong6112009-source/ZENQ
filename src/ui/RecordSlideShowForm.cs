@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -875,7 +875,7 @@ namespace ZenQOffice.UI
 
             if (promptSaveVideo)
             {
-                DialogResult ask = MessageBox.Show(
+                DialogResult ask = ZenQOffice.UI.FluentMessageBox.Show(
                     "Đã hoàn thành phiên ghi hình bài thuyết trình!\n\nBạn có muốn chọn vị trí lưu tệp video trình chiếu (.mp4 / .wmv / .avi) ngay bây giờ không?",
                     "Lưu Bản Ghi Video (Save Recorded Presentation Video)",
                     MessageBoxButtons.YesNo,
@@ -919,7 +919,7 @@ namespace ZenQOffice.UI
 
                 if (_presentation == null || _presentation.Slides.Count == 0)
                 {
-                    if (showSuccessDialog) MessageBox.Show("Không có slide nào để xuất video!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show("Không có slide nào để xuất video!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -953,7 +953,7 @@ namespace ZenQOffice.UI
 
                 if (showSuccessDialog)
                 {
-                    DialogResult openFolder = MessageBox.Show(
+                    DialogResult openFolder = ZenQOffice.UI.FluentMessageBox.Show(
                         string.Format("Bản ghi video đã được xuất thành công tại:\n\n{0}\n\nBạn có muốn mở thư mục chứa video không?", targetPath),
                         "Xuất Video Thành Công (Export Complete)",
                         MessageBoxButtons.YesNo,
@@ -973,7 +973,7 @@ namespace ZenQOffice.UI
             {
                 Cursor = Cursors.Default;
                 Console.WriteLine("EXPORT ERROR: " + ex.ToString());
-                if (showSuccessDialog) MessageBox.Show("Lỗi khi xuất video: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất video: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1291,7 +1291,7 @@ namespace ZenQOffice.UI
 
         private void ShowClearMenu(Point loc)
         {
-            ContextMenuStrip menu = new ContextMenuStrip();
+            ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Items.Add("Xóa bản ghi trên slide hiện tại (Clear on Current Slide)", null, (s, e) =>
             {
                 if (_slideAnnotations.ContainsKey(_currentSlideIndex))
@@ -1323,7 +1323,7 @@ namespace ZenQOffice.UI
 
         private void ShowSettingsMenu(Point loc)
         {
-            ContextMenuStrip menu = new ContextMenuStrip();
+            ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Items.Add("🎤 Thiết bị Microphone: Mặc định (Default Mic)", null, null).Enabled = false;
             menu.Items.Add("📷 Thiết bị Camera: Webcam HD", null, null).Enabled = false;
             menu.Show(this, loc);

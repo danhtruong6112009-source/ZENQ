@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -281,11 +281,11 @@ namespace ZenQOffice.UI
                         {
                             string json = string.Format("{{\n  \"StyleSetIndex\": {0},\n  \"Name\": \"{1}\"\n}}", _activeIndex, "Custom Style Set");
                             System.IO.File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
-                            MessageBox.Show("Đã lưu và xuất bộ kiểu ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu và xuất bộ kiểu ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Lỗi khi xuất bộ kiểu: " + ex.Message, "Lỗi xuất bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất bộ kiểu: " + ex.Message, "Lỗi xuất bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -318,11 +318,11 @@ namespace ZenQOffice.UI
                         {
                             string fName = System.IO.Path.GetFileNameWithoutExtension(ofd.FileName);
                             if (OnStyleSetSelected != null) OnStyleSetSelected(0);
-                            MessageBox.Show("Đã nạp và áp dụng bộ kiểu '" + fName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show("Đã nạp và áp dụng bộ kiểu '" + fName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Lỗi khi nhập bộ kiểu: " + ex.Message, "Lỗi nhập bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi nhập bộ kiểu: " + ex.Message, "Lỗi nhập bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }

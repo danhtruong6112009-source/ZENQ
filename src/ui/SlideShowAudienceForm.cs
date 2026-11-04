@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
@@ -117,6 +117,8 @@ namespace ZenQOffice.UI
             base.OnMouseDown(e);
             if (_slidesView == null || _appForm == null) return;
 
+            if(_slidesView.IsSlideSorterModalOpen) { _slidesView.HandleMouseDown(e.Location,ClientSize.Width,ClientSize.Height,e.Button,this); Invalidate(); return; }
+            if (e.Button == MouseButtons.Left && _slidesView.TryToggleHoveredGif(e.Location, ClientSize.Width, ClientSize.Height, true)) { Invalidate(); return; }
             if (e.Button == MouseButtons.Left)
             {
                 _slidesView.AdvancePresenterStep();
@@ -134,9 +136,31 @@ namespace ZenQOffice.UI
             }
         }
 
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            if (_slidesView==null) return;
+            if(!_slidesView.ScrollPresentationGrid(e.Delta,ClientSize.Width,ClientSize.Height))
+            { if(e.Delta<0) _slidesView.AdvancePresenterStep(); else if(e.Delta>0) _slidesView.PreviousPresenterStep(); }
+            Invalidate();
+        }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            _slidesView?.HandleMouseUp(e.Location,ClientSize.Width,ClientSize.Height);
+        }
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _slidesView?.ClearGifHover();
+            Invalidate();
+        }
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            if(_slidesView?.IsSlideSorterModalOpen==true) _slidesView.HandleMouseMove(e.Location,ClientSize.Width,ClientSize.Height);
+            else _slidesView?.UpdateGifHover(e.Location, ClientSize.Width, ClientSize.Height, true);
+            Invalidate();
             if (_slidesView != null && _slidesView.LaserPointerMode)
             {
                 _slidesView.CurrentLaserPoint = e.Location;

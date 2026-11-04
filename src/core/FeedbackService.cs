@@ -66,7 +66,7 @@ namespace ZenQOffice.Core
             }
             catch
             {
-                return "ZenQ Office 5.8 | Windows";
+                return "ZenQ Office 6.0 | Windows";
             }
         }
 

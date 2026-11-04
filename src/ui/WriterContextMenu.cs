@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -868,7 +868,7 @@ namespace ZenQOffice.UI
                     if (!string.IsNullOrEmpty(comment))
                     {
                         _writerView.ApplyHighlightToSelectionOrTyping(Color.FromArgb(254, 240, 138));
-                        MessageBox.Show("Đã thêm ghi chú: \"" + comment + "\"", "New Comment", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show("Đã thêm ghi chú: \"" + comment + "\"", "New Comment", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         if (_parentForm != null) _parentForm.Invalidate();
                     }
                     break;
@@ -954,7 +954,7 @@ namespace ZenQOffice.UI
                     break;
 
                 case 14: // Align ≡ ▾
-                    ContextMenuStrip aMenu = new ContextMenuStrip();
+                    ContextMenuStrip aMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                     aMenu.Items.Add("Căn trái (Left: Ctrl+L)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(0); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Items.Add("Căn giữa (Center: Ctrl+E)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(1); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Items.Add("Căn phải (Right: Ctrl+R)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(2); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
@@ -1113,10 +1113,10 @@ namespace ZenQOffice.UI
 
             WriterFloatingMiniToolbarForm.CloseCurrent();
 
-            ContextMenuStrip cms = new ContextMenuStrip();
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.ShowImageMargin = true;
             cms.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
-            cms.Renderer = new ExcelMenuRenderer();
+            cms.Renderer = FluentUi.MenuRenderer;
 
             // 1. Mini-Toolbar Host
             WriterMiniToolbarControl toolbar = new WriterMiniToolbarControl(writerView, ribbon, parentForm, null);
@@ -1184,7 +1184,7 @@ namespace ZenQOffice.UI
             // 6. Paragraph...
             cms.Items.Add(CreateMenuItem("Paragraph...", CreateParagraphIcon(), (s, e) =>
             {
-                ContextMenuStrip pMenu = new ContextMenuStrip();
+                ContextMenuStrip pMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                 pMenu.Items.Add("Căn trái (Left: Ctrl+L)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(0); if (parentForm != null) parentForm.Invalidate(); });
                 pMenu.Items.Add("Căn giữa (Center: Ctrl+E)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(1); if (parentForm != null) parentForm.Invalidate(); });
                 pMenu.Items.Add("Căn phải (Right: Ctrl+R)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(2); if (parentForm != null) parentForm.Invalidate(); });

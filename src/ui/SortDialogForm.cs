@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -47,7 +47,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblSortBy = new Label { Text = "Đối tượng:", Location = new Point(14, 26), AutoSize = true };
-            _cboSortBy = new ComboBox
+            _cboSortBy = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 23),
                 Size = new Size(130, 23),
@@ -57,7 +57,7 @@ namespace ZenQOffice.UI
             _cboSortBy.SelectedIndex = 0;
 
             Label lblType = new Label { Text = "Kiểu dữ liệu:", Location = new Point(14, 56), AutoSize = true };
-            _cboType = new ComboBox
+            _cboType = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 53),
                 Size = new Size(130, 23),

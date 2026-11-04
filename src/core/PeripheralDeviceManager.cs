@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -593,7 +593,7 @@ namespace ZenQOffice.Core
             }
             catch
             {
-                MessageBox.Show("Không tìm thấy trình điều khiển máy quét WIA mặc định hoặc chưa kết nối máy Scan USB/LAN.",
+                ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy trình điều khiển máy quét WIA mặc định hoặc chưa kết nối máy Scan USB/LAN.",
                     "Quét Tài Liệu (WIA Scanner)", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }

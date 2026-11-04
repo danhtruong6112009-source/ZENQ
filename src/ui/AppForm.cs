@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -25,6 +25,7 @@ namespace ZenQOffice.UI
         private AiConfigPanel _aiConfigPanel;
         public AiConfigPanel AiConfigPanel { get { return _aiConfigPanel; } }
         private D2DGraphics _appD2d;
+        private GpuHwndSurface _gpuSurface;
 
         public void OpenBackstageView(int defaultTab = 0, OfficeAppMode? overrideMode = null)
         {
@@ -59,6 +60,7 @@ namespace ZenQOffice.UI
         public void ResetCursorBlink()
         {
             if (WriterView != null) WriterView.CursorVisible = true;
+            if (SlidesView != null) SlidesView.CursorVisible = true;
             if (_cursorTimer != null)
             {
                 _cursorTimer.Stop();
@@ -191,7 +193,7 @@ namespace ZenQOffice.UI
                     Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                     UpdateStandaloneTitle();
                     Invalidate();
-                    MessageBox.Show("Đã lưu tài liệu thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tài liệu thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -208,7 +210,7 @@ namespace ZenQOffice.UI
                     Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                     UpdateStandaloneTitle();
                     Invalidate();
-                    MessageBox.Show("Đã lưu bản trình chiếu thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bản trình chiếu thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -225,7 +227,7 @@ namespace ZenQOffice.UI
                     Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                     UpdateStandaloneTitle();
                     Invalidate();
-                    MessageBox.Show("Đã lưu bảng tính thành công!", "ZENQ OFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bảng tính thành công!", "ZENQ OFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -242,7 +244,7 @@ namespace ZenQOffice.UI
                     Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                     UpdateStandaloneTitle();
                     Invalidate();
-                    MessageBox.Show("Đã lưu tệp PDF thành công!", "ZENQ OFFICE PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tệp PDF thành công!", "ZENQ OFFICE PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -259,7 +261,7 @@ namespace ZenQOffice.UI
                     Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                     UpdateStandaloneTitle();
                     Invalidate();
-                    MessageBox.Show("Đã lưu thiết kế thành công!", "Thiết kế & Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã lưu thiết kế thành công!", "Thiết kế & Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -461,6 +463,8 @@ namespace ZenQOffice.UI
                     else if (mode == OfficeAppMode.Writer) iconName = "icon\\writer.ico";
                     else if (mode == OfficeAppMode.Photo) iconName = System.IO.File.Exists(System.IO.Path.Combine(baseDir, "icon\\vector.ico")) ? "icon\\vector.ico" : "icon\\photo.ico";
 
+                    string newIconName = System.IO.Path.Combine("icon",System.IO.Path.GetFileNameWithoutExtension(iconName)+"_new.ico");
+                    if(System.IO.File.Exists(System.IO.Path.Combine(baseDir,newIconName)))iconName=newIconName;
                     string iconPath = System.IO.Path.Combine(baseDir, iconName);
                     if (System.IO.File.Exists(iconPath))
                     {
@@ -470,7 +474,7 @@ namespace ZenQOffice.UI
                 }
 
                 // Ứng dụng mẹ GenOffice (Hub đầy đủ tab): LUÔN LUÔN giữ nguyên Icon chính thức ZenQOffice.ico
-                string hubIconPath = System.IO.Path.Combine(baseDir, "ZenQOffice.ico");
+                string hubIconPath = System.IO.Path.Combine(baseDir,"ZenQOffice.ico");
                 if (System.IO.File.Exists(hubIconPath))
                 {
                     this.Icon = new Icon(hubIconPath);
@@ -912,31 +916,91 @@ namespace ZenQOffice.UI
                 {
                     botH = (int)Math.Round(26f * Ribbon.CurrentDpiScale);
                 }
-                int sbH = Math.Max(100, ClientSize.Height - topY - botH);
+                float dpiScale = (Ribbon != null && Ribbon.CurrentDpiScale > 0) ? Ribbon.CurrentDpiScale : 1.0f;
 
-                int sbW;
-                if (_aiSidebar.IsCanvasOpen)
+                if (_aiSidebar.IsIslandMode)
                 {
-                    int targetW = (int)(ClientSize.Width * 0.68f);
-                    int maxAllowed = Math.Max(300, ClientSize.Width - 280);
-                    sbW = Math.Min(maxAllowed, Math.Max(640, Math.Min(1120, targetW)));
+                    int sbW;
+                    if (_aiSidebar.IsCanvasOpen)
+                    {
+                        int targetW = (int)(ClientSize.Width * 0.70f);
+                        int maxAllowed = Math.Max(320, ClientSize.Width - 60);
+                        sbW = Math.Min(maxAllowed, Math.Max(640, Math.Min(1120, targetW)));
+                    }
+                    else
+                    {
+                        sbW = Math.Min(ClientSize.Width - 40, (int)Math.Round(395f * dpiScale));
+                    }
+                    int availH = ClientSize.Height - topY - botH;
+                    int sbH = Math.Min(availH - 20, Math.Max(380, (int)(availH * 0.88f)));
+
+                    if (!_aiSidebar.HasCustomPosition)
+                    {
+                        int islandX = Math.Max(12, ClientSize.Width - sbW - 16);
+                        int islandY = Math.Max(topY + 6, topY + 12);
+                        _aiSidebar.Location = new Point(islandX, islandY);
+                    }
+                    else
+                    {
+                        int curX = Math.Max(10, Math.Min(ClientSize.Width - sbW - 10, _aiSidebar.Left));
+                        int curY = Math.Max(topY + 4, Math.Min(ClientSize.Height - 80, _aiSidebar.Top));
+                        _aiSidebar.Location = new Point(curX, curY);
+                    }
+
+                    _aiSidebar.Size = new Size(sbW, sbH);
+                    _aiSidebar.UpdateIslandStyle();
+                    _aiSidebar.BringToFront();
                 }
                 else
                 {
-                    float dpiScale = (Ribbon != null && Ribbon.CurrentDpiScale > 0) ? Ribbon.CurrentDpiScale : 1.0f;
-                    sbW = Math.Min(ClientSize.Width - 40, (int)Math.Round(380f * dpiScale));
-                }
+                    int sbH = Math.Max(100, ClientSize.Height - topY - botH);
+                    int sbW;
+                    if (_aiSidebar.IsCanvasOpen)
+                    {
+                        int targetW = (int)(ClientSize.Width * 0.68f);
+                        int maxAllowed = Math.Max(300, ClientSize.Width - 280);
+                        sbW = Math.Min(maxAllowed, Math.Max(640, Math.Min(1120, targetW)));
+                    }
+                    else
+                    {
+                        sbW = Math.Min(ClientSize.Width - 40, (int)Math.Round(380f * dpiScale));
+                    }
 
-                _aiSidebar.Location = new Point(Math.Max(0, ClientSize.Width - sbW), topY);
-                _aiSidebar.Size = new Size(sbW, sbH);
-                _aiSidebar.BringToFront();
+                    _aiSidebar.Location = new Point(Math.Max(0, ClientSize.Width - sbW), topY);
+                    _aiSidebar.Size = new Size(sbW, sbH);
+                    _aiSidebar.UpdateIslandStyle();
+                    _aiSidebar.BringToFront();
+                }
             }
+        }
+
+        private void DrawAiSidebarIslandShadow(D2DGraphics g)
+        {
+            if (_aiSidebar == null || !_aiSidebar.Visible || !_aiSidebar.UsesRoundedFrame) return;
+
+            Rectangle b = _aiSidebar.Bounds;
+            if (b.Width <= 0 || b.Height <= 0) return;
+            float radius = 12f;
+
+            // A single close, low-opacity shadow avoids stacked bands below the island.
+            if (_aiSidebar.IsIslandMode)
+            {
+                RectangleF shadowBounds = new RectangleF(b.X - 0.5f, b.Y + 1f, b.Width + 1f, b.Height + 0.5f);
+                using var shadow = new SolidBrush(Color.FromArgb(14, 0, 0, 0));
+                g.FillRoundedRectangle(shadow, shadowBounds, radius + 0.5f);
+            }
+
+            _aiSidebar.DrawHostBackdrop(g, b);
         }
 
         public int GetEffectiveDocWidth(int totalWidth)
         {
             if (_aiSidebar != null && _aiSidebar.Visible && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
             {
+                if (_aiSidebar.IsIslandMode)
+                {
+                    return totalWidth; // Chế độ Island: Trôi nổi độc lập không bóp méo khổ tài liệu
+                }
                 return Math.Max(300, totalWidth - _aiSidebar.Width);
             }
             return totalWidth;
@@ -987,9 +1051,9 @@ namespace ZenQOffice.UI
             Size = new Size(1366, 800);
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;
-            DoubleBuffered = true;
+            DoubleBuffered = false;
             AllowDrop = true;
-            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.Opaque, true);
 
             try
             {
@@ -1074,7 +1138,7 @@ namespace ZenQOffice.UI
             try
             {
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string hubIconPath = System.IO.Path.Combine(baseDir, "ZenQOffice.ico");
+                string hubIconPath = System.IO.Path.Combine(baseDir,"ZenQOffice.ico");
                 if (System.IO.File.Exists(hubIconPath))
                 {
                     this.Icon = new Icon(hubIconPath);
@@ -1093,9 +1157,11 @@ namespace ZenQOffice.UI
             _cursorTimer.Interval = 530;
             _cursorTimer.Tick += (s, e) =>
             {
+                if(FluentUi.IsMenuOpen)return;
                 WriterView.CursorVisible = !WriterView.CursorVisible;
                 if (PdfView != null) PdfView.ShowCursor = !PdfView.ShowCursor;
-                if ((Ribbon.CurrentMode == OfficeAppMode.Writer || Ribbon.CurrentMode == OfficeAppMode.Pdf) && !SlidesView.IsPresenting)
+                if (SlidesView != null) SlidesView.CursorVisible = !SlidesView.CursorVisible;
+                if ((Ribbon.CurrentMode == OfficeAppMode.Writer || Ribbon.CurrentMode == OfficeAppMode.Pdf || Ribbon.CurrentMode == OfficeAppMode.Slides) && (SlidesView == null || !SlidesView.IsPresenting))
                     Invalidate();
             };
             _cursorTimer.Start();
@@ -1105,6 +1171,7 @@ namespace ZenQOffice.UI
             _animTimer.Interval = 15;
             _animTimer.Tick += (s, e) =>
             {
+                if(FluentUi.IsMenuOpen&&(SlidesView==null||!SlidesView.IsPresenting))return;
                 if (NewTabRadialLauncher.IsOpen)
                 {
                     NewTabRadialLauncher.UpdateAnimation();
@@ -1137,12 +1204,6 @@ namespace ZenQOffice.UI
                         }
                         Invalidate();
                         Update();
-                    }
-                    else if (anim3 && SlidesView != null && SlidesView.IsPreviewingTransition && !SlidesView.IsPresenting && !anim1 && !anim2 && !anim4 && !anim5 && !anim6)
-                    {
-                        int leftSidebarW, canvasX, canvasW, contentY, contentH, bottomThumbH;
-                        SlidesView.GetEffectiveLayoutMetrics(ClientSize.Width, ClientSize.Height, out leftSidebarW, out canvasX, out canvasW, out contentY, out contentH, out bottomThumbH);
-                        Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
                     }
                     else
                     {
@@ -1632,6 +1693,13 @@ namespace ZenQOffice.UI
                 return;
             }
 
+            const int WM_ERASEBKGND = 0x0014;
+            if (m.Msg == WM_ERASEBKGND)
+            {
+                m.Result = (IntPtr)1; // Chặn Windows và TeamViewer xóa nền GDI gây chớp nháy (flicker)
+                return;
+            }
+
             if (m.Msg == PeripheralDeviceManager.WM_DEVICECHANGE)
             {
                 HandleWmDeviceChange(ref m);
@@ -1672,9 +1740,20 @@ namespace ZenQOffice.UI
             // Fully handled by Direct2D pipeline - suppress GDI background erase to eliminate flickering
         }
 
+        private bool transitionPaintQueued;
+        private void QueueNextTransitionPaint()
+        {
+            if(transitionPaintQueued || IsDisposed || Disposing || !Visible || WindowState==FormWindowState.Minimized || !IsHandleCreated || _gpuSurface?.UsesFlipModel!=true || Ribbon.CurrentMode!=OfficeAppMode.Slides || SlidesView?.IsTransitioning!=true || (_audienceForm!=null&&_audienceForm.Visible) || FluentUi.IsMenuOpen)return;
+            var view=SlidesView;transitionPaintQueued=true;
+            try{BeginInvoke(new Action(()=>{
+                transitionPaintQueued=false;
+                if(IsDisposed || Disposing || !Visible || WindowState==FormWindowState.Minimized || SlidesView!=view || Ribbon.CurrentMode!=OfficeAppMode.Slides || !view.IsTransitioning)return;
+                view.UpdateAnimationAndTransition();Invalidate();
+            }));}catch(InvalidOperationException){transitionPaintQueued=false;}
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            if (e.Graphics == null) return;
             if (_isPainting) return; // prevent re-entrant paint — WinForms will re-queue WM_PAINT
             _isPainting = true;
             try
@@ -1682,21 +1761,54 @@ namespace ZenQOffice.UI
                 int w = Math.Max(1, ClientSize.Width);
                 int h = Math.Max(1, ClientSize.Height);
 
-                using (D2DGraphics d2d = new D2DGraphics(e.Graphics, w, h))
+                // ƯU TIÊN 1: RENDER TRỰC TIẾP TRÊN GPU HARDWARE / WARP (Direct3D 11 + DXGI Flip Model + Direct2D)
+                // Triệt tiêu 100% GDI / GDI+ trung gian, không thông qua e.Graphics hay BindDC
+                if (_gpuSurface == null || _gpuSurface.Hwnd != this.Handle)
                 {
-                    RenderFrame(d2d, w, h);
+                    _gpuSurface = GpuEngine.GetOrCreateSurface(this.Handle, w, h);
+                }
+
+                if (_gpuSurface != null && _gpuSurface.ActiveRenderTarget != null)
+                {
+                    _gpuSurface.Resize(w, h);
+                    using (D2DGraphics d2d = D2DGraphics.FromGpuSurface(_gpuSurface))
+                    {
+                        if (d2d != null)
+                        {
+                            RenderFrame(d2d, w, h);
+                        }
+                    }
+
+                    if (_gpuSurface.UsesFlipModel)
+                    {
+                        _gpuSurface.Present(vsync: true); // Luôn đồng bộ Vertical Blank để loại bỏ chớp giật trên màn hình cảm ứng & TeamViewer
+                    }
+                    return;
+                }
+
+                // FALLBACK: GDI Interop chỉ kích hoạt nếu GPU pipeline không khả dụng
+                if (e.Graphics != null)
+                {
+                    using (D2DGraphics d2d = new D2DGraphics(e.Graphics, w, h))
+                    {
+                        RenderFrame(d2d, w, h);
+                    }
                 }
             }
             catch (Exception ex)
             {
+                try { System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "render_debug.log"), "AppForm.OnPaint Error: " + ex + "\r\n"); } catch { }
                 System.Diagnostics.Debug.WriteLine("AppForm.OnPaint Critical Error: " + ex);
                 // BẢO VỆ CHỐNG DẤU CHÉO ĐỎ (ANTI RED-X GUARD):
                 // Tuyệt đối không để exception văng ra WinForms runtime
                 try
                 {
-                    using (SolidBrush safeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    if (e.Graphics != null)
                     {
-                        e.Graphics.FillRectangle(safeBg, ClientRectangle);
+                        using (SolidBrush safeBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                        {
+                            e.Graphics.FillRectangle(safeBg, ClientRectangle);
+                        }
                     }
                 }
                 catch { }
@@ -1714,12 +1826,26 @@ namespace ZenQOffice.UI
             finally
             {
                 _isPainting = false;
+                QueueNextTransitionPaint();
             }
         }
+
+        public new void Invalidate(Rectangle rect) => base.Invalidate();
+        public new void Invalidate(Rectangle rect, bool invalidateChildren) => base.Invalidate();
+        public new void Invalidate(Region region) => base.Invalidate();
+        public new void Invalidate(Region region, bool invalidateChildren) => base.Invalidate();
 
         private void RenderFrame(D2DGraphics g, int clientWidth, int clientHeight)
         {
             if (g == null) return;
+            bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
+            Color wsBg = (Ribbon != null && Ribbon.CurrentMode == OfficeAppMode.Writer) ? Color.FromArgb(243, 243, 243) :
+                         ((Ribbon != null && Ribbon.CurrentMode == OfficeAppMode.Slides) ? Color.FromArgb(240, 240, 240) :
+                         Color.FromArgb(238, 238, 238));
+            Color frameBgColor = (isIsland && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                ? wsBg
+                : Color.FromArgb(248, 250, 252);
+            g.Clear(frameBgColor);
 
             try
             {
@@ -1758,8 +1884,9 @@ namespace ZenQOffice.UI
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
                 // Ensure top title bar area (0..36px) is solidly prefilled
-                bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-                Color titleBarColor = Color.FromArgb(248, 250, 252);
+                Color titleBarColor = (isIsland && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
+                    ? wsBg
+                    : Color.FromArgb(248, 250, 252);
                 int topFillH = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
                 using (SolidBrush titleBg = new SolidBrush(titleBarColor))
                 {
@@ -1773,6 +1900,7 @@ namespace ZenQOffice.UI
 
                 // 1. Draw Active Viewport (Home / Writer / Calc / Slides / Pdf)
                 int currentActiveTab = Ribbon?.ActiveDocIndex ?? -1;
+                var viewportState = g.Save();
                 try
                 {
                     if (Ribbon.CurrentMode == OfficeAppMode.Home)
@@ -1798,6 +1926,7 @@ namespace ZenQOffice.UI
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
                         {
+                            SlidesView.ShowAnimationOrderTags = Ribbon.ActiveRibbonTab >= 0 && Ribbon.ActiveRibbonTab < Ribbon.RibbonTabs.Length && Ribbon.RibbonTabs[Ribbon.ActiveRibbonTab] == "Hoạt họa";
                             SlidesView.Draw(g, effectiveDocWidth, clientHeight);
                         }
                         else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
@@ -1816,6 +1945,7 @@ namespace ZenQOffice.UI
                 catch (Exception ex)
                 {
                     _tabPaintErrorCount++;
+                    try { System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "render_debug.log"), $"Viewport Draw error (Tab: {currentActiveTab}): " + ex + "\r\n"); } catch { }
                     System.Diagnostics.Debug.WriteLine($"AppForm Viewport Draw error (Tab: {currentActiveTab}, count: {_tabPaintErrorCount}): " + ex.Message);
 
                     // Nếu tab bị lỗi vẽ liên tục (từ 2 frame trở lên), kích hoạt cứu hộ khẩn cấp
@@ -1826,6 +1956,20 @@ namespace ZenQOffice.UI
                             TriggerEmergencyTabRecovery(currentActiveTab, ex);
                         }));
                     }
+                }
+                finally
+                {
+                    // Đảm bảo khôi phục sạch Clip, Transform và Opacity trước khi vẽ Ribbon & Status Bar
+                    g.Restore(viewportState);
+                    g.ResetClip();
+                    g.ResetTransform();
+                    g.CurrentImageOpacity = 1.0f;
+                }
+
+                // 1.5. Draw Floating Island Shadow & Border behind _aiSidebar if in Island Mode
+                if (_aiSidebar != null && _aiSidebar.Visible && _aiSidebar.UsesRoundedFrame)
+                {
+                    DrawAiSidebarIslandShadow(g);
                 }
 
                 // 2. Draw Ribbon Bar
@@ -1838,6 +1982,7 @@ namespace ZenQOffice.UI
                 }
                 catch (Exception ex)
                 {
+                    try { System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "render_debug.log"), "Ribbon Draw error: " + ex + "\r\n"); } catch { }
                     System.Diagnostics.Debug.WriteLine("AppForm Ribbon Draw error: " + ex.Message);
                 }
 
@@ -2448,6 +2593,13 @@ namespace ZenQOffice.UI
         {
             base.OnMouseWheel(e);
 
+            Point curClientPt = this.PointToClient(Cursor.Position);
+            if (_aiSidebar != null && _aiSidebar.Visible && (_aiSidebar.Bounds.Contains(e.Location) || _aiSidebar.Bounds.Contains(curClientPt)))
+            {
+                _aiSidebar.HandleExternalMouseWheel(e.Delta);
+                return;
+            }
+
             if (Ribbon != null && !Ribbon.StandaloneMode)
             {
                 int ribbonTopH = (Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
@@ -2472,6 +2624,7 @@ namespace ZenQOffice.UI
 
             if (SlidesView != null && SlidesView.IsPresenting)
             {
+                if(SlidesView.ScrollPresentationGrid(e.Delta,ClientSize.Width,ClientSize.Height)) { Invalidate(); return; }
                 if (SlidesView.IsPresenterViewMode)
                 {
                     if (SlidesView.LastNotesTextRect.Width > 0 && SlidesView.LastNotesTextRect.Contains(e.X, e.Y))
@@ -2544,6 +2697,12 @@ namespace ZenQOffice.UI
 
             if (Ribbon.CurrentMode == OfficeAppMode.Home)
             {
+                if (HomeView.IsTemplateDiscoveryMode)
+                {
+                    HomeView.TemplateDiscovery.HandleMouseWheel(e.Delta);
+                    Invalidate();
+                    return;
+                }
                 int maxScroll = HomeView.GetMaxScroll(ClientSize.Height, ClientSize.Width);
                 float step = -wheelNotches * 84f;
                 float diff = HomeView.TargetScrollY - HomeView.SmoothScrollY;
@@ -2747,13 +2906,9 @@ namespace ZenQOffice.UI
                     // Khi lăn chuột trên thanh trượt đáy (Bottom Thumbnail Strip) hoặc đang giữ kéo thumbnail ngang
                     if (bottomThumbH > 0 && (e.Y >= contentY + contentH || (SlidesView.PotentialDragSlideIndex >= 0 && SlidesView.IsDraggingBottomSlideThumbnail)))
                     {
-                        int totalBottomWidth = (SlidesView.Presentation != null ? SlidesView.Presentation.Slides.Count : 0) * (86 + 10) + 60;
-                        int trackW = canvasW - 16 - 130;
-                        int maxBottomScroll = Math.Max(0, totalBottomWidth - trackW);
-                        int bottomScrollStep = (e.Delta > 0) ? -60 : 60;
-                        float diffBtm = SlidesView.TargetBottomThumbScrollX - SlidesView.SmoothBottomThumbScrollX;
-                        float leadBtm = ((bottomScrollStep > 0 && diffBtm > 0) || (bottomScrollStep < 0 && diffBtm < 0)) ? Math.Sign(diffBtm) * Math.Min(Math.Abs(diffBtm), 45f) : 0f;
-                        float newBottom = Math.Max(0, Math.Min(maxBottomScroll, (float)Math.Round(SlidesView.SmoothBottomThumbScrollX + leadBtm + bottomScrollStep)));
+                        int maxBottomScroll = SlidesView.GetBottomThumbnailMaxScroll(canvasW);
+                        float bottomScrollStep = -e.Delta / 120f * 36f;
+                        float newBottom = Math.Max(0, Math.Min(maxBottomScroll, (float)Math.Round(SlidesView.TargetBottomThumbScrollX + bottomScrollStep)));
                         SlidesView.TargetBottomThumbScrollX = newBottom;
                         if (SlidesView.PotentialDragSlideIndex >= 0)
                         {
@@ -2780,11 +2935,7 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            int scrollStep = (e.Delta > 0) ? -80 : 80;
-                            float diffEl = SlidesView.TargetElementsScrollY - SlidesView.SmoothElementsScrollY;
-                            float leadEl = ((scrollStep > 0 && diffEl > 0) || (scrollStep < 0 && diffEl < 0)) ? Math.Sign(diffEl) * Math.Min(Math.Abs(diffEl), 60f) : 0f;
-                            float newElem = Math.Max(0, (float)Math.Round(SlidesView.SmoothElementsScrollY + leadEl + scrollStep));
-                            SlidesView.TargetElementsScrollY = newElem;
+                            SlidesView.ScrollElementsCatalog(e.Delta);
                             SlidesView.UpdateSmoothScroll();
                             Invalidate(new Rectangle(0, contentY, leftSidebarW, contentH));
                             return;
@@ -2795,9 +2946,7 @@ namespace ZenQOffice.UI
                         // Scroll Thumbnails Pane (Nội suy ngắn ~55ms, dừng gọn không trôi)
                         int maxThumbScroll = SlidesView.GetMaxThumbScrollY();
                         int scrollStep = (e.Delta > 0) ? -56 : 56;
-                        float diffTh = SlidesView.TargetThumbScrollY - SlidesView.SmoothThumbScrollY;
-                        float leadTh = ((scrollStep > 0 && diffTh > 0) || (scrollStep < 0 && diffTh < 0)) ? Math.Sign(diffTh) * Math.Min(Math.Abs(diffTh), 45f) : 0f;
-                        float newThumb = Math.Max(0, Math.Min(maxThumbScroll, (float)Math.Round(SlidesView.SmoothThumbScrollY + leadTh + scrollStep)));
+                        float newThumb = Math.Max(0, Math.Min(maxThumbScroll, (float)Math.Round(SlidesView.TargetThumbScrollY + scrollStep)));
                         SlidesView.TargetThumbScrollY = newThumb;
                         if (SlidesView.PotentialDragSlideIndex >= 0)
                         {
@@ -2816,31 +2965,73 @@ namespace ZenQOffice.UI
                     else
                     {
                         int rightSidebarW = (SlidesView.IsSidebarOpen && SlidesView.SidebarPanel != SidebarPanelType.None && !SlidesView.IsPresenting) ? 280 : 0;
-                        if (rightSidebarW > 0 && e.X >= ClientSize.Width - rightSidebarW)
+                        if (rightSidebarW > 0 && e.X >= GetEffectiveDocWidth(ClientSize.Width) - rightSidebarW && e.X < GetEffectiveDocWidth(ClientSize.Width))
                         {
                             int scrollStep = (e.Delta > 0) ? 60 : -60;
-                            int minSidebarScroll = Math.Min(0, (ClientSize.Height - 155 - 26 - 42) - 660);
+                            int contentHeight = SlidesView.SidebarPanel == SidebarPanelType.AnimationPane ? 120 + (SlidesView.ActiveSlide?.Animations.Count ?? 0) * 60 : 660;
+                            int minSidebarScroll = Math.Min(0, (ClientSize.Height - 155 - 26 - 42) - contentHeight);
                             SlidesView.SidebarScrollY = Math.Max(minSidebarScroll, Math.Min(0, SlidesView.SidebarScrollY + scrollStep));
                             Invalidate();
                             return;
                         }
-                        canvasW = ClientSize.Width - 210 - rightSidebarW;
-                        int canvasH = ClientSize.Height - 155 - 26;
                         int minScrollX, maxScrollX, minScrollY, maxScrollY;
-                        SlidesView.GetScrollLimits(canvasW, canvasH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
+                        SlidesView.GetScrollLimits(canvasW, contentH, out minScrollX, out maxScrollX, out minScrollY, out maxScrollY);
 
-                        bool isZoomed = (SlidesView.ZoomLevel > 1.05f) || (minScrollX < maxScrollX) || (minScrollY < maxScrollY);
+                        bool canScrollV = (minScrollY < maxScrollY);
+                        bool canScrollH = (minScrollX < maxScrollX);
+                        bool isShift = (ModifierKeys & Keys.Shift) != 0;
 
-                        if (!isZoomed)
+                        if (canScrollH && isShift)
                         {
-                            // Chuyển slide mượt mà, phản hồi dồn dập chuẩn MS PowerPoint (không bao giờ bị nuốt phím hay khựng)
+                            // Shift + MouseWheel: Cuộn ngang slide mượt mà chuẩn PowerPoint
+                            float stepX = -e.Delta / 120f * 32f;
+                            float newTargetX = Math.Max(minScrollX, Math.Min(maxScrollX, (float)Math.Round(SlidesView.TargetCanvasScrollX + stepX)));
+                            if (Math.Abs(newTargetX - SlidesView.SmoothCanvasScrollX) > 0.5f)
+                            {
+                                SlidesView.TargetCanvasScrollX = newTargetX;
+
+                                Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
+                            }
+                            return;
+                        }
+                        else if (canScrollV)
+                        {
+                            // Khi đang phóng to (Zoomed In) hoặc có item ngoài slide trên/dưới: Cuộn dọc
+                            float scrollRange = maxScrollY - minScrollY;
+                            float stepY = -e.Delta / 120f * Math.Min(32f, Math.Max(12f, scrollRange * .12f));
+
+                            float newTargetY = Math.Max(minScrollY, Math.Min(maxScrollY, (float)Math.Round(SlidesView.TargetCanvasScrollY + stepY)));
+                            if (Math.Abs(newTargetY - SlidesView.SmoothCanvasScrollY) > 0.5f)
+                            {
+                                SlidesView.TargetCanvasScrollY = newTargetY;
+
+                                Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
+                            }
+                            return;
+                        }
+                        else if (canScrollH)
+                        {
+                            // Khi có item ngoài slide trái/phải (không có cuộn dọc): Lăn chuột cuộn ngang chính xác
+                            float stepX = -e.Delta / 120f * 32f;
+                            float newTargetX = Math.Max(minScrollX, Math.Min(maxScrollX, (float)Math.Round(SlidesView.TargetCanvasScrollX + stepX)));
+                            if (Math.Abs(newTargetX - SlidesView.SmoothCanvasScrollX) > 0.5f)
+                            {
+                                SlidesView.TargetCanvasScrollX = newTargetX;
+                                SlidesView.UpdateSmoothScroll();
+                                Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
+                            }
+                            return;
+                        }
+                        else
+                        {
+                            // Khi slide vừa vặn khung hình (Fit to Window / Zoom <= 100% và không có item ngoài slide): 
+                            // Lăn chuột chuyển slide trước / sau dứt khoát chuẩn 100% PowerPoint, slide luôn khóa cứng chính giữa tâm, 0% rung giật
                             _slideWheelDeltaAccumulator += e.Delta;
                             int notchThreshold = 120; // 1 nấc con lăn tiêu chuẩn
 
                             if (Math.Abs(_slideWheelDeltaAccumulator) >= notchThreshold)
                             {
                                 double elapsedMs = (DateTime.Now - LastSlideWheelTime).TotalMilliseconds;
-                                // Giới hạn phản hồi 40ms vừa vặn 60 FPS (cho phép cuộn dồn dập tới 25 slide/giây cực mượt mà không bao giờ lag hay khựng)
                                 if (elapsedMs >= 40)
                                 {
                                     LastSlideWheelTime = DateTime.Now;
@@ -2876,80 +3067,6 @@ namespace ZenQOffice.UI
                                         SlidesView.TargetCanvasScrollX = 0f;
                                         SlidesView.SmoothCanvasScrollY = 0f;
                                         SlidesView.TargetCanvasScrollY = 0f;
-                                        SlidesView.EnsureSlideVisibleInThumbnails(SlidesView.ActiveSlideIndex);
-                                        if (SlidesView.IsPresenting && SlidesView.ActiveSlide != null && SlidesView.ActiveSlide.Transition != TransitionType.None)
-                                        {
-                                            SlidesView.TriggerTransition(prevIdx, SlidesView.ActiveSlideIndex, true);
-                                        }
-                                        Invalidate();
-                                        return;
-                                    }
-                                }
-                            }
-                            return;
-                        }
-                        else
-                        {
-                            // 2. Chế độ Phóng to (Zoomed In): Cuộn nội dung slide mượt ~55ms rồi dừng gọn, không trôi
-                            int slideScrollStep = (e.Delta > 0) ? -65 : 65;
-                            float diffCv = SlidesView.TargetCanvasScrollY - SlidesView.SmoothCanvasScrollY;
-                            float leadCv = ((slideScrollStep > 0 && diffCv > 0) || (slideScrollStep < 0 && diffCv < 0)) ? Math.Sign(diffCv) * Math.Min(Math.Abs(diffCv), 50f) : 0f;
-                            float newTargetScrollY = Math.Max(minScrollY, Math.Min(maxScrollY, (float)Math.Round(SlidesView.SmoothCanvasScrollY + leadCv + slideScrollStep)));
-
-                            if (Math.Abs(newTargetScrollY - SlidesView.SmoothCanvasScrollY) > 0.5f)
-                            {
-                                SlidesView.TargetCanvasScrollY = newTargetScrollY;
-                                SlidesView.UpdateSmoothScroll();
-                                SlideWheelTickCount = 0;
-                                Invalidate(new Rectangle(canvasX, contentY, canvasW, contentH));
-                                return;
-                            }
-                            else
-                            {
-                                // Khi đã cuộn kịch mép trên hoặc dưới của slide phóng to: Lăn tiếp có chủ ý để chuyển slide
-                                if ((DateTime.Now - LastSlideWheelTime).TotalMilliseconds > 400)
-                                {
-                                    SlideWheelTickCount = 0;
-                                }
-                                LastSlideWheelTime = DateTime.Now;
-
-                                if (scrollDir == LastSlideWheelDirection)
-                                {
-                                    SlideWheelTickCount++;
-                                }
-                                else
-                                {
-                                    LastSlideWheelDirection = scrollDir;
-                                    SlideWheelTickCount = 1;
-                                }
-
-                                if (SlideWheelTickCount >= 2)
-                                {
-                                    SlideWheelTickCount = 0;
-                                    int prevIdx = SlidesView.ActiveSlideIndex;
-
-                                    if (scrollDir < 0 && SlidesView.ActiveSlideIndex < SlidesView.Presentation.Slides.Count - 1)
-                                    {
-                                        SlidesView.ActiveSlideIndex++;
-                                        SlidesView.SelectedShapeIndex = -1;
-                                        SlidesView.CanvasScrollY = minScrollY;
-                                        SlidesView.SmoothCanvasScrollY = minScrollY;
-                                        SlidesView.TargetCanvasScrollY = minScrollY;
-                                        SlidesView.EnsureSlideVisibleInThumbnails(SlidesView.ActiveSlideIndex);
-                                        if (SlidesView.IsPresenting && SlidesView.ActiveSlide != null && SlidesView.ActiveSlide.Transition != TransitionType.None)
-                                        {
-                                            SlidesView.TriggerTransition(prevIdx, SlidesView.ActiveSlideIndex, false);
-                                        }
-                                        Invalidate();
-                                        return;
-                                    }
-                                    else if (scrollDir > 0 && SlidesView.ActiveSlideIndex > 0)
-                                    {
-                                        SlidesView.ActiveSlideIndex--;
-                                        SlidesView.SelectedShapeIndex = -1;
-                                        SlidesView.CanvasScrollY = maxScrollY;
-                                        SlidesView.SmoothCanvasScrollY = maxScrollY;
-                                        SlidesView.TargetCanvasScrollY = maxScrollY;
                                         SlidesView.EnsureSlideVisibleInThumbnails(SlidesView.ActiveSlideIndex);
                                         if (SlidesView.IsPresenting && SlidesView.ActiveSlide != null && SlidesView.ActiveSlide.Transition != TransitionType.None)
                                         {
@@ -3405,7 +3522,11 @@ namespace ZenQOffice.UI
                 int ribbonH = (Ribbon.CurrentMode == OfficeAppMode.Home) ? 64 : 155;
                 if (e.Y <= ribbonH)
                 {
-                    if (WriterView != null) WriterView.IsSelecting = false;
+                    if (WriterView != null)
+                    {
+                        WriterView.IsSelecting = false;
+                        WriterView.IsDocumentMouseDown = false;
+                    }
                     int rTop = (Ribbon != null && Ribbon.RibbonTopHeight > 0) ? Ribbon.RibbonTopHeight : 36;
                     if (e.Y <= rTop && e.Button == MouseButtons.Left && Ribbon != null)
                     {
@@ -3466,7 +3587,7 @@ namespace ZenQOffice.UI
 
                     if (e.Button == MouseButtons.Right && e.Y <= 155 && Ribbon != null && Ribbon.CurrentMode != OfficeAppMode.Home)
                     {
-                        ContextMenuStrip rMenu = new ContextMenuStrip();
+                        ContextMenuStrip rMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                         bool isStandard = (AppSettings.Instance.RibbonStyle == RibbonStyle.Standard);
                         
                         ToolStripMenuItem miStd = new ToolStripMenuItem("Tiêu chuẩn (Chuẩn Microsoft Office)", null, (s, ev) =>
@@ -3552,7 +3673,7 @@ namespace ZenQOffice.UI
                                     bool ok = WriterView.LoadDocumentFile(openFilePath, Ribbon);
                                     if (!ok)
                                     {
-                                        MessageBox.Show("Không thể nạp nội dung của tệp Word:\n" + openFilePath, "Thông báo lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Không thể nạp nội dung của tệp Word:\n" + openFilePath, "Thông báo lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                                     }
                                 }
                                 else if (clickedMode.Value == OfficeAppMode.Slides && SlidesView != null)
@@ -3607,7 +3728,7 @@ namespace ZenQOffice.UI
                             }
                             else
                             {
-                                MessageBox.Show("Không tìm thấy tệp hoặc tệp đã bị di chuyển:\n" + openFilePath, "Không tìm thấy tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy tệp hoặc tệp đã bị di chuyển:\n" + openFilePath, "Không tìm thấy tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                                 Ribbon.CloseDocTab(activeIdx, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                 Invalidate();
                                 return;
@@ -3834,6 +3955,8 @@ namespace ZenQOffice.UI
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            if (SlidesView != null && Ribbon.CurrentMode == OfficeAppMode.Slides)
+                SlidesView.UpdateGifHover(e.Location, ClientSize.Width, ClientSize.Height);
 
             if (BackstageView != null && BackstageView.IsOpen)
             {
@@ -4016,7 +4139,7 @@ namespace ZenQOffice.UI
                     {
                         Invalidate();
                     }
-                    if (HomeView.IsHoverHand || HomeView.HoverTabIndex >= 0 || HomeView.HoverCardIndex >= 0 || HomeView.HoverRowIndex >= 0 || HomeView.HoverHelpBtn)
+                    if (HomeView.IsHoverHand || (!HomeView.IsTemplateDiscoveryMode && (HomeView.HoverTabIndex >= 0 || HomeView.HoverCardIndex >= 0 || HomeView.HoverRowIndex >= 0 || HomeView.HoverHelpBtn)))
                     {
                         Cursor = Cursors.Hand;
                         Cursor.Current = Cursors.Hand;
@@ -4363,6 +4486,7 @@ namespace ZenQOffice.UI
         protected override void OnMouseLeave(EventArgs e)
         {
             base.OnMouseLeave(e);
+            SlidesView?.ClearGifHover();
             if (Ribbon != null && (Ribbon.HoverX != -1 || Ribbon.HoverY != -1))
             {
                 Ribbon.UpdateHover(-1, -1);
@@ -4433,6 +4557,56 @@ namespace ZenQOffice.UI
                     return;
                 }
 
+                if (Ribbon.CurrentMode == OfficeAppMode.Home && HomeView != null)
+                {
+                    if (HomeView.IsTemplateDiscoveryMode && HomeView.TemplateDiscovery != null && HomeView.TemplateDiscovery.IsSearchFocused)
+                    {
+                        if (e.KeyChar == '\b')
+                        {
+                            if (HomeView.TemplateDiscovery.SearchQuery.Length > 0)
+                            {
+                                HomeView.TemplateDiscovery.SearchQuery = HomeView.TemplateDiscovery.SearchQuery.Substring(0, HomeView.TemplateDiscovery.SearchQuery.Length - 1);
+                                HomeView.TemplateDiscovery.TargetScrollY = 0f;
+                                HomeView.TemplateDiscovery.SmoothScrollY = 0f;
+                            }
+                        }
+                        else if (e.KeyChar == '\r' || e.KeyChar == '\n')
+                        {
+                            HomeView.TemplateDiscovery.IsSearchFocused = false;
+                        }
+                        else if (!char.IsControl(e.KeyChar))
+                        {
+                            HomeView.TemplateDiscovery.SearchQuery += e.KeyChar;
+                            HomeView.TemplateDiscovery.TargetScrollY = 0f;
+                            HomeView.TemplateDiscovery.SmoothScrollY = 0f;
+                        }
+                        e.Handled = true;
+                        Invalidate();
+                        return;
+                    }
+                    else if (HomeView.IsSearchFocused)
+                    {
+                        if (e.KeyChar == '\b')
+                        {
+                            if (HomeView.SearchKeyword.Length > 0)
+                            {
+                                HomeView.SearchKeyword = HomeView.SearchKeyword.Substring(0, HomeView.SearchKeyword.Length - 1);
+                            }
+                        }
+                        else if (e.KeyChar == '\r' || e.KeyChar == '\n')
+                        {
+                            HomeView.IsSearchFocused = false;
+                        }
+                        else if (!char.IsControl(e.KeyChar))
+                        {
+                            HomeView.SearchKeyword += e.KeyChar;
+                        }
+                        e.Handled = true;
+                        Invalidate();
+                        return;
+                    }
+                }
+
                 if (Ribbon.CurrentMode == OfficeAppMode.Writer)
                 {
                     WriterView.CursorVisible = true;
@@ -4484,6 +4658,56 @@ namespace ZenQOffice.UI
                             // Khi đang chọn hình ảnh: Không ghi vào trang văn bản
                             e.Handled = true;
                             return;
+                        }
+
+                        if (sh.ShapeType == "Group")
+                        {
+                            var targetChild = WriterView.ActiveGroupChild;
+                            if (targetChild != null)
+                            {
+                                if (!targetChild.IsEditingText)
+                                {
+                                    if (!char.IsControl(e.KeyChar) || e.KeyChar == '\r')
+                                    {
+                                        targetChild.IsEditingText = true;
+                                        targetChild.TextContent = (targetChild.TextContent ?? "") + (e.KeyChar == '\r' ? "\n" : e.KeyChar.ToString());
+                                        targetChild.TextCursorIndex = targetChild.TextContent.Length;
+                                        WriterView.SyncShapeTagInDocument(sh);
+                                        MarkActiveTabModified();
+                                    }
+                                    e.Handled = true;
+                                    Invalidate();
+                                    return;
+                                }
+
+                                if (targetChild.TextContent == null) targetChild.TextContent = "";
+                                int curC = Math.Max(0, Math.Min(targetChild.TextCursorIndex, targetChild.TextContent.Length));
+
+                                if (e.KeyChar == (char)Keys.Back)
+                                {
+                                    if (curC > 0 && targetChild.TextContent.Length > 0)
+                                    {
+                                        targetChild.TextContent = targetChild.TextContent.Substring(0, curC - 1) + targetChild.TextContent.Substring(curC);
+                                        targetChild.TextCursorIndex = curC - 1;
+                                    }
+                                }
+                                else if (!char.IsControl(e.KeyChar) || e.KeyChar == '\r' || e.KeyChar == '\n')
+                                {
+                                    string ins = (e.KeyChar == '\r' ? "\n" : e.KeyChar.ToString());
+                                    targetChild.TextContent = targetChild.TextContent.Insert(curC, ins);
+                                    targetChild.TextCursorIndex = curC + ins.Length;
+                                }
+                                WriterView.SyncShapeTagInDocument(sh);
+                                MarkActiveTabModified();
+                                e.Handled = true;
+                                Invalidate();
+                                return;
+                            }
+                            else
+                            {
+                                e.Handled = true;
+                                return;
+                            }
                         }
 
                         if (sh.IsSmartArt)
@@ -5040,7 +5264,7 @@ namespace ZenQOffice.UI
                                     }
                                     else
                                     {
-                                        MessageBox.Show("Không tìm thấy '" + findText + "' trong tài liệu.", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy '" + findText + "' trong tài liệu.", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 };
                                 frForm.OnReplace += (findText, repText) =>
@@ -5078,7 +5302,7 @@ namespace ZenQOffice.UI
                                         }
                                         MarkActiveTabModified();
                                         Invalidate();
-                                        MessageBox.Show("Đã thay thế tất cả " + count + " vị trí trùng khớp!", "Tìm kiếm & Thay thế", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã thay thế tất cả " + count + " vị trí trùng khớp!", "Tìm kiếm & Thay thế", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 };
                                 frForm.Show(this);
@@ -5669,7 +5893,7 @@ namespace ZenQOffice.UI
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].FilePath = sfd.FileName;
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                                         }
-                                        MessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bản trình chiếu chuẩn .pptx thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
                             }
@@ -5688,7 +5912,7 @@ namespace ZenQOffice.UI
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].FilePath = sfd.FileName;
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                                         }
-                                        MessageBox.Show("Đã lưu bảng tính thành công!", "ZENQ OFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bảng tính thành công!", "ZENQ OFFICE Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
                             }
@@ -5709,7 +5933,7 @@ namespace ZenQOffice.UI
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].FilePath = sfd.FileName;
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                                             Invalidate();
-                                            MessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công!", "Tài liệu PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tệp PDF '" + sfd.FileName + "' thành công!", "Tài liệu PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                         }
                                     }
                                 }
@@ -5735,7 +5959,7 @@ namespace ZenQOffice.UI
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].FilePath = sfd.FileName;
                                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                                             Invalidate();
-                                            MessageBox.Show("Đã lưu tệp PSD thành công!", "ZenQ Vector Designer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tệp PSD thành công!", "ZenQ Vector Designer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                         }
                                     }
                                 }
@@ -5758,7 +5982,7 @@ namespace ZenQOffice.UI
                                         Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                                         Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                         Invalidate();
-                                        MessageBox.Show("Đã mở tài liệu '" + fName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã mở tài liệu '" + fName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
                             }
@@ -5801,7 +6025,7 @@ namespace ZenQOffice.UI
                                         Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                         Ribbon.RefreshCustomFonts();
                                         Invalidate();
-                                        MessageBox.Show("Đã mở bản trình chiếu '" + fName + "' thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã mở bản trình chiếu '" + fName + "' thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
                             }
@@ -5825,7 +6049,7 @@ namespace ZenQOffice.UI
                                             }
                                             Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                             Invalidate();
-                                            MessageBox.Show("Đã mở bảng tính '" + fName + "' thành công!", "ZenQ Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                            ZenQOffice.UI.FluentMessageBox.Show("Đã mở bảng tính '" + fName + "' thành công!", "ZenQ Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                         }
                                     }
                                 }
@@ -5851,7 +6075,7 @@ namespace ZenQOffice.UI
                                         }
                                         Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                         Invalidate();
-                                        MessageBox.Show("Đã mở tệp PDF '" + fName + "' thành công!", "ZenQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show("Đã mở tệp PDF '" + fName + "' thành công!", "ZenQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
                             }
@@ -5878,7 +6102,7 @@ namespace ZenQOffice.UI
                                             }
                                             Ribbon.SaveTabState(Ribbon.ActiveDocIndex, SlidesView, WriterView, CalcView, PdfView, PhotoView);
                                             Invalidate();
-                                            MessageBox.Show("Đã mở tệp thiết kế '" + fName + "' thành công!", "ZenQ Vector Designer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                            ZenQOffice.UI.FluentMessageBox.Show("Đã mở tệp thiết kế '" + fName + "' thành công!", "ZenQ Vector Designer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                         }
                                     }
                                 }
@@ -6337,6 +6561,83 @@ namespace ZenQOffice.UI
                             }
                         }
 
+                        if (sh.ShapeType == "Group")
+                        {
+                            var targetChild = WriterView.ActiveGroupChild;
+                            if (targetChild != null)
+                            {
+                                if (targetChild.IsEditingText)
+                                {
+                                    if (targetChild.TextContent == null) targetChild.TextContent = "";
+                                    int curC = Math.Max(0, Math.Min(targetChild.TextCursorIndex, targetChild.TextContent.Length));
+                                    if (e.KeyCode == Keys.Left) { targetChild.TextCursorIndex = Math.Max(0, curC - 1); Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Right) { targetChild.TextCursorIndex = Math.Min(targetChild.TextContent.Length, curC + 1); Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Home) { targetChild.TextCursorIndex = 0; Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.End) { targetChild.TextCursorIndex = targetChild.TextContent.Length; Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Delete)
+                                    {
+                                        if (curC < targetChild.TextContent.Length)
+                                        {
+                                            targetChild.TextContent = targetChild.TextContent.Substring(0, curC) + targetChild.TextContent.Substring(curC + 1);
+                                            WriterView.SyncShapeTagInDocument(sh);
+                                            MarkActiveTabModified();
+                                            Invalidate();
+                                            e.Handled = true;
+                                            return;
+                                        }
+                                    }
+                                    if (e.KeyCode == Keys.Escape)
+                                    {
+                                        targetChild.IsEditingText = false;
+                                        Invalidate();
+                                        e.Handled = true;
+                                        return;
+                                    }
+                                    e.Handled = true;
+                                    return;
+                                }
+                                else
+                                {
+                                    // Child selected but not editing text
+                                    int moveStep = e.Shift ? 10 : 2;
+                                    if (e.KeyCode == Keys.Left) { targetChild.PageX -= moveStep; WriterView.SyncShapeTagInDocument(sh); Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Right) { targetChild.PageX += moveStep; WriterView.SyncShapeTagInDocument(sh); Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Up) { targetChild.PageY -= moveStep; WriterView.SyncShapeTagInDocument(sh); Invalidate(); e.Handled = true; return; }
+                                    if (e.KeyCode == Keys.Down) { targetChild.PageY += moveStep; WriterView.SyncShapeTagInDocument(sh); Invalidate(); e.Handled = true; return; }
+
+                                    if (e.KeyCode == Keys.F2 || e.KeyCode == Keys.Enter)
+                                    {
+                                        targetChild.IsEditingText = true;
+                                        targetChild.TextCursorIndex = targetChild.TextContent != null ? targetChild.TextContent.Length : 0;
+                                        Invalidate();
+                                        e.Handled = true;
+                                        return;
+                                    }
+                                    if (e.KeyCode == Keys.Delete || e.KeyCode == Keys.Back)
+                                    {
+                                        if (sh.GroupChildren != null) sh.GroupChildren.Remove(targetChild);
+                                        WriterView.ActiveGroupChild = null;
+                                        WriterView.SyncShapeTagInDocument(sh);
+                                        WriterView.SaveUndoState();
+                                        MarkActiveTabModified();
+                                        Invalidate();
+                                        e.Handled = true;
+                                        return;
+                                    }
+                                    if (e.KeyCode == Keys.Escape)
+                                    {
+                                        targetChild.IsSelected = false;
+                                        WriterView.ActiveGroupChild = null;
+                                        Invalidate();
+                                        e.Handled = true;
+                                        return;
+                                    }
+                                    e.Handled = true;
+                                    return;
+                                }
+                            }
+                        }
+
                         // Trường hợp chọn hình/ảnh ngoài (chưa ở chế độ gõ văn bản bên trong shape)
                         if (sh.ShapeType == "Image" || !sh.IsEditingText)
                         {
@@ -6611,7 +6912,7 @@ namespace ZenQOffice.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không thể mở bảng tra cứu phím tắt: " + ex.Message, "Trợ giúp", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Không thể mở bảng tra cứu phím tắt: " + ex.Message, "Trợ giúp", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -6645,7 +6946,7 @@ namespace ZenQOffice.UI
                             }
                         }
                         Invalidate();
-                        MessageBox.Show("Đã lưu tài liệu '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tài liệu '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -6678,9 +6979,9 @@ namespace ZenQOffice.UI
                                 if (ok)
                                 {
                                     if (dlg.SelectedIndices.Count > 1)
-                                        MessageBox.Show(this, $"Đã lưu {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã lưu {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     else
-                                        MessageBox.Show(this, $"Đã lưu ảnh slide vào tệp '{sfd.FileName}' thành công!", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã lưu ảnh slide vào tệp '{sfd.FileName}' thành công!", "Lưu ảnh thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return;
                                 }
                             }
@@ -6704,8 +7005,8 @@ namespace ZenQOffice.UI
                             }
                         }
                         Invalidate();
-                        if (ok) MessageBox.Show("Đã lưu bản trình chiếu thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể lưu bản trình chiếu.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bản trình chiếu thành công!", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể lưu bản trình chiếu.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -6733,8 +7034,8 @@ namespace ZenQOffice.UI
                             }
                         }
                         Invalidate();
-                        if (ok) MessageBox.Show("Đã lưu bảng tính thành công!", "ZenQ Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể lưu bảng tính.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã lưu bảng tính thành công!", "ZenQ Calc", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể lưu bảng tính.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -6776,8 +7077,8 @@ namespace ZenQOffice.UI
                             }
                         }
                         Invalidate();
-                        if (ok) MessageBox.Show("Đã lưu tệp PDF thành công!", "ZenQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể lưu tệp PDF.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã lưu tệp PDF thành công!", "ZenQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể lưu tệp PDF.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -6801,8 +7102,8 @@ namespace ZenQOffice.UI
                             Ribbon.DocTabs[Ribbon.ActiveDocIndex].IsModified = false;
                         }
                         Invalidate();
-                        if (ok) MessageBox.Show("Đã lưu thiết kế thành công!", "Thiết kế & Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể lưu thiết kế.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã lưu thiết kế thành công!", "Thiết kế & Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể lưu thiết kế.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -6839,9 +7140,9 @@ namespace ZenQOffice.UI
                                 if (ok)
                                 {
                                     if (dlg.SelectedIndices.Count > 1)
-                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     else
-                                        MessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return;
                                 }
                             }
@@ -6855,8 +7156,8 @@ namespace ZenQOffice.UI
                             ok = WriterView.SaveDocumentFile(sfd.FileName, Ribbon, false);
                         }
 
-                        if (ok) MessageBox.Show("Đã xuất tài liệu '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể xuất tài liệu. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã xuất tài liệu '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể xuất tài liệu. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Calc)
@@ -6867,8 +7168,8 @@ namespace ZenQOffice.UI
                     if (sfd.ShowDialog(this) == DialogResult.OK)
                     {
                         bool ok = SaveSpreadsheetDocument(sfd.FileName);
-                        if (ok) MessageBox.Show("Đã xuất bảng tính '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể xuất bảng tính. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã xuất bảng tính '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể xuất bảng tính. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Slides)
@@ -6895,9 +7196,9 @@ namespace ZenQOffice.UI
                                 if (ok)
                                 {
                                     if (dlg.SelectedIndices.Count > 1)
-                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh slide vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     else
-                                        MessageBox.Show(this, $"Đã xuất slide vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất slide vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return;
                                 }
                             }
@@ -6915,8 +7216,8 @@ namespace ZenQOffice.UI
                             ok = ZenQOffice.Format.PptxHandler.SavePptx(sfd.FileName, SlidesView.Presentation);
                         }
 
-                        if (ok) MessageBox.Show("Đã xuất bản trình chiếu '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể xuất bản trình chiếu. Vui lòng kiểm tra lại quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã xuất bản trình chiếu '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể xuất bản trình chiếu. Vui lòng kiểm tra lại quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Pdf)
@@ -6978,9 +7279,9 @@ namespace ZenQOffice.UI
                                 if (ok)
                                 {
                                     if (dlg.SelectedIndices.Count > 1)
-                                        MessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất {dlg.SelectedIndices.Count} ảnh trang vào thư mục:\n{System.IO.Path.GetDirectoryName(sfd.FileName)}", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     else
-                                        MessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                        ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xuất trang vào tệp '{sfd.FileName}' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return;
                                 }
                             }
@@ -6990,8 +7291,8 @@ namespace ZenQOffice.UI
                             ok = ZenQOffice.Format.PdfHandler.SavePdf(PdfView.Document, sfd.FileName);
                         }
 
-                        if (ok) MessageBox.Show("Đã xuất tệp thành công:\n'" + sfd.FileName + "'", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể xuất tệp. Vui lòng kiểm tra lại quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã xuất tệp thành công:\n'" + sfd.FileName + "'", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể xuất tệp. Vui lòng kiểm tra lại quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
                 else if (Ribbon.CurrentMode == OfficeAppMode.Photo)
@@ -7002,8 +7303,8 @@ namespace ZenQOffice.UI
                     if (sfd.ShowDialog(this) == DialogResult.OK)
                     {
                         bool ok = PhotoView.Document != null && PhotoView.Document.SaveToFile(sfd.FileName);
-                        if (ok) MessageBox.Show("Đã xuất thiết kế '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        else MessageBox.Show("Không thể xuất thiết kế. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (ok) ZenQOffice.UI.FluentMessageBox.Show("Đã xuất thiết kế '" + sfd.FileName + "' thành công!", "Xuất thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else ZenQOffice.UI.FluentMessageBox.Show("Không thể xuất thiết kế. Vui lòng kiểm tra quyền truy cập.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -7037,13 +7338,13 @@ namespace ZenQOffice.UI
                     pd.UseEXDialog = true;
                     if (pd.ShowDialog(this) == DialogResult.OK)
                     {
-                        MessageBox.Show("Đã gửi lệnh in tài liệu đến máy in: " + pd.PrinterSettings.PrinterName, "In Ấn - ZENQ OFFICE Suite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show("Đã gửi lệnh in tài liệu đến máy in: " + pd.PrinterSettings.PrinterName, "In Ấn - ZENQ OFFICE Suite", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không thể khởi động trình quản lý in ấn: " + ex.Message, "In ấn", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Không thể khởi động trình quản lý in ấn: " + ex.Message, "In ấn", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -7155,6 +7456,10 @@ namespace ZenQOffice.UI
             {
                 Ribbon.IsParentMaximized = (this.WindowState == FormWindowState.Maximized);
             }
+            if (_gpuSurface != null && ClientSize.Width > 0 && ClientSize.Height > 0)
+            {
+                try { _gpuSurface.Resize(ClientSize.Width, ClientSize.Height); } catch { }
+            }
             if (_appD2d != null && ClientSize.Width > 0 && ClientSize.Height > 0)
             {
                 try { _appD2d.Resize(ClientSize.Width, ClientSize.Height); } catch { }
@@ -7166,6 +7471,11 @@ namespace ZenQOffice.UI
 
         protected override void OnHandleDestroyed(EventArgs e)
         {
+            if (_gpuSurface != null)
+            {
+                try { GpuEngine.DestroySurface(this.Handle); } catch { }
+                _gpuSurface = null;
+            }
             if (_appD2d != null)
             {
                 try { _appD2d.Dispose(); } catch { }
@@ -8037,7 +8347,21 @@ namespace ZenQOffice.UI
         {
             Point pt = startPt.IsEmpty ? _touchPanStartPt : startPt;
 
-            if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null)
+            if (Ribbon.CurrentMode == OfficeAppMode.Home && HomeView != null)
+            {
+                if (HomeView.IsTemplateDiscoveryMode)
+                {
+                    HomeView.TemplateDiscovery.TargetScrollY = Math.Max(0f, Math.Min(HomeView.TemplateDiscovery.MaxScrollY, HomeView.TemplateDiscovery.TargetScrollY - dy * 1.5f));
+                    HomeView.TemplateDiscovery.SmoothScrollY = HomeView.TemplateDiscovery.TargetScrollY;
+                }
+                else
+                {
+                    int maxScroll = HomeView.GetMaxScroll(ClientSize.Height, ClientSize.Width);
+                    HomeView.TargetScrollY = Math.Max(0, Math.Min(maxScroll, HomeView.TargetScrollY - dy * 1.5f));
+                    HomeView.SmoothScrollY = HomeView.TargetScrollY;
+                }
+            }
+            else if (Ribbon.CurrentMode == OfficeAppMode.Writer && WriterView != null)
             {
                 int maxScrollY = WriterView.GetMaxScrollY(ClientSize.Height, Ribbon);
                 WriterView.TargetScrollY = Math.Max(0, Math.Min(maxScrollY, WriterView.TargetScrollY - dy * 1.4f));

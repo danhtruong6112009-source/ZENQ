@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -32,7 +32,7 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 250, 252);
 
             Label lblTitle = new Label { Text = "Các kịch bản hiện có:", Location = new Point(16, 14), AutoSize = true };
-            lstScenarios = new ListBox { Location = new Point(16, 36), Width = 340, Height = 160 };
+            lstScenarios = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 36), Width = 340, Height = 160 };
             lstScenarios.SelectedIndexChanged += LstScenarios_SelectedIndexChanged;
 
             Button btnShow = new Button { Text = "Hiển thị", Location = new Point(370, 36), Width = 115, Height = 28, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White };
@@ -104,7 +104,7 @@ namespace ZenQOffice.UI
             if (idx >= 0 && idx < calcView.Scenarios.Count)
             {
                 calcView.ApplyScenario(idx);
-                MessageBox.Show($"Đã áp dụng kịch bản \"{calcView.Scenarios[idx].Name}\" vào bảng tính thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show($"Đã áp dụng kịch bản \"{calcView.Scenarios[idx].Name}\" vào bảng tính thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -158,7 +158,7 @@ namespace ZenQOffice.UI
             int idx = lstScenarios.SelectedIndex;
             if (idx >= 0 && idx < calcView.Scenarios.Count)
             {
-                if (MessageBox.Show($"Bạn có chắc chắn muốn xóa kịch bản \"{calcView.Scenarios[idx].Name}\"?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (ZenQOffice.UI.FluentMessageBox.Show($"Bạn có chắc chắn muốn xóa kịch bản \"{calcView.Scenarios[idx].Name}\"?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     calcView.Scenarios.RemoveAt(idx);
                     RefreshList();
@@ -170,11 +170,11 @@ namespace ZenQOffice.UI
         {
             if (calcView.Scenarios.Count == 0)
             {
-                MessageBox.Show("Chưa có kịch bản nào để tạo tóm tắt.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Chưa có kịch bản nào để tạo tóm tắt.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             calcView.GenerateScenarioSummaryReport();
-            MessageBox.Show("Đã tạo trang báo cáo Tóm tắt Kịch bản (Scenario Summary) thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show("Đã tạo trang báo cáo Tóm tắt Kịch bản (Scenario Summary) thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             this.Close();
         }
     }

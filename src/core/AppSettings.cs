@@ -62,7 +62,8 @@ namespace ZenQOffice.Core
         public bool AutoStraightenInk { get; set; } = true;
         public bool LaunchAsStandaloneBranch { get; set; } = true;
         public OfficeAppMode DefaultBranchApp { get; set; } = OfficeAppMode.Writer;
-        public bool RegisterFileAssociationsOnStartup { get; set; } = false;
+        public bool RegisterFileAssociationsOnStartup { get; set; } = false;
+        public bool AiChatIslandMode { get; set; } = false;
         public string LastNotifiedUpdateVersion { get; set; } = "";
         public string FeedbackWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbwFOUzEf14JkfAqsuYkScjgRpbzD7M3JghMpyZpjm9uL6z3XjLa0pm20XgsnW3L6Man/exec";
         public string FeedbackUserContact { get; set; } = "";
@@ -211,7 +212,11 @@ namespace ZenQOffice.Core
 
                 XmlElement elRegFiles = doc.CreateElement("RegisterFileAssociationsOnStartup");
                 elRegFiles.InnerText = RegisterFileAssociationsOnStartup.ToString();
-                root.AppendChild(elRegFiles);
+                root.AppendChild(elRegFiles);
+
+                XmlElement elAiIsland = doc.CreateElement("AiChatIslandMode");
+                elAiIsland.InnerText = AiChatIslandMode.ToString();
+                root.AppendChild(elAiIsland);
 
                 XmlElement elLastNotif = doc.CreateElement("LastNotifiedUpdateVersion");
                 elLastNotif.InnerText = LastNotifiedUpdateVersion ?? "";
@@ -307,6 +312,9 @@ namespace ZenQOffice.Core
                         XmlNode nBranchApp = root.SelectSingleNode("DefaultBranchApp");
                         if (nBranchApp != null) { int v; if (int.TryParse(nBranchApp.InnerText, out v)) s.DefaultBranchApp = (OfficeAppMode)v; }
 
+                        XmlNode nAiIsland = root.SelectSingleNode("AiChatIslandMode");
+                        if (nAiIsland != null) { bool v; if (bool.TryParse(nAiIsland.InnerText, out v)) s.AiChatIslandMode = v; }
+
                         XmlNode nRegFiles = root.SelectSingleNode("RegisterFileAssociationsOnStartup");
                         if (nRegFiles != null) { bool v; if (bool.TryParse(nRegFiles.InnerText, out v)) s.RegisterFileAssociationsOnStartup = v; }
 

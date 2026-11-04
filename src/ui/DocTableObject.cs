@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -117,6 +117,8 @@ namespace ZenQOffice.UI
     {
         public List<DocTableCell> Cells { get; set; }
         public int HeightPt { get; set; }
+        public bool CantSplit { get; set; }
+        public bool RepeatHeader { get; set; }
 
         public DocTableRow()
         {

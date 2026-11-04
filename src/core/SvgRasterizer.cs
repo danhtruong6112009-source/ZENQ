@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -1569,6 +1569,40 @@ namespace ZenQOffice.Core
                  string.Equals(visVal, "collapse", StringComparison.OrdinalIgnoreCase)))
             {
                 return;
+            }
+
+            // Gaussian blur is used by editable icon shadows and edge highlights.
+            // Render the filtered subtree once, then retain normal parent transforms and opacity.
+            if (attrs.TryGetValue("filter", out string filterValue) &&
+                defsById.TryGetValue(ExtractUrlId(filterValue) ?? "", out XElement filterDef))
+            {
+                var primitives = filterDef.Elements().ToList();
+                if (primitives.Count == 1 && primitives[0].Name.LocalName == "feGaussianBlur")
+                {
+                    string deviation = GetAttr(primitives[0], "stdDeviation") ?? "0";
+                    var parts = Regex.Split(deviation.Trim(), @"[\s,]+");
+                    double sigma = parts.Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double n) ? n : 0).DefaultIfEmpty(0).Max();
+                    if (sigma > 0 && sigma <= 64)
+                    {
+                        var unfiltered = new XElement(elem);
+                        unfiltered.SetAttributeValue("filter", "none");
+                        unfiltered.SetAttributeValue("style", (GetAttr(unfiltered,"style") ?? "") + ";filter:none");
+                        var visual = new WpfDrawingVisual();
+                        using(var inner = visual.RenderOpen()) RenderElementRecursive(inner, unfiltered, parentState, defBrushes, defsById, cssRules, depth + 1);
+                        WpfRect bounds = visual.ContentBounds;
+                        if (!bounds.IsEmpty && bounds.Width > 0 && bounds.Height > 0)
+                        {
+                            bounds.Inflate(sigma * 3 + 1, sigma * 3 + 1);
+                            double scale = Math.Min(4, Math.Min(2048 / bounds.Width, 2048 / bounds.Height));
+                            if(scale > 0){
+                                visual.Effect = new System.Windows.Media.Effects.BlurEffect { Radius = sigma * 3, KernelType = System.Windows.Media.Effects.KernelType.Gaussian, RenderingBias = System.Windows.Media.Effects.RenderingBias.Quality };
+                                visual.Transform = new WpfMatrixTransform(new WpfMatrix(scale,0,0,scale,-bounds.X*scale,-bounds.Y*scale));
+                                var blurred = new WpfRenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(bounds.Width*scale)),Math.Max(1,(int)Math.Ceiling(bounds.Height*scale)),96,96,WpfPixelFormats.Pbgra32);
+                                blurred.Render(visual);blurred.Freeze();dc.DrawImage(blurred,bounds);return;
+                            }
+                        }
+                    }
+                }
             }
 
             SvgRenderState state = MergeRenderState(parentState, attrs);

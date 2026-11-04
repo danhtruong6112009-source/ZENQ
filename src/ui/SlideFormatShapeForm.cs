@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -113,7 +113,7 @@ namespace ZenQOffice.UI
             BackColor = Color.FromArgb(248, 249, 250);
             Font = new Font("Segoe UI", 9f);
 
-            TabControl tabCtrl = new TabControl
+            TabControl tabCtrl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(520, 450),
@@ -215,7 +215,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblDash = new Label { Text = "Kiểu nét:", Location = new Point(335, 58), AutoSize = true };
-            cboDashStyle = new ComboBox { Location = new Point(390, 56), Size = new Size(85, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboDashStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(390, 56), Size = new Size(85, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboDashStyle.Items.AddRange(new object[] { "Liền (Solid)", "Nét đứt (Dash)", "Chấm (Dot)" });
             cboDashStyle.SelectedIndex = DashStyleResult == DashStyle.Dash ? 1 : (DashStyleResult == DashStyle.Dot ? 2 : 0);
             cboDashStyle.SelectedIndexChanged += (s, e) => {

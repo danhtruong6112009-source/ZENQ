@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -80,7 +80,7 @@ namespace ZenQOffice.UI
                 }
             };
 
-            tabControl = new TabControl();
+            tabControl = new ZenQOffice.UI.FluentTabControl();
             tabControl.Location = new Point(12, 10);
             tabControl.Size = new Size(500, 30);
             tabFind = new TabPage("Tìm kiếm (Find)");
@@ -148,7 +148,7 @@ namespace ZenQOffice.UI
             lblSearchBy.AutoSize = true;
             this.Controls.Add(lblSearchBy);
 
-            cboSearchBy = new ComboBox();
+            cboSearchBy = new ZenQOffice.UI.FluentComboBox();
             cboSearchBy.DropDownStyle = ComboBoxStyle.DropDownList;
             cboSearchBy.Items.AddRange(new object[] { "Theo Hàng (By Rows)", "Theo Cột (By Columns)" });
             cboSearchBy.SelectedIndex = 0;
@@ -162,7 +162,7 @@ namespace ZenQOffice.UI
             lblLookIn.AutoSize = true;
             this.Controls.Add(lblLookIn);
 
-            cboLookIn = new ComboBox();
+            cboLookIn = new ZenQOffice.UI.FluentComboBox();
             cboLookIn.DropDownStyle = ComboBoxStyle.DropDownList;
             cboLookIn.Items.AddRange(new object[] { "Giá trị (Values)", "Công thức (Formulas)" });
             cboLookIn.SelectedIndex = 0;
@@ -258,7 +258,7 @@ namespace ZenQOffice.UI
             lblStatus.Text = statusMsg;
             if (!found)
             {
-                MessageBox.Show(this, "Không tìm thấy nội dung: \"" + q + "\"", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Không tìm thấy nội dung: \"" + q + "\"", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             if (_parentForm != null) _parentForm.Invalidate();
         }
@@ -275,7 +275,7 @@ namespace ZenQOffice.UI
             lblStatus.Text = statusMsg;
             if (!found)
             {
-                MessageBox.Show(this, "Không tìm thấy nội dung: \"" + q + "\"", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Không tìm thấy nội dung: \"" + q + "\"", "Tìm kiếm", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             if (_parentForm != null) _parentForm.Invalidate();
         }
@@ -311,7 +311,7 @@ namespace ZenQOffice.UI
                 cboLookIn.SelectedIndex == 1);
 
             lblStatus.Text = string.Format("Đã hoàn tất thay thế {0} vị trí.", count);
-            MessageBox.Show(this, string.Format("ZenQ Calc đã hoàn thành việc tìm kiếm và thực hiện {0} lượt thay thế.", count),
+            ZenQOffice.UI.FluentMessageBox.Show(this, string.Format("ZenQ Calc đã hoàn thành việc tìm kiếm và thực hiện {0} lượt thay thế.", count),
                 "Thay thế tất cả", MessageBoxButtons.OK, MessageBoxIcon.Information);
             if (_parentForm != null) _parentForm.Invalidate();
         }

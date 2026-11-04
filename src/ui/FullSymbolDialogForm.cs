@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -201,7 +201,7 @@ namespace ZenQOffice.UI
 
         private void InitControls()
         {
-            TabControl tabCtrl = new TabControl
+            TabControl tabCtrl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 10),
                 Size = new Size(540, 420)
@@ -214,7 +214,7 @@ namespace ZenQOffice.UI
             Label lblF = new Label { Text = "Font:", Location = new Point(15, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
             tabSymbols.Controls.Add(lblF);
 
-            cbFont = new ComboBox { Location = new Point(55, 9), Size = new Size(180, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cbFont = new ZenQOffice.UI.FluentComboBox { Location = new Point(55, 9), Size = new Size(180, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cbFont.Items.AddRange(new object[] { "Arial Black", "Calibri", "Segoe UI Symbol", "Arial", "Cambria Math", "Times New Roman", "(normal text)" });
             cbFont.SelectedIndex = 0;
             cbFont.SelectedIndexChanged += (s, e) => pnlGrid.Invalidate();
@@ -223,7 +223,7 @@ namespace ZenQOffice.UI
             Label lblS = new Label { Text = "Subset:", Location = new Point(255, 12), AutoSize = true, Font = new Font("Segoe UI", 9) };
             tabSymbols.Controls.Add(lblS);
 
-            cbSubset = new ComboBox { Location = new Point(310, 9), Size = new Size(210, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cbSubset = new ZenQOffice.UI.FluentComboBox { Location = new Point(310, 9), Size = new Size(210, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             foreach (var key in Subsets.Keys) cbSubset.Items.Add(key);
             cbSubset.SelectedIndex = 0;
             cbSubset.SelectedIndexChanged += (s, e) =>
@@ -468,7 +468,7 @@ namespace ZenQOffice.UI
             };
             tabSymbols.Controls.Add(lblFrom);
 
-            cbFrom = new ComboBox
+            cbFrom = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(460, 295),
                 Size = new Size(60, 22),

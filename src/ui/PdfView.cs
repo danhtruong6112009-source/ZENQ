@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -4448,7 +4448,7 @@ namespace ZenQOffice.UI
                 RadioButton rbAll = new RadioButton { Text = "Tất cả các trang (" + Document.Pages.Count + " trang)", Location = new Point(30, 104), AutoSize = true };
 
                 Label lblAngle = new Label { Text = "Góc xoay:", Location = new Point(210, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
-                ComboBox cbAngle = new ComboBox { Location = new Point(210, 48), Width = 135, DropDownStyle = ComboBoxStyle.DropDownList };
+                ComboBox cbAngle = new ZenQOffice.UI.FluentComboBox { Location = new Point(210, 48), Width = 135, DropDownStyle = ComboBoxStyle.DropDownList };
                 cbAngle.Items.AddRange(new object[] { "90° Xuôi kim", "180° Đảo ngược", "270° Ngược kim" });
                 cbAngle.SelectedIndex = 0;
 
@@ -4493,7 +4493,7 @@ namespace ZenQOffice.UI
             if (Document == null || Document.Pages.Count == 0) return false;
             if (Document.Pages.Count <= 1)
             {
-                MessageBox.Show("Không thể xóa trang duy nhất còn lại của tài liệu PDF.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Không thể xóa trang duy nhất còn lại của tài liệu PDF.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
@@ -4528,7 +4528,7 @@ namespace ZenQOffice.UI
                         if (ActivePageIndex >= Document.Pages.Count) ActivePageIndex = Document.Pages.Count - 1;
                         InvalidateAllCaches();
                         if (parentForm != null) parentForm.Invalidate();
-                        MessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "ZENQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "ZENQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                 }
@@ -4571,7 +4571,7 @@ namespace ZenQOffice.UI
                                         onMerged(mergedDoc, sfd.FileName);
                                     }
 
-                                    MessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    ZenQOffice.UI.FluentMessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }
@@ -4579,7 +4579,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Lỗi khi ghép tệp PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi ghép tệp PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -4634,13 +4634,13 @@ namespace ZenQOffice.UI
                                     {
                                         onSplit(splitDoc, sfd.FileName);
                                     }
-                                    MessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    ZenQOffice.UI.FluentMessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }
                             catch (Exception ex)
                             {
-                                MessageBox.Show("Lỗi khi tách PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi tách PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
@@ -5035,7 +5035,7 @@ namespace ZenQOffice.UI
                 NumericUpDown numDigits = new NumericUpDown { Location = new Point(20, 110), Width = 80, Minimum = 1, Maximum = 12, Value = 6 };
 
                 Label lblPos = new Label { Text = "Vị trí đánh số:", Location = new Point(140, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
-                ComboBox cbPos = new ComboBox { Location = new Point(140, 110), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
+                ComboBox cbPos = new ZenQOffice.UI.FluentComboBox { Location = new Point(140, 110), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
                 cbPos.Items.AddRange(new object[] { "Góc dưới cùng bên phải", "Góc dưới cùng ở giữa", "Góc dưới cùng bên trái", "Góc trên cùng bên phải", "Góc trên cùng ở giữa", "Góc trên cùng bên trái" });
                 cbPos.SelectedIndex = 0;
 
@@ -5126,13 +5126,13 @@ namespace ZenQOffice.UI
                     {
                         PushUndoState("Gỡ mật khẩu bảo mật PDF");
                         Document.RemovePasswordProtection(dlg.OpenPassword ?? "");
-                        MessageBox.Show(parentForm, "Đã gỡ bỏ toàn bộ mật khẩu bảo vệ và hạn chế thao tác trên tài liệu!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã gỡ bỏ toàn bộ mật khẩu bảo vệ và hạn chế thao tác trên tài liệu!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (dlg.IsProtected)
                     {
                         PushUndoState("Thiết lập mật khẩu bảo mật PDF");
                         Document.SetPasswordProtection(dlg.OpenPassword, dlg.PermissionPassword, dlg.AllowPrinting, dlg.AllowCopying, dlg.AllowModifying, dlg.KeyLength);
-                        MessageBox.Show(parentForm, "Đã thiết lập mật khẩu mã hóa thành công theo chuẩn " + dlg.KeyLength + "-bit AES!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã thiết lập mật khẩu mã hóa thành công theo chuẩn " + dlg.KeyLength + "-bit AES!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
@@ -5175,7 +5175,7 @@ namespace ZenQOffice.UI
                         bool saved = PdfHandler.SavePdf(extractedDoc, dlg.OutputFilePath);
                         if (saved)
                         {
-                            MessageBox.Show(parentForm, "Đã trích xuất " + dlg.SelectedPageIndices.Count + " trang và lưu thành công vào:\n" + dlg.OutputFilePath, "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã trích xuất " + dlg.SelectedPageIndices.Count + " trang và lưu thành công vào:\n" + dlg.OutputFilePath, "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                     else
@@ -5186,7 +5186,7 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            MessageBox.Show(parentForm, "Đã trích xuất thành công " + dlg.SelectedPageIndices.Count + " trang!", "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã trích xuất thành công " + dlg.SelectedPageIndices.Count + " trang!", "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                     return true;
@@ -5208,7 +5208,7 @@ namespace ZenQOffice.UI
                         var externalDoc = PdfHandler.LoadPdf(dlg.SelectedFilePath);
                         if (externalDoc == null || externalDoc.Pages == null || externalDoc.Pages.Count == 0)
                         {
-                            MessageBox.Show(parentForm, "Không thể đọc nội dung từ tệp PDF đã chọn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Không thể đọc nội dung từ tệp PDF đã chọn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             return false;
                         }
 
@@ -5218,12 +5218,12 @@ namespace ZenQOffice.UI
                         InvalidateAllCaches();
                         if (parentForm != null) parentForm.Invalidate();
 
-                        MessageBox.Show(parentForm, "Đã chèn thành công " + externalDoc.Pages.Count + " trang từ:\n" + Path.GetFileName(dlg.SelectedFilePath), "Chèn Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã chèn thành công " + externalDoc.Pages.Count + " trang từ:\n" + Path.GetFileName(dlg.SelectedFilePath), "Chèn Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(parentForm, "Lỗi khi chèn trang: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Lỗi khi chèn trang: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -5255,12 +5255,12 @@ namespace ZenQOffice.UI
                             msg += $"\n\n- Dung lượng gốc: {originalBytes / 1024:N0} KB\n- Dung lượng nén: {compressedBytes / 1024:N0} KB\n- Tiết kiệm: {savedPct:0.#}%";
                         }
                         msg += $"\n\nTệp đã lưu tại:\n{dlg.OutputFilePath}";
-                        MessageBox.Show(parentForm, msg, "Nén & Tối ưu hóa PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, msg, "Nén & Tối ưu hóa PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                     else
                     {
-                        MessageBox.Show(parentForm, "Không thể hoàn tất nén tài liệu PDF!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Không thể hoàn tất nén tài liệu PDF!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -5279,7 +5279,7 @@ namespace ZenQOffice.UI
                     bool ok = PdfConverterEngine.ExportToDocx(Document, sfd.FileName);
                     if (ok)
                     {
-                        var res = MessageBox.Show(parentForm, "Đã xuất tài liệu sang Microsoft Word (.docx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Word 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã xuất tài liệu sang Microsoft Word (.docx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Word 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
                             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
@@ -5303,7 +5303,7 @@ namespace ZenQOffice.UI
                     bool ok = PdfConverterEngine.ExportToXlsx(Document, sfd.FileName);
                     if (ok)
                     {
-                        var res = MessageBox.Show(parentForm, "Đã xuất bảng biểu sang Microsoft Excel (.xlsx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Excel 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã xuất bảng biểu sang Microsoft Excel (.xlsx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Excel 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
                             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
@@ -5325,7 +5325,7 @@ namespace ZenQOffice.UI
                     var list = PdfConverterEngine.ExportToImages(Document, fbd.SelectedPath, "PNG", 150);
                     if (list.Count > 0)
                     {
-                        MessageBox.Show(parentForm, $"Đã xuất thành công {list.Count} trang thành hình ảnh PNG tại:\n{fbd.SelectedPath}", "Xuất Hình Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, $"Đã xuất thành công {list.Count} trang thành hình ảnh PNG tại:\n{fbd.SelectedPath}", "Xuất Hình Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                 }
@@ -5339,13 +5339,13 @@ namespace ZenQOffice.UI
             string text = PdfConverterEngine.ExtractAllText(Document, includePageHeaders: true);
             if (string.IsNullOrEmpty(text))
             {
-                MessageBox.Show(parentForm, "Tài liệu PDF không chứa nội dung văn bản có thể trích xuất.", "Trích xuất Văn bản", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Tài liệu PDF không chứa nội dung văn bản có thể trích xuất.", "Trích xuất Văn bản", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;
             }
 
             try { Clipboard.SetText(text); } catch { }
 
-            var res = MessageBox.Show(parentForm, $"Đã trích xuất toàn bộ văn bản ({text.Length:N0} ký tự) và sao chép vào Clipboard!\n\nBạn có muốn lưu nội dung này ra tệp văn bản thuần (.txt) không?", "Trích xuất Văn bản", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, $"Đã trích xuất toàn bộ văn bản ({text.Length:N0} ký tự) và sao chép vào Clipboard!\n\nBạn có muốn lưu nội dung này ra tệp văn bản thuần (.txt) không?", "Trích xuất Văn bản", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (res == DialogResult.Yes)
             {
                 using (var sfd = new SaveFileDialog { Filter = "Tệp văn bản (*.txt)|*.txt", Title = "Lưu văn bản trích xuất" })

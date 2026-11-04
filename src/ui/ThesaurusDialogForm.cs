@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -100,7 +100,7 @@ namespace ZenQOffice.UI
             lblHeader.ForeColor = Color.FromArgb(96, 94, 92);
             this.Controls.Add(lblHeader);
 
-            lstResults = new ListBox();
+            lstResults = new ZenQOffice.UI.FluentListBox();
             lstResults.Location = new Point(14, 144);
             lstResults.Size = new Size(338, 230);
             lstResults.Font = new Font("Segoe UI", 10f, FontStyle.Regular);

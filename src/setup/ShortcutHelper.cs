@@ -75,7 +75,7 @@ namespace ZenQOffice.Setup
             CleanObsoleteShortcuts();
 
             string exePath = Path.Combine(installDir, "ZenQOffice.exe");
-            string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
+            string icoPath = Path.Combine(installDir,"ZenQOffice.ico");
             string iconDir = Path.Combine(installDir, "icon");
             string writerIco = Path.Combine(iconDir, "writer.ico");
             string calcIco = Path.Combine(iconDir, "calc.ico");
@@ -206,10 +206,10 @@ namespace ZenQOffice.Setup
                     {
                         string exePath = Path.Combine(installDir, "ZenQOffice.exe");
                         string uninstallExe = Path.Combine(installDir, "Uninstall.exe");
-                        string icoPath = Path.Combine(installDir, "ZenQOffice.ico");
+                        string icoPath = Path.Combine(installDir,"ZenQOffice.ico");
 
                         key.SetValue("DisplayName", "ZENQ OFFICE");
-                        key.SetValue("DisplayVersion", "5.8");
+                        key.SetValue("DisplayVersion", "6.0");
                         key.SetValue("Publisher", "NEXTGENEDUSPACE STUDIO");
                         key.SetValue("DisplayIcon", File.Exists(icoPath) ? icoPath : exePath);
                         key.SetValue("InstallLocation", installDir);

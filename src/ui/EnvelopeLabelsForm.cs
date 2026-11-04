@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -46,7 +46,7 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 249, 250);
             this.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
-            tabControl = new TabControl();
+            tabControl = new ZenQOffice.UI.FluentTabControl();
             tabControl.Dock = DockStyle.Fill;
             tabControl.Font = new Font("Segoe UI", 9.2f, FontStyle.Regular);
 
@@ -93,7 +93,7 @@ namespace ZenQOffice.UI
             lblSize.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
             tabEnvelopes.Controls.Add(lblSize);
 
-            cboEnvelopeSize = new ComboBox();
+            cboEnvelopeSize = new ZenQOffice.UI.FluentComboBox();
             cboEnvelopeSize.DropDownStyle = ComboBoxStyle.DropDownList;
             cboEnvelopeSize.Location = new Point(16, 252);
             cboEnvelopeSize.Size = new Size(320, 26);
@@ -174,7 +174,7 @@ namespace ZenQOffice.UI
             lblLayout.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
             tabLabels.Controls.Add(lblLayout);
 
-            cboLabelLayout = new ComboBox();
+            cboLabelLayout = new ZenQOffice.UI.FluentComboBox();
             cboLabelLayout.DropDownStyle = ComboBoxStyle.DropDownList;
             cboLabelLayout.Location = new Point(16, 192);
             cboLabelLayout.Size = new Size(320, 26);

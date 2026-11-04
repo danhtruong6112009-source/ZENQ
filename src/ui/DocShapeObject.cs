@@ -26,6 +26,7 @@ namespace ZenQOffice.UI
         public Rectangle OriginalBoundsEmu;
         public bool AspectRatioLock;
         public Color[] ResolvedThemePalette;
+        public List<DocShapeObject> GroupChildren;
     }
 
     public class DocShapeObject
@@ -184,6 +185,14 @@ namespace ZenQOffice.UI
         public Color ShadowColor { get; set; }
         public int StylePresetIndex { get; set; }
 
+        // Vector shape properties
+        public bool HasFill { get; set; }
+        public bool HasLine { get; set; }
+        public bool FlipH { get; set; }
+        public bool FlipV { get; set; }
+        public bool HasHeadArrow { get; set; }
+        public bool HasTailArrow { get; set; }
+
         // Text Inside Shape
         public bool IsEditingText { get; set; }
         public string TextContent { get; set; }
@@ -323,6 +332,199 @@ namespace ZenQOffice.UI
             }
         }
 
+        public DocShapeObject Clone()
+        {
+            DocShapeObject copy = new DocShapeObject();
+            copy.Id = this.Id;
+            copy.ShapeType = this.ShapeType;
+            copy.SmartArtType = this.SmartArtType;
+            copy.SmartArtTitle = this.SmartArtTitle;
+            copy.ChartData = this.ChartData != null ? this.ChartData.Clone() : null;
+            copy.PageNumber = this.PageNumber;
+            copy.PageX = this.PageX;
+            copy.PageY = this.PageY;
+            copy.BaseWidth = this.BaseWidth;
+            copy.BaseHeight = this.BaseHeight;
+            copy.WidthDelta = this.WidthDelta;
+            copy.HeightDelta = this.HeightDelta;
+            copy.RotationAngle = this.RotationAngle;
+            copy.WrapMode = this.WrapMode;
+            copy.Visible = this.Visible;
+            copy.CustomName = this.CustomName;
+            copy.FixPosition = this.FixPosition;
+            copy.PositionCalculated = this.PositionCalculated;
+            copy.IsSelected = this.IsSelected;
+            copy.ShowLayoutOptions = this.ShowLayoutOptions;
+            copy.AdjustValue1 = this.AdjustValue1;
+            copy.AdjustValue2 = this.AdjustValue2;
+            copy.AdjustValue3 = this.AdjustValue3;
+            copy.ImagePath = this.ImagePath;
+            copy.CachedImage = this.CachedImage;
+            copy.PictureStylePreset = this.PictureStylePreset;
+            copy.PictureBrightness = this.PictureBrightness;
+            copy.PictureContrast = this.PictureContrast;
+            copy.PictureGrayscale = this.PictureGrayscale;
+            copy.PictureSepia = this.PictureSepia;
+            copy.PictureInvert = this.PictureInvert;
+            copy.PictureTransparency = this.PictureTransparency;
+            copy.PictureCornerRadius = this.PictureCornerRadius;
+            copy.PictureHasReflection = this.PictureHasReflection;
+            copy.PictureFlipHorizontal = this.PictureFlipHorizontal;
+            copy.PictureFlipVertical = this.PictureFlipVertical;
+            copy.AltText = this.AltText;
+            copy.FillColor = this.FillColor;
+            copy.OutlineColor = this.OutlineColor;
+            copy.OutlineWidth = this.OutlineWidth;
+            copy.OutlineDashStyle = this.OutlineDashStyle;
+            copy.HasShadow = this.HasShadow;
+            copy.HasGlow = this.HasGlow;
+            copy.ShadowColor = this.ShadowColor;
+            copy.StylePresetIndex = this.StylePresetIndex;
+            copy.HasFill = this.HasFill;
+            copy.HasLine = this.HasLine;
+            copy.FlipH = this.FlipH;
+            copy.FlipV = this.FlipV;
+            copy.HasHeadArrow = this.HasHeadArrow;
+            copy.HasTailArrow = this.HasTailArrow;
+            copy.IsEditingText = this.IsEditingText;
+            copy.TextContent = this.TextContent;
+            copy.PlaceholderText = this.PlaceholderText;
+            copy.TextCursorIndex = this.TextCursorIndex;
+            copy.WordWrap = this.WordWrap;
+            copy.TextColor = this.TextColor;
+            copy.FontFamily = this.FontFamily;
+            copy.FontSize = this.FontSize;
+            copy.Bold = this.Bold;
+            copy.Italic = this.Italic;
+            copy.TextAlignment = this.TextAlignment;
+            copy.TextLineAlignment = this.TextLineAlignment;
+            copy.LastBounds = this.LastBounds;
+            copy.GroupChildren = new List<DocShapeObject>();
+            if (this.GroupChildren != null)
+            {
+                for (int i = 0; i < this.GroupChildren.Count; i++)
+                {
+                    if (this.GroupChildren[i] != null) copy.GroupChildren.Add(this.GroupChildren[i].Clone());
+                }
+            }
+            return copy;
+        }
+
+        public static string SerializeGroupChildren(List<DocShapeObject> children)
+        {
+            if (children == null || children.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < children.Count; i++)
+            {
+                var c = children[i];
+                if (c == null) continue;
+                if (sb.Length > 0) sb.Append("~");
+                string sType = c.ShapeType ?? "Rectangle";
+                int x = c.PageX;
+                int y = c.PageY;
+                int w = c.BaseWidth + c.WidthDelta;
+                int h = c.BaseHeight + c.HeightDelta;
+                string fillHex = c.HasFill ? string.Format("{0:X2}{1:X2}{2:X2}", c.FillColor.R, c.FillColor.G, c.FillColor.B) : "none";
+                string lineHex = c.HasLine ? string.Format("{0:X2}{1:X2}{2:X2}", c.OutlineColor.R, c.OutlineColor.G, c.OutlineColor.B) : "none";
+                string lineW = c.OutlineWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                int align = (int)c.TextAlignment;
+                string fs = c.FontSize.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+                string bold = c.Bold ? "1" : "0";
+                string italic = c.Italic ? "1" : "0";
+                string txtHex = string.Format("{0:X2}{1:X2}{2:X2}", c.TextColor.R, c.TextColor.G, c.TextColor.B);
+                string adj = c.AdjustValue1.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                string flags = (c.FlipH ? "1" : "0") + (c.FlipV ? "1" : "0") + (c.HasHeadArrow ? "1" : "0") + (c.HasTailArrow ? "1" : "0");
+                string escTxt = Uri.EscapeDataString(c.TextContent ?? "");
+                sb.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                    "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12};{13};{14};{15}",
+                    sType, x, y, w, h, fillHex, lineHex, lineW, align, fs, bold, italic, txtHex, adj, flags, escTxt);
+            }
+            return Uri.EscapeDataString(sb.ToString());
+        }
+
+        public static List<DocShapeObject> DeserializeGroupChildren(string data)
+        {
+            var list = new List<DocShapeObject>();
+            if (string.IsNullOrEmpty(data)) return list;
+            string unesc;
+            try { unesc = Uri.UnescapeDataString(data); }
+            catch { unesc = data; }
+            string[] items = unesc.Split(new char[] { '~' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var item in items)
+            {
+                string[] f = item.Split(';');
+                if (f.Length < 16) continue;
+                try
+                {
+                    var child = new DocShapeObject();
+                    child.ShapeType = f[0];
+                    int px, py, pw, ph;
+                    int.TryParse(f[1], out px);
+                    int.TryParse(f[2], out py);
+                    int.TryParse(f[3], out pw);
+                    int.TryParse(f[4], out ph);
+                    child.PageX = px;
+                    child.PageY = py;
+                    child.BaseWidth = pw;
+                    child.BaseHeight = ph;
+                    if (f[5] == "none")
+                    {
+                        child.HasFill = false;
+                        child.FillColor = Color.Transparent;
+                    }
+                    else
+                    {
+                        child.HasFill = true;
+                        int cRgb = int.Parse(f[5], System.Globalization.NumberStyles.HexNumber);
+                        child.FillColor = Color.FromArgb(255, (cRgb >> 16) & 0xFF, (cRgb >> 8) & 0xFF, cRgb & 0xFF);
+                    }
+                    if (f[6] == "none")
+                    {
+                        child.HasLine = false;
+                        child.OutlineColor = Color.Transparent;
+                        child.OutlineWidth = 0;
+                    }
+                    else
+                    {
+                        child.HasLine = true;
+                        int lRgb = int.Parse(f[6], System.Globalization.NumberStyles.HexNumber);
+                        child.OutlineColor = Color.FromArgb(255, (lRgb >> 16) & 0xFF, (lRgb >> 8) & 0xFF, lRgb & 0xFF);
+                        float lw;
+                        if (float.TryParse(f[7], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lw))
+                            child.OutlineWidth = lw;
+                        else
+                            child.OutlineWidth = 1.0f;
+                    }
+                    int al;
+                    if (int.TryParse(f[8], out al)) child.TextAlignment = (StringAlignment)al;
+                    float fs;
+                    if (float.TryParse(f[9], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fs)) child.FontSize = fs;
+                    child.Bold = (f[10] == "1");
+                    child.Italic = (f[11] == "1");
+                    try
+                    {
+                        int tRgb = int.Parse(f[12], System.Globalization.NumberStyles.HexNumber);
+                        child.TextColor = Color.FromArgb(255, (tRgb >> 16) & 0xFF, (tRgb >> 8) & 0xFF, tRgb & 0xFF);
+                    }
+                    catch { child.TextColor = Color.Black; }
+                    float adj;
+                    if (float.TryParse(f[13], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out adj)) child.AdjustValue1 = adj;
+                    if (f[14].Length >= 4)
+                    {
+                        child.FlipH = (f[14][0] == '1');
+                        child.FlipV = (f[14][1] == '1');
+                        child.HasHeadArrow = (f[14][2] == '1');
+                        child.HasTailArrow = (f[14][3] == '1');
+                    }
+                    try { child.TextContent = Uri.UnescapeDataString(f[15]); }
+                    catch { child.TextContent = f[15]; }
+                    list.Add(child);
+                }
+                catch { }
+            }
+            return list;
+        }
+
         public GraphicsPath GetContourPath(Rectangle bounds)
         {
             return ShapeRenderer.CreateShapePath(this, bounds);
@@ -354,6 +556,13 @@ namespace ZenQOffice.UI
             AdjustValue1 = 0.2f;
             AdjustValue2 = 0.4f;
             AdjustValue3 = 0.8f;
+
+            HasFill = true;
+            HasLine = true;
+            FlipH = false;
+            FlipV = false;
+            HasHeadArrow = false;
+            HasTailArrow = false;
 
             FillColor = Color.FromArgb(43, 87, 154); // Classic MS Word Theme Blue (#2B579A)
             OutlineColor = Color.FromArgb(30, 60, 110);
@@ -449,6 +658,14 @@ namespace ZenQOffice.UI
                 if (p.OriginalBoundsEmu != Rectangle.Empty) OriginalBoundsEmu = p.OriginalBoundsEmu;
                 if (p.AspectRatioLock) AspectRatioLock = true;
                 if (p.ResolvedThemePalette != null) ResolvedThemePalette = p.ResolvedThemePalette;
+                if (p.GroupChildren != null && p.GroupChildren.Count > 0)
+                {
+                    GroupChildren = new List<DocShapeObject>();
+                    foreach (var c in p.GroupChildren)
+                    {
+                        if (c != null) GroupChildren.Add(c.Clone());
+                    }
+                }
             }
         }
 
@@ -538,7 +755,7 @@ namespace ZenQOffice.UI
                 return;
             }
 
-            string[] keys = new string[] { "ID=", "TYPE=", "PATH=", "X=", "Y=", "W=", "H=", "WRAP=", "PAGE=", "STYLE=", "YREL=", "SMARTART=", "TITLE=", "TEXT=", "ADJ1=", "ADJ2=", "ADJ3=", "NODES=", "VSTYLE=", "ARLOCK=", "EMUX=", "EMUY=", "EMUW=", "EMUH=" };
+            string[] keys = new string[] { "ID=", "TYPE=", "PATH=", "X=", "Y=", "W=", "H=", "WRAP=", "PAGE=", "STYLE=", "YREL=", "SMARTART=", "TITLE=", "TEXT=", "ADJ1=", "ADJ2=", "ADJ3=", "NODES=", "VSTYLE=", "ARLOCK=", "EMUX=", "EMUY=", "EMUW=", "EMUH=", "CHILDREN=" };
             int curPos = 0;
             string smartArtType = null;
             string smartArtTitle = null;
@@ -551,6 +768,7 @@ namespace ZenQOffice.UI
             bool hasArLock = false;
             int emuX = 0, emuY = 0, emuW = 0, emuH = 0;
             bool hasEmu = false;
+            string childrenMeta = null;
 
             while (curPos < inner.Length)
             {
@@ -621,6 +839,7 @@ namespace ZenQOffice.UI
                 else if (matchedKey == "EMUY=") { int.TryParse(val, out emuY); hasEmu = true; }
                 else if (matchedKey == "EMUW=") { int.TryParse(val, out emuW); hasEmu = true; }
                 else if (matchedKey == "EMUH=") { int.TryParse(val, out emuH); hasEmu = true; }
+                else if (matchedKey == "CHILDREN=") { childrenMeta = val; }
 
                 curPos = nextKeyStart;
             }
@@ -644,6 +863,10 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(nodesMeta)) p.NodesMeta = nodesMeta;
                 if (hasArLock) p.AspectRatioLock = arLock;
                 if (hasEmu) p.OriginalBoundsEmu = new Rectangle(emuX, emuY, emuW, emuH);
+                if (!string.IsNullOrEmpty(childrenMeta))
+                {
+                    p.GroupChildren = DeserializeGroupChildren(childrenMeta);
+                }
             }
 
             ParsedTagCache[tag] = new ParsedShapeTagInfo

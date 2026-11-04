@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -46,6 +46,28 @@ namespace ZenQOffice.UI
             }
         }
 
+        private static Bitmap LoadModernIcon(OfficeAppMode mode)
+        {
+            string name=mode switch {OfficeAppMode.Writer=>"writer",OfficeAppMode.Calc=>"calc",OfficeAppMode.Slides=>"present",OfficeAppMode.Pdf=>"pdf",OfficeAppMode.Photo=>"vector",_=>null};
+            if(name==null)return null;
+            string editable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"icon",name+"_new.svg");
+            if(File.Exists(editable))return RenderSquareIcon(editable);
+            using var stream=typeof(AppIconRenderer).Assembly.GetManifestResourceStream("icon."+name+"_new.svg");
+            if(stream==null)return null;
+            using var reader=new StreamReader(stream);return RenderSquareIcon(reader.ReadToEnd());
+        }
+
+        private static Bitmap RenderSquareIcon(string svg)
+        {
+            var artwork=ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svg,256,256);
+            if(artwork==null || (artwork.Width==256 && artwork.Height==256))return artwork;
+            var square=new Bitmap(256,256,PixelFormat.Format32bppArgb);
+            using(var g=Graphics.FromImage(square)){
+                g.Clear(Color.Transparent);g.DrawImageUnscaled(artwork,(256-artwork.Width)/2,(256-artwork.Height)/2);
+            }
+            artwork.Dispose();return square;
+        }
+
         public static Image GetRawImage(OfficeAppMode mode)
         {
             string key = mode.ToString();
@@ -56,10 +78,18 @@ namespace ZenQOffice.UI
                     return _rawIcons[key];
                 }
 
+                var modern = LoadModernIcon(mode);
+                if (modern != null) { _rawIcons[key] = modern; return modern; }
+
                 string fileName = GetIconFileName(mode);
                 string resName = GetIconResourceName(mode);
 
                 List<string> candidateFiles = new List<string> { fileName };
+                if (mode == OfficeAppMode.Home)
+                {
+                    candidateFiles.Insert(0, "zenqofficenew.png");
+                    if (!candidateFiles.Contains("zenqoffice_new.png")) candidateFiles.Add("zenqoffice_new.png");
+                }
                 if (mode == OfficeAppMode.Photo)
                 {
                     candidateFiles.Insert(0, "vector.png");
@@ -102,6 +132,11 @@ namespace ZenQOffice.UI
                 {
                     System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
                     List<string> candidateRes = new List<string> { resName, "icon." + fileName, fileName };
+                    if (mode == OfficeAppMode.Home)
+                    {
+                        candidateRes.Insert(0, "zenqofficenew.png");
+                        candidateRes.Insert(1, "icon_zenqofficenew.png");
+                    }
                     if (mode == OfficeAppMode.Photo)
                     {
                         candidateRes.Insert(0, "icon_vector.png");
@@ -238,6 +273,141 @@ namespace ZenQOffice.UI
             return DrawAppIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height), mode);
         }
 
+        private static Image _rawAiIcon = null;
+        private static readonly Dictionary<int, Bitmap> _scaledAiCache = new Dictionary<int, Bitmap>();
+
+        public static Image GetRawAiIcon()
+        {
+            if (_rawAiIcon != null) return _rawAiIcon;
+            lock (_syncLock)
+            {
+                if (_rawAiIcon != null) return _rawAiIcon;
+
+                string[] candidateFiles = new string[] { "AIicon.png", "aiicon.png", "AiIcon.png", "ai.ico" };
+                string[] possibleDirs = new string[]
+                {
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon"),
+                    Path.Combine(Application.StartupPath, "icon"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "icon"),
+                    Path.Combine(Application.StartupPath, "..", "..", "..", "icon"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "icon"),
+                    "icon"
+                };
+
+                foreach (string dir in possibleDirs)
+                {
+                    foreach (string fn in candidateFiles)
+                    {
+                        try
+                        {
+                            string p = Path.Combine(dir, fn);
+                            if (File.Exists(p))
+                            {
+                                byte[] bytes = File.ReadAllBytes(p);
+                                using (MemoryStream ms = new MemoryStream(bytes))
+                                using (Image temp = Image.FromStream(ms))
+                                {
+                                    _rawAiIcon = new Bitmap(temp);
+                                    return _rawAiIcon;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                // Embedded Resource
+                try
+                {
+                    var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                    foreach (var resName in new string[] { "icon_ai.png", "icon.AIicon.png", "AIicon.png", "icon_ai.ico" })
+                    {
+                        using (var st = asm.GetManifestResourceStream(resName))
+                        {
+                            if (st != null)
+                            {
+                                byte[] buf = new byte[st.Length];
+                                st.Read(buf, 0, buf.Length);
+                                using (MemoryStream ms = new MemoryStream(buf))
+                                using (Image temp = Image.FromStream(ms))
+                                {
+                                    _rawAiIcon = new Bitmap(temp);
+                                    return _rawAiIcon;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                return null;
+            }
+        }
+
+        public static Bitmap GetScaledAiBitmap(int size)
+        {
+            if (size <= 0) size = 24;
+            lock (_syncLock)
+            {
+                if (_scaledAiCache.TryGetValue(size, out Bitmap cached) && cached != null)
+                {
+                    return cached;
+                }
+
+                Image raw = GetRawAiIcon();
+                if (raw == null) return null;
+
+                Bitmap bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.Clear(Color.Transparent);
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.DrawImage(raw, new Rectangle(0, 0, size, size));
+                }
+
+                _scaledAiCache[size] = bmp;
+                return bmp;
+            }
+        }
+
+        public static bool DrawAiIcon(D2DGraphics g, float x, float y, float size)
+        {
+            if (g == null || size <= 0) return false;
+            int s = (int)Math.Max(16, Math.Round(size));
+            Bitmap bmp = GetScaledAiBitmap(s);
+            if (bmp != null)
+            {
+                g.DrawImage(bmp, x, y, size, size);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool DrawAiIcon(D2DGraphics g, RectangleF rect) => DrawAiIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height));
+
+        public static bool DrawAiIcon(Graphics g, float x, float y, float size)
+        {
+            if (g == null || size <= 0) return false;
+            int s = (int)Math.Max(16, Math.Round(size));
+            Bitmap bmp = GetScaledAiBitmap(s);
+            if (bmp != null)
+            {
+                var prevInterp = g.InterpolationMode;
+                var prevSmooth = g.SmoothingMode;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.DrawImage(bmp, x, y, size, size);
+                g.SmoothingMode = prevSmooth;
+                g.InterpolationMode = prevInterp;
+                return true;
+            }
+            return false;
+        }
+
+        public static bool DrawAiIcon(Graphics g, RectangleF rect) => DrawAiIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height));
+
         private static Image _rawBanner = null;
         private static Bitmap _cachedBanner = null;
         private static int _cachedBannerW = 0;
@@ -252,6 +422,15 @@ namespace ZenQOffice.UI
 
                 string[] possiblePaths = new string[]
                 {
+                    Path.Combine(Application.StartupPath, "icon", "bannernew.png"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon", "bannernew.png"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "icon", "bannernew.png"),
+                    @"icon\bannernew.png",
+                    Path.Combine(Application.StartupPath, "bannernew.png"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bannernew.png"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "bannernew.png"),
+                    "bannernew.png",
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "bannernew.png"),
                     Path.Combine(Application.StartupPath, "icon", "banner1.png"),
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon", "banner1.png"),
                     Path.Combine(Directory.GetCurrentDirectory(), "icon", "banner1.png"),
@@ -285,16 +464,20 @@ namespace ZenQOffice.UI
                 try
                 {
                     System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
-                    using (Stream st = asm.GetManifestResourceStream("banner.png"))
+                    string[] bannerRes = new string[] { "bannernew.png", "banner.png" };
+                    foreach (var bName in bannerRes)
                     {
-                        if (st != null)
+                        using (Stream st = asm.GetManifestResourceStream(bName))
                         {
-                            byte[] buf = new byte[st.Length];
-                            st.Read(buf, 0, buf.Length);
-                            using (MemoryStream ms = new MemoryStream(buf))
+                            if (st != null)
                             {
-                                _rawBanner = Image.FromStream(ms);
-                                return _rawBanner;
+                                byte[] buf = new byte[st.Length];
+                                st.Read(buf, 0, buf.Length);
+                                using (MemoryStream ms = new MemoryStream(buf))
+                                {
+                                    _rawBanner = Image.FromStream(ms);
+                                    return _rawBanner;
+                                }
                             }
                         }
                     }

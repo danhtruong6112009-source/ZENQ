@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -48,7 +48,7 @@ namespace ZenQOffice.UI
             Font = new Font("Segoe UI", 9.0f);
             BackColor = Color.FromArgb(245, 246, 248);
 
-            tabControl = new TabControl
+            tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(500, 380),
@@ -145,7 +145,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblStyle = new Label { Text = "Style:", Location = new Point(10, 20), AutoSize = true };
-            lstStyle = new ListBox
+            lstStyle = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(10, 38),
                 Size = new Size(130, 100),
@@ -203,7 +203,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblWidth = new Label { Text = "Width (Độ dày):", Location = new Point(10, 200), AutoSize = true };
-            cboWidth = new ComboBox
+            cboWidth = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(10, 220),
                 Size = new Size(130, 25),
@@ -271,7 +271,7 @@ namespace ZenQOffice.UI
             Button btnRight = CreateBorderToggleBtn("►", new Point(160, 85), () => { rightBorder = !rightBorder; currentSetting = 4; previewPanel.Invalidate(); });
 
             Label lblApply = new Label { Text = "Apply to (Áp dụng cho):", Location = new Point(15, 215), AutoSize = true };
-            cboApplyTo = new ComboBox
+            cboApplyTo = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(15, 235),
                 Size = new Size(165, 25),

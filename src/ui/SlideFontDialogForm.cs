@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -76,7 +76,7 @@ namespace ZenQOffice.UI
             BackColor = Color.FromArgb(248, 249, 250);
             Font = new Font("Segoe UI", 9f);
 
-            TabControl tabCtrl = new TabControl
+            TabControl tabCtrl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(500, 450),
@@ -89,7 +89,7 @@ namespace ZenQOffice.UI
 
             Label lblF = new Label { Text = "Phông chữ:", Location = new Point(14, 12), AutoSize = true };
             txtFont = new TextBox { Location = new Point(14, 32), Size = new Size(160, 23), Text = FontNameResult };
-            lstFont = new ListBox { Location = new Point(14, 56), Size = new Size(160, 110) };
+            lstFont = new ZenQOffice.UI.FluentListBox { Location = new Point(14, 56), Size = new Size(160, 110) };
 
             InstalledFontCollection fonts = new InstalledFontCollection();
             foreach (var fam in fonts.Families) lstFont.Items.Add(fam.Name);
@@ -112,7 +112,7 @@ namespace ZenQOffice.UI
 
             Label lblS = new Label { Text = "Kiểu phông:", Location = new Point(184, 12), AutoSize = true };
             txtStyle = new TextBox { Location = new Point(184, 32), Size = new Size(130, 23) };
-            lstStyle = new ListBox { Location = new Point(184, 56), Size = new Size(130, 110) };
+            lstStyle = new ZenQOffice.UI.FluentListBox { Location = new Point(184, 56), Size = new Size(130, 110) };
             lstStyle.Items.AddRange(new object[] { "Thường (Regular)", "Nghiêng (Italic)", "Đậm (Bold)", "Đậm Nghiêng (Bold Italic)" });
             int styleIdx = 0;
             if (BoldResult && ItalicResult) styleIdx = 3;
@@ -132,7 +132,7 @@ namespace ZenQOffice.UI
 
             Label lblSz = new Label { Text = "Cỡ chữ:", Location = new Point(324, 12), AutoSize = true };
             txtSize = new TextBox { Location = new Point(324, 32), Size = new Size(65, 23), Text = ((int)FontSizeResult).ToString() };
-            lstSize = new ListBox { Location = new Point(324, 56), Size = new Size(65, 110) };
+            lstSize = new ZenQOffice.UI.FluentListBox { Location = new Point(324, 56), Size = new Size(65, 110) };
             int[] sizes = new int[] { 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 96 };
             foreach (int sz in sizes) lstSize.Items.Add(sz.ToString());
             int sIdx = lstSize.FindString(((int)FontSizeResult).ToString());
@@ -171,7 +171,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblUnd = new Label { Text = "Kiểu gạch chân:", Location = new Point(184, 178), AutoSize = true };
-            cboUnderlineStyle = new ComboBox { Location = new Point(184, 198), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboUnderlineStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(184, 198), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboUnderlineStyle.Items.AddRange(new object[] { "(không có)", "Nét đơn", "Nét đôi", "Nét dày", "Nét chấm" });
             cboUnderlineStyle.SelectedIndex = UnderlineResult ? 1 : 0;
             cboUnderlineStyle.SelectedIndexChanged += (s, e) => {
@@ -224,7 +224,7 @@ namespace ZenQOffice.UI
             tabSpacing.BackColor = Color.White;
 
             Label lblSpcT = new Label { Text = "Khoảng cách:", Location = new Point(20, 24), AutoSize = true };
-            cboSpacingType = new ComboBox { Location = new Point(130, 21), Size = new Size(160, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboSpacingType = new ZenQOffice.UI.FluentComboBox { Location = new Point(130, 21), Size = new Size(160, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboSpacingType.Items.AddRange(new object[] { "Bình thường (Normal)", "Mở rộng (Expanded)", "Thu hẹp (Condensed)" });
             cboSpacingType.SelectedIndex = CharacterSpacingResult > 0 ? 1 : (CharacterSpacingResult < 0 ? 2 : 0);
 

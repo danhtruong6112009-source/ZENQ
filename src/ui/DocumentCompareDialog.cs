@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Text;
@@ -150,7 +150,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                MessageBox.Show("Vui lòng chọn tài liệu gốc hợp lệ.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tài liệu gốc hợp lệ.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -161,7 +161,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                MessageBox.Show("Vui lòng chọn tài liệu sửa đổi cần so sánh.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tài liệu sửa đổi cần so sánh.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -187,7 +187,7 @@ namespace ZenQOffice.UI
             if (_lastResult != null && _writerView != null)
             {
                 DocumentCompareEngine.ApplyToWriterView(_writerView, _lastResult);
-                MessageBox.Show("Đã nạp toàn bộ các thay đổi so sánh vào chế độ Theo dõi sửa đổi (Track Changes) của tài liệu!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Đã nạp toàn bộ các thay đổi so sánh vào chế độ Theo dõi sửa đổi (Track Changes) của tài liệu!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Close();
             }
         }
@@ -213,7 +213,7 @@ namespace ZenQOffice.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không thể đọc tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show("Không thể đọc tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return "";
             }
         }

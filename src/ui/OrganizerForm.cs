@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -186,7 +186,7 @@ namespace ZenQOffice.UI
             Label lblDoc = new Label { Text = "In Document1:", Location = new Point(12, 10), AutoSize = true };
             pnl.Controls.Add(lblDoc);
 
-            _lstDocStyles = new ListBox
+            _lstDocStyles = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(12, 30),
                 Size = new Size(224, 160),
@@ -205,7 +205,7 @@ namespace ZenQOffice.UI
             Label lblDocScope = new Label { Text = "Styles available in:", Location = new Point(12, 198), AutoSize = true };
             pnl.Controls.Add(lblDocScope);
 
-            _cboDocStylesScope = new ComboBox
+            _cboDocStylesScope = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(12, 218),
                 Size = new Size(224, 23),
@@ -256,7 +256,7 @@ namespace ZenQOffice.UI
             Label lblNormal = new Label { Text = "In Normal:", Location = new Point(336, 10), AutoSize = true };
             pnl.Controls.Add(lblNormal);
 
-            _lstNormalStyles = new ListBox
+            _lstNormalStyles = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(336, 30),
                 Size = new Size(224, 160),
@@ -273,7 +273,7 @@ namespace ZenQOffice.UI
             Label lblNormalScope = new Label { Text = "Styles available in:", Location = new Point(336, 198), AutoSize = true };
             pnl.Controls.Add(lblNormalScope);
 
-            _cboNormalStylesScope = new ComboBox
+            _cboNormalStylesScope = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(336, 218),
                 Size = new Size(224, 23),
@@ -410,7 +410,7 @@ namespace ZenQOffice.UI
             Label lblDoc = new Label { Text = "In Document1:", Location = new Point(12, 10), AutoSize = true };
             pnl.Controls.Add(lblDoc);
 
-            _lstDocMacros = new ListBox
+            _lstDocMacros = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(12, 30),
                 Size = new Size(224, 160),
@@ -422,7 +422,7 @@ namespace ZenQOffice.UI
             Label lblDocScope = new Label { Text = "Macro Project Items available in:", Location = new Point(12, 198), AutoSize = true };
             pnl.Controls.Add(lblDocScope);
 
-            _cboDocMacrosScope = new ComboBox
+            _cboDocMacrosScope = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(12, 218),
                 Size = new Size(224, 23),
@@ -473,7 +473,7 @@ namespace ZenQOffice.UI
             Label lblNormal = new Label { Text = "In Normal:", Location = new Point(336, 10), AutoSize = true };
             pnl.Controls.Add(lblNormal);
 
-            _lstNormalMacros = new ListBox
+            _lstNormalMacros = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(336, 30),
                 Size = new Size(224, 160),
@@ -487,7 +487,7 @@ namespace ZenQOffice.UI
             Label lblNormalScope = new Label { Text = "Macro Project Items available in:", Location = new Point(336, 198), AutoSize = true };
             pnl.Controls.Add(lblNormalScope);
 
-            _cboNormalMacrosScope = new ComboBox
+            _cboNormalMacrosScope = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(336, 218),
                 Size = new Size(224, 23),

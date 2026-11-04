@@ -51,7 +51,7 @@ namespace ZenQOffice.UI
             headerPanel.Controls.Add(lblSub);
 
             // Tab Control for 7 Categories
-            TabControl tabControl = new TabControl
+            TabControl tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)

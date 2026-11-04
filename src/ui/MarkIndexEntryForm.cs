@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -108,7 +108,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtMainEntry.Text.Trim()))
                 {
-                    MessageBox.Show("Vui lòng nhập mục tra cứu chính!", "Đánh dấu mục", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập mục tra cứu chính!", "Đánh dấu mục", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     this.DialogResult = DialogResult.None;
                     return;
                 }
@@ -133,7 +133,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtMainEntry.Text.Trim()))
                 {
-                    MessageBox.Show("Vui lòng nhập mục tra cứu chính!", "Đánh dấu mục", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập mục tra cứu chính!", "Đánh dấu mục", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     this.DialogResult = DialogResult.None;
                     return;
                 }

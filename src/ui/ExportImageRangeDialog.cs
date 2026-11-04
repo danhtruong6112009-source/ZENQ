@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -238,7 +238,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtRange.Text))
                 {
-                    MessageBox.Show(this, isSlide ? "Vui lòng nhập phạm vi slide cần xuất!" : "Vui lòng nhập phạm vi trang cần xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? "Vui lòng nhập phạm vi slide cần xuất!" : "Vui lòng nhập phạm vi trang cần xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -246,7 +246,7 @@ namespace ZenQOffice.UI
                 SelectedIndices = PdfHandler.ParsePageRange(txtRange.Text, totalItems);
                 if (SelectedIndices == null || SelectedIndices.Count == 0)
                 {
-                    MessageBox.Show(this, isSlide ? "Phạm vi slide không hợp lệ hoặc nằm ngoài số lượng slide trong bản trình chiếu!" : "Phạm vi trang không hợp lệ hoặc nằm ngoài số lượng trang trong tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? "Phạm vi slide không hợp lệ hoặc nằm ngoài số lượng slide trong bản trình chiếu!" : "Phạm vi trang không hợp lệ hoặc nằm ngoài số lượng trang trong tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -254,7 +254,7 @@ namespace ZenQOffice.UI
 
             if (SelectedIndices.Count == 0)
             {
-                MessageBox.Show(this, "Không có mục nào được chọn để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Không có mục nào được chọn để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

@@ -25,12 +25,17 @@ namespace ZenQOffice.UI
         private AppForm _mainAppForm = null;
         private bool _sessionRestored = false;
         private Thread _bgWorker = null;
+        private OfficeAppMode? _directMode = null;
+        private string _directFile = null;
 
         public Action OnSplashFinished { get; set; }
         public AppForm CreatedAppForm { get { return _mainAppForm; } }
 
-        public GenOfficeSplashScreen(bool autoInit = true)
+        public GenOfficeSplashScreen(OfficeAppMode? directMode = null, string directFile = null)
         {
+            _directMode = directMode;
+            _directFile = directFile;
+
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
             ShowInTaskbar = false;
@@ -38,7 +43,7 @@ namespace ZenQOffice.UI
             Width = 580;
             Height = 320;
             DoubleBuffered = true;
-            Opacity = 0.0;
+            Opacity = 0.05;
             BackColor = Color.White;
 
             SetStyle(ControlStyles.AllPaintingInWmPaint |
@@ -56,18 +61,25 @@ namespace ZenQOffice.UI
             KeyDown += (s, e) => SkipIntro();
 
             _stopwatch = new Stopwatch();
-            _stopwatch.Start();
+        }
 
-            if (autoInit)
+        public GenOfficeSplashScreen(bool autoInit) : this(null, null) { }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            _stopwatch.Restart();
+
+            StartBackgroundInit();
+
+            if (_animTimer == null)
             {
-                // Khởi động luồng nạp và khôi phục tab phiên làm việc trước
-                StartBackgroundInit();
-
                 _animTimer = new System.Windows.Forms.Timer();
                 _animTimer.Interval = 16; // 60 FPS
                 _animTimer.Tick += OnAnimationTick;
-                _animTimer.Start();
             }
+            _animTimer.Start();
+            Invalidate();
         }
 
         private void StartBackgroundInit()
@@ -82,33 +94,63 @@ namespace ZenQOffice.UI
         {
             try
             {
-                // Giai đoạn 1: Khởi động hệ thống
-                SetStatus("Đang khởi động ZENQ OFFICE...", 0.20f);
-                Thread.Sleep(500);
-
-                // Giai đoạn 2: Nạp các mô-đun
-                SetStatus("Đang khởi tạo các mô-đun ứng dụng...", 0.45f);
-                Thread.Sleep(600);
-
-                // Giai đoạn 3: Kiểm tra phiên làm việc trước
-                SetStatus("Đang kiểm tra phiên làm việc trước...", 0.65f);
-                Thread.Sleep(400);
-
-                var session = SessionManager.LoadSession();
-                if (session != null && session.Tabs != null && session.Tabs.Count > 0)
+                if (_directMode.HasValue)
                 {
-                    for (int i = 0; i < session.Tabs.Count; i++)
+                    string modeTitle = "ZENQ OFFICE";
+                    if (_directMode.Value == OfficeAppMode.Writer) modeTitle = "ZenQ Writer";
+                    else if (_directMode.Value == OfficeAppMode.Calc) modeTitle = "ZenQ Calc";
+                    else if (_directMode.Value == OfficeAppMode.Slides) modeTitle = "ZenQ Slides";
+                    else if (_directMode.Value == OfficeAppMode.Pdf) modeTitle = "ZenQ PDF";
+                    else if (_directMode.Value == OfficeAppMode.Photo) modeTitle = "ZenQ Đồ họa & Ảnh";
+
+                    SetStatus(string.Format("Đang khởi động {0}...", modeTitle), 0.35f);
+                    Thread.Sleep(300);
+
+                    if (!string.IsNullOrEmpty(_directFile))
                     {
-                        var tab = session.Tabs[i];
-                        string title = !string.IsNullOrEmpty(tab.Title) ? tab.Title : "Tài liệu " + (i + 1);
-                        SetStatus(string.Format("Đang khôi phục: {0}...", title), 0.65f + ((float)(i + 1) / session.Tabs.Count) * 0.28f);
+                        SetStatus(string.Format("Đang nạp: {0}...", Path.GetFileName(_directFile)), 0.70f);
                         Thread.Sleep(300);
                     }
-                }
+                    else
+                    {
+                        SetStatus("Đang tải cấu hình mô-đun...", 0.70f);
+                        Thread.Sleep(250);
+                    }
 
-                _sessionRestored = true;
-                SetStatus("Khởi tạo hoàn tất. Đang mở Workspace...", 1.0f);
-                Thread.Sleep(350);
+                    _sessionRestored = true;
+                    SetStatus("Sẵn sàng làm việc!", 1.0f);
+                    Thread.Sleep(200);
+                }
+                else
+                {
+                    // Giai đoạn 1: Khởi động hệ thống
+                    SetStatus("Đang khởi động ZENQ OFFICE...", 0.25f);
+                    Thread.Sleep(400);
+
+                    // Giai đoạn 2: Nạp các mô-đun
+                    SetStatus("Đang khởi tạo các mô-đun ứng dụng...", 0.50f);
+                    Thread.Sleep(450);
+
+                    // Giai đoạn 3: Kiểm tra phiên làm việc trước
+                    SetStatus("Đang kiểm tra phiên làm việc trước...", 0.75f);
+                    Thread.Sleep(300);
+
+                    var session = SessionManager.LoadSession();
+                    if (session != null && session.Tabs != null && session.Tabs.Count > 0)
+                    {
+                        for (int i = 0; i < session.Tabs.Count && i < 3; i++)
+                        {
+                            var tab = session.Tabs[i];
+                            string title = !string.IsNullOrEmpty(tab.Title) ? tab.Title : "Tài liệu " + (i + 1);
+                            SetStatus(string.Format("Đang khôi phục: {0}...", title), 0.75f + ((float)(i + 1) / Math.Min(3, session.Tabs.Count)) * 0.22f);
+                            Thread.Sleep(180);
+                        }
+                    }
+
+                    _sessionRestored = true;
+                    SetStatus("Khởi tạo hoàn tất. Đang mở Workspace...", 1.0f);
+                    Thread.Sleep(200);
+                }
             }
             catch (Exception ex)
             {
@@ -125,21 +167,19 @@ namespace ZenQOffice.UI
 
         private void SkipIntro()
         {
-            if (_sessionRestored)
-            {
-                _progress = 1.0f;
-                _targetProgress = 1.0f;
-            }
+            _sessionRestored = true;
+            _progress = 1.0f;
+            _targetProgress = 1.0f;
         }
 
         private void OnAnimationTick(object sender, EventArgs e)
         {
-            long elapsed = _stopwatch.ElapsedMilliseconds;
+            long elapsed = _stopwatch != null ? _stopwatch.ElapsedMilliseconds : 0;
 
-            // Phase 1: Fade-in mượt mà (0 - 400ms)
-            if (elapsed < 400)
+            // Phase 1: Fade-in mượt mà (0 - 350ms)
+            if (elapsed < 350)
             {
-                Opacity = Math.Min(1.0, elapsed / 400.0);
+                Opacity = Math.Max(0.05, Math.Min(1.0, elapsed / 350.0));
             }
             else if (!_isClosing)
             {
@@ -147,10 +187,11 @@ namespace ZenQOffice.UI
             }
 
             // Tiến trình tiến dần đều siêu mượt
-            _progress += (_targetProgress - _progress) * 0.08f;
+            _progress += (_targetProgress - _progress) * 0.10f;
 
-            // Phase 2: Khi đã hoàn tất khôi phục và qua tối thiểu 2.8s -> Fade-out mở app
-            if (_sessionRestored && elapsed >= 2800 && _progress >= 0.96f)
+            // Phase 2: Fade-out mở app
+            int minDuration = _directMode.HasValue ? 1000 : 1800;
+            if (_sessionRestored && elapsed >= minDuration && _progress >= 0.95f)
             {
                 if (!_isClosing)
                 {
@@ -158,8 +199,8 @@ namespace ZenQOffice.UI
                 }
 
                 // Fade-out êm dịu
-                Opacity -= 0.06;
-                if (Opacity <= 0.02)
+                Opacity -= 0.08;
+                if (Opacity <= 0.04)
                 {
                     _animTimer.Stop();
                     TopMost = false;
@@ -223,11 +264,21 @@ namespace ZenQOffice.UI
             float textX = logoX + logoSize + 22f;
             float textY = logoY + 12f;
 
-            // Tên "ZENQ OFFICE" viết hoa toàn bộ
+            string headerTitle = "ZENQ OFFICE";
+            if (_directMode.HasValue)
+            {
+                if (_directMode.Value == OfficeAppMode.Writer) headerTitle = "ZENQ WRITER";
+                else if (_directMode.Value == OfficeAppMode.Calc) headerTitle = "ZENQ CALC";
+                else if (_directMode.Value == OfficeAppMode.Slides) headerTitle = "ZENQ SLIDES";
+                else if (_directMode.Value == OfficeAppMode.Pdf) headerTitle = "ZENQ PDF";
+                else if (_directMode.Value == OfficeAppMode.Photo) headerTitle = "ZENQ PHOTO";
+            }
+
+            // Tên viết hoa toàn bộ
             using (Font titleFont = new Font("Segoe UI", 28f, FontStyle.Bold, GraphicsUnit.Pixel))
             using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("ZENQ OFFICE", titleFont, titleB, textX, textY);
+                g.DrawString(headerTitle, titleFont, titleB, textX, textY);
             }
 
             // Subtitle: NEXTGENEDUSPACE STUDIO
@@ -295,7 +346,7 @@ namespace ZenQOffice.UI
                 g.DrawString("© 2026 NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sf);
 
                 StringFormat sfLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                g.DrawString("Phiên bản 5.8", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
+                g.DrawString("Phiên bản 6.0", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
             }
         }
 
@@ -591,6 +642,7 @@ namespace ZenQOffice.UI
     /// </summary>
     public class ZenQOfficeSplashScreen : GenOfficeSplashScreen
     {
-        public ZenQOfficeSplashScreen(bool autoInit = true) : base(autoInit) { }
+        public ZenQOfficeSplashScreen(bool autoInit = true) : base(null, null) { }
+        public ZenQOfficeSplashScreen(OfficeAppMode? directMode, string directFile = null) : base(directMode, directFile) { }
     }
 }

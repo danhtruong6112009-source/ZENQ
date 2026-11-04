@@ -1,0 +1,5 @@
+# ZenQ Office suite icon concept
+
+Asset: zenqoffice_suite_new.png. Created with the built-in image_gen tool. This is the revised design preview, not yet the executable icon. Previous icon files are retained.
+
+Prompt: Create one premium main app icon for ZenQ Office, immediately communicating an office productivity suite. A central white upright rounded document with crisp blue paragraph strokes, an emerald spreadsheet panel with a white cell grid behind on the left, and an orange presentation panel with a white slide/chart symbol behind on the right. Integrate the three panels into a compact unified folio with a blue-ultramarine-violet folded ribbon around the lower portion and a subtle Z fold at the front. Contemporary Microsoft 365-level material and gradient polish, with original geometry. Satin surfaces, rich smooth gradients, curved sculpted edges, contact shadows and restrained rim highlights. Readable at 32px. Near-orthographic frontal composition, square balanced footprint, transparent background and safe margins, no caption or brand-logo copy.

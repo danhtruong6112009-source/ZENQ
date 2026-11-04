@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -59,7 +59,7 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    MessageBox.Show("Vui lòng nhập tên cho dấu trang!", "Dấu trang", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập tên cho dấu trang!", "Dấu trang", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             };
             this.Controls.Add(btnAdd);
@@ -67,7 +67,7 @@ namespace ZenQOffice.UI
             Label lblList = new Label { Text = "Danh sách dấu trang hiện có:", Location = new Point(18, 75), AutoSize = true };
             this.Controls.Add(lblList);
 
-            lstBookmarks = new ListBox { Location = new Point(18, 98), Size = new Size(230, 180), BorderStyle = BorderStyle.FixedSingle };
+            lstBookmarks = new ZenQOffice.UI.FluentListBox { Location = new Point(18, 98), Size = new Size(230, 180), BorderStyle = BorderStyle.FixedSingle };
             if (existingBookmarks != null)
             {
                 foreach (var b in existingBookmarks) lstBookmarks.Items.Add(b);

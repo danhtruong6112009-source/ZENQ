@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -282,14 +282,14 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtRange.Text))
                 {
-                    MessageBox.Show(this, "Vui lòng nhập dải trang cần trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập dải trang cần trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
                 SelectedPageIndices = PdfHandler.ParsePageRange(txtRange.Text, totalPages);
                 if (SelectedPageIndices.Count == 0)
                 {
-                    MessageBox.Show(this, "Dải trang không hợp lệ hoặc nằm ngoài phạm vi tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Dải trang không hợp lệ hoặc nằm ngoài phạm vi tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -305,7 +305,7 @@ namespace ZenQOffice.UI
 
             if (SelectedPageIndices.Count == 0)
             {
-                MessageBox.Show(this, "Không có trang nào được chọn để trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Không có trang nào được chọn để trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -313,7 +313,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtSavePath.Text))
                 {
-                    MessageBox.Show(this, "Vui lòng chọn đường dẫn tệp để lưu các trang trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn đường dẫn tệp để lưu các trang trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     btnBrowseSave.PerformClick();
                     if (string.IsNullOrWhiteSpace(txtSavePath.Text)) return;
                 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -402,7 +402,7 @@ namespace ZenQOffice.UI
             Panel pnl = new Panel { BackColor = Color.White };
 
             Label lblSort = new Label { Text = "Sort order:", Location = new Point(14, 12), AutoSize = true };
-            _cboEditSort = new ComboBox
+            _cboEditSort = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 10),
                 Size = new Size(160, 23),
@@ -420,7 +420,7 @@ namespace ZenQOffice.UI
 
             Label lblSelect = new Label { Text = "Select a style to edit", Location = new Point(14, 40), AutoSize = true, ForeColor = Color.FromArgb(30, 30, 30) };
 
-            _lstEditStyles = new ListBox
+            _lstEditStyles = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(14, 60),
                 Size = new Size(464, 140),
@@ -628,7 +628,7 @@ namespace ZenQOffice.UI
             Panel pnl = new Panel { BackColor = Color.White };
 
             Label lblSort = new Label { Text = "Sort order:", Location = new Point(14, 12), AutoSize = true };
-            _cboRecommendSort = new ComboBox
+            _cboRecommendSort = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 10),
                 Size = new Size(160, 23),
@@ -652,7 +652,7 @@ namespace ZenQOffice.UI
                 ForeColor = Color.FromArgb(30, 30, 30)
             };
 
-            _lstRecommendStyles = new ListBox
+            _lstRecommendStyles = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(14, 74),
                 Size = new Size(464, 120),
@@ -781,7 +781,7 @@ namespace ZenQOffice.UI
             Panel pnl = new Panel { BackColor = Color.White };
 
             Label lblSort = new Label { Text = "Sort order:", Location = new Point(14, 12), AutoSize = true };
-            _cboRestrictSort = new ComboBox
+            _cboRestrictSort = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 10),
                 Size = new Size(160, 23),
@@ -805,7 +805,7 @@ namespace ZenQOffice.UI
                 ForeColor = Color.FromArgb(30, 30, 30)
             };
 
-            _lstRestrictStyles = new ListBox
+            _lstRestrictStyles = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(14, 74),
                 Size = new Size(464, 120),
@@ -899,7 +899,7 @@ namespace ZenQOffice.UI
 
             // Section 1: Font
             Label lblFont = new Label { Text = "Font:", Location = new Point(24, 14), AutoSize = true, ForeColor = Color.FromArgb(31, 41, 55) };
-            _lstFont = new ListBox
+            _lstFont = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(24, 34),
                 Size = new Size(240, 84),
@@ -930,7 +930,7 @@ namespace ZenQOffice.UI
             else _lstFont.SelectedIndex = 0; // +Body
 
             Label lblSize = new Label { Text = "Size:", Location = new Point(350, 14), AutoSize = true, ForeColor = Color.FromArgb(31, 41, 55) };
-            _lstSize = new ListBox
+            _lstSize = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(350, 34),
                 Size = new Size(116, 84),
@@ -947,7 +947,7 @@ namespace ZenQOffice.UI
             _lstSize.SelectedIndex = selSizeIdx;
 
             Label lblFontColor = new Label { Text = "Font color:", Location = new Point(24, 128), AutoSize = true, ForeColor = Color.FromArgb(31, 41, 55) };
-            _cboFontColor = new ComboBox
+            _cboFontColor = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(135, 125),
                 Size = new Size(130, 24),
@@ -1020,7 +1020,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblSpecial = new Label { Text = "Special:", Location = new Point(190, 186), AutoSize = true };
-            _cboSpecial = new ComboBox
+            _cboSpecial = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(245, 184),
                 Size = new Size(95, 23),
@@ -1042,7 +1042,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblAlign = new Label { Text = "Alignment:", Location = new Point(24, 246), AutoSize = true };
-            _cboAlignment = new ComboBox
+            _cboAlignment = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(100, 244),
                 Size = new Size(240, 23),
@@ -1096,7 +1096,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblLineSpacing = new Label { Text = "Line spacing:", Location = new Point(190, 304), AutoSize = true };
-            _cboLineSpacing = new ComboBox
+            _cboLineSpacing = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(275, 302),
                 Size = new Size(95, 23),

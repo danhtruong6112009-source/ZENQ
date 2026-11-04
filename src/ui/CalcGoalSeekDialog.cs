@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -103,14 +103,14 @@ namespace ZenQOffice.UI
             uint setRow, setCol;
             if (!SparseMatrix.TryParseCellReference(setRef, out setRow, out setCol))
             {
-                MessageBox.Show("Ô đặt giá trị không hợp lệ. Vui lòng nhập tọa độ như A1 hoặc $A$1.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Ô đặt giá trị không hợp lệ. Vui lòng nhập tọa độ như A1 hoặc $A$1.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             uint chgRow, chgCol;
             if (!SparseMatrix.TryParseCellReference(chgRef, out chgRow, out chgCol))
             {
-                MessageBox.Show("Ô cần thay đổi không hợp lệ. Vui lòng nhập tọa độ như B2 hoặc $B$2.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Ô cần thay đổi không hợp lệ. Vui lòng nhập tọa độ như B2 hoặc $B$2.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -118,14 +118,14 @@ namespace ZenQOffice.UI
             if (!double.TryParse(toValStr, NumberStyles.Float, CultureInfo.InvariantCulture, out targetVal) &&
                 !double.TryParse(toValStr, NumberStyles.Float, CultureInfo.CurrentCulture, out targetVal))
             {
-                MessageBox.Show("Giá trị mục tiêu phải là một số hợp lệ.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Giá trị mục tiêu phải là một số hợp lệ.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             CellData setCell = _calcView.CurrentSheet.GetCell(setRow, setCol);
             if (setCell == null || string.IsNullOrEmpty(setCell.FormulaStr))
             {
-                MessageBox.Show("Ô đặt giá trị (" + setRef + ") phải chứa một công thức.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Ô đặt giá trị (" + setRef + ") phải chứa một công thức.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -227,7 +227,7 @@ namespace ZenQOffice.UI
                 "Nhấn OK để giữ giá trị đã giải, hoặc Cancel để hoàn tác về giá trị ban đầu.",
                 setRef, targetVal, actualVal);
 
-            DialogResult dr = MessageBox.Show(msg, "Trạng thái Dò tìm Mục tiêu", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+            DialogResult dr = ZenQOffice.UI.FluentMessageBox.Show(msg, "Trạng thái Dò tìm Mục tiêu", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
             if (dr == DialogResult.Cancel)
             {
                 SetCellNum(chgCell, origVal);

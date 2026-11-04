@@ -162,6 +162,71 @@ namespace ZenQOffice.UI
         /// <summary>
         /// Tạo hoặc lấy từ bộ nhớ đệm Bitmap 32-bit ARGB siêu mịn được khử răng cưa qua bộ lọc SSAA 4x.
         /// </summary>
+        public static void DrawGlyphDirectVector(Graphics g, char glyph, RectangleF bounds, Color color, float fontSize = 0)
+        {
+            if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+            EnsureFontLoaded();
+
+            if (glyph == '\uF51E')
+            {
+                // Align Justify: 3 crisp vector bars
+                float barW = bounds.Width * 0.65f;
+                float startX = bounds.X + (bounds.Width - barW) / 2f;
+                float barH = Math.Max(1.2f, bounds.Height * 0.08f);
+                float startY = bounds.Y + bounds.Height * 0.28f;
+                float stepY = bounds.Height * 0.22f;
+                using (SolidBrush b = new SolidBrush(color))
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        g.FillRectangle(b, startX, startY + i * stepY, barW, barH);
+                    }
+                }
+                return;
+            }
+
+            float fontSz = (fontSize > 0) ? Math.Min(fontSize, bounds.Height * 0.88f) : (bounds.Height * 0.72f);
+            Font font = GetFont(fontSz);
+
+            var prevText = g.TextRenderingHint;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            try
+            {
+                using (SolidBrush brush = new SolidBrush(color))
+                using (StringFormat sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    g.DrawString(glyph.ToString(), font, brush, bounds, sf);
+                }
+            }
+            catch
+            {
+                g.TextRenderingHint = TextRenderingHint.AntiAlias;
+                using (SolidBrush brush = new SolidBrush(color))
+                using (StringFormat sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    g.DrawString(glyph.ToString(), font, brush, bounds, sf);
+                }
+            }
+            finally
+            {
+                g.TextRenderingHint = prevText;
+            }
+        }
+
+        /// <summary>
+        /// Tạo hoặc lấy từ bộ nhớ đệm Bitmap 32-bit ARGB siêu mịn được khử răng cưa qua bộ lọc SSAA 4x.
+        /// </summary>
         public static Bitmap GetGlyphBitmap(char glyph, int width, int height, Color color, float fontSize = 0)
         {
             if (width <= 0) width = 16;
@@ -174,154 +239,41 @@ namespace ZenQOffice.UI
             {
                 lock (_glyphRasterSync)
                 {
-                    // 1. Kết xuất vector ở độ phân giải 4x (Super-Sampling 4x)
                     int scale = 4;
-                    int hiW = Math.Max(32, width * scale);
-                    int hiH = Math.Max(32, height * scale);
+                    int hiW = width * scale;
+                    int hiH = height * scale;
+                    float hiFontSz = ((fontSize > 0) ? fontSize : (height * 0.72f)) * scale;
 
-                using (Bitmap hiBmp = new Bitmap(hiW, hiH, PixelFormat.Format32bppArgb))
-                {
-                    using (Graphics gHi = Graphics.FromImage(hiBmp))
+                    using (Bitmap hiBmp = new Bitmap(hiW, hiH, PixelFormat.Format32bppArgb))
                     {
-                        gHi.Clear(Color.Transparent);
-                        if (glyph == '\uF51E')
+                        using (Graphics gHi = Graphics.FromImage(hiBmp))
                         {
-                            // Align Justify: Tái tạo đồng bộ 100% từ vạch chuẩn của \uE8E4 (Align Left) trong font Segoe Fluent Icons.
-                            // Đảm bảo cùng độ dày, cùng bo góc, cùng độ dài và chuẩn xác trên cùng 3 hàng ngang (không bao giờ lệch hàng hay dày/dài bất thường).
-                            float hiFontSz = (fontSize > 0) ? Math.Min(fontSize * scale, hiH * 0.75f) : (hiH * 0.72f);
-                            Font hiFont = GetFont(hiFontSz);
-
-                            using (Bitmap hiSrc = new Bitmap(hiW, hiH, PixelFormat.Format32bppArgb))
-                            {
-                                using (Graphics gSrc = Graphics.FromImage(hiSrc))
-                                {
-                                    gSrc.Clear(Color.Transparent);
-                                    gSrc.TextRenderingHint = TextRenderingHint.AntiAlias;
-                                    using (SolidBrush brush = new SolidBrush(color))
-                                    using (StringFormat sf = new StringFormat
-                                    {
-                                        Alignment = StringAlignment.Center,
-                                        LineAlignment = StringAlignment.Center,
-                                        FormatFlags = StringFormatFlags.NoWrap
-                                    })
-                                    {
-                                        gSrc.DrawString("\uE8E4", hiFont, brush, new RectangleF(0, 0, hiW, hiH), sf);
-                                    }
-                                }
-
-                                // Dò tìm vị trí đỉnh của 3 vạch (y1, y2, y3) của icon căn lề trái chuẩn
-                                int checkX = Math.Max(1, hiW / 3);
-                                var peaks = new System.Collections.Generic.List<int>();
-                                int prevA = 0;
-                                bool growing = false;
-                                for (int y = 0; y < hiH; y++)
-                                {
-                                    int a = hiSrc.GetPixel(checkX, y).A;
-                                    if (a > prevA) growing = true;
-                                    else if (a < prevA && growing && prevA > 120)
-                                    {
-                                        peaks.Add(y - 1);
-                                        growing = false;
-                                    }
-                                    prevA = a;
-                                }
-
-                                int y1, y2, y3, deltaY;
-                                if (peaks.Count >= 3)
-                                {
-                                    y1 = peaks[0];
-                                    y2 = peaks[1];
-                                    y3 = peaks[2];
-                                    deltaY = (int)Math.Round((y3 - y1) / 2.0);
-                                }
-                                else
-                                {
-                                    deltaY = (int)Math.Round(hiFontSz * (640.0 / 2048.0));
-                                    y2 = (int)Math.Round(hiH / 2.0 - (hiFontSz * 0.03));
-                                    y1 = y2 - deltaY;
-                                    y3 = y2 + deltaY;
-                                }
-
-                                int sliceHalf = Math.Max(3, deltaY / 2);
-                                int sliceH = sliceHalf * 2;
-                                Rectangle srcMidRect = new Rectangle(0, Math.Max(0, y2 - sliceHalf), hiW, sliceH);
-
-                                // Sao chép vạch giữa (vạch dài nhất chuẩn nét) sang cả 3 hàng y1, y2, y3
-                                gHi.DrawImage(hiSrc, new Rectangle(0, y1 - sliceHalf, hiW, sliceH), srcMidRect, GraphicsUnit.Pixel);
-                                gHi.DrawImage(hiSrc, new Rectangle(0, y2 - sliceHalf, hiW, sliceH), srcMidRect, GraphicsUnit.Pixel);
-                                gHi.DrawImage(hiSrc, new Rectangle(0, y3 - sliceHalf, hiW, sliceH), srcMidRect, GraphicsUnit.Pixel);
-                            }
+                            gHi.Clear(Color.Transparent);
+                            DrawGlyphDirectVector(gHi, glyph, new RectangleF(0, 0, hiW, hiH), color, hiFontSz);
                         }
-                        else
+
+                        Bitmap targetBmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+                        using (Graphics gTarget = Graphics.FromImage(targetBmp))
                         {
-                            gHi.TextRenderingHint = TextRenderingHint.AntiAlias;
-
-                            float hiFontSz = (fontSize > 0) ? Math.Min(fontSize * scale, hiH * 0.75f) : (hiH * 0.72f);
-                            Font hiFont = GetFont(hiFontSz);
-
-                            using (SolidBrush brush = new SolidBrush(color))
-                            using (StringFormat sf = new StringFormat
-                            {
-                                Alignment = StringAlignment.Center,
-                                LineAlignment = StringAlignment.Center,
-                                FormatFlags = StringFormatFlags.NoWrap
-                            })
-                            {
-                                gHi.DrawString(glyph.ToString(), hiFont, brush, new RectangleF(0, 0, hiW, hiH), sf);
-                            }
+                            gTarget.Clear(Color.Transparent);
+                            gTarget.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                            gTarget.SmoothingMode = SmoothingMode.HighQuality;
+                            gTarget.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                            gTarget.DrawImage(hiBmp, new Rectangle(0, 0, width, height), 0, 0, hiW, hiH, GraphicsUnit.Pixel);
                         }
-                    }
-
-                    // 2. Thu nhỏ về kích thước gốc bằng bộ lọc Bicubic 16-tap (khử răng cưa hoàn hảo)
-                    Bitmap targetBmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-                    using (Graphics gTarget = Graphics.FromImage(targetBmp))
-                    {
-                        gTarget.Clear(Color.Transparent);
-                        gTarget.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                        gTarget.SmoothingMode = SmoothingMode.HighQuality;
-                        gTarget.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-                        gTarget.DrawImage(hiBmp, new Rectangle(0, 0, width, height));
-                    }
-                    return targetBmp;
+                        return targetBmp;
                     }
                 }
             });
         }
 
         /// <summary>
-        /// Vẽ một ký tự Glyph của Segoe Fluent Icons căn giữa hoàn hảo trong bounds bằng SSAA bitmap mịn màng.
+        /// Vẽ một ký tự Glyph của Segoe Fluent Icons căn giữa hoàn hảo trong bounds sắc nét chuẩn pixel vector.
         /// </summary>
         public static void DrawGlyph(Graphics g, char glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
             if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
-
-            try
-            {
-                int w = (int)Math.Max(1, Math.Round(bounds.Width));
-                int h = (int)Math.Max(1, Math.Round(bounds.Height));
-
-                Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
-                if (bmp != null)
-                {
-                    lock (bmp)
-                    {
-                        var prevInterp = g.InterpolationMode;
-                        var prevSmooth = g.SmoothingMode;
-                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                        g.SmoothingMode = SmoothingMode.HighQuality;
-
-                        g.DrawImage(bmp, bounds.X, bounds.Y, bounds.Width, bounds.Height);
-
-                        g.InterpolationMode = prevInterp;
-                        g.SmoothingMode = prevSmooth;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("DrawGlyph error: " + ex.Message);
-            }
+            DrawGlyphDirectVector(g, glyph, bounds, color, fontSize);
         }
 
         public static void DrawGlyph(Graphics g, char glyph, Rectangle bounds, Color color, float fontSize = 0)
@@ -335,44 +287,30 @@ namespace ZenQOffice.UI
         }
 
         /// <summary>
-        /// Hỗ trợ vẽ trực tiếp lên DirectX Direct2D Graphics
+        /// Hỗ trợ vẽ trực tiếp lên DirectX Direct2D Graphics phần cứng (Zero GDI+, Pure GPU DirectWrite)
         /// </summary>
         public static void DrawGlyphD2D(D2DGraphics g, char glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
             if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
-
-            try
-            {
-                int w = (int)Math.Max(1, Math.Round(bounds.Width));
-                int h = (int)Math.Max(1, Math.Round(bounds.Height));
-                Bitmap bmp = GetGlyphBitmap(glyph, w, h, color, fontSize);
-                if (bmp != null)
-                {
-                    lock (bmp)
-                    {
-                        g.DrawImage(bmp, bounds);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("DrawGlyphD2D error: " + ex.Message);
-            }
+            g.DrawGlyph(glyph, bounds, color, fontSize);
         }
 
         public static void DrawGlyph(D2DGraphics g, char glyph, RectangleF bounds, Color color, float fontSize = 0)
         {
-            DrawGlyphD2D(g, glyph, bounds, color, fontSize);
+            if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+            g.DrawGlyph(glyph, bounds, color, fontSize);
         }
 
         public static void DrawGlyph(D2DGraphics g, char glyph, Rectangle bounds, Color color, float fontSize = 0)
         {
-            DrawGlyphD2D(g, glyph, new RectangleF(bounds.X, bounds.Y, bounds.Width, bounds.Height), color, fontSize);
+            if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+            g.DrawGlyph(glyph, bounds, color, fontSize);
         }
 
         public static void DrawGlyph(D2DGraphics g, char glyph, int x, int y, int size, Color color, float fontSize = 0)
         {
-            DrawGlyphD2D(g, glyph, new RectangleF(x, y, size, size), color, fontSize);
+            if (g == null || size <= 0) return;
+            g.DrawGlyph(glyph, x, y, size, color, fontSize);
         }
 
         /// <summary>
@@ -498,10 +436,14 @@ namespace ZenQOffice.UI
                 case "help":
                     return '\uE897';
                 case "info":
-                    return '\uE946';
-                case "feedback":
-                    return '\uED15';
-                case "bug":
+                    return '\uE946';
+
+                case "feedback":
+
+                    return '\uED15';
+
+                case "bug":
+
                     return '\uEBE8';
                 case "warning":
                     return '\uE7BA';

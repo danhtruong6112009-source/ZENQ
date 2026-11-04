@@ -157,7 +157,12 @@ namespace ZenQOffice.Core
                     fullUserPrompt = "[NGỮ CẢNH TÀI LIỆU HIỆN TẠI]:\n" + contextData + "\n\n[YÊU CẦU CỦA NGƯỜI DÙNG]:\n" + fullUserPrompt;
                 }
 
-                if (config.Provider == AiProviderType.GoogleAIStudio)
+                if (!string.IsNullOrEmpty(config.ModelName) &&
+                    config.ModelName.Trim().Equals("zenq-vector-slide", StringComparison.OrdinalIgnoreCase))
+                {
+                    resp = CallZenqVectorSearch(fullUserPrompt, null, null);
+                }
+                else if (config.Provider == AiProviderType.GoogleAIStudio)
                 {
                     resp = CallGoogleGemini(config, fullSystemPrompt, fullUserPrompt, history);
                 }
@@ -261,7 +266,12 @@ namespace ZenQOffice.Core
                     fullUserPrompt = "[NGỮ CẢNH TÀI LIỆU HIỆN TẠI]:\n" + contextData + "\n\n[YÊU CẦU CỦA NGƯỜI DÙNG]:\n" + fullUserPrompt;
                 }
 
-                if (config.Provider == AiProviderType.GoogleAIStudio)
+                if (!string.IsNullOrEmpty(config.ModelName) &&
+                    config.ModelName.Trim().Equals("zenq-vector-slide", StringComparison.OrdinalIgnoreCase))
+                {
+                    resp = CallZenqVectorSearch(fullUserPrompt, onChunk, isCancelled);
+                }
+                else if (config.Provider == AiProviderType.GoogleAIStudio)
                 {
                     resp = CallGoogleGeminiStream(config, fullSystemPrompt, fullUserPrompt, onChunk, history, isCancelled);
                 }
@@ -322,6 +332,108 @@ namespace ZenQOffice.Core
                 }
             });
         }
+
+        #region ZenQ Vector Search (Instant Slide Layout Retrieval)
+        private static string FindZenqVectorScriptPath()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string scriptPath = Path.Combine(baseDir, "tools", "zenq_vector_search.py");
+            if (!File.Exists(scriptPath))
+            {
+                DirectoryInfo di = new DirectoryInfo(baseDir);
+                for (int i = 0; i < 4 && di != null; i++)
+                {
+                    string candidate = Path.Combine(di.FullName, "tools", "zenq_vector_search.py");
+                    if (File.Exists(candidate)) { scriptPath = candidate; break; }
+                    di = di.Parent;
+                }
+            }
+            return File.Exists(scriptPath) ? scriptPath : null;
+        }
+
+        private static AiResponse CallZenqVectorSearch(string userPrompt, Action<string> onChunk = null, Func<bool> isCancelled = null)
+        {
+            AiResponse resp = new AiResponse();
+            resp.ModelUsed = "zenq-vector-slide";
+            try
+            {
+                string cleanQuery = userPrompt ?? "";
+                int reqIdx = cleanQuery.LastIndexOf("[YÊU CẦU CỦA NGƯỜI DÙNG]:");
+                if (reqIdx >= 0) cleanQuery = cleanQuery.Substring(reqIdx + "[YÊU CẦU CỦA NGƯỜI DÙNG]:".Length).Trim();
+
+                string scriptPath = FindZenqVectorScriptPath();
+                if (string.IsNullOrEmpty(scriptPath))
+                {
+                    resp.Success = false;
+                    resp.ErrorMessage = "Không tìm thấy công cụ Vector Search tại tools/zenq_vector_search.py.";
+                    return resp;
+                }
+
+                string safeQuery = cleanQuery.Replace("\"", "'").Replace("\r", " ").Replace("\n", " ").Trim();
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "python",
+                    Arguments = string.Format("\"{0}\" \"{1}\"", scriptPath, safeQuery),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                using (Process proc = Process.Start(psi))
+                {
+                    string output = proc.StandardOutput.ReadToEnd();
+                    string err = proc.StandardError.ReadToEnd();
+                    proc.WaitForExit(30000);
+
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        string finalOut = output.Trim();
+                        resp.Success = true;
+                        resp.Text = finalOut;
+
+                        if (onChunk != null)
+                        {
+                            // Chỉ stream lời chào tự nhiên đến người dùng, KHÔNG stream khối JSON ra khung chat!
+                            string chatDisplay = finalOut;
+                            int actionIdx = chatDisplay.IndexOf("[ZENQ_ACTION", StringComparison.OrdinalIgnoreCase);
+                            if (actionIdx >= 0)
+                            {
+                                chatDisplay = chatDisplay.Substring(0, actionIdx).Trim();
+                            }
+                            if (string.IsNullOrEmpty(chatDisplay))
+                            {
+                                chatDisplay = "🎨 AI đã định vị và kiến tạo slide hoàn chỉnh lên Canvas.";
+                            }
+
+                            int step = Math.Max(5, chatDisplay.Length / 10);
+                            for (int i = 0; i < chatDisplay.Length; i += step)
+                            {
+                                if (isCancelled != null && isCancelled()) break;
+                                int len = Math.Min(step, chatDisplay.Length - i);
+                                onChunk(chatDisplay.Substring(i, len));
+                                Thread.Sleep(15);
+                            }
+                        }
+                        resp.Text = finalOut;
+                    }
+                    else
+                    {
+                        resp.Success = false;
+                        resp.ErrorMessage = "Lỗi chạy Vector Model: " + err;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                resp.Success = false;
+                resp.ErrorMessage = "Lỗi khởi chạy Python Vector Search: " + ex.Message;
+            }
+            return resp;
+        }
+        #endregion
 
         #region Google AI Studio (Gemini v1beta REST API)
         private static AiResponse CallGoogleGemini(AiConfig config, string systemPrompt, string userPrompt, List<AiChatMessage> history = null)
@@ -859,6 +971,10 @@ namespace ZenQOffice.Core
         public static List<string> ScanLocalOllamaModels(string endpoint = null)
         {
             List<string> models = new List<string>();
+            if (!string.IsNullOrEmpty(FindZenqVectorScriptPath()))
+            {
+                models.Add("zenq-vector-slide");
+            }
 
             // 1. Thử gọi REST API endpoint http://localhost:11434/api/tags
             string baseHost = !string.IsNullOrWhiteSpace(endpoint) ? endpoint.TrimEnd('/') : "http://localhost:11434";

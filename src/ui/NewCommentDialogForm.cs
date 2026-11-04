@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -122,7 +122,7 @@ namespace ZenQOffice
             {
                 if (string.IsNullOrWhiteSpace(_txtComment.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập nội dung bình luận!", "ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập nội dung bình luận!", "ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 CommentText = _txtComment.Text.Trim();

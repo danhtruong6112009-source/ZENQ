@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -78,7 +78,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(pnlHeader);
 
             // 2. TabControl with 3 Signature Methods
-            tabControl = new TabControl
+            tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(14, 75),
                 Size = new Size(536, 395),
@@ -170,7 +170,7 @@ namespace ZenQOffice.UI
             // Lý do / Mục đích
             startY += 45;
             Label lblReason = new Label { Text = "Mục đích ký:", Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
-            cbReason = new ComboBox { Location = new Point(txtX, startY), Width = ctrlW, DropDownStyle = ComboBoxStyle.DropDown };
+            cbReason = new ZenQOffice.UI.FluentComboBox { Location = new Point(txtX, startY), Width = ctrlW, DropDownStyle = ComboBoxStyle.DropDown };
             cbReason.Items.AddRange(new object[] { "Đã phê duyệt tài liệu", "Xác nhận tính pháp lý", "Ký duyệt hợp đồng", "Đã thanh toán hợp lệ", "Xác nhận đã đọc và đồng ý", "Bản thảo phê duyệt sơ bộ" });
             cbReason.Text = string.IsNullOrEmpty(defaultReason) ? "Đã phê duyệt tài liệu" : defaultReason;
             page.Controls.Add(lblReason);
@@ -453,7 +453,7 @@ namespace ZenQOffice.UI
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Không thể mở tệp ảnh: " + ex.Message, "Lỗi nạp ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Không thể mở tệp ảnh: " + ex.Message, "Lỗi nạp ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }

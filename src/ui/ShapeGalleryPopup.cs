@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -142,7 +142,7 @@ namespace ZenQOffice.UI
 
             // 2. Đường thẳng (Lines)
             string[] lines = new string[] {
-                "Line", "ArrowLine", "DoubleArrowLine", "ElbowConnector", "ElbowArrowConnector", "CurvedConnector", "FreeformShape", "FreeformScribble"
+                "Line", "ArrowLine", "DoubleArrowLine", "ElbowConnector", "ElbowArrowConnector", "ElbowDoubleArrowConnector", "CurvedConnector", "CurvedArrowConnector", "CurvedDoubleArrowConnector", "FreeformShape", "FreeformScribble"
             };
             startY = AddGroupSection("Đường thẳng (Lines)", lines, startY, leftMargin, itemW, itemH, gap, cols);
 
@@ -157,14 +157,14 @@ namespace ZenQOffice.UI
             string[] basic = new string[] {
                 "TextBox", "Oval", "Triangle", "RightTriangle", "Parallelogram", "Trapezoid", "Diamond", "Pentagon",
                 "Hexagon", "Octagon", "Decagon", "Cross", "Cylinder", "Cube", "Bevel", "Donut",
-                "SmileFace", "Heart", "Lightning", "Sun", "Moon", "Cloud", "Teardrop", "Arc"
+                "SmileFace", "Heart", "Lightning", "Sun", "Moon", "Cloud", "Teardrop", "Arc", "Heptagon", "Dodecagon", "Pie", "Chord", "Frame", "HalfFrame", "Corner", "FoldedCorner", "Plaque", "LeftBracket", "RightBracket", "BracketPair", "LeftBrace", "RightBrace", "BracePair"
             };
             startY = AddGroupSection("Hình dạng cơ bản (Basic Shapes)", basic, startY, leftMargin, itemW, itemH, gap, cols);
 
             // 5. Mũi tên khối (Block Arrows)
             string[] arrows = new string[] {
                 "RightArrow", "LeftArrow", "UpArrow", "DownArrow", "LeftRightArrow", "UpDownArrow", "QuadArrow", "BentArrow",
-                "UTurnArrow", "Chevron"
+                "UTurnArrow", "Chevron", "StripedRightArrow", "NotchedRightArrow", "PentagonArrow", "LeftRightUpArrow"
             };
             startY = AddGroupSection("Mũi tên khối (Block Arrows)", arrows, startY, leftMargin, itemW, itemH, gap, cols);
 
@@ -178,20 +178,20 @@ namespace ZenQOffice.UI
             string[] flowchart = new string[] {
                 "Rectangle", "FlowchartAlternateProcess", "FlowchartDecision", "FlowchartData", "FlowchartPredefinedProcess", "FlowchartInternalStorage",
                 "FlowchartDocument", "FlowchartMultidocument", "FlowchartTerminator", "FlowchartPreparation", "FlowchartManualInput", "FlowchartManualOperation",
-                "FlowchartConnector", "FlowchartOffpageConnector", "FlowchartCard", "FlowchartPunchedTape"
+                "FlowchartConnector", "FlowchartOffpageConnector", "FlowchartCard", "FlowchartPunchedTape", "FlowchartSummingJunction", "FlowchartOr", "FlowchartSort", "FlowchartCollate", "FlowchartExtract", "FlowchartMerge", "FlowchartStoredData", "FlowchartDelay", "FlowchartSequentialAccessStorage", "FlowchartMagneticDisk", "FlowchartDirectAccessStorage", "FlowchartDisplay"
             };
             startY = AddGroupSection("Lưu trình (Flowchart)", flowchart, startY, leftMargin, itemW, itemH, gap, cols);
 
             // 8. Sao và Biểu ngữ (Stars and Banners)
             string[] stars = new string[] {
                 "Explosion1", "Explosion2", "Star4", "Star5", "Star6", "Star8", "Star10", "Star12",
-                "Star16", "Star24", "Star32", "HorizontalScroll", "VerticalScroll"
+                "Star16", "Star24", "Star32", "HorizontalScroll", "VerticalScroll", "RibbonUp", "RibbonDown", "RibbonCurvedUp", "RibbonCurvedDown"
             };
             startY = AddGroupSection("Sao và Biểu ngữ (Stars and Banners)", stars, startY, leftMargin, itemW, itemH, gap, cols);
 
             // 9. Chú thích (Callouts)
             string[] callouts = new string[] {
-                "CalloutRect", "CalloutRoundedRect", "CalloutOval", "CalloutCloud"
+                "CalloutRect", "CalloutRoundedRect", "CalloutOval", "CalloutCloud", "LineCallout1", "LineCallout2", "LineCallout3", "LineCallout1NoBorder", "LineCallout2NoBorder", "LineCallout3NoBorder"
             };
             startY = AddGroupSection("Chú thích (Callouts)", callouts, startY, leftMargin, itemW, itemH, gap, cols);
 
@@ -340,32 +340,8 @@ namespace ZenQOffice.UI
                     }
                     else if (item.ShapeType.StartsWith("ActionButton"))
                     {
-                        g.DrawRectangle(itemPen, iconBounds);
-                        // Draw symbol inside button
-                        using (Brush b = new SolidBrush(Color.FromArgb(45, 55, 72)))
-                        {
-                            float cx = iconBounds.X + iconBounds.Width / 2f;
-                            float cy = iconBounds.Y + iconBounds.Height / 2f;
-                            if (item.ShapeType == "ActionButtonBack")
-                            {
-                                PointF[] pts = new PointF[] { new PointF(cx + 4, cy - 4), new PointF(cx - 4, cy), new PointF(cx + 4, cy + 4) };
-                                g.FillPolygon(b, pts);
-                            }
-                            else if (item.ShapeType == "ActionButtonForward")
-                            {
-                                PointF[] pts = new PointF[] { new PointF(cx - 4, cy - 4), new PointF(cx + 4, cy), new PointF(cx - 4, cy + 4) };
-                                g.FillPolygon(b, pts);
-                            }
-                            else if (item.ShapeType == "ActionButtonHome")
-                            {
-                                PointF[] pts = new PointF[] { new PointF(cx, cy - 5), new PointF(cx + 5, cy), new PointF(cx + 3, cy), new PointF(cx + 3, cy + 5), new PointF(cx - 3, cy + 5), new PointF(cx - 3, cy), new PointF(cx - 5, cy) };
-                                g.FillPolygon(b, pts);
-                            }
-                            else
-                            {
-                                g.FillEllipse(b, cx - 3, cy - 3, 6, 6);
-                            }
-                        }
+                        using var buttonPath = ShapeRenderer.CreateShapePath(item.ShapeType,iconBounds);
+                        g.DrawPath(itemPen,buttonPath);
                     }
                     else
                     {

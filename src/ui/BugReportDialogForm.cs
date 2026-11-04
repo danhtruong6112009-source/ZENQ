@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -527,11 +527,11 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                MessageBox.Show("Clipboard hiện không có ảnh chụp màn hình.\n\nCách làm:\n1. Nhấn tổ hợp phím [Win + Shift + S] trên bàn phím để chụp màn hình.\n2. Quay lại đây nhấn nút 'Dán ảnh Clipboard' (hoặc nhấn Ctrl + V) là xong!", "Chưa có ảnh trong Clipboard", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Clipboard hiện không có ảnh chụp màn hình.\n\nCách làm:\n1. Nhấn tổ hợp phím [Win + Shift + S] trên bàn phím để chụp màn hình.\n2. Quay lại đây nhấn nút 'Dán ảnh Clipboard' (hoặc nhấn Ctrl + V) là xong!", "Chưa có ảnh trong Clipboard", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không thể đọc Clipboard: " + ex.Message, "Lỗi Clipboard", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Không thể đọc Clipboard: " + ex.Message, "Lỗi Clipboard", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -553,7 +553,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Không thể mở tệp ảnh: " + ex.Message, "Lỗi tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ZenQOffice.UI.FluentMessageBox.Show("Không thể mở tệp ảnh: " + ex.Message, "Lỗi tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
             }
@@ -632,7 +632,7 @@ namespace ZenQOffice.UI
             string title = _txtTitle.Text.Trim();
             if (string.IsNullOrWhiteSpace(title))
             {
-                MessageBox.Show("Vui lòng nhập Tiêu đề tóm tắt về lỗi hoặc góp ý của bạn.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập Tiêu đề tóm tắt về lỗi hoặc góp ý của bạn.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtTitle.Focus();
                 return;
             }
@@ -640,7 +640,7 @@ namespace ZenQOffice.UI
             string desc = _txtDescription.Text.Trim();
             if (string.IsNullOrWhiteSpace(desc))
             {
-                MessageBox.Show("Vui lòng nhập Nội dung phản hồi chi tiết để chúng tôi có thể hỗ trợ bạn tốt nhất.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập Nội dung phản hồi chi tiết để chúng tôi có thể hỗ trợ bạn tốt nhất.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtDescription.Focus();
                 return;
             }

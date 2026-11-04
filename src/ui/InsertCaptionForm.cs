@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -79,7 +79,7 @@ namespace ZenQOffice.UI
             Label lblLbl = new Label { Text = "Nhãn (Label):", Location = new Point(20, 75), AutoSize = true };
             this.Controls.Add(lblLbl);
 
-            cboLabel = new ComboBox { Location = new Point(20, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboLabel = new ZenQOffice.UI.FluentComboBox { Location = new Point(20, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
             cboLabel.Items.AddRange(new object[] { "Hình (Figure)", "Bảng (Table)", "Phương trình (Equation)" });
             if (defaultLabel == "Bảng") cboLabel.SelectedIndex = 1;
             else if (defaultLabel == "Phương trình") cboLabel.SelectedIndex = 2;
@@ -90,7 +90,7 @@ namespace ZenQOffice.UI
             Label lblPos = new Label { Text = "Vị trí (Position):", Location = new Point(230, 75), AutoSize = true };
             this.Controls.Add(lblPos);
 
-            cboPosition = new ComboBox { Location = new Point(230, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboPosition = new ZenQOffice.UI.FluentComboBox { Location = new Point(230, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
             cboPosition.Items.AddRange(new object[] { "Dưới mục đã chọn (Below)", "Trên mục đã chọn (Above)" });
             cboPosition.SelectedIndex = 0;
             this.Controls.Add(cboPosition);

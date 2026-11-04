@@ -1197,8 +1197,11 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(pickedModel) && !pickedModel.StartsWith("⏳") && !pickedModel.StartsWith("⚠️"))
                 {
                     if (_currentProfile.Provider == AiProviderType.GoogleAIStudio && pickedModel == "gemini-3.1-flash") pickedModel = "gemini-3.1-flash-lite";
-                    _currentProfile.SelectedModel = pickedModel;
-                    if (!_currentProfile.SavedModels.Contains(pickedModel)) _currentProfile.SavedModels.Add(pickedModel);
+                    if (AiKeyProfile.IsModelCompatible(_currentProfile.Provider, pickedModel))
+                    {
+                        _currentProfile.SelectedModel = pickedModel;
+                        if (!_currentProfile.SavedModels.Contains(pickedModel)) _currentProfile.SavedModels.Add(pickedModel);
+                    }
                 }
             }
             else
@@ -1207,13 +1210,17 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(typedModel) && !typedModel.StartsWith("⏳") && !typedModel.StartsWith("⚠️"))
                 {
                     if (_currentProfile.Provider == AiProviderType.GoogleAIStudio && typedModel == "gemini-3.1-flash") typedModel = "gemini-3.1-flash-lite";
-                    _currentProfile.SelectedModel = typedModel;
-                    if (!_currentProfile.SavedModels.Contains(typedModel))
+                    if (AiKeyProfile.IsModelCompatible(_currentProfile.Provider, typedModel))
                     {
-                        _currentProfile.SavedModels.Add(typedModel);
+                        _currentProfile.SelectedModel = typedModel;
+                        if (!_currentProfile.SavedModels.Contains(typedModel))
+                        {
+                            _currentProfile.SavedModels.Add(typedModel);
+                        }
                     }
                 }
             }
+            _currentProfile.RemoveIncompatibleModels();
 
             if (_currentProfile.Provider == AiProviderType.GoogleAIStudio)
             {

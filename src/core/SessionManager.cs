@@ -166,7 +166,7 @@ namespace ZenQOffice.Core
                             }
                         }
                     }
-                    else if (string.IsNullOrEmpty(tab.FilePath) && needsDraft && tab.Mode == OfficeAppMode.Slides)
+                    else if (needsDraft && tab.Mode == OfficeAppMode.Slides)
                     {
                         PresentationRoot pres = (i == appForm.Ribbon.ActiveDocIndex && appForm.SlidesView != null) 
                             ? appForm.SlidesView.Presentation 
@@ -471,6 +471,8 @@ namespace ZenQOffice.Core
                                         if (ext == ".docx")
                                         {
                                             loaded = appForm.WriterView.LoadDocumentFile(draftPath, appForm.Ribbon);
+                                            if (loaded && hasFile)
+                                                appForm.WriterView.RestoreBorderlessTablesFromOriginalDocx(item.FilePath);
                                         }
                                         else if (IsSafeDraftText(draftPath))
                                         {
@@ -491,7 +493,7 @@ namespace ZenQOffice.Core
                                         }
                                     }
                                 }
-                                else if (item.Mode == OfficeAppMode.Slides && appForm.SlidesView != null && !hasFile)
+                                else if (item.Mode == OfficeAppMode.Slides && appForm.SlidesView != null && (!hasFile || item.IsModified))
                                 {
                                     appForm.SlidesView.Presentation = Format.PptxHandler.LoadPptx(draftPath);
                                     appForm.SlidesView.ActiveSlideIndex = Math.Max(0, Math.Min(appForm.SlidesView.Presentation.Slides.Count - 1, item.ActiveSlideIndex));

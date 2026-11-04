@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -244,7 +244,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrWhiteSpace(txtFile.Text) || !File.Exists(txtFile.Text))
             {
-                MessageBox.Show(this, "Vui lòng chọn một tệp PDF hợp lệ!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn một tệp PDF hợp lệ!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 btnBrowse.PerformClick();
                 return;
             }

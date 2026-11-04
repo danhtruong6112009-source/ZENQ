@@ -29,3 +29,17 @@ svg_suite_results/
 tests/bin_docx/
 tests/sample_doc.docx
 tiktok_dump.html
+models/
+*.gguf
+*.raw
+*.gif
+src.zip
+.abstract_build/
+.grand_build/
+.slide_build/
+output/
+tools/*.zip
+tools/*.json
+tools/*.ipynb
+tools/__pycache__/
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -51,7 +51,7 @@ namespace ZenQOffice.UI
             BackColor = Color.FromArgb(243, 244, 246);
             Font = new Font("Segoe UI", 9f);
 
-            TabControl tabControl = new TabControl
+            TabControl tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(380, 420),
@@ -169,7 +169,7 @@ namespace ZenQOffice.UI
             tabPaper.BackColor = Color.White;
 
             Label lblPaperHead = new Label { Text = "Khổ giấy (Paper size):", Location = new Point(15, 12), AutoSize = true };
-            cboPaper = new ComboBox { Location = new Point(15, 32), Size = new Size(335, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboPaper = new ZenQOffice.UI.FluentComboBox { Location = new Point(15, 32), Size = new Size(335, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboPaper.Items.AddRange(new object[] {
                 "Letter", "Tabloid", "Legal", "Statement", "Executive", "A3", "A4", "A5", "B4 (JIS)", "B5 (JIS)", "Tùy chỉnh (Custom size)"
             });
@@ -204,12 +204,12 @@ namespace ZenQOffice.UI
             // Paper source
             GroupBox grpSource = new GroupBox { Text = "Nguồn giấy (Paper source)", Location = new Point(15, 120), Size = new Size(335, 100) };
             Label lblTray1 = new Label { Text = "Trang đầu (First page):", Location = new Point(10, 20), AutoSize = true };
-            ListBox lstTray1 = new ListBox { Location = new Point(10, 40), Size = new Size(150, 50) };
+            ListBox lstTray1 = new ZenQOffice.UI.FluentListBox { Location = new Point(10, 40), Size = new Size(150, 50) };
             lstTray1.Items.AddRange(new object[] { "Khay mặc định (Default)", "Nạp thủ công (Manual)" });
             lstTray1.SelectedIndex = 0;
 
             Label lblTray2 = new Label { Text = "Các trang khác (Other):", Location = new Point(175, 20), AutoSize = true };
-            ListBox lstTray2 = new ListBox { Location = new Point(175, 40), Size = new Size(150, 50) };
+            ListBox lstTray2 = new ZenQOffice.UI.FluentListBox { Location = new Point(175, 40), Size = new Size(150, 50) };
             lstTray2.Items.AddRange(new object[] { "Khay mặc định (Default)", "Nạp thủ công (Manual)" });
             lstTray2.SelectedIndex = 0;
 
@@ -236,7 +236,7 @@ namespace ZenQOffice.UI
             grpPaperPrev.Controls.Add(picPaperPreview);
 
             Label lblApplyPaper = new Label { Text = "Áp dụng vào (Apply to):", Location = new Point(130, 30), AutoSize = true };
-            cboApplyToPaper = new ComboBox { Location = new Point(130, 52), Size = new Size(190, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboApplyToPaper = new ZenQOffice.UI.FluentComboBox { Location = new Point(130, 52), Size = new Size(190, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboApplyToPaper.Items.AddRange(new object[] { "Toàn bộ tài liệu (Whole document)", "Từ điểm này trở đi (This point forward)" });
             cboApplyToPaper.SelectedIndex = 0;
             grpPaperPrev.Controls.Add(lblApplyPaper);

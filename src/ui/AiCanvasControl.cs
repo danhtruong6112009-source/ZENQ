@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -69,8 +69,8 @@ namespace ZenQOffice.UI
 
         public AiCanvasControl()
         {
-            this.DoubleBuffered = true;
-            this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            this.DoubleBuffered = false;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             this.BackColor = Color.White;
         }
 
@@ -106,8 +106,9 @@ namespace ZenQOffice.UI
             if (this.Width <= 0 || this.Height <= 0) return;
 
             // KẾT XUẤT 100% DIRECT2D / DIRECTWRITE (GPU / Microsoft WARP)
-            using (D2DGraphics g = new D2DGraphics(e.Graphics, this.Width, this.Height))
+            using (var frame = AiGpuPaint.Begin(this, e))
             {
+                var g = frame.Graphics;
                 if (IsResultScreen)
                 {
                     RenderResultScreenDirect2D(g);

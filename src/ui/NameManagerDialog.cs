@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -89,7 +89,7 @@ namespace ZenQOffice.UI
                 TextBox txtN = new TextBox { Text = "VungDuLieu1", Location = new Point(16, 38), Width = 330 };
 
                 Label lblS = new Label { Text = "Phạm vi (Scope):", Location = new Point(16, 70), AutoSize = true };
-                ComboBox cboS = new ComboBox { Location = new Point(16, 92), Width = 330, DropDownStyle = ComboBoxStyle.DropDownList };
+                ComboBox cboS = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 92), Width = 330, DropDownStyle = ComboBoxStyle.DropDownList };
                 cboS.Items.Add("Toàn bảng tính (Workbook)");
                 cboS.SelectedIndex = 0;
 
@@ -146,7 +146,7 @@ namespace ZenQOffice.UI
         {
             if (lvNames.SelectedItems.Count == 0) return;
             var dn = lvNames.SelectedItems[0].Tag as DefinedNameModel;
-            if (dn != null && MessageBox.Show($"Bạn có chắc chắn muốn xóa tên \"{dn.Name}\"?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (dn != null && ZenQOffice.UI.FluentMessageBox.Show($"Bạn có chắc chắn muốn xóa tên \"{dn.Name}\"?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 calcView.DefinedNames.Remove(dn);
                 RefreshList();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -37,7 +37,7 @@ namespace ZenQOffice.UI
             Label lblCols = new Label { Text = "Số cột hiển thị (Columns):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblCols);
 
-            cboColumns = new ComboBox { Location = new Point(200, 14), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboColumns = new ZenQOffice.UI.FluentComboBox { Location = new Point(200, 14), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
             cboColumns.Items.AddRange(new object[] { "2 Cột (Khuyên dùng)", "3 Cột", "1 Cột" });
             cboColumns.SelectedIndex = 0;
             this.Controls.Add(cboColumns);
@@ -45,7 +45,7 @@ namespace ZenQOffice.UI
             Label lblPrev = new Label { Text = "Xem trước bảng chỉ mục theo thứ tự A-Z:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             this.Controls.Add(lblPrev);
 
-            lstPreview = new ListBox { Location = new Point(20, 70), Size = new Size(445, 120), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 8.5f) };
+            lstPreview = new ZenQOffice.UI.FluentListBox { Location = new Point(20, 70), Size = new Size(445, 120), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 8.5f) };
             this.Controls.Add(lstPreview);
 
             chkRightAlign = new CheckBox { Text = "Căn lề phải số trang (Right align page numbers)", Location = new Point(20, 204), AutoSize = true, Checked = true };
@@ -55,7 +55,7 @@ namespace ZenQOffice.UI
             Label lblLeader = new Label { Text = "Đường dẫn tab (Tab leader):", Location = new Point(20, 235), AutoSize = true };
             this.Controls.Add(lblLeader);
 
-            cboTabLeader = new ComboBox { Location = new Point(200, 232), Width = 170, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboTabLeader = new ZenQOffice.UI.FluentComboBox { Location = new Point(200, 232), Width = 170, DropDownStyle = ComboBoxStyle.DropDownList };
             cboTabLeader.Items.AddRange(new object[] { ".................... (Chấm)", "-------------------- (Gạch)", "(Không có)" });
             cboTabLeader.SelectedIndex = 0;
             cboTabLeader.SelectedIndexChanged += (s, e) => UpdatePreview();
@@ -197,7 +197,7 @@ namespace ZenQOffice.UI
             var map = ScanIndexEntries();
             if (map.Count == 0)
             {
-                MessageBox.Show("Chưa tìm thấy từ khóa nào được đánh dấu tra cứu trong tài liệu.\n\nVui lòng bôi đen từ khóa và chọn 'Đánh dấu mục' (Alt + Shift + X) trước khi chèn bảng chỉ mục!", "Chèn Chỉ Mục", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Chưa tìm thấy từ khóa nào được đánh dấu tra cứu trong tài liệu.\n\nVui lòng bôi đen từ khóa và chọn 'Đánh dấu mục' (Alt + Shift + X) trước khi chèn bảng chỉ mục!", "Chèn Chỉ Mục", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.None;
                 return;
             }

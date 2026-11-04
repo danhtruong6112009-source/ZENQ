@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -66,7 +66,7 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
             // Tab Control
-            TabControl tabCtrl = new TabControl { Location = new Point(12, 12), Size = new Size(502, 420) };
+            TabControl tabCtrl = new ZenQOffice.UI.FluentTabControl { Location = new Point(12, 12), Size = new Size(502, 420) };
             TabPage tabMain = new TabPage("Thụt lề & Giãn cách (Indents and Spacing)");
             tabMain.BackColor = Color.White;
 
@@ -76,7 +76,7 @@ namespace ZenQOffice.UI
             Label lblAlign = new Label { Text = "Căn lề (Alignment):", Location = new Point(16, 26), AutoSize = true };
             grpGen.Controls.Add(lblAlign);
 
-            _cboAlignment = new ComboBox { Location = new Point(160, 24), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboAlignment = new ZenQOffice.UI.FluentComboBox { Location = new Point(160, 24), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboAlignment.Items.AddRange(new object[] { "Trái (Left)", "Giữa (Center)", "Phải (Right)", "Căn đều hai bên (Justified)" });
             _cboAlignment.SelectedIndex = AlignmentResult;
             _cboAlignment.SelectedIndexChanged += (s, e) => UpdatePreview();
@@ -104,7 +104,7 @@ namespace ZenQOffice.UI
             Label lblSpecial = new Label { Text = "Đặc biệt (Special):", Location = new Point(210, 28), AutoSize = true };
             grpIndent.Controls.Add(lblSpecial);
 
-            _cboSpecialIndent = new ComboBox { Location = new Point(320, 24), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboSpecialIndent = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 24), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboSpecialIndent.Items.AddRange(new object[] { "(Không có)", "Dòng đầu (First line)", "Nhô dòng (Hanging)" });
             _cboSpecialIndent.SelectedIndex = 0;
             _cboSpecialIndent.SelectedIndexChanged += (s, e) => {
@@ -142,7 +142,7 @@ namespace ZenQOffice.UI
             Label lblLineSp = new Label { Text = "Cách dòng:", Location = new Point(210, 28), AutoSize = true };
             grpSpacing.Controls.Add(lblLineSp);
 
-            _cboLineSpacing = new ComboBox { Location = new Point(320, 24), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboLineSpacing = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 24), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboLineSpacing.Items.AddRange(new object[] { "Đơn (Single 1.0)", "1.15 dòng", "1.5 dòng", "Đôi (Double 2.0)", "Đa dòng (Multiple)" });
             _cboLineSpacing.SelectedIndex = 1; // 1.15 default
             _cboLineSpacing.SelectedIndexChanged += (s, e) => {
@@ -175,7 +175,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(tabCtrl);
 
             // Bottom Buttons
-            _btnOk = new Button
+            _btnOk = new SettingsActionButton
             {
                 Text = "OK",
                 DialogResult = DialogResult.OK,
@@ -189,7 +189,7 @@ namespace ZenQOffice.UI
             _btnOk.Click += (s, e) => SaveAndClose();
             this.Controls.Add(_btnOk);
 
-            _btnCancel = new Button
+            _btnCancel = new SettingsActionButton
             {
                 Text = "Hủy bỏ",
                 DialogResult = DialogResult.Cancel,

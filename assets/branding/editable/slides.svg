@@ -1,0 +1,98 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="280" height="340" viewBox="0 0 140 170"><title>ZenQ Slides — matched to user-edited Calc</title><defs xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" id="slides-defs209">
+    <linearGradient id="slides-linearGradient217" inkscape:collect="always">
+      <stop style="stop-color:#ffffff;stop-opacity:1;" offset="0" id="slides-stop217"/>
+      <stop style="stop-color:#eaeaea;stop-opacity:1;" offset="1" id="slides-stop218"/>
+    </linearGradient>
+    <linearGradient id="slides-linearGradient215" inkscape:collect="always">
+      <stop style="stop-color:#ffffff;stop-opacity:1;" offset="0" id="slides-stop215"/>
+      <stop style="stop-color:#eaeaea;stop-opacity:1;" offset="1" id="slides-stop216"/>
+    </linearGradient>
+    <linearGradient id="slides-linearGradient210" inkscape:collect="always">
+      <stop style="stop-color:#000000;stop-opacity:0.29824561;" offset="0" id="slides-stop210"/>
+      <stop style="stop-color:#000000;stop-opacity:0;" offset="1" id="slides-stop211"/>
+    </linearGradient>
+    <defs id="slides-defs68">
+      <linearGradient id="slides-calc-body" x1="40.113828" y1="14.271056" x2="138.07192" y2="123.75362" gradientTransform="scale(0.83387703,1.1992176)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFD211" id="slides-stop42"/>
+        <stop offset="0.3" stop-color="#FFA100" id="slides-stop43"/>
+        <stop offset="0.7" stop-color="#FF7900" id="slides-stop44"/>
+        <stop offset="1" stop-color="#E74700" id="slides-stop45"/>
+      </linearGradient>
+      <linearGradient id="slides-calc-back" x1="6.1474309" y1="31.697328" x2="39.921559" y2="144.27775" gradientTransform="scale(0.93535009,1.0691184)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFA100" id="slides-stop46"/>
+        <stop offset="0.62" stop-color="#8F2600" id="slides-stop47"/>
+        <stop offset="1" stop-color="#6F1B00" id="slides-stop48"/>
+      </linearGradient>
+      <linearGradient id="slides-calc-curl" x1="10.330261" y1="19.747808" x2="58.538144" y2="58.314115" gradientTransform="scale(0.58081787,1.7217101)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFD211" id="slides-stop49"/>
+        <stop offset="0.5" stop-color="#FFA100" id="slides-stop50"/>
+        <stop offset="1" stop-color="#E74700" id="slides-stop51"/>
+      </linearGradient>
+      <linearGradient id="slides-calc-fold" x1="49.910295" y1="17.671705" x2="123.24787" y2="99.1579" gradientTransform="scale(0.98176139,1.0185774)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFE885" id="slides-stop52"/>
+        <stop offset="0.5" stop-color="#FFE885" id="slides-stop53"/>
+        <stop offset="1" stop-color="#FFA100" id="slides-stop54"/>
+      </linearGradient>
+      <linearGradient id="slides-calc-edge" x1="40.846226" y1="14.69957" x2="77.367557" y2="14.69957" gradientTransform="scale(0.83239024,1.2013596)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="white" stop-opacity="0.35" id="slides-stop55"/>
+        <stop offset="0.14" stop-color="white" stop-opacity="0.07" id="slides-stop56"/>
+        <stop offset="1" stop-color="white" stop-opacity="0" id="slides-stop57"/>
+      </linearGradient>
+      <linearGradient id="slides-calc-rim" x1="40.113828" y1="14.271056" x2="155.35864" y2="129.51587" gradientTransform="scale(0.83387703,1.1992176)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFD211" id="slides-stop58"/>
+        <stop offset="0.45" stop-color="#FFA100" id="slides-stop59"/>
+        <stop offset="1" stop-color="#E74700" id="slides-stop60"/>
+      </linearGradient>
+      <radialGradient id="slides-calc-gloss" cx="57.965601" cy="28.395069" r="108.4227" gradientTransform="scale(0.83239024,1.2013596)" fx="57.965601" fy="28.395069" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="white" stop-opacity="0.12" id="slides-stop61"/>
+        <stop offset="0.6" stop-color="white" stop-opacity="0" id="slides-stop62"/>
+        <stop offset="1" stop-color="white" stop-opacity="0" id="slides-stop63"/>
+      </radialGradient>
+      <linearGradient id="slides-calc-vertical-rim" x1="96.521883" y1="6.7148814" x2="96.521883" y2="50.60109" gradientTransform="scale(0.36002199,2.7776081)" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FFF0B2" stop-opacity="0.7" id="slides-stop64"/>
+        <stop offset="0.6" stop-color="#FFF0B2" stop-opacity="0.55" id="slides-stop65"/>
+        <stop offset="1" stop-color="#FFF0B2" stop-opacity="0.05" id="slides-stop66"/>
+      </linearGradient>
+      <radialGradient id="slides-calc-volume" cx="148.12764" cy="63.77511" r="79.890411" gradientTransform="matrix(0.83239024,0,0,1.2013596,140,0)" fx="148.12764" fy="63.77511" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#6F1B00" stop-opacity="0.28" id="slides-stop67"/>
+        <stop offset="1" stop-color="#6F1B00" stop-opacity="0" id="slides-stop68"/>
+      </radialGradient>
+    </defs>
+    <linearGradient inkscape:collect="always" xlink:href="#slides-linearGradient210" id="slides-linearGradient211" x1="29" y1="101.43947" x2="109.09356" y2="101.43947" gradientUnits="userSpaceOnUse"/>
+    <filter inkscape:collect="always" style="color-interpolation-filters:sRGB" id="slides-filter211" x="-0.11966228" y="-0.035387938" width="1.1865634" height="1.112283">
+      <feGaussianBlur inkscape:collect="always" stdDeviation="1.6076042" id="slides-feGaussianBlur211"/>
+    </filter>
+    <filter inkscape:collect="always" style="color-interpolation-filters:sRGB" id="slides-filter212" x="-0.060368356" y="-0.057221326" width="1.1088177" height="1.0975008">
+      <feGaussianBlur inkscape:collect="always" stdDeviation="0.36880988" id="slides-feGaussianBlur212"/>
+    </filter>
+    <filter inkscape:collect="always" style="color-interpolation-filters:sRGB" id="slides-filter213" x="-0.059478141" y="-0.070006567" width="1.1248052" height="1.1325018">
+      <feGaussianBlur inkscape:collect="always" stdDeviation="0.68804992" id="slides-feGaussianBlur213"/>
+    </filter>
+    <filter inkscape:collect="always" style="color-interpolation-filters:sRGB" id="slides-filter214" x="-0.057882439" y="-0.040059262" width="1.1157649" height="1.0801453">
+      <feGaussianBlur inkscape:collect="always" stdDeviation="1.9786799" id="slides-feGaussianBlur214"/>
+    </filter>
+    <filter inkscape:collect="always" style="color-interpolation-filters:sRGB" id="slides-filter215" x="-0.0086956601" y="-0.0059825823" width="1.0173913" height="1.011987">
+      <feGaussianBlur inkscape:collect="always" stdDeviation="0.11503654" id="slides-feGaussianBlur215"/>
+    </filter>
+    <linearGradient inkscape:collect="always" xlink:href="#slides-linearGradient215" id="slides-linearGradient216" x1="43.048972" y1="101.81427" x2="119.41556" y2="101.81427" gradientUnits="userSpaceOnUse"/>
+    <linearGradient inkscape:collect="always" xlink:href="#slides-linearGradient217" id="slides-linearGradient218" x1="45.62416" y1="103.30839" x2="116.91697" y2="103.30839" gradientUnits="userSpaceOnUse"/>
+  </defs>
+  <g transform="translate(-140 0)"><g xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="slides-calc-back-ribbon" transform="translate(140)">
+    <path d="M 34.265791,35.848105 C 34.265791,39.848105 28,42 22,43 12,45 6,53 6,65 v 62 c 0,16 8,27 23,27 h 82 L 50,141 C 39,138 34,132 34,121 V 34 Z" fill="url(#slides-calc-back)" stroke="#FF7900" stroke-width="0.5" id="slides-path68" style="fill:url(#slides-calc-back)" sodipodi:nodetypes="ccsssccscc"/>
+    <path d="M 33,37 C 31,41 27,42 22,43 12,45 6,53 6,65 v 8 c 1,15 11,29 28,44 V 34 Z" fill="url(#slides-calc-curl)" id="slides-path69" style="fill:url(#slides-calc-curl)"/>
+    <path d="M 28.288367,42.024917 C 25.537619,43.105588 22.274868,43.437662 20,44 12,47 7,54 7,64" fill="none" stroke="#FFD211" stroke-opacity="0.7" stroke-width="0.8" id="slides-path70" sodipodi:nodetypes="ccc" style="filter:url(#slides-filter212)"/>
+  </g>
+  <g xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="slides-calc-contact-shadow" fill="none" stroke="#6F1B00" transform="translate(140)">
+    <path d="M 36.625,40.375 34,121 c -0.35795,10.99417 5,17 16,20 l 58,13" stroke-width="10" stroke-opacity="0.035" id="slides-path71" style="mix-blend-mode:normal;fill:#000000;fill-opacity:0.0376175;stroke:url(#slides-linearGradient211);stroke-opacity:1;filter:url(#slides-filter211)" sodipodi:nodetypes="cscc"/>
+  </g>
+  <g xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="slides-calc-front-panel" transform="translate(140)">
+    <path d="M 49,18 C 40,16 34,23 34,34 v 87 c 0,11 5,17 16,20 l 60,13 c 12,3 19,-3 19,-14 V 59 C 129,46 125,41 113,37 L 57,20 c -3,-1 -5,-2 -8,-2 z" transform="translate(-0.5,0.7)" fill="#8F2600" stroke="#8F2600" stroke-width="1.5" stroke-opacity="0.25" id="slides-path74" style="filter:url(#slides-filter214)"/>
+    <path d="M 48.84532,17.84532 C 39.84532,15.84532 34,23 34,34 v 87 c 0,11 5,17 16,20 l 60,13 c 12,3 19,-3 19,-14 V 59 C 129,46 125,41 113,37 L 57,20 c -5.35473,-1.525501 -6.78091,-1.896182 -8.15468,-2.15468 z" fill="url(#slides-calc-body)" stroke="url(#slides-calc-rim)" stroke-width="1.1" id="slides-path75" style="fill:url(#slides-calc-body);stroke:url(#slides-calc-rim);filter:url(#slides-filter215)" sodipodi:nodetypes="cssccssccc"/>
+    <path d="M 49,18 C 40,16 34,23 34,34 v 87 c 0,11 5,17 16,20 l 60,13 c 12,3 19,-3 19,-14 V 59 C 129,46 125,41 113,37 L 57,20 c -3,-1 -5,-2 -8,-2 z" fill="url(#slides-calc-edge)" id="slides-path76" style="fill:url(#slides-calc-edge)"/>
+  </g>
+  <g xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="slides-calc-gradient-fold" transform="translate(140)">
+    <path d="M 113,37 62.179649,21.572393 m 0.04954,0.03458 C 69.83667,30.869301 69.166768,39.787505 104,59.25 115.26811,65.545871 128,86 129,101 V 59 c 0,-13 -4,-18 -16,-22" fill="url(#slides-calc-fold)" id="slides-path78" style="fill:url(#slides-calc-fold)" sodipodi:nodetypes="cccscsc"/>
+  </g>
+  <g id="slides-calc-edge-light" transform="translate(140)"/>
+  <g id="slides-calc-symbol" transform="translate(140 0)"><g transform="matrix(1 0.27 0 1 0 -20)"><rect x="45" y="70" width="67" height="59" rx="5" fill="none" stroke="#FFF" stroke-width="5"/><path d="M65 85a14 14 0 1 0 14 14H65Z" fill="#FFF"/><path d="M69 81v14h14a14 14 0 0 0-14-14Z" fill="#FFF"/><rect x="86" y="97" width="7" height="21" fill="#FFF"/><rect x="98" y="84" width="7" height="34" fill="#FFF"/></g></g></g></svg>

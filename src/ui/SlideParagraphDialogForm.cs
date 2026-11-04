@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ZenQOffice.Core;
@@ -68,7 +68,7 @@ namespace ZenQOffice.UI
             GroupBox grpGeneral = new GroupBox { Text = "Căn chỉnh chung", Location = new Point(14, 12), Size = new Size(475, 75) };
             
             Label lblAlign = new Label { Text = "Căn chỉnh:", Location = new Point(16, 26), AutoSize = true };
-            cboAlignment = new ComboBox { Location = new Point(90, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboAlignment = new ZenQOffice.UI.FluentComboBox { Location = new Point(90, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboAlignment.Items.AddRange(new object[] { "Căn trái", "Căn giữa", "Căn phải", "Căn đều hai bên" });
             cboAlignment.SelectedIndex = AlignmentResult == TextAlignment.Center ? 1 : (AlignmentResult == TextAlignment.Right ? 2 : (AlignmentResult == TextAlignment.Justify ? 3 : 0));
             cboAlignment.SelectedIndexChanged += (s, e) => {
@@ -77,7 +77,7 @@ namespace ZenQOffice.UI
             };
 
             Label lblVert = new Label { Text = "Dọc:", Location = new Point(245, 26), AutoSize = true };
-            cboVerticalAlignment = new ComboBox { Location = new Point(310, 23), Size = new Size(140, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboVerticalAlignment = new ZenQOffice.UI.FluentComboBox { Location = new Point(310, 23), Size = new Size(140, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboVerticalAlignment.Items.AddRange(new object[] { "Trên cùng", "Ở giữa", "Dưới cùng" });
             cboVerticalAlignment.SelectedIndex = VerticalAlignmentResult == VerticalTextAlignment.Middle ? 1 : (VerticalAlignmentResult == VerticalTextAlignment.Bottom ? 2 : 0);
             cboVerticalAlignment.SelectedIndexChanged += (s, e) => {
@@ -114,7 +114,7 @@ namespace ZenQOffice.UI
             numSpaceAfter.ValueChanged += (s, e) => { SpaceAfterResult = (float)numSpaceAfter.Value; UpdatePreview(); };
 
             Label lblLnSpc = new Label { Text = "Cách dòng:", Location = new Point(245, 26), AutoSize = true };
-            cboLineSpacing = new ComboBox { Location = new Point(325, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboLineSpacing = new ZenQOffice.UI.FluentComboBox { Location = new Point(325, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboLineSpacing.Items.AddRange(new object[] { "Dòng đơn", "1.5 dòng", "Dòng đôi", "Nhiều dòng" });
 
             Label lblAt = new Label { Text = "Bằng:", Location = new Point(245, 65), AutoSize = true };
@@ -162,8 +162,8 @@ namespace ZenQOffice.UI
             Controls.Add(grpPreview);
 
             // Action Buttons
-            Button btnOk = new Button { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(320, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            Button btnCancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel, Location = new Point(410, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
+            Button btnOk = new SettingsActionButton { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(320, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnCancel = new SettingsActionButton { Text = "Hủy", DialogResult = DialogResult.Cancel, Location = new Point(410, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
 
             btnOk.FlatAppearance.BorderSize = 0;
             btnCancel.FlatAppearance.BorderSize = 0;

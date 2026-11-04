@@ -1,8 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using ZenQOffice.Core;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ZenQOffice.UI
 {
@@ -10,8 +12,10 @@ namespace ZenQOffice.UI
     {
         public event Action<TransitionDirection> OnDirectionSelected;
         public event Action<MorphType> OnMorphModeSelected;
+        public event Action<List<int>> OnColorsSelected;
+        private bool pickingColor;
 
-        public TransitionEffectOptionsDropDownForm(Point screenLocation, TransitionType transType, TransitionDirection currentDir, MorphType currentMorph)
+        public TransitionEffectOptionsDropDownForm(Point screenLocation, TransitionType transType, TransitionDirection currentDir, MorphType currentMorph, List<int> currentColors=null)
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
@@ -46,7 +50,7 @@ namespace ZenQOffice.UI
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Horizontal, "Horizontal Out (Ngang mở ra)", currentDir == TransitionDirection.Horizontal, "↔");
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Out, "Horizontal In (Ngang khép vào)", currentDir == TransitionDirection.Out, "⇖");
             }
-            else if (transType == TransitionType.Blinds || transType == TransitionType.Comb)
+            else if (transType == TransitionType.Blinds || transType == TransitionType.Comb || transType == TransitionType.RandomBars)
             {
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Vertical, "Vertical (Chiều dọc)", currentDir == TransitionDirection.Vertical, "||");
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Horizontal, "Horizontal (Chiều ngang)", currentDir == TransitionDirection.Horizontal, "=");
@@ -61,6 +65,11 @@ namespace ZenQOffice.UI
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.Smoothly, "Smoothly (Chuyển êm)", currentDir != TransitionDirection.ThroughBlack, "☁");
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.ThroughBlack, "Through Black (Qua màn đen)", currentDir == TransitionDirection.ThroughBlack, "⬛");
             }
+            else if(transType==TransitionType.GenOffice_ColorWipe||transType==TransitionType.GenOffice_SmoothFlow)
+            {
+                var choices=new[]{(TransitionDirection.FromRight,"Sang trái","←"),(TransitionDirection.FromLeft,"Sang phải","→"),(TransitionDirection.FromBottom,"Lên trên","↑"),(TransitionDirection.FromTop,"Xuống dưới","↓"),(TransitionDirection.FromBottomRight,"Chéo lên trái","↖"),(TransitionDirection.FromBottomLeft,"Chéo lên phải","↗"),(TransitionDirection.FromTopLeft,"Chéo xuống phải","↘"),(TransitionDirection.FromTopRight,"Chéo xuống trái","↙")};
+                foreach(var choice in choices)AddDirectionOption(pnlContent,ref curY,itemW,itemH,choice.Item1,choice.Item2,currentDir==choice.Item1||(currentDir==TransitionDirection.Smooth&&choice.Item1==TransitionDirection.FromRight),choice.Item3);
+            }
             else
             {
                 // Default directional 4-way transitions (Push, Wipe, Reveal, Cover, Uncover, Pan, Cube, etc.)
@@ -70,9 +79,29 @@ namespace ZenQOffice.UI
                 AddDirectionOption(pnlContent, ref curY, itemW, itemH, TransitionDirection.FromTop, "From Top (Từ trên xuống)", currentDir == TransitionDirection.FromTop, "↓");
             }
 
+            if(transType==TransitionType.GenOffice_ColorWipe)
+            {
+                var automatic=new Button{Text="Tự lấy màu từ slide",Location=new Point(8,curY),Size=new Size(190,27),FlatStyle=FlatStyle.Flat};
+                automatic.Click+=(s,e)=>{OnColorsSelected?.Invoke(new List<int>());Close();};pnlContent.Controls.Add(automatic);curY+=32;
+                int[] defaults={0xCFBDA8,0xB18D6C,0xDACBB8,0xE6D9C5};var colors=Enumerable.Range(0,4).Select(i=>currentColors!=null&&i<currentColors.Count?currentColors[i]:defaults[i]).ToList();
+                pnlContent.Controls.Add(new Label{Text="Màu theo thứ tự gạt",Location=new Point(8,curY+4),AutoSize=true});curY+=27;
+                for(int i=0;i<4;i++)
+                {
+                    int index=i;Color Paint(int rgb)=>Color.FromArgb(255,(rgb>>16)&255,(rgb>>8)&255,rgb&255);
+                    var swatch=new Button{Location=new Point(9+i*46,curY),Size=new Size(36,28),FlatStyle=FlatStyle.Flat,BackColor=Paint(colors[i]),Text=(i+1).ToString(),UseVisualStyleBackColor=false};swatch.FlatAppearance.BorderColor=Color.FromArgb(190,195,204);
+                    swatch.Click+=(s,e)=>
+                    {
+                        pickingColor=true;
+                        try{using var picker=new ColorDialog{Color=Paint(colors[index]),FullOpen=true};if(picker.ShowDialog(this)==DialogResult.OK){colors[index]=picker.Color.ToArgb()&0xffffff;swatch.BackColor=picker.Color;OnColorsSelected?.Invoke(new List<int>(colors));}}
+                        finally{pickingColor=false;if(!IsDisposed&&!Disposing)Activate();}
+                    };
+                    pnlContent.Controls.Add(swatch);
+                }
+                curY+=34;
+            }
             Size = new Size(itemW + 8, curY + 6);
             Controls.Add(pnlContent);
-            Deactivate += (s, e) => Close();
+            Deactivate += (s, e) => {if(!pickingColor)Close();};
         }
 
         protected override void OnPaint(PaintEventArgs e)

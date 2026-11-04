@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -8,59 +8,56 @@ using ZenQOffice.Core;
 namespace ZenQOffice.UI
 {
     /// <summary>
-    /// Popup thả xuống gợi ý các lệnh Slash Commands (/) khi người dùng gõ "/" trong ô chat AI.
-    /// Thiết kế hiện đại chuẩn Google Workspace / Fluent Design: đổ bóng mềm, viền bo tròn, hỗ trợ phím mũi tên và Enter.
+    /// Popup gợi ý lệnh Slash Commands (/) dạng UserControl nội bộ (In-Panel Control).
+    /// Khắc phục 100% lỗi cướp focus của ToolStripDropDown: Không bao giờ làm mất con nháy (caret) của ô nhập,
+    /// cho phép người dùng xoá liên tục nhiều ký tự hoặc xoá dấu '/' ngay lập tức mà không cần click chuột.
     /// </summary>
-    public class AiSlashCommandPopup : ToolStripDropDown
+    public class AiSlashCommandPopup : UserControl
     {
-        private List<AiSlashCommand> _commands;
+        private List<AiSlashCommand> _commands = new List<AiSlashCommand>();
         private int _selectedIndex = 0;
-        private ToolStripControlHost _host;
-        private SlashCommandListControl _listControl;
+        private int _hoverIndex = -1;
+        private int _scrollOffset = 0;
+        private const int ItemHeight = 38;
+        private const int MaxVisibleItems = 5;
 
         public event Action<AiSlashCommand> CommandSelected;
 
         public AiSlashCommandPopup()
         {
-            this.AutoClose = true;
-            this.DropShadowEnabled = true;
-            this.Padding = Padding.Empty;
-            this.Margin = Padding.Empty;
+            this.DoubleBuffered = false;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+            this.SetStyle(ControlStyles.Selectable, false);
+            this.TabStop = false; // Ngăn chặn việc chiếm TabStop hay Focus từ txtInput
             this.BackColor = Color.White;
-
-            _listControl = new SlashCommandListControl();
-            _listControl.ItemClicked += (cmd) =>
-            {
-                this.Close();
-                if (CommandSelected != null) CommandSelected(cmd);
-            };
-
-            _host = new ToolStripControlHost(_listControl);
-            _host.Margin = Padding.Empty;
-            _host.Padding = Padding.Empty;
-            _host.AutoSize = false;
-            this.Items.Add(_host);
+            this.Cursor = Cursors.Hand;
+            this.Visible = false;
         }
 
         public void UpdateList(List<AiSlashCommand> commands)
         {
-            _commands = commands;
+            _commands = commands ?? new List<AiSlashCommand>();
             _selectedIndex = 0;
-            _listControl.SetCommands(commands);
+            _hoverIndex = -1;
+            _scrollOffset = 0;
 
-            int itemH = 40;
-            int totalH = Math.Min(320, Math.Max(40, commands.Count * itemH + 8));
-            _listControl.Size = new Size(330, totalH);
-            _host.Size = new Size(330, totalH);
-            this.Size = new Size(330, totalH);
+            int count = Math.Min(MaxVisibleItems, _commands.Count);
+            int totalH = Math.Max(42, count * ItemHeight + 8);
+            this.Height = totalH;
+            this.Invalidate();
+        }
+
+        public void Close()
+        {
+            this.Visible = false;
         }
 
         public bool SelectNext()
         {
             if (_commands == null || _commands.Count == 0) return false;
             _selectedIndex = (_selectedIndex + 1) % _commands.Count;
-            _listControl.SelectedIndex = _selectedIndex;
-            _listControl.Invalidate();
+            EnsureVisible(_selectedIndex);
+            this.Invalidate();
             return true;
         }
 
@@ -68,9 +65,21 @@ namespace ZenQOffice.UI
         {
             if (_commands == null || _commands.Count == 0) return false;
             _selectedIndex = (_selectedIndex - 1 + _commands.Count) % _commands.Count;
-            _listControl.SelectedIndex = _selectedIndex;
-            _listControl.Invalidate();
+            EnsureVisible(_selectedIndex);
+            this.Invalidate();
             return true;
+        }
+
+        private void EnsureVisible(int index)
+        {
+            if (index < _scrollOffset)
+            {
+                _scrollOffset = index;
+            }
+            else if (index >= _scrollOffset + MaxVisibleItems)
+            {
+                _scrollOffset = index - MaxVisibleItems + 1;
+            }
         }
 
         public AiSlashCommand GetSelectedCommand()
@@ -87,139 +96,150 @@ namespace ZenQOffice.UI
             var cmd = GetSelectedCommand();
             if (cmd != null)
             {
-                this.Close();
-                if (CommandSelected != null) CommandSelected(cmd);
+                this.Visible = false;
+                CommandSelected?.Invoke(cmd);
             }
         }
 
-        private class SlashCommandListControl : Control
+        protected override void OnMouseWheel(MouseEventArgs e)
         {
-            private List<AiSlashCommand> _items = new List<AiSlashCommand>();
-            private int _hoverIndex = -1;
-            public int SelectedIndex { get; set; } = 0;
-            public event Action<AiSlashCommand> ItemClicked;
-
-            public SlashCommandListControl()
+            base.OnMouseWheel(e);
+            if (_commands.Count > MaxVisibleItems)
             {
-                this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-                this.BackColor = Color.White;
-                this.Cursor = Cursors.Hand;
-            }
-
-            public void SetCommands(List<AiSlashCommand> items)
-            {
-                _items = items ?? new List<AiSlashCommand>();
-                _hoverIndex = -1;
-                SelectedIndex = 0;
+                int maxOffset = _commands.Count - MaxVisibleItems;
+                if (e.Delta < 0) _scrollOffset = Math.Min(maxOffset, _scrollOffset + 1);
+                else _scrollOffset = Math.Max(0, _scrollOffset - 1);
                 this.Invalidate();
             }
+        }
 
-            protected override void OnMouseMove(MouseEventArgs e)
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int idx = _scrollOffset + (e.Y - 4) / ItemHeight;
+            if (idx >= 0 && idx < _commands.Count && idx != _hoverIndex)
             {
-                base.OnMouseMove(e);
-                int idx = (e.Y - 4) / 40;
-                if (idx >= 0 && idx < _items.Count && idx != _hoverIndex)
-                {
-                    _hoverIndex = idx;
-                    SelectedIndex = idx;
-                    this.Invalidate();
-                }
-            }
-
-            protected override void OnMouseLeave(EventArgs e)
-            {
-                base.OnMouseLeave(e);
-                _hoverIndex = -1;
+                _hoverIndex = idx;
+                _selectedIndex = idx;
                 this.Invalidate();
             }
+        }
 
-            protected override void OnMouseClick(MouseEventArgs e)
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hoverIndex = -1;
+            this.Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            int idx = _scrollOffset + (e.Y - 4) / ItemHeight;
+            if (idx >= 0 && idx < _commands.Count)
             {
-                base.OnMouseClick(e);
-                int idx = (e.Y - 4) / 40;
-                if (idx >= 0 && idx < _items.Count)
+                _selectedIndex = idx;
+                ConfirmSelection();
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using var frame = AiGpuPaint.Begin(this, e);
+            var g = frame.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            // Đổ bóng & Viền bo tròn thanh lịch
+            Rectangle bounds = new Rectangle(0, 0, this.Width - 1, this.Height - 1);
+            using (GraphicsPath gp = RoundRect(bounds, 8))
+            {
+                using (SolidBrush bgBrush = new SolidBrush(Color.White))
                 {
-                    if (ItemClicked != null) ItemClicked(_items[idx]);
+                    g.FillPath(bgBrush, gp);
+                }
+                using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1.2f))
+                {
+                    g.DrawPath(borderPen, gp);
                 }
             }
 
-            protected override void OnPaint(PaintEventArgs e)
+            if (_commands == null || _commands.Count == 0)
             {
-                base.OnPaint(e);
-                Graphics g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-                // Nền trắng tinh tế
-                g.Clear(Color.White);
-
-                // Viền khung popup
-                using (Pen borderPen = new Pen(Color.FromArgb(226, 232, 240), 1))
+                using (Font emptyFont = new Font("Segoe UI", 9f, FontStyle.Italic))
+                using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawRectangle(borderPen, 0, 0, this.Width - 1, this.Height - 1);
+                    g.DrawString("Không tìm thấy lệnh phù hợp...", emptyFont, textBrush, new PointF(16, 12));
                 }
+                return;
+            }
 
-                if (_items == null || _items.Count == 0)
+            int visibleCount = Math.Min(MaxVisibleItems, _commands.Count - _scrollOffset);
+            using (Font nameFont = new Font("Segoe UI", 9.2f, FontStyle.Bold))
+            using (Font descFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (SolidBrush nameBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            using (SolidBrush descBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            using (SolidBrush selNameBrush = new SolidBrush(Color.FromArgb(67, 56, 202)))
+            {
+                for (int i = 0; i < visibleCount; i++)
                 {
-                    using (Font emptyFont = new Font("Segoe UI", 9f, FontStyle.Italic))
-                    using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
-                    {
-                        g.DrawString("Không tìm thấy lệnh phù hợp...", emptyFont, textBrush, new PointF(16, 12));
-                    }
-                    return;
-                }
+                    int itemIdx = _scrollOffset + i;
+                    var cmd = _commands[itemIdx];
+                    int itemY = 4 + i * ItemHeight;
+                    Rectangle itemRect = new Rectangle(4, itemY, this.Width - 8, ItemHeight);
 
-                int itemH = 40;
-                using (Font nameFont = new Font("Segoe UI", 9.2f, FontStyle.Bold))
-                using (Font descFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
-                using (SolidBrush nameBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
-                using (SolidBrush descBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
-                using (SolidBrush selNameBrush = new SolidBrush(Color.FromArgb(67, 56, 202)))
-                {
-                    for (int i = 0; i < _items.Count; i++)
+                    bool isSelected = (itemIdx == _selectedIndex);
+                    if (isSelected)
                     {
-                        var cmd = _items[i];
-                        int itemY = 4 + i * itemH;
-                        Rectangle itemRect = new Rectangle(4, itemY, this.Width - 8, itemH);
-
-                        bool isSelected = (i == SelectedIndex);
-                        if (isSelected)
+                        using (GraphicsPath gp = RoundRect(itemRect, 6))
+                        using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(238, 242, 255)))
                         {
-                            using (GraphicsPath gp = RoundRect(itemRect, 6))
-                            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(238, 242, 255)))
-                            {
-                                g.FillPath(bgBrush, gp);
-                            }
+                            g.FillPath(bgBrush, gp);
                         }
-
-                        // Vẽ icon glyph
-                        Rectangle iconRect = new Rectangle(itemRect.X + 8, itemY + 10, 20, 20);
-                        Color iconCol = isSelected ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139);
-                        FluentIconRenderer.DrawGlyph(g, cmd.IconGlyph, iconRect, iconCol, 14f);
-
-                        // Vẽ Tên lệnh & Mô tả
-                        PointF namePt = new PointF(itemRect.X + 34, itemY + 4);
-                        g.DrawString(cmd.DisplayName ?? cmd.Name, nameFont, isSelected ? selNameBrush : nameBrush, namePt);
-
-                        PointF descPt = new PointF(itemRect.X + 34, itemY + 21);
-                        string shortDesc = cmd.Description;
-                        if (shortDesc != null && shortDesc.Length > 42) shortDesc = shortDesc.Substring(0, 42) + "...";
-                        g.DrawString(shortDesc, descFont, descBrush, descPt);
                     }
+
+                    // Biểu tượng glyph
+                    Rectangle iconRect = new Rectangle(itemRect.X + 8, itemY + 9, 20, 20);
+                    Color iconCol = isSelected ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139);
+                    FluentIconRenderer.DrawGlyph(g, cmd.IconGlyph, iconRect, iconCol, 13.5f);
+
+                    // Tên lệnh & mô tả
+                    PointF namePt = new PointF(itemRect.X + 34, itemY + 3);
+                    g.DrawString(cmd.DisplayName ?? cmd.Name, nameFont, isSelected ? selNameBrush : nameBrush, namePt);
+
+                    PointF descPt = new PointF(itemRect.X + 34, itemY + 20);
+                    string shortDesc = cmd.Description;
+                    if (shortDesc != null && shortDesc.Length > 44) shortDesc = shortDesc.Substring(0, 44) + "...";
+                    g.DrawString(shortDesc, descFont, descBrush, descPt);
                 }
             }
 
-            private static GraphicsPath RoundRect(Rectangle r, int radius)
+            // Thanh cuộn mini nếu có nhiều hơn 5 mục
+            if (_commands.Count > MaxVisibleItems)
             {
-                GraphicsPath path = new GraphicsPath();
-                int d = radius * 2;
-                path.AddArc(r.X, r.Y, d, d, 180, 90);
-                path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-                path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-                path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-                path.CloseFigure();
-                return path;
+                int trackH = this.Height - 12;
+                int thumbH = Math.Max(16, trackH * MaxVisibleItems / _commands.Count);
+                int maxOffset = _commands.Count - MaxVisibleItems;
+                int thumbY = 6 + (trackH - thumbH) * _scrollOffset / maxOffset;
+                Rectangle thumbR = new Rectangle(this.Width - 6, thumbY, 3, thumbH);
+                using (SolidBrush sb = new SolidBrush(Color.FromArgb(180, 203, 213, 225)))
+                {
+                    g.FillRectangle(sb, thumbR);
+                }
             }
+        }
+
+        private static GraphicsPath RoundRect(Rectangle r, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int d = radius * 2;
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }

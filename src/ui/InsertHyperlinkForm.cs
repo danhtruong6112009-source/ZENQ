@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -461,7 +461,7 @@ namespace ZenQOffice.UI
                 Label lblSound = new Label { Text = "🔊 Âm thanh khi bấm:", Location = new Point(14, 425), AutoSize = true, ForeColor = Color.FromArgb(51, 65, 85) };
                 this.Controls.Add(lblSound);
 
-                cboSound = new ComboBox
+                cboSound = new ZenQOffice.UI.FluentComboBox
                 {
                     Location = new Point(145, 421),
                     Width = 235,
@@ -590,7 +590,7 @@ namespace ZenQOffice.UI
             };
             _panelSlide.Controls.Add(lblHeader);
 
-            lstSlideTargets = new ListBox
+            lstSlideTargets = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(14, 36),
                 Size = new Size(245, 250),
@@ -760,7 +760,7 @@ namespace ZenQOffice.UI
             };
             _panelWeb.Controls.Add(lblQuick);
 
-            ListBox lstQuickUrls = new ListBox
+            ListBox lstQuickUrls = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(16, 110),
                 Size = new Size(466, 180),
@@ -1121,7 +1121,7 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 250, 252);
             this.Font = new Font("Segoe UI", 9.0f);
 
-            _tabControl = new TabControl
+            _tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(542, 455),
@@ -1197,7 +1197,7 @@ namespace ZenQOffice.UI
             c.RbHyperlink = new RadioButton { Text = "Liên kết đến (Hyperlink to):", Location = new Point(16, 50), AutoSize = true, Font = regFont };
             grpAction.Controls.Add(c.RbHyperlink);
 
-            c.CboHyperlinkTarget = new ComboBox
+            c.CboHyperlinkTarget = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(36, 74),
                 Width = 265,
@@ -1219,7 +1219,7 @@ namespace ZenQOffice.UI
             c.CboHyperlinkTarget.SelectedIndex = 0;
             grpAction.Controls.Add(c.CboHyperlinkTarget);
 
-            c.CboSpecificSlide = new ComboBox
+            c.CboSpecificSlide = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(36, 104),
                 Width = 265,
@@ -1337,7 +1337,7 @@ namespace ZenQOffice.UI
                 };
                 grpAction.Controls.Add(c.ChkRevealShape);
 
-                c.CboRevealShape = new ComboBox
+                c.CboRevealShape = new ZenQOffice.UI.FluentComboBox
                 {
                     Location = new Point(248, 268),
                     Width = 244,
@@ -1378,7 +1378,7 @@ namespace ZenQOffice.UI
             c.ChkPlaySound = new CheckBox { Text = "Phát âm thanh (Play sound):", Location = new Point(16, 26), AutoSize = true, Font = regFont };
             grpFeedback.Controls.Add(c.ChkPlaySound);
 
-            c.CboSound = new ComboBox
+            c.CboSound = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(205, 23),
                 Width = 210,

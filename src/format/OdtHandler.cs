@@ -288,6 +288,7 @@ namespace ZenQOffice.Format
 
         private static string EscapeXml(string text)
         {
+            text = ZenQOffice.UI.WriterMath.ToLinear(text);
             if (string.IsNullOrEmpty(text)) return string.Empty;
             return text.Replace("&", "&amp;")
                        .Replace("<", "&lt;")

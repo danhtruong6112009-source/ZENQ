@@ -1975,17 +1975,19 @@ namespace ZenQOffice.UI
 
         private void DrawOfficePreviewDiagram(D2DGraphics g, Rectangle r, string typeId)
         {
-            if (previewDispatch == null) InitPreviewDispatch();
-            Action<D2DGraphics, Rectangle> drawer;
-            if (previewDispatch.TryGetValue(typeId, out drawer))
+            if(r.Width<=0||r.Height<=0)return;
+            var template=allTemplates.Find(item=>item.TypeId==typeId);
+            var shape=SmartArtRenderer.CreateDefaultSmartArt(typeId,template?.Name??typeId);
+            float scale=Math.Min(r.Width/480f,r.Height/220f);
+            var state=g.Save();
+            try
             {
-                drawer(g, r);
+                g.IntersectClip(r);
+                g.TranslateTransform(r.X+(r.Width-480*scale)/2,r.Y+(r.Height-220*scale)/2);
+                g.ScaleTransform(scale,scale);
+                ShapeRenderer.DrawShape(g,shape,new Rectangle(0,0,480,220),null,1f);
             }
-            else
-            {
-                // Fallback for any unknown type
-                DrawListPreview(g, r, typeId);
-            }
+            finally{g.Restore(state);}
         }
 
         // =========================================================================

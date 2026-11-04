@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -82,7 +82,7 @@ namespace ZenQOffice.UI
             Label lblFmt = new Label { Text = "Định dạng số:", Location = new Point(20, 26), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             grpFormat.Controls.Add(lblFmt);
 
-            cboNumberFormat = new ComboBox
+            cboNumberFormat = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(130, 23),
                 Size = new Size(160, 24),
@@ -130,7 +130,7 @@ namespace ZenQOffice.UI
             Label lblList = new Label { Text = "Danh sách các chú thích hiện có trong tài liệu:", Location = new Point(20, 320), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.DimGray };
             this.Controls.Add(lblList);
 
-            lstExistingNotes = new ListBox
+            lstExistingNotes = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(20, 340),
                 Size = new Size(485, 45),

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
@@ -3044,7 +3044,7 @@ namespace ZenQOffice.UI
             // Action Buttons
             int btnY = y;
             DrawInspButton(g, x + 10, btnY, 52, 28, "+ Thêm", () => {
-                ContextMenuStrip menu = new ContextMenuStrip();
+                ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
                 var itemRect = new ToolStripMenuItem("Thêm hình chữ nhật vector");
                 itemRect.Click += (s, e) => Document?.AddVectorShape(VectorShapeType.Rectangle, new RectangleF(150, 150, 200, 150), ShapeFillColor, ShapeStrokeColor, ShapeStrokeWidth, ShapeCornerRadius, ActiveShapePointCount);
                 var itemEllipse = new ToolStripMenuItem("Thêm hình tròn / Elip vector");
@@ -5918,7 +5918,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
                 if (bmp == null)
                 {
-                    MessageBox.Show(owner, "Không thể đọc định dạng hình ảnh này.", "Lỗi tải ảnh", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(owner, "Không thể đọc định dạng hình ảnh này.", "Lỗi tải ảnh", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -5968,7 +5968,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             }
             catch (Exception ex)
             {
-                MessageBox.Show(owner, "Lỗi khi chèn ảnh: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(owner, "Lỗi khi chèn ảnh: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

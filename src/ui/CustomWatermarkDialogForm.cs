@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -100,7 +100,7 @@ namespace ZenQOffice.UI
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Không thể nạp tệp hình ảnh: " + ex.Message, "Lỗi hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Không thể nạp tệp hình ảnh: " + ex.Message, "Lỗi hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -110,7 +110,7 @@ namespace ZenQOffice.UI
             Label lblScale = new Label { Text = "Tỉ lệ (Scale):", Location = new Point(48, 106), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblScale);
 
-            cbScale = new ComboBox
+            cbScale = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(140, 103),
                 Size = new Size(130, 24),
@@ -147,7 +147,7 @@ namespace ZenQOffice.UI
             Label lblLang = new Label { Text = "Ngôn ngữ (Language):", Location = new Point(48, 171), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblLang);
 
-            cbLanguage = new ComboBox { Location = new Point(185, 168), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
+            cbLanguage = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 168), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
             cbLanguage.Items.AddRange(new object[] { "Tiếng Việt (Việt Nam)", "English (United States)" });
             cbLanguage.SelectedIndex = 0;
             this.Controls.Add(cbLanguage);
@@ -156,7 +156,7 @@ namespace ZenQOffice.UI
             Label lblText = new Label { Text = "Văn bản (Text):", Location = new Point(48, 203), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblText);
 
-            cbText = new ComboBox { Location = new Point(185, 200), Size = new Size(305, 24), Font = new Font("Segoe UI", 9) };
+            cbText = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 200), Size = new Size(305, 24), Font = new Font("Segoe UI", 9) };
             cbText.Items.AddRange(new object[] { "BẢO MẬT", "KHÔNG SAO CHÉP", "BẢN THẢO", "TUYỆT MẬT", "CONFIDENTIAL", "DO NOT COPY", "DRAFT", "ORIGINAL", "SAMPLE", "ASAP" });
             cbText.Text = !string.IsNullOrEmpty(currentText) ? currentText : "BẢO MẬT";
             this.Controls.Add(cbText);
@@ -165,7 +165,7 @@ namespace ZenQOffice.UI
             Label lblFont = new Label { Text = "Phông chữ (Font):", Location = new Point(48, 235), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblFont);
 
-            cbFont = new ComboBox { Location = new Point(185, 232), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
+            cbFont = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 232), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
             cbFont.Items.AddRange(new object[] { "Calibri", "Arial", "Times New Roman", "Segoe UI", "Tahoma", "Verdana" });
             cbFont.SelectedIndex = 1; // Arial
             this.Controls.Add(cbFont);
@@ -174,7 +174,7 @@ namespace ZenQOffice.UI
             Label lblSize = new Label { Text = "Cỡ chữ (Size):", Location = new Point(48, 267), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblSize);
 
-            cbSize = new ComboBox { Location = new Point(185, 264), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
+            cbSize = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 264), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
             cbSize.Items.AddRange(new object[] { "Tự động (Auto)", "36", "44", "48", "54", "66", "72", "80", "96" });
             cbSize.SelectedIndex = 0;
             this.Controls.Add(cbSize);

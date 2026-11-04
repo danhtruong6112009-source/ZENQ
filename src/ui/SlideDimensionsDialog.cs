@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ZenQOffice.Core;
@@ -56,7 +56,7 @@ namespace ZenQOffice.UI
             Controls.Add(lblPreset);
             curY += 24;
 
-            _cboPresets = new ComboBox
+            _cboPresets = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(20, curY),
                 Size = new Size(395, 26),
@@ -171,7 +171,7 @@ namespace ZenQOffice.UI
             Controls.Add(gbFit);
             curY += 80;
 
-            _btnOk = new Button
+            _btnOk = new SettingsActionButton
             {
                 Text = "Đồng ý",
                 Location = new Point(225, curY),
@@ -186,7 +186,7 @@ namespace ZenQOffice.UI
             _btnOk.Click += OnOkClick;
             Controls.Add(_btnOk);
 
-            _btnCancel = new Button
+            _btnCancel = new SettingsActionButton
             {
                 Text = "Hủy",
                 Location = new Point(330, curY),

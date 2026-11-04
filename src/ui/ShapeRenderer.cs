@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace ZenQOffice.UI
 {
-    public static class ShapeRenderer
+    public static partial class ShapeRenderer
     {
         public static GraphicsPath CreateShapePath(DocShapeObject shape, Rectangle bounds)
         {
@@ -26,6 +26,7 @@ namespace ZenQOffice.UI
 
         public static GraphicsPath CreateShapePath(string shapeType, Rectangle bounds, float adj1, float adj2, float adj3)
         {
+            if (TryOfficePreset(shapeType, bounds, out var officePath)) return officePath;
             GraphicsPath path = new GraphicsPath();
             float x = bounds.X;
             float y = bounds.Y;
@@ -590,12 +591,15 @@ namespace ZenQOffice.UI
 
                 case "ElbowConnector":
                 case "ElbowArrowConnector":
+                case "ElbowDoubleArrowConnector":
                     path.AddLine(x, y + h, x + w / 2f, y + h);
                     path.AddLine(x + w / 2f, y + h, x + w / 2f, y);
                     path.AddLine(x + w / 2f, y, x + w, y);
                     break;
 
                 case "CurvedConnector":
+                case "CurvedArrowConnector":
+                case "CurvedDoubleArrowConnector":
                     path.AddBezier(x, y + h, x, y, x + w, y + h, x + w, y);
                     break;
 
@@ -897,8 +901,22 @@ namespace ZenQOffice.UI
                         bool hasCustomTextColor = shape.NodeTextColors != null && shape.NodeTextColors.ContainsKey(ni);
                         bool hasCustomScale = shape.NodeScaleDeltas != null && shape.NodeScaleDeltas.ContainsKey(ni);
                         bool hasVisualStyle = shape.VisualStylePreset > 0;
-                        bool shouldDrawNode = isActivelyEditing || hasCustomShape || hasCustomScale || (shape.NodeOffsetDeltas != null && shape.NodeOffsetDeltas.ContainsKey(ni));
+                        bool shouldDrawNode = hasCustomShape || hasCustomScale || (shape.NodeOffsetDeltas != null && shape.NodeOffsetDeltas.ContainsKey(ni));
 
+                        if(isActivelyEditing&&!shouldDrawNode)
+                        {
+                            RectangleF rf=shape.SubShapeRelativeBounds[ni];
+                            var rect=new RectangleF(bounds.X+rf.X*bounds.Width,bounds.Y+rf.Y*bounds.Height,rf.Width*bounds.Width,rf.Height*bounds.Height);
+                            string value=shape.GetNodeText(ni)??"";
+                            float size=Math.Clamp(rect.Height*.24f,8f,14f);
+                            using var font=new Font("Segoe UI",size,FontStyle.Bold);
+                            string prefix=value.Substring(0,Math.Clamp(shape.TextCursorIndex,0,value.Length));
+                            float full=g.MeasureString(value,font).Width,before=g.MeasureString(prefix,font).Width;
+                            float cx=Math.Clamp(rect.X+(rect.Width-full)/2+before,rect.Left+2,Math.Max(rect.Left+2,rect.Right-2));
+                            float ch=Math.Min(rect.Height-4,Math.Max(12,size*1.333333f));
+                            using var pen=new Pen(hasCustomTextColor?shape.NodeTextColors[ni]:Color.White,1f);
+                            g.DrawLine(pen,cx,rect.Y+(rect.Height-ch)/2,cx,rect.Y+(rect.Height+ch)/2);
+                        }
                         if (shouldDrawNode)
                         {
                             RectangleF rf = shape.SubShapeRelativeBounds[ni];
@@ -1171,6 +1189,36 @@ namespace ZenQOffice.UI
                         );
                         child.LastBounds = childBounds;
                         DrawShape(g, child, childBounds, ribbon, zoomLevel);
+                    }
+                }
+
+                // Draw child selection frame and handles if a child is selected
+                DocShapeObject selectedChild = null;
+                if (shape.GroupChildren != null)
+                {
+                    foreach (var c in shape.GroupChildren)
+                    {
+                        if (c.IsSelected) { selectedChild = c; break; }
+                    }
+                }
+                if (selectedChild != null && !selectedChild.LastBounds.IsEmpty)
+                {
+                    using (Pen childPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawRectangle(childPen, selectedChild.LastBounds);
+                    }
+                    int cs = 6;
+                    Rectangle cb = selectedChild.LastBounds;
+                    int[] chx = new int[] { cb.Left - cs / 2, cb.Left + cb.Width / 2 - cs / 2, cb.Right - cs / 2, cb.Right - cs / 2, cb.Right - cs / 2, cb.Left + cb.Width / 2 - cs / 2, cb.Left - cs / 2, cb.Left - cs / 2 };
+                    int[] chy = new int[] { cb.Top - cs / 2, cb.Top - cs / 2, cb.Top - cs / 2, cb.Top + cb.Height / 2 - cs / 2, cb.Bottom - cs / 2, cb.Bottom - cs / 2, cb.Bottom - cs / 2, cb.Top + cb.Height / 2 - cs / 2 };
+                    using (SolidBrush hb = new SolidBrush(Color.White))
+                    using (Pen hp = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
+                    {
+                        for (int hi = 0; hi < 8; hi++)
+                        {
+                            g.FillRectangle(hb, chx[hi], chy[hi], cs, cs);
+                            g.DrawRectangle(hp, chx[hi], chy[hi], cs, cs);
+                        }
                     }
                 }
 
@@ -1641,6 +1689,14 @@ namespace ZenQOffice.UI
                     using (Pen outlinePen = new Pen(shape.OutlineColor, shape.OutlineWidth * zoomLevel))
                     {
                         outlinePen.DashStyle = shape.OutlineDashStyle;
+                        if (shape.HasTailArrow || shape.ShapeType == "ArrowLine" || shape.ShapeType == "DoubleArrowLine" || (shape.ShapeType.EndsWith("Connector") && shape.ShapeType.Contains("Arrow")))
+                        {
+                            try { outlinePen.CustomEndCap = new AdjustableArrowCap(4, 4, true); } catch { }
+                        }
+                        if (shape.HasHeadArrow || (shape.ShapeType.Contains("DoubleArrow")))
+                        {
+                            try { outlinePen.CustomStartCap = new AdjustableArrowCap(4, 4, true); } catch { }
+                        }
                         g.DrawPath(outlinePen, path);
                     }
                 }

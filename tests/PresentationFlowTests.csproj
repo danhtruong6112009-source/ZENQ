@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><IntermediateOutputPath>obj/PresentationFlowTests/$(Configuration)/</IntermediateOutputPath><OutputPath>bin/PresentationFlowTests/</OutputPath><TargetFramework>net10.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../ZenQOffice.csproj"/><Reference Include="Vortice.Direct2D1"><HintPath>../Vortice.Direct2D1.dll</HintPath></Reference><Compile Include="PresentationFlowTests.cs"/></ItemGroup>
+</Project>

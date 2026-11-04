@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -62,7 +62,7 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f);
             this.BackColor = Color.FromArgb(248, 250, 252);
 
-            tabControl = new TabControl { Dock = DockStyle.Top, Height = 320 };
+            tabControl = new ZenQOffice.UI.FluentTabControl { Dock = DockStyle.Top, Height = 320 };
             tabSettings = new TabPage("Cài đặt");
             tabInputMessage = new TabPage("Thông báo nhập");
             tabErrorAlert = new TabPage("Cảnh báo lỗi");
@@ -70,7 +70,7 @@ namespace ZenQOffice.UI
 
             // ==================== TAB 1: Cài đặt ====================
             Label lblAllow = new Label { Text = "Cho phép (Allow):", Location = new Point(16, 16), AutoSize = true };
-            cboAllow = new ComboBox { Location = new Point(16, 38), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboAllow = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 38), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
             cboAllow.Items.AddRange(new object[] {
                 "Bất kỳ giá trị nào (Any)",
                 "Số nguyên (Whole number)",
@@ -85,7 +85,7 @@ namespace ZenQOffice.UI
             chkInCellDropdown = new CheckBox { Text = "Danh sách thả xuống trong ô", Location = new Point(220, 68), AutoSize = true, Checked = true };
 
             Label lblData = new Label { Text = "Dữ liệu (Data):", Location = new Point(16, 75), AutoSize = true };
-            cboOperator = new ComboBox { Location = new Point(16, 96), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboOperator = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 96), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
             cboOperator.Items.AddRange(new object[] {
                 "Ở giữa (between)",
                 "Không ở giữa (not between)",
@@ -122,7 +122,7 @@ namespace ZenQOffice.UI
             // ==================== TAB 3: Cảnh báo lỗi ====================
             chkShowErrorMessage = new CheckBox { Text = "Hiển thị cảnh báo lỗi khi nhập dữ liệu không hợp lệ", Location = new Point(16, 16), AutoSize = true, Checked = true };
             Label lblStyle = new Label { Text = "Kiểu cảnh báo (Style):", Location = new Point(16, 50), AutoSize = true };
-            cboErrorStyle = new ComboBox { Location = new Point(16, 72), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboErrorStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 72), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
             cboErrorStyle.Items.AddRange(new object[] { "⛔ Dừng lại (Stop)", "⚠️ Cảnh báo (Warning)", "ℹ️ Thông tin (Information)" });
 
             Label lblErrTitle = new Label { Text = "Tiêu đề:", Location = new Point(180, 50), AutoSize = true };

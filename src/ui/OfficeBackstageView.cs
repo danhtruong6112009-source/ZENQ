@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -1543,12 +1543,12 @@ namespace ZenQOffice.UI
 
             if (templateIndex == 1)
             {
-                openPath = _appForm.HomeView != null ? _appForm.HomeView.EnsureTemplateLeaveRequest() : null;
+                openPath = null;
                 if (!string.IsNullOrEmpty(openPath)) docTitle = "Mẫu - Đơn xin nghỉ phép.docx";
             }
             else if (templateIndex == 2)
             {
-                openPath = _appForm.HomeView != null ? _appForm.HomeView.EnsureTemplateProjectReport() : null;
+                openPath = null;
                 if (!string.IsNullOrEmpty(openPath)) docTitle = "Mẫu - Báo cáo tiến độ dự án.docx";
             }
 
@@ -1576,7 +1576,7 @@ namespace ZenQOffice.UI
 
             if (templateIndex == 3)
             {
-                openPath = _appForm.HomeView != null ? _appForm.HomeView.EnsureTemplateTimesheet() : null;
+                openPath = null;
                 if (!string.IsNullOrEmpty(openPath)) docTitle = "Mẫu - Bảng chấm công.csv";
             }
 
@@ -1626,7 +1626,7 @@ namespace ZenQOffice.UI
         {
             if (item == null || string.IsNullOrEmpty(item.FilePath) || !File.Exists(item.FilePath))
             {
-                MessageBox.Show("Tệp này không tồn tại hoặc đã bị di chuyển:\n" + (item?.FilePath ?? ""), "Không tìm thấy tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show("Tệp này không tồn tại hoặc đã bị di chuyển:\n" + (item?.FilePath ?? ""), "Không tìm thấy tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

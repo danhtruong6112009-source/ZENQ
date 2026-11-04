@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -143,7 +143,7 @@ namespace ZenQOffice.UI
             };
             this.Controls.Add(lblSugg);
 
-            lstSuggestions = new ListBox
+            lstSuggestions = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(16, 224),
                 Size = new Size(320, 80),
@@ -236,7 +236,7 @@ namespace ZenQOffice.UI
         {
             if (_items == null || _items.Count == 0 || _currentIndex >= _items.Count)
             {
-                MessageBox.Show("Kiểm tra chính tả hoàn tất! Không còn lỗi nào khác trên trang tính.", "Chính Tả Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Kiểm tra chính tả hoàn tất! Không còn lỗi nào khác trên trang tính.", "Chính Tả Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Close();
                 return;
             }

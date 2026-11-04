@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -54,7 +54,7 @@ namespace ZenQOffice.UI
             BackColor = Color.FromArgb(243, 244, 246);
             Font = new Font("Segoe UI", 9f);
 
-            TabControl tabControl = new TabControl
+            TabControl tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(460, 375),
@@ -68,25 +68,25 @@ namespace ZenQOffice.UI
             // Horizontal Group
             GroupBox grpHoriz = new GroupBox { Text = "Theo chiều ngang (Horizontal)", Location = new Point(10, 10), Size = new Size(430, 130) };
             RadioButton rdoHAlign = new RadioButton { Text = "Căn gióng (Alignment)", Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
-            ComboBox cboHAlign = new ComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboHAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboHAlign.Items.AddRange(new object[] { "Trái (Left)", "Giữa (Center)", "Phải (Right)" });
             cboHAlign.SelectedIndex = 0;
             Label lblHRel = new Label { Text = "so với", Location = new Point(275, 23), AutoSize = true };
-            ComboBox cboHRel = new ComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboHRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboHRel.Items.AddRange(new object[] { "Cột (Column)", "Lề (Margin)", "Trang (Page)" });
             cboHRel.SelectedIndex = 0;
 
             RadioButton rdoHAbs = new RadioButton { Text = "Vị trí tuyệt đối (Absolute)", Location = new Point(15, 54), Size = new Size(150, 22) };
             NumericUpDown numHAbs = new NumericUpDown { Location = new Point(170, 52), Size = new Size(95, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = -5m, Maximum = 20m, Value = 0m };
             Label lblHAbsRel = new Label { Text = "bên phải", Location = new Point(275, 55), AutoSize = true };
-            ComboBox cboHAbsRel = new ComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboHAbsRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboHAbsRel.Items.AddRange(new object[] { "Cột (Column)", "Lề (Margin)", "Trang (Page)" });
             cboHAbsRel.SelectedIndex = 0;
 
             RadioButton rdoHRel = new RadioButton { Text = "Vị trí tương đối (Relative)", Location = new Point(15, 86), Size = new Size(150, 22) };
             NumericUpDown numHRelVal = new NumericUpDown { Location = new Point(170, 84), Size = new Size(95, 24), Minimum = 0, Maximum = 100, Value = 0 };
             Label lblHRelUnit = new Label { Text = "% so với", Location = new Point(275, 87), AutoSize = true };
-            ComboBox cboHRelTo = new ComboBox { Location = new Point(320, 84), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboHRelTo = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 84), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboHRelTo.Items.AddRange(new object[] { "Trang (Page)", "Lề (Margin)" });
             cboHRelTo.SelectedIndex = 0;
 
@@ -96,18 +96,18 @@ namespace ZenQOffice.UI
             // Vertical Group
             GroupBox grpVert = new GroupBox { Text = "Theo chiều dọc (Vertical)", Location = new Point(10, 145), Size = new Size(430, 100) };
             RadioButton rdoVAlign = new RadioButton { Text = "Căn gióng (Alignment)", Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
-            ComboBox cboVAlign = new ComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboVAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboVAlign.Items.AddRange(new object[] { "Trên (Top)", "Giữa (Middle)", "Dưới (Bottom)" });
             cboVAlign.SelectedIndex = 0;
             Label lblVRel = new Label { Text = "so với", Location = new Point(275, 23), AutoSize = true };
-            ComboBox cboVRel = new ComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboVRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboVRel.Items.AddRange(new object[] { "Trang (Page)", "Lề (Margin)", "Đoạn (Paragraph)" });
             cboVRel.SelectedIndex = 0;
 
             RadioButton rdoVAbs = new RadioButton { Text = "Vị trí tuyệt đối (Absolute)", Location = new Point(15, 54), Size = new Size(150, 22) };
             NumericUpDown numVAbs = new NumericUpDown { Location = new Point(170, 52), Size = new Size(95, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = -5m, Maximum = 20m, Value = 0m };
             Label lblVAbsRel = new Label { Text = "bên dưới", Location = new Point(275, 55), AutoSize = true };
-            ComboBox cboVAbsRel = new ComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            ComboBox cboVAbsRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
             cboVAbsRel.Items.AddRange(new object[] { "Đoạn (Paragraph)", "Lề (Margin)", "Trang (Page)" });
             cboVAbsRel.SelectedIndex = 0;
 

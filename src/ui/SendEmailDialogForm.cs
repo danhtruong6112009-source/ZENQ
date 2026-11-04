@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -310,7 +310,7 @@ namespace ZenQOffice.UI
 
                 if (!string.IsNullOrEmpty(attachmentPath) && File.Exists(attachmentPath))
                 {
-                    MessageBox.Show(this,
+                    ZenQOffice.UI.FluentMessageBox.Show(this,
                         "Cửa sổ soạn thư đã được mở thành công!\n\nTệp đính kèm đã được chuẩn bị tại:\n" + attachmentPath + "\n(Đã sao chép sẵn vào Clipboard, bạn có thể dán tệp trực tiếp bằng Ctrl+V).",
                         "ZenQ Office Email", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
@@ -318,7 +318,7 @@ namespace ZenQOffice.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this,
+                ZenQOffice.UI.FluentMessageBox.Show(this,
                     "Không thể mở ứng dụng gửi thư mặc định: " + ex.Message + "\n\nTệp đính kèm đã sẵn sàng tại: " + (attachmentPath ?? "Chưa lưu"),
                     "Lỗi gửi thư", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }

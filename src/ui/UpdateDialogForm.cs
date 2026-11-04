@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -438,7 +438,7 @@ namespace ZenQOffice.UI
                             _lblStatus.Visible = true;
                             _lblStatus.Text = "❌ " + errorMsg;
                             _lblStatus.ForeColor = Color.FromArgb(239, 68, 68);
-                            MessageBox.Show(this, errorMsg, "Lỗi cập nhật", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(this, errorMsg, "Lỗi cập nhật", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         });
                     }
                     catch { }

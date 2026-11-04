@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -23,6 +23,14 @@ namespace ZenQOffice.UI
         {
             string[] possiblePaths = new string[]
             {
+                Path.Combine(Application.StartupPath, "icon", "zenqofficenew.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon", "zenqofficenew.png"),
+                Path.Combine(Directory.GetCurrentDirectory(), "icon", "zenqofficenew.png"),
+                @"icon\zenqofficenew.png",
+                Path.Combine(Application.StartupPath, "zenqofficenew.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "zenqofficenew.png"),
+                Path.Combine(Directory.GetCurrentDirectory(), "zenqofficenew.png"),
+                "zenqofficenew.png",
                 Path.Combine(Application.StartupPath, "ZENQOFFICE.png"),
                 Path.Combine(Application.StartupPath, "ZenQOffice.png"),
                 Path.Combine(Application.StartupPath, "GENOFFICE.png"),
@@ -77,7 +85,7 @@ namespace ZenQOffice.UI
                 try
                 {
                     System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
-                    string[] resNames = new string[] { "app_logo.png", "ZENQOFFICE.png", "ZenQOffice.png", "GENOFFICE.png", "logo.png" };
+                    string[] resNames = new string[] { "zenqofficenew.png", "app_logo.png", "ZENQOFFICE.png", "ZenQOffice.png", "GENOFFICE.png", "logo.png" };
                     foreach (string rn in resNames)
                     {
                         using (Stream st = asm.GetManifestResourceStream(rn))

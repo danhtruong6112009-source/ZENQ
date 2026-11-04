@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -121,7 +121,7 @@ namespace ZenQOffice.UI
             Label lblStyle = new Label { Text = "Kiểu viền (Style):", Location = new Point(145, 42), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
             this.Controls.Add(lblStyle);
 
-            ListBox lbStyle = new ListBox
+            ListBox lbStyle = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(145, 60),
                 Size = new Size(130, 100),
@@ -166,7 +166,7 @@ namespace ZenQOffice.UI
             Label lblWidth = new Label { Text = "Độ dày (Width):", Location = new Point(145, 230), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
             this.Controls.Add(lblWidth);
 
-            ComboBox cbWidth = new ComboBox
+            ComboBox cbWidth = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(145, 250),
                 Size = new Size(130, 26),

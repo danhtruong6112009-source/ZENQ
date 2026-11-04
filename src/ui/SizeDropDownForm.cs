@@ -14,6 +14,9 @@ namespace ZenQOffice.UI
         private bool _isInputFocused = false;
         private bool _isBtnIncHover = false;
         private bool _isBtnDecHover = false;
+        private bool _hasTypedCustomText = false;
+        private bool _suppressTextChanged = false;
+        private bool _closedWithSelection = false;
 
         public float SelectedFontSize { get; private set; }
         public event Action<float> OnSizeSelected;
@@ -40,7 +43,7 @@ namespace ZenQOffice.UI
             BackColor = Color.White;
             DoubleBuffered = true;
 
-            int desiredW = 84;
+            int desiredW = 96;
             // 38px header + exactly 9 items of 26px = 272px for zero clipped items
             int desiredH = 38 + (9 * 26);
             Rectangle wa = Screen.GetWorkingArea(screenLocation);
@@ -82,7 +85,7 @@ namespace ZenQOffice.UI
                 ForeColor = Color.FromArgb(15, 23, 42),
                 BorderStyle = BorderStyle.None,
                 Location = new Point(24, 10),
-                Width = 34,
+                Width = 46,
                 Height = 18,
                 TextAlign = HorizontalAlignment.Center
             };
@@ -100,17 +103,33 @@ namespace ZenQOffice.UI
                 topPanel.Invalidate();
             };
 
+            txtCustomSize.TextChanged += (s, e) =>
+            {
+                if (_suppressTextChanged) return;
+                _hasTypedCustomText = true;
+                float parsed;
+                if (TryParseFontSize(txtCustomSize.Text, out parsed))
+                {
+                    SelectedFontSize = parsed;
+                    if (listControl != null) listControl.SetCurrentSize(parsed);
+                    if (OnSizeSelected != null) OnSizeSelected(parsed);
+                }
+            };
+
             txtCustomSize.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
                 {
-                    ApplyCustomTextAndClose();
+                    e.SuppressKeyPress = true;
                     e.Handled = true;
+                    ApplyCustomTextAndClose();
                 }
                 else if (e.KeyCode == Keys.Escape)
                 {
-                    Close();
+                    e.SuppressKeyPress = true;
                     e.Handled = true;
+                    _closedWithSelection = true;
+                    Close();
                 }
                 else if (e.KeyCode == Keys.Up)
                 {
@@ -245,26 +264,60 @@ namespace ZenQOffice.UI
 
             listControl.OnSizeClicked += (sz) =>
             {
+                _closedWithSelection = true;
                 SelectedFontSize = sz;
                 if (OnSizeSelected != null) OnSizeSelected(sz);
                 Close();
             };
 
-            Deactivate += (s, e) => Close();
+            Shown += (s, e) =>
+            {
+                txtCustomSize.Focus();
+                txtCustomSize.SelectAll();
+            };
+
+            Deactivate += (s, e) =>
+            {
+                if (!_closedWithSelection && _hasTypedCustomText)
+                {
+                    float parsed;
+                    if (TryParseFontSize(txtCustomSize.Text, out parsed))
+                    {
+                        SelectedFontSize = parsed;
+                        if (OnSizeSelected != null) OnSizeSelected(SelectedFontSize);
+                    }
+                }
+                Close();
+            };
 
             Controls.Add(listControl);
             Controls.Add(topPanel);
         }
 
+        private static bool TryParseFontSize(string text, out float parsed)
+        {
+            parsed = 0f;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            string normalized = text.Trim().Replace(',', '.');
+            if (float.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out parsed) &&
+                parsed >= 1f && parsed <= 1638f)
+            {
+                return true;
+            }
+            return false;
+        }
+
         private void IncrementSize(float delta)
         {
             float cur;
-            if (!float.TryParse(txtCustomSize.Text, out cur)) cur = SelectedFontSize;
+            if (!TryParseFontSize(txtCustomSize.Text, out cur)) cur = SelectedFontSize;
             float next = cur + delta;
             if (next < 1f) next = 1f;
-            if (next > 144f) next = 144f;
+            if (next > 1638f) next = 1638f;
             SelectedFontSize = next;
+            _suppressTextChanged = true;
             txtCustomSize.Text = next.ToString("0.#");
+            _suppressTextChanged = false;
             txtCustomSize.SelectAll();
             listControl.SetCurrentSize(next);
             if (OnSizeSelected != null) OnSizeSelected(next);
@@ -273,8 +326,9 @@ namespace ZenQOffice.UI
         private void ApplyCustomTextAndClose()
         {
             float parsed;
-            if (float.TryParse(txtCustomSize.Text, out parsed) && parsed > 0 && parsed <= 500)
+            if (TryParseFontSize(txtCustomSize.Text, out parsed))
             {
+                _closedWithSelection = true;
                 SelectedFontSize = parsed;
                 if (OnSizeSelected != null) OnSizeSelected(SelectedFontSize);
                 Close();
@@ -325,7 +379,7 @@ namespace ZenQOffice.UI
     public class SizeListControl : Control
     {
         private readonly float[] _sizes = new float[] {
-            8f, 9f, 10f, 10.5f, 11f, 12f, 14f, 16f, 18f, 20f, 22f, 24f, 26f, 28f, 36f, 48f, 72f
+            8f, 9f, 10f, 10.5f, 11f, 12f, 14f, 16f, 18f, 20f, 22f, 24f, 26f, 28f, 36f, 48f, 72f, 80f, 88f, 96f
         };
 
         private const int ITEM_HEIGHT = 26;

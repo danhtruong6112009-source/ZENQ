@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -49,7 +49,7 @@ namespace ZenQOffice.UI
             Label lblHeading = new Label { Text = "Chọn công thức toán học từ thư viện:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblHeading);
 
-            lstEquations = new ListBox { Location = new Point(20, 38), Size = new Size(485, 235), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.0f) };
+            lstEquations = new ZenQOffice.UI.FluentListBox { Location = new Point(20, 38), Size = new Size(485, 235), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.0f) };
             foreach (var eq in equations)
             {
                 lstEquations.Items.Add(string.Format("{0}:   {1}", eq.Name, eq.Formula.Replace("\n", " ")));

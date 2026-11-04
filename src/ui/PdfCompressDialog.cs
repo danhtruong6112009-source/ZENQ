@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -263,7 +263,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrWhiteSpace(txtOutput.Text))
             {
-                MessageBox.Show(this, "Vui lòng chọn đường dẫn để lưu tệp PDF đã nén!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn đường dẫn để lưu tệp PDF đã nén!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 btnBrowse.PerformClick();
                 return;
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -77,7 +77,7 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
             // Tab Control: Phông chữ & Khoảng cách nâng cao
-            TabControl tabCtrl = new TabControl { Location = new Point(12, 12), Size = new Size(502, 450) };
+            TabControl tabCtrl = new ZenQOffice.UI.FluentTabControl { Location = new Point(12, 12), Size = new Size(502, 450) };
 
             TabPage tabFont = new TabPage("Phông chữ (Font)");
             tabFont.BackColor = Color.White;
@@ -133,7 +133,7 @@ namespace ZenQOffice.UI
             _txtFont = new TextBox { Location = new Point(16, 30), Size = new Size(160, 24) };
             tab.Controls.Add(_txtFont);
 
-            _lstFont = new ListBox { Location = new Point(16, 56), Size = new Size(160, 120) };
+            _lstFont = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 56), Size = new Size(160, 120) };
             string[] sysFonts = new string[] { "Calibri", "Aptos", "Arial", "Segoe UI", "Times New Roman", "Tahoma", "Verdana", "Georgia", "Courier New", "Trebuchet MS", "Consolas" };
             _lstFont.Items.AddRange(sysFonts);
             _lstFont.SelectedIndexChanged += (s, e) => {
@@ -149,7 +149,7 @@ namespace ZenQOffice.UI
             _txtStyle = new TextBox { Location = new Point(190, 30), Size = new Size(130, 24) };
             tab.Controls.Add(_txtStyle);
 
-            _lstStyle = new ListBox { Location = new Point(190, 56), Size = new Size(130, 120) };
+            _lstStyle = new ZenQOffice.UI.FluentListBox { Location = new Point(190, 56), Size = new Size(130, 120) };
             _lstStyle.Items.AddRange(new object[] { "Thường (Regular)", "Nghiêng (Italic)", "Đậm (Bold)", "Đậm Nghiêng (Bold Italic)" });
             _lstStyle.SelectedIndexChanged += (s, e) => {
                 if (_lstStyle.SelectedItem != null) _txtStyle.Text = _lstStyle.SelectedItem.ToString();
@@ -164,7 +164,7 @@ namespace ZenQOffice.UI
             _txtSize = new TextBox { Location = new Point(334, 30), Size = new Size(60, 24) };
             tab.Controls.Add(_txtSize);
 
-            _lstSize = new ListBox { Location = new Point(334, 56), Size = new Size(60, 120) };
+            _lstSize = new ZenQOffice.UI.FluentListBox { Location = new Point(334, 56), Size = new Size(60, 120) };
             _lstSize.Items.AddRange(new object[] { 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72 });
             _lstSize.SelectedIndexChanged += (s, e) => {
                 if (_lstSize.SelectedItem != null) _txtSize.Text = _lstSize.SelectedItem.ToString();
@@ -194,7 +194,7 @@ namespace ZenQOffice.UI
             Label lblUnd = new Label { Text = "Kiểu gạch chân:", Location = new Point(190, 186), AutoSize = true };
             tab.Controls.Add(lblUnd);
 
-            _cboUnderlineStyle = new ComboBox { Location = new Point(190, 206), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboUnderlineStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(190, 206), Size = new Size(130, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboUnderlineStyle.Items.AddRange(new object[] { "(không có)", "Nét đơn (Single)", "Nét đôi (Double)", "Nét đậm (Thick)", "Nét đứt (Dashed)" });
             _cboUnderlineStyle.SelectedIndex = UnderlineResult ? 1 : 0;
             _cboUnderlineStyle.SelectedIndexChanged += (s, e) => UpdatePreview();
@@ -256,7 +256,7 @@ namespace ZenQOffice.UI
             Label lblType = new Label { Text = "Giãn cách:", Location = new Point(16, 32), AutoSize = true };
             grpSpacing.Controls.Add(lblType);
 
-            _cboSpacingType = new ComboBox { Location = new Point(120, 28), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboSpacingType = new ZenQOffice.UI.FluentComboBox { Location = new Point(120, 28), Size = new Size(160, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboSpacingType.Items.AddRange(new object[] { "Bình thường (Normal)", "Mở rộng (Expanded)", "Thu hẹp (Condensed)" });
             _cboSpacingType.SelectedIndex = 0;
             _cboSpacingType.SelectedIndexChanged += (s, e) => {

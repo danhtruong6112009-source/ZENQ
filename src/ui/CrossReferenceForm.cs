@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -32,7 +32,7 @@ namespace ZenQOffice.UI
             Label lblType = new Label { Text = "Loại tham chiếu:", Location = new Point(18, 15), AutoSize = true };
             this.Controls.Add(lblType);
 
-            cboRefType = new ComboBox { Location = new Point(18, 36), Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboRefType = new ZenQOffice.UI.FluentComboBox { Location = new Point(18, 36), Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
             cboRefType.Items.AddRange(new object[] { "Tiêu đề (Heading)", "Dấu trang (Bookmark)", "Chú thích cuối trang (Footnote)", "Hình ảnh / Bảng (Figure/Table)" });
             cboRefType.SelectedIndex = 0;
             this.Controls.Add(cboRefType);
@@ -40,7 +40,7 @@ namespace ZenQOffice.UI
             Label lblInsertAs = new Label { Text = "Chèn tham chiếu tới:", Location = new Point(235, 15), AutoSize = true };
             this.Controls.Add(lblInsertAs);
 
-            cboInsertAs = new ComboBox { Location = new Point(235, 36), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboInsertAs = new ZenQOffice.UI.FluentComboBox { Location = new Point(235, 36), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
             cboInsertAs.Items.AddRange(new object[] { "Văn bản tiêu đề / nội dung", "Số trang", "Số thứ tự mục", "Trên / Dưới" });
             cboInsertAs.SelectedIndex = 0;
             this.Controls.Add(cboInsertAs);
@@ -48,7 +48,7 @@ namespace ZenQOffice.UI
             Label lblList = new Label { Text = "Chọn mục trong tài liệu:", Location = new Point(18, 75), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblList);
 
-            lstItems = new ListBox { Location = new Point(18, 98), Size = new Size(407, 170), BorderStyle = BorderStyle.FixedSingle };
+            lstItems = new ZenQOffice.UI.FluentListBox { Location = new Point(18, 98), Size = new Size(407, 170), BorderStyle = BorderStyle.FixedSingle };
             this.Controls.Add(lstItems);
 
             cboRefType.SelectedIndexChanged += (s, e) =>
@@ -74,7 +74,7 @@ namespace ZenQOffice.UI
             {
                 if (lstItems.SelectedItem == null || (lstItems.SelectedItem.ToString().StartsWith("(") && lstItems.SelectedItem.ToString().EndsWith(")")))
                 {
-                    MessageBox.Show("Vui lòng chọn một mục hợp lệ trong tài liệu để chèn tham chiếu!", "Tham Chiếu Chéo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một mục hợp lệ trong tài liệu để chèn tham chiếu!", "Tham Chiếu Chéo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     this.DialogResult = DialogResult.None;
                     return;
                 }

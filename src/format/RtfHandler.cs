@@ -322,6 +322,7 @@ namespace ZenQOffice.Format
 
         public static string EscapeRtfText(string text)
         {
+            text = ZenQOffice.UI.WriterMath.ToLinear(text);
             if (string.IsNullOrEmpty(text)) return string.Empty;
 
             var sb = new StringBuilder(text.Length * 2);

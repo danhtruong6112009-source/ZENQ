@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -155,7 +155,7 @@ namespace ZenQOffice.UI
             numTo = new NumericUpDown { Location = new Point(165, 48), Size = new Size(52, 23), Minimum = 1, Maximum = _totalSlides, Value = SlideTo };
 
             rbCustomShow = new RadioButton { Text = "Custom show:", Location = new Point(10, 80), AutoSize = true, Checked = false };
-            cboCustomShows = new ComboBox { Location = new Point(32, 104), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
+            cboCustomShows = new ZenQOffice.UI.FluentComboBox { Location = new Point(32, 104), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
             cboCustomShows.Items.Add("(No custom shows)");
             cboCustomShows.SelectedIndex = 0;
 
@@ -186,7 +186,7 @@ namespace ZenQOffice.UI
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
             Label lblMon = new Label { Text = "Slide show monitor:", Location = new Point(10, 22), AutoSize = true };
-            cboMonitors = new ComboBox { Location = new Point(10, 44), Size = new Size(224, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboMonitors = new ZenQOffice.UI.FluentComboBox { Location = new Point(10, 44), Size = new Size(224, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cboMonitors.Items.Add("Automatic");
             for (int m = 0; m < Screen.AllScreens.Length; m++)
             {
@@ -195,7 +195,7 @@ namespace ZenQOffice.UI
             cboMonitors.SelectedIndex = Math.Min(cboMonitors.Items.Count - 1, Math.Max(0, MonitorIndex));
 
             Label lblRes = new Label { Text = "Resolution:", Location = new Point(10, 76), AutoSize = true };
-            cboResolution = new ComboBox { Location = new Point(10, 98), Size = new Size(224, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboResolution = new ZenQOffice.UI.FluentComboBox { Location = new Point(10, 98), Size = new Size(224, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cboResolution.Items.AddRange(new object[] { "Use Current Resolution", "1920x1080", "1600x900", "1366x768", "1280x720", "1024x768", "800x600" });
             cboResolution.SelectedIndex = 0;
 

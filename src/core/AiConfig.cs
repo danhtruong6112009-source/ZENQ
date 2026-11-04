@@ -110,10 +110,55 @@ namespace ZenQOffice.Core
             return errors;
         }
 
+        /// <summary>
+        /// Model có thuộc đúng nhà cung cấp của profile này không (chặn lẫn model giữa các API Key).
+        /// </summary>
+        public static bool IsModelCompatible(AiProviderType provider, string model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return false;
+            string m = model.Trim().ToLowerInvariant();
+            if (provider == AiProviderType.Ollama)
+            {
+                if (m.StartsWith("gemini-") || m.StartsWith("gpt-") || m.StartsWith("claude-") || m == "o1" || m == "o3-mini") return false;
+                return true;
+            }
+            // Model cục bộ (Ollama / ZenQ Vector) không bao giờ thuộc API đám mây
+            if (m.StartsWith("zenq-") || m.Contains(":")) return false;
+            if (provider == AiProviderType.GoogleAIStudio)
+            {
+                return m.StartsWith("gemini") || m.StartsWith("gemma") || m.StartsWith("learnlm") || m.StartsWith("models/");
+            }
+            if (provider == AiProviderType.OpenAI)
+            {
+                if (m.StartsWith("gemini") || m.StartsWith("deepseek") || m.StartsWith("llama")) return false;
+            }
+            if (provider == AiProviderType.DeepSeek)
+            {
+                return m.StartsWith("deepseek");
+            }
+            if (provider == AiProviderType.Groq)
+            {
+                if (m.StartsWith("gemini") || m.StartsWith("gpt-")) return false;
+            }
+            return true;
+        }
+
+        public void RemoveIncompatibleModels()
+        {
+            if (SavedModels == null) SavedModels = new List<string>();
+            if ((int)Provider < 0) return;
+            SavedModels.RemoveAll(x => !IsModelCompatible(Provider, x));
+            if (!string.IsNullOrEmpty(SelectedModel) && !IsModelCompatible(Provider, SelectedModel))
+            {
+                SelectedModel = SavedModels.Count > 0 ? SavedModels[0] : "";
+            }
+        }
+
         public void AddModel(string model)
         {
             if (string.IsNullOrWhiteSpace(model)) return;
             model = model.Trim();
+            if ((int)Provider >= 0 && !IsModelCompatible(Provider, model)) return;
             if (!SavedModels.Contains(model))
             {
                 SavedModels.Add(model);
@@ -129,6 +174,7 @@ namespace ZenQOffice.Core
                 if (!string.IsNullOrWhiteSpace(m))
                 {
                     string trimmed = m.Trim();
+                    if ((int)Provider >= 0 && !IsModelCompatible(Provider, trimmed)) continue;
                     if (!SavedModels.Contains(trimmed)) SavedModels.Add(trimmed);
                 }
             }
@@ -409,6 +455,8 @@ namespace ZenQOffice.Core
                     };
                 case AiProviderType.Ollama:
                     return new List<string> {
+                        "zenq-vector-slide",
+                        "zenq-slide-ai",
                         "qwen2.5:3b",
                         "llama3.2:3b",
                         "phi3:mini",
@@ -551,6 +599,8 @@ namespace ZenQOffice.Core
                                 prof.SavedModels.RemoveAll(m => m == "gemini-3.1-flash" || m.StartsWith("gemini-1.") || m.StartsWith("gemini-2.") || m == "gemini-2.5-flash" || m == "gemini-2.5-pro");
                             }
 
+                            prof.RemoveIncompatibleModels();
+
                             if (!string.IsNullOrEmpty(prof.SelectedModel) && !prof.SavedModels.Contains(prof.SelectedModel))
                             {
                                 prof.SavedModels.Insert(0, prof.SelectedModel);
@@ -644,6 +694,7 @@ namespace ZenQOffice.Core
                 {
                     // CHỈ lưu profile đã cấu hình đầy đủ
                     if (!prof.IsConfigured) continue;
+                    prof.RemoveIncompatibleModels();
 
                     if (prof.Provider == AiProviderType.GoogleAIStudio)
                     {

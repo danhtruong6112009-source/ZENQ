@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -939,14 +939,14 @@ namespace ZenQOffice.UI
         {
             if (currentFontList.Count == 0)
             {
-                MessageBox.Show("Vui lòng mở một tệp PPTX hoặc DOCX có chứa phông chữ trước khi trích xuất.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng mở một tệp PPTX hoặc DOCX có chứa phông chữ trước khi trích xuất.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             List<ExtractedFontInfo> embeddedOnly = currentFontList.FindAll(f => f.Data != null && f.Data.Length > 0);
             if (embeddedOnly.Count == 0)
             {
-                MessageBox.Show("Tệp này không chứa tệp phông chữ nhúng trực tiếp. Các phông chữ hiển thị hiện đang lấy từ máy tính.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Tệp này không chứa tệp phông chữ nhúng trực tiếp. Các phông chữ hiển thị hiện đang lấy từ máy tính.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -960,7 +960,7 @@ namespace ZenQOffice.UI
                     bool ok = VietnameseFontToolkit.ExportFonts(embeddedOnly, fbd.SelectedPath, out msg);
                     if (ok)
                     {
-                        var res = MessageBox.Show(msg + "\n\nBạn có muốn mở thư mục vừa lưu không?", "Trích xuất hoàn tất", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        var res = ZenQOffice.UI.FluentMessageBox.Show(msg + "\n\nBạn có muốn mở thư mục vừa lưu không?", "Trích xuất hoàn tất", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
                             try { Process.Start("explorer.exe", fbd.SelectedPath); } catch { }
@@ -968,7 +968,7 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
-                        MessageBox.Show(msg, "Lỗi trích xuất", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(msg, "Lỗi trích xuất", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -978,7 +978,7 @@ namespace ZenQOffice.UI
         {
             if (selectedFont == null || selectedFont.Data == null)
             {
-                MessageBox.Show("Vui lòng chọn một phông chữ nhúng trong danh sách để nạp vào ZenQ Office.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một phông chữ nhúng trong danh sách để nạp vào ZenQ Office.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -986,12 +986,12 @@ namespace ZenQOffice.UI
             bool ok = VietnameseFontToolkit.InstallFontToApp(selectedFont, out msg);
             if (ok)
             {
-                MessageBox.Show(msg, "Cài đặt thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(msg, "Cài đặt thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadDocumentFile(activeDocumentPath);
             }
             else
             {
-                MessageBox.Show(msg, "Lỗi nạp phông chữ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(msg, "Lỗi nạp phông chữ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -999,14 +999,14 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrEmpty(activeDocumentPath) || !File.Exists(activeDocumentPath))
             {
-                MessageBox.Show("Vui lòng chọn tệp PPTX hoặc DOCX cần sửa trước.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tệp PPTX hoặc DOCX cần sửa trước.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             string ext = Path.GetExtension(activeDocumentPath).ToLowerInvariant();
             if (ext != ".pptx" && ext != ".docx")
             {
-                MessageBox.Show("Tính năng sửa lỗi tiếng Việt tự động hiện hỗ trợ các tệp trình chiếu PowerPoint (.pptx) và văn bản Word (.docx).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Tính năng sửa lỗi tiếng Việt tự động hiện hỗ trợ các tệp trình chiếu PowerPoint (.pptx) và văn bản Word (.docx).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -1158,7 +1158,7 @@ namespace ZenQOffice.UI
                                     repDetail += "\n\nCác phông chữ đã được thay thế đẹp mắt:\n- " + string.Join("\n- ", report.ReplacedFonts);
                                 }
 
-                                var res = MessageBox.Show(repDetail + "\n\nBạn có muốn mở tệp vừa sửa ngay bây giờ không?", "Hoàn tất sửa lỗi", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                                var res = ZenQOffice.UI.FluentMessageBox.Show(repDetail + "\n\nBạn có muốn mở tệp vừa sửa ngay bây giờ không?", "Hoàn tất sửa lỗi", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                                 if (res == DialogResult.Yes)
                                 {
                                     try { Process.Start(new ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
@@ -1168,7 +1168,7 @@ namespace ZenQOffice.UI
                             }
                             else
                             {
-                                MessageBox.Show(report?.Message ?? "Có lỗi xảy ra khi xử lý tệp.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show(report?.Message ?? "Có lỗi xảy ra khi xử lý tệp.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -183,7 +183,7 @@ namespace ZenQOffice.UI
 
             if (checkedCols.Count == 0)
             {
-                MessageBox.Show(this, "Vui lòng chọn ít nhất một cột để kiểm tra trùng lặp!",
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn ít nhất một cột để kiểm tra trùng lặp!",
                     "Xóa Trùng Lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -193,7 +193,7 @@ namespace ZenQOffice.UI
             _calcView.ExecuteRemoveDuplicates(_minR, _maxR, _minC, _maxC, checkedCols,
                 chkHasHeaders.Checked, out dupCount, out uniqueCount);
 
-            MessageBox.Show(this, string.Format("Đã tìm thấy và xóa {0} dòng trùng lặp!\nGiữ lại {1} dòng dữ liệu duy nhất.",
+            ZenQOffice.UI.FluentMessageBox.Show(this, string.Format("Đã tìm thấy và xóa {0} dòng trùng lặp!\nGiữ lại {1} dòng dữ liệu duy nhất.",
                 dupCount, uniqueCount), "Xóa Trùng Lặp Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             if (_parentForm != null) _parentForm.Invalidate();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Windows.Forms;
 
@@ -226,7 +226,7 @@ namespace ZenQOffice.Core
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string ico = Path.Combine(baseDir, "ZenQOffice.ico");
-            CreateShortcut("ZENQ OFFICE", "", File.Exists(ico) ? "ZenQOffice.ico" : "ZenQOffice.ico", "ZENQ OFFICE");
+            CreateShortcut("ZENQ OFFICE", "", "ZenQOffice.ico", "ZENQ OFFICE");
         }
 
         public static void CreateAllShortcuts()

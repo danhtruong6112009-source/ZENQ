@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -374,8 +375,8 @@ namespace ZenQOffice.Format
                             }
                         }
 
-                        // Fallback: only if default header/footer targets were missing
-                        if (string.IsNullOrEmpty(meta.HeaderText) || string.IsNullOrEmpty(meta.FooterText))
+                        // Fallback: only if word/document.xml was missing so header/footer references could not be inspected
+                        if (docRefEntry == null && (string.IsNullOrEmpty(meta.HeaderText) || string.IsNullOrEmpty(meta.FooterText)))
                         {
                             foreach (var entry in archive.Entries)
                             {
@@ -1331,6 +1332,13 @@ namespace ZenQOffice.Format
 
             try
             {
+                if (!string.IsNullOrEmpty(xmlContent) && xmlContent.Contains("http://www.w3.org/XML/1998/namespace"))
+                {
+                    xmlContent = Regex.Replace(
+                        xmlContent,
+                        @"\b(d\d+p\d+):space=""([^""]*)""\s+xmlns:\1=""http://www\.w3\.org/XML/1998/namespace""",
+                        @"xml:space=""$2""");
+                }
                 XmlDocument doc = new XmlDocument();
                 doc.LoadXml(xmlContent);
 
@@ -2139,13 +2147,35 @@ namespace ZenQOffice.Format
             XmlNodeList children = p.SelectNodes("w:r | w:hyperlink | w:smartTag | w:drawing | w:pict | m:oMath | m:oMathPara | mc:AlternateContent | *[local-name()='AlternateContent']", nsmgr);
             if (children != null && children.Count > 0)
             {
+                // Pre-check if this paragraph contains multiple anchored vector shapes (e.g., an ungrouped multi-shape diagram)
+                List<XmlNode> allParaDrawings = SelectUniqueDrawingsInNode(p, nsmgr);
+                List<XmlNode> anchorShapeDrawings = new List<XmlNode>();
+                if (allParaDrawings != null && allParaDrawings.Count > 1)
+                {
+                    foreach (XmlNode dn in allParaDrawings)
+                    {
+                        bool hasAnchor = dn.SelectSingleNode(".//wp:anchor | .//*[local-name()='anchor']", nsmgr) != null;
+                        bool hasBlip = dn.SelectSingleNode(".//a:blip | .//*[local-name()='blip'] | .//v:imagedata | .//*[local-name()='imagedata']", nsmgr) != null;
+                        if (hasAnchor && !hasBlip)
+                        {
+                            anchorShapeDrawings.Add(dn);
+                        }
+                    }
+                }
+                bool renderedCompositeAnchors = false;
+                if (anchorShapeDrawings.Count > 1)
+                {
+                    renderedCompositeAnchors = TryRenderCompositeAnchoredShapes(anchorShapeDrawings, nsmgr, archive, sb, runs, false);
+                }
+
                 foreach (XmlNode r in children)
                 {
                     if (r.LocalName == "AlternateContent")
                     {
-                        XmlNode drawingInAlt = r.SelectSingleNode(".//w:drawing | .//w:pict | .//*[local-name()='drawing'] | .//*[local-name()='pict']", nsmgr);
-                        if (drawingInAlt != null)
+                        List<XmlNode> altDrawings = SelectUniqueDrawingsInNode(r, nsmgr);
+                        foreach (XmlNode drawingInAlt in altDrawings)
                         {
+                            if (renderedCompositeAnchors && anchorShapeDrawings.Contains(drawingInAlt)) continue;
                             ExtractDrawingImage(drawingInAlt, nsmgr, archive, relsToTarget, sb, runs);
                         }
                         continue;
@@ -2153,7 +2183,12 @@ namespace ZenQOffice.Format
 
                     if (r.LocalName == "oMath" || r.LocalName == "oMathPara")
                     {
-                        string mStr = ExtractMathNodeText(r, nsmgr);
+                        if (r.LocalName == "oMathPara" && paraAlignments != null)
+                        {
+                            string mathAlignment = r.SelectSingleNode("m:oMathParaPr/m:jc", nsmgr)?.Attributes?["m:val"]?.Value ?? "center";
+                            paraAlignments[paraStartIndex] = mathAlignment == "left" ? 0 : mathAlignment == "right" ? 2 : 1;
+                        }
+                        string mStr = WriterMath.Register(r);
                         if (!string.IsNullOrEmpty(mStr))
                         {
                             int start = sb.Length;
@@ -2165,21 +2200,16 @@ namespace ZenQOffice.Format
 
                     if (r.LocalName == "drawing" || r.LocalName == "pict")
                     {
+                        if (renderedCompositeAnchors && anchorShapeDrawings.Contains(r)) continue;
                         ExtractDrawingImage(r, nsmgr, archive, relsToTarget, sb, runs);
                         continue;
                     }
 
-                    XmlNode innerDrawing = r.SelectSingleNode(".//w:drawing | .//w:pict | .//*[local-name()='drawing'] | .//*[local-name()='pict']", nsmgr);
-                    if (innerDrawing != null)
+                    List<XmlNode> innerDrawings = SelectUniqueDrawingsInNode(r, nsmgr);
+                    foreach (XmlNode innerDrawing in innerDrawings)
                     {
+                        if (renderedCompositeAnchors && anchorShapeDrawings.Contains(innerDrawing)) continue;
                         ExtractDrawingImage(innerDrawing, nsmgr, archive, relsToTarget, sb, runs);
-                    }
-
-                    // Check for embedded MathType equation (<w:object>)
-                    XmlNode objNode = r.SelectSingleNode(".//w:object | .//*[local-name()='object']", nsmgr);
-                    if (objNode != null)
-                    {
-                        ExtractDrawingImage(objNode, nsmgr, archive, relsToTarget, sb, runs);
                     }
 
                     // Extract run properties (inheriting paragraph defaults cleanly without run-to-run bleed)
@@ -2356,12 +2386,13 @@ namespace ZenQOffice.Format
 
                     fontSize = ApplyOpenXmlCharacterScaling(fontSize, runWidthScale, runCharSpacingPt);
 
-                    // 8.8. Extract text tokens
+                    // 8.8. Extract text tokens (excluding any text inside drawing/pict/textbox/Fallback)
                     XmlNodeList tList = r.SelectNodes(".//w:t | .//w:tab | .//w:br | .//w:cr | .//w:sym | .//w:noBreakHyphen", nsmgr);
                     if (tList != null)
                     {
                         foreach (XmlNode tNode in tList)
                         {
+                            if (IsNodeInsideDrawingOrTextbox(tNode, r)) continue;
                             string str = "";
                             if (tNode.LocalName == "t") str = tNode.InnerText;
                             else if (tNode.LocalName == "br")
@@ -2424,6 +2455,26 @@ namespace ZenQOffice.Format
                 if (pDrawing != null)
                 {
                     ExtractDrawingImage(pDrawing, nsmgr, archive, relsToTarget, sb, runs);
+                }
+            }
+            // Floating drawings are stored as separate internal tag paragraphs. Copy the
+            // source paragraph formatting to its actual text after those inserted tags.
+            string importedParagraph=sb.ToString(paraStartIndex,sb.Length-paraStartIndex);
+            if(importedParagraph.Contains("![SHAPE:"))
+            {
+                void Carry<T>(Dictionary<int,T> map,int target)
+                {if(map!=null&&map.TryGetValue(paraStartIndex,out var value))map[target]=value;}
+                int target=paraStartIndex;
+                foreach(string fragment in importedParagraph.Split('\n'))
+                {
+                    if(target!=paraStartIndex&&!string.IsNullOrWhiteSpace(fragment)&&!fragment.TrimStart().StartsWith("![SHAPE:"))
+                    {
+                        Carry(paraAlignments,target);Carry(paraLineSpacings,target);
+                        Carry(paraSpacingsBefore,target);Carry(paraSpacingsAfter,target);
+                        Carry(paraFirstLineIndents,target);Carry(paraLeftIndents,target);
+                        Carry(paraRightIndents,target);Carry(paraHangingIndents,target);Carry(paraTabStops,target);
+                    }
+                    target+=fragment.Length+1;
                 }
             }
             if (sb.Length == paraStartIndex)
@@ -3740,7 +3791,9 @@ namespace ZenQOffice.Format
                 case "round1Rect": return "RoundSingleCorner";
                 case "round2SameRect": return "RoundSameSideCorner";
                 case "round2DiagRect": return "RoundDiagonalCorner";
-                default: return "Rectangle";
+                default:
+                    if(prst.StartsWith("flowChart")||prst.StartsWith("actionButton"))return ShapeRenderer.OfficePresetFromOpenXml(prst);
+                    return "Rectangle";
             }
         }
 
@@ -3913,7 +3966,17 @@ namespace ZenQOffice.Format
                     {
                         long emu;
                         if (long.TryParse(posHNode.InnerText.Trim(), out emu))
-                            x = Math.Max(0, (int)(emu / 9525L));
+                        {
+                            float origin=0;
+                            string relative=posHNode.ParentNode?.Attributes?["relativeFrom"]?.Value;
+                            if(relative=="margin"||relative=="column")
+                            {
+                                var section=drawingNode.SelectSingleNode("ancestor::w:p/w:pPr/w:sectPr",nsmgr)??drawingNode.SelectSingleNode("following::w:sectPr[1]",nsmgr);
+                                var margins=section?.SelectSingleNode("w:pgMar",nsmgr);
+                                origin=float.TryParse(margins==null?null:GetWAttr(margins,"left"),out float twips)?twips/15f:96f;
+                            }
+                            x=(int)Math.Round(origin+emu/9525.0);
+                        }
                     }
                     
                     if (posVParent != null && posVParent.Attributes != null)
@@ -3957,18 +4020,46 @@ namespace ZenQOffice.Format
                     }
                 }
 
+                // 3.0. Embedded Word Chart (<c:chart>) Detection
+                string chartTag;
+                if (TryParseDocxChart(drawingNode, nsmgr, archive, relsToTarget, w, h, wrapMode, x, y, yRel, out chartTag))
+                {
+                    if (!string.IsNullOrEmpty(chartTag))
+                    {
+                        if (sb.Length > 0 && !sb.ToString().EndsWith("\n"))
+                            sb.AppendLine();
+                        int start = sb.Length;
+                        sb.AppendLine(chartTag);
+                        runs.Add(new FormattedRun(start, chartTag.Length + 1, "Times New Roman", 11f, false, false, false, false, Color.Black, Color.Transparent));
+                    }
+                    return;
+                }
+
+                // 3.1. Word Group Shape (<wpg:wgp> / <v:group>) Detection
+                string groupPngPath;
+                List<DocShapeObject> extractedGroupChildren = null;
+                bool isWordGroupShape = false;
+                if (string.IsNullOrEmpty(tempFile) && TryRenderWordGroupShape(drawingNode, nsmgr, archive, w, h, out groupPngPath, out extractedGroupChildren))
+                {
+                    tempFile = groupPngPath;
+                    isWordGroupShape = true;
+                    // Render group shapes as inline diagrams at their paragraph position so they don't overlap text
+                    isAnchor = false;
+                    wrapMode = 0;
+                }
+
                 // 3. SmartArt Diagram Detection
                 string saType = null, saTitle = null, saText = null, preRenderedPath = null, nodesMeta = null;
                 bool saArLock = false;
                 Rectangle saOrigBoundsEmu = Rectangle.Empty;
                 Color[] saResolvedPalette = null;
-                bool isSmartArt = TryParseSmartArtDiagram(drawingNode, nsmgr, archive, relsToTarget, w, h, out saType, out saTitle, out saText, out preRenderedPath, out nodesMeta, out saArLock, out saOrigBoundsEmu, out saResolvedPalette);
+                bool isSmartArt = !isWordGroupShape && TryParseSmartArtDiagram(drawingNode, nsmgr, archive, relsToTarget, w, h, out saType, out saTitle, out saText, out preRenderedPath, out nodesMeta, out saArLock, out saOrigBoundsEmu, out saResolvedPalette);
 
                 // 4. Custom Vector Shape Detection
                 string shpType = null, shpText = null;
                 float shpA1 = 0.2f, shpA2 = 0.4f, shpA3 = 0.8f;
                 bool isCustomShape = false;
-                if (!isSmartArt)
+                if (!isSmartArt && !isWordGroupShape)
                 {
                     isCustomShape = TryParseShapeMetadata(drawingNode, nsmgr, out shpType, out shpText, out shpA1, out shpA2, out shpA3);
                     if (isCustomShape && !string.IsNullOrEmpty(tempFile) && string.IsNullOrEmpty(shpText) && (shpType == "Rectangle" || string.IsNullOrEmpty(shpType)))
@@ -4063,6 +4154,19 @@ namespace ZenQOffice.Format
                     };
                     DocShapeObject.TagCache[shapeId] = prop;
                 }
+                else if (isWordGroupShape && extractedGroupChildren != null && extractedGroupChildren.Count > 0)
+                {
+                    string shapeId = "grp_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                    string serChildren = DocShapeObject.SerializeGroupChildren(extractedGroupChildren);
+                    tag = string.Format("![SHAPE:ID={0}:TYPE=Group:PATH={1}:X={2}:Y={3}:W={4}:H={5}:WRAP={6}:PAGE=-1:YREL={7}:CHILDREN={8}]",
+                        shapeId, tempFile ?? "", x, y, w, h, wrapMode, yRel, serChildren);
+
+                    DocShapeTagProperties prop = new DocShapeTagProperties
+                    {
+                        GroupChildren = extractedGroupChildren
+                    };
+                    DocShapeObject.TagCache[shapeId] = prop;
+                }
                 else
                 {
                     if (string.IsNullOrEmpty(tempFile))
@@ -4095,6 +4199,1192 @@ namespace ZenQOffice.Format
                 }
             }
             catch { }
+        }
+
+        private static bool IsNodeInsideDrawingOrTextbox(XmlNode node, XmlNode stopParent)
+        {
+            XmlNode cur = node != null ? node.ParentNode : null;
+            while (cur != null && cur != stopParent)
+            {
+                string ln = cur.LocalName ?? "";
+                if (ln == "drawing" || ln == "pict" || ln == "object" || ln == "txbxContent" || ln == "txbx" || ln == "textbox" || ln == "Fallback" || ln == "AlternateContent")
+                    return true;
+                cur = cur.ParentNode;
+            }
+            return false;
+        }
+
+        private static List<XmlNode> SelectUniqueDrawingsInNode(XmlNode container, XmlNamespaceManager nsmgr)
+        {
+            List<XmlNode> result = new List<XmlNode>();
+            if (container == null) return result;
+
+            if (container.LocalName == "AlternateContent")
+            {
+                XmlNode choice = container.SelectSingleNode("mc:Choice | *[local-name()='Choice']", nsmgr);
+                XmlNode fallback = container.SelectSingleNode("mc:Fallback | *[local-name()='Fallback']", nsmgr);
+                if (choice != null)
+                {
+                    XmlNodeList cDraws = choice.SelectNodes(".//w:drawing | .//w:pict | .//w:object | .//*[local-name()='drawing'] | .//*[local-name()='pict'] | .//*[local-name()='object']", nsmgr);
+                    if (cDraws != null)
+                    {
+                        foreach (XmlNode cd in cDraws)
+                        {
+                            if (!IsNodeInsideTextbox(cd, choice)) result.Add(cd);
+                        }
+                    }
+                }
+                if (result.Count == 0 && fallback != null)
+                {
+                    XmlNodeList fDraws = fallback.SelectNodes(".//w:drawing | .//w:pict | .//w:object | .//*[local-name()='drawing'] | .//*[local-name()='pict'] | .//*[local-name()='object']", nsmgr);
+                    if (fDraws != null)
+                    {
+                        foreach (XmlNode fd in fDraws)
+                        {
+                            if (!IsNodeInsideTextbox(fd, fallback)) result.Add(fd);
+                        }
+                    }
+                }
+                return result;
+            }
+
+            XmlNodeList allCandidates = container.SelectNodes(".//mc:AlternateContent | .//*[local-name()='AlternateContent'] | .//w:drawing | .//w:pict | .//w:object | .//*[local-name()='drawing'] | .//*[local-name()='pict'] | .//*[local-name()='object']", nsmgr);
+            if (allCandidates == null) return result;
+
+            foreach (XmlNode cand in allCandidates)
+            {
+                if (IsNodeInsideTextbox(cand, container)) continue;
+                if (cand.LocalName == "AlternateContent")
+                {
+                    // Skip nested AlternateContent inside another AlternateContent
+                    if (HasAncestorWithLocalName(cand, container, "AlternateContent")) continue;
+                    List<XmlNode> sub = SelectUniqueDrawingsInNode(cand, nsmgr);
+                    foreach (XmlNode s in sub)
+                    {
+                        if (!result.Contains(s)) result.Add(s);
+                    }
+                }
+                else
+                {
+                    // Direct drawing/pict/object: skip if it is inside an AlternateContent (handled above)
+                    if (HasAncestorWithLocalName(cand, container, "AlternateContent")) continue;
+                    if (!result.Contains(cand)) result.Add(cand);
+                }
+            }
+            return result;
+        }
+
+        private static bool IsNodeInsideTextbox(XmlNode node, XmlNode stopParent)
+        {
+            XmlNode cur = node != null ? node.ParentNode : null;
+            while (cur != null && cur != stopParent)
+            {
+                string ln = cur.LocalName ?? "";
+                if (ln == "txbxContent" || ln == "txbx" || ln == "textbox") return true;
+                cur = cur.ParentNode;
+            }
+            return false;
+        }
+
+        private static bool HasAncestorWithLocalName(XmlNode node, XmlNode stopParent, string localName)
+        {
+            XmlNode cur = node != null ? node.ParentNode : null;
+            while (cur != null && cur != stopParent)
+            {
+                if (cur.LocalName == localName) return true;
+                cur = cur.ParentNode;
+            }
+            return false;
+        }
+
+        private class WordDrawingShapeItem
+        {
+            public float X, Y, W, H;
+            public string Geom = "rect";
+            public XmlNode CustGeomNode;
+            public bool HasFill = true;
+            public Color FillColor = Color.FromArgb(68, 114, 196);
+            public bool HasLine = true;
+            public Color LineColor = Color.FromArgb(47, 82, 143);
+            public float LineWidthPt = 1.0f;
+            public bool FlipH, FlipV;
+            public float RotationDeg;
+            public bool HasHeadArrow, HasTailArrow;
+            public string Text = "";
+            public Color TextColor = Color.Black;
+            public float FontSizePt = 10.5f;
+            public bool Bold = false;
+            public bool Italic = false;
+            public StringAlignment HAlign = StringAlignment.Center;
+            public float Adj1 = -1f;
+        }
+
+        private static Dictionary<string, Color> BuildDocxThemePalette(ZipArchive archive)
+        {
+            Dictionary<string, Color> palette = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
+            palette["accent1"] = Color.FromArgb(68, 114, 196);
+            palette["accent2"] = Color.FromArgb(237, 125, 49);
+            palette["accent3"] = Color.FromArgb(165, 165, 165);
+            palette["accent4"] = Color.FromArgb(255, 192, 0);
+            palette["accent5"] = Color.FromArgb(91, 155, 213);
+            palette["accent6"] = Color.FromArgb(112, 173, 71);
+            palette["lt1"] = Color.White;
+            palette["bg1"] = Color.White;
+            palette["lt2"] = Color.FromArgb(231, 230, 230);
+            palette["bg2"] = Color.FromArgb(231, 230, 230);
+            palette["dk1"] = Color.Black;
+            palette["tx1"] = Color.Black;
+            palette["dk2"] = Color.FromArgb(68, 84, 106);
+            palette["tx2"] = Color.FromArgb(68, 84, 106);
+
+            if (archive != null)
+            {
+                ZipArchiveEntry themeEntry = FindZipEntry(archive, "word/theme/theme1.xml");
+                if (themeEntry != null)
+                {
+                    try
+                    {
+                        using (Stream ts = themeEntry.Open())
+                        {
+                            XmlDocument tDoc = new XmlDocument();
+                            tDoc.Load(ts);
+                            string[] names = new string[] { "accent1", "accent2", "accent3", "accent4", "accent5", "accent6", "dk1", "dk2", "lt1", "lt2" };
+                            foreach (string nm in names)
+                            {
+                                XmlNode clrNode = tDoc.SelectSingleNode("//*[local-name()='" + nm + "']/*[local-name()='srgbClr' or local-name()='sysClr']");
+                                if (clrNode != null && clrNode.Attributes != null)
+                                {
+                                    XmlAttribute valAttr = clrNode.Attributes["lastClr"] ?? clrNode.Attributes["val"];
+                                    if (valAttr != null)
+                                    {
+                                        int rgb;
+                                        if (int.TryParse(valAttr.Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb))
+                                        {
+                                            Color c = Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+                                            palette[nm] = c;
+                                        }
+                                    }
+                                }
+                            }
+                            palette["bg1"] = palette["lt1"];
+                            palette["bg2"] = palette["lt2"];
+                            palette["tx1"] = palette["dk1"];
+                            palette["tx2"] = palette["dk2"];
+                        }
+                    }
+                    catch { }
+                }
+            }
+            return palette;
+        }
+
+        private static Color ResolveDrawingMLColorNode(XmlNode parentNode, Dictionary<string, Color> palette, Color defaultColor)
+        {
+            if (parentNode == null) return defaultColor;
+            Color baseCol = defaultColor;
+            XmlNode clrNode = null;
+
+            XmlNode srgb = parentNode.SelectSingleNode(".//*[local-name()='srgbClr']");
+            XmlNode scheme = parentNode.SelectSingleNode(".//*[local-name()='schemeClr']");
+            XmlNode prst = parentNode.SelectSingleNode(".//*[local-name()='prstClr']");
+            XmlNode sys = parentNode.SelectSingleNode(".//*[local-name()='sysClr']");
+            if (srgb != null && srgb.Attributes != null && srgb.Attributes["val"] != null)
+            {
+                clrNode = srgb;
+                int rgb;
+                if (int.TryParse(srgb.Attributes["val"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb))
+                    baseCol = Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+            }
+            else if (scheme != null && scheme.Attributes != null && scheme.Attributes["val"] != null)
+            {
+                clrNode = scheme;
+                string key = scheme.Attributes["val"].Value;
+                if (palette != null && palette.ContainsKey(key))
+                    baseCol = palette[key];
+            }
+            else if (prst != null && prst.Attributes != null && prst.Attributes["val"] != null)
+            {
+                clrNode = prst;
+                try { baseCol = Color.FromName(prst.Attributes["val"].Value); } catch { }
+            }
+            else if (sys != null && sys.Attributes != null)
+            {
+                clrNode = sys;
+                string lastClr = sys.Attributes["lastClr"] != null ? sys.Attributes["lastClr"].Value : null;
+                string val = sys.Attributes["val"] != null ? sys.Attributes["val"].Value : null;
+                int rgb;
+                if (!string.IsNullOrEmpty(lastClr) && int.TryParse(lastClr, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb))
+                {
+                    baseCol = Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+                }
+                else if (val == "window")
+                {
+                    baseCol = Color.White;
+                }
+                else if (val == "windowText")
+                {
+                    baseCol = Color.Black;
+                }
+            }
+
+            if (clrNode != null)
+            {
+                float lumMod = 1.0f;
+                float lumOff = 0.0f;
+                float tint = -1.0f;
+                float shade = -1.0f;
+                foreach (XmlNode mod in clrNode.ChildNodes)
+                {
+                    if (mod.Attributes == null || mod.Attributes["val"] == null) continue;
+                    int v;
+                    if (!int.TryParse(mod.Attributes["val"].Value, out v)) continue;
+                    if (mod.LocalName == "lumMod") lumMod = v / 100000.0f;
+                    else if (mod.LocalName == "lumOff") lumOff = v / 100000.0f;
+                    else if (mod.LocalName == "tint") tint = v / 100000.0f;
+                    else if (mod.LocalName == "shade") shade = v / 100000.0f;
+                }
+
+                if (lumMod != 1.0f || lumOff != 0.0f)
+                {
+                    // Apply HSL luminance modulation & offset matching Office DrawingML
+                    float r = baseCol.R / 255f, g = baseCol.G / 255f, b = baseCol.B / 255f;
+                    float max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+                    float h = 0f, s = 0f, l = (max + min) * 0.5f;
+                    if (max != min)
+                    {
+                        float d = max - min;
+                        s = l > 0.5f ? d / (2f - max - min) : d / (max + min);
+                        if (max == r) h = (g - b) / d + (g < b ? 6f : 0f);
+                        else if (max == g) h = (b - r) / d + 2f;
+                        else h = (r - g) / d + 4f;
+                        h /= 6f;
+                    }
+                    l = Math.Max(0f, Math.Min(1f, l * lumMod + lumOff));
+                    if (s == 0f)
+                    {
+                        int gray = (int)Math.Round(l * 255f);
+                        baseCol = Color.FromArgb(255, gray, gray, gray);
+                    }
+                    else
+                    {
+                        float q = l < 0.5f ? l * (1f + s) : l + s - l * s;
+                        float p = 2f * l - q;
+                        Func<float, float, float, float> hue2rgb = (p1, q1, t1) =>
+                        {
+                            if (t1 < 0f) t1 += 1f;
+                            if (t1 > 1f) t1 -= 1f;
+                            if (t1 < 1f / 6f) return p1 + (q1 - p1) * 6f * t1;
+                            if (t1 < 1f / 2f) return q1;
+                            if (t1 < 2f / 3f) return p1 + (q1 - p1) * (2f / 3f - t1) * 6f;
+                            return p1;
+                        };
+                        int nr = (int)Math.Round(hue2rgb(p, q, h + 1f / 3f) * 255f);
+                        int ng = (int)Math.Round(hue2rgb(p, q, h) * 255f);
+                        int nb = (int)Math.Round(hue2rgb(p, q, h - 1f / 3f) * 255f);
+                        baseCol = Color.FromArgb(255, Math.Max(0, Math.Min(255, nr)), Math.Max(0, Math.Min(255, ng)), Math.Max(0, Math.Min(255, nb)));
+                    }
+                }
+                else if (tint >= 0f && tint <= 1f)
+                {
+                    int tr = (int)(baseCol.R * tint + 255 * (1f - tint));
+                    int tg = (int)(baseCol.G * tint + 255 * (1f - tint));
+                    int tb = (int)(baseCol.B * tint + 255 * (1f - tint));
+                    baseCol = Color.FromArgb(255, Math.Max(0, Math.Min(255, tr)), Math.Max(0, Math.Min(255, tg)), Math.Max(0, Math.Min(255, tb)));
+                }
+                else if (shade >= 0f && shade <= 1f)
+                {
+                    int sr = (int)(baseCol.R * shade);
+                    int sg = (int)(baseCol.G * shade);
+                    int sb = (int)(baseCol.B * shade);
+                    baseCol = Color.FromArgb(255, Math.Max(0, Math.Min(255, sr)), Math.Max(0, Math.Min(255, sg)), Math.Max(0, Math.Min(255, sb)));
+                }
+            }
+            return baseCol;
+        }
+
+        private static WordDrawingShapeItem ParseSingleWpsShape(XmlNode wsp, float destX, float destY, float destW, float destH, Dictionary<string, Color> palette, XmlNamespaceManager nsmgr)
+        {
+            if (wsp == null || destW <= 0 || destH <= 0) return null;
+            WordDrawingShapeItem item = new WordDrawingShapeItem
+            {
+                X = destX,
+                Y = destY,
+                W = destW,
+                H = destH
+            };
+
+            XmlNode spPr = wsp.SelectSingleNode("./*[local-name()='spPr']") ?? wsp.SelectSingleNode(".//*[local-name()='spPr']");
+            XmlNode styleNode = wsp.SelectSingleNode("./*[local-name()='style']") ?? wsp.SelectSingleNode(".//*[local-name()='style']");
+
+            if (spPr != null)
+            {
+                XmlNode xfrm = spPr.SelectSingleNode("./*[local-name()='xfrm']");
+                if (xfrm != null && xfrm.Attributes != null)
+                {
+                    if (xfrm.Attributes["flipH"] != null && (xfrm.Attributes["flipH"].Value == "1" || xfrm.Attributes["flipH"].Value.ToLower() == "true"))
+                        item.FlipH = true;
+                    if (xfrm.Attributes["flipV"] != null && (xfrm.Attributes["flipV"].Value == "1" || xfrm.Attributes["flipV"].Value.ToLower() == "true"))
+                        item.FlipV = true;
+                    if (xfrm.Attributes["rot"] != null)
+                    {
+                        long rotVal;
+                        if (long.TryParse(xfrm.Attributes["rot"].Value, out rotVal))
+                            item.RotationDeg = rotVal / 60000.0f;
+                    }
+                }
+
+                XmlNode prstGeom = spPr.SelectSingleNode("./*[local-name()='prstGeom']");
+                if (prstGeom != null && prstGeom.Attributes != null && prstGeom.Attributes["prst"] != null)
+                {
+                    item.Geom = prstGeom.Attributes["prst"].Value;
+                    XmlNode gd = prstGeom.SelectSingleNode(".//*[local-name()='gd']");
+                    if (gd != null && gd.Attributes != null && gd.Attributes["fmla"] != null)
+                    {
+                        string fmla = gd.Attributes["fmla"].Value;
+                        if (fmla.StartsWith("val "))
+                        {
+                            float v;
+                            if (float.TryParse(fmla.Substring(4).Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out v))
+                                item.Adj1 = v / 100000.0f;
+                        }
+                    }
+                }
+                item.CustGeomNode = spPr.SelectSingleNode("./*[local-name()='custGeom']");
+            }
+
+            // Defaults from <wps:style>
+            Color defaultFill = palette != null && palette.ContainsKey("accent1") ? palette["accent1"] : Color.FromArgb(68, 114, 196);
+            Color defaultLine = palette != null && palette.ContainsKey("accent1") ? ControlPaint.Dark(palette["accent1"], 0.15f) : Color.FromArgb(47, 82, 143);
+            Color defaultFontCol = Color.Black;
+            bool styleHasFill = false;
+            bool styleHasLine = false;
+
+            if (styleNode != null)
+            {
+                XmlNode fillRef = styleNode.SelectSingleNode("./*[local-name()='fillRef']");
+                if (fillRef != null)
+                {
+                    int idx = 1;
+                    if (fillRef.Attributes != null && fillRef.Attributes["idx"] != null) int.TryParse(fillRef.Attributes["idx"].Value, out idx);
+                    if (idx > 0)
+                    {
+                        styleHasFill = true;
+                        defaultFill = ResolveDrawingMLColorNode(fillRef, palette, defaultFill);
+                    }
+                }
+                XmlNode lnRef = styleNode.SelectSingleNode("./*[local-name()='lnRef']");
+                if (lnRef != null)
+                {
+                    int idx = 1;
+                    if (lnRef.Attributes != null && lnRef.Attributes["idx"] != null) int.TryParse(lnRef.Attributes["idx"].Value, out idx);
+                    if (idx > 0)
+                    {
+                        styleHasLine = true;
+                        defaultLine = ResolveDrawingMLColorNode(lnRef, palette, defaultLine);
+                    }
+                }
+                XmlNode fontRef = styleNode.SelectSingleNode("./*[local-name()='fontRef']");
+                if (fontRef != null)
+                {
+                    defaultFontCol = ResolveDrawingMLColorNode(fontRef, palette, defaultFontCol);
+                }
+            }
+
+            bool isLineGeom = item.Geom == "line" || item.Geom.StartsWith("straightConnector") || item.Geom.StartsWith("bentConnector") || item.Geom.StartsWith("curvedConnector");
+            item.HasFill = !isLineGeom && styleHasFill;
+            item.FillColor = defaultFill;
+            item.HasLine = isLineGeom || styleHasLine;
+            item.LineColor = defaultLine;
+
+            if (spPr != null)
+            {
+                if (spPr.SelectSingleNode("./*[local-name()='noFill']") != null)
+                {
+                    item.HasFill = false;
+                }
+                else
+                {
+                    XmlNode solidFill = spPr.SelectSingleNode("./*[local-name()='solidFill']");
+                    if (solidFill != null)
+                    {
+                        item.HasFill = true;
+                        item.FillColor = ResolveDrawingMLColorNode(solidFill, palette, defaultFill);
+                    }
+                }
+
+                XmlNode ln = spPr.SelectSingleNode("./*[local-name()='ln']");
+                if (ln != null)
+                {
+                    if (ln.SelectSingleNode("./*[local-name()='noFill']") != null)
+                    {
+                        item.HasLine = false;
+                    }
+                    else
+                    {
+                        item.HasLine = true;
+                        XmlNode lnFill = ln.SelectSingleNode("./*[local-name()='solidFill']");
+                        if (lnFill != null)
+                            item.LineColor = ResolveDrawingMLColorNode(lnFill, palette, defaultLine);
+                        if (ln.Attributes != null && ln.Attributes["w"] != null)
+                        {
+                            long lw;
+                            if (long.TryParse(ln.Attributes["w"].Value, out lw) && lw > 0)
+                                item.LineWidthPt = Math.Max(0.75f, lw / 12700.0f);
+                        }
+                        XmlNode headEnd = ln.SelectSingleNode("./*[local-name()='headEnd']");
+                        if (headEnd != null && headEnd.Attributes != null && headEnd.Attributes["type"] != null && headEnd.Attributes["type"].Value != "none")
+                            item.HasHeadArrow = true;
+                        XmlNode tailEnd = ln.SelectSingleNode("./*[local-name()='tailEnd']");
+                        if (tailEnd != null && tailEnd.Attributes != null && tailEnd.Attributes["type"] != null && tailEnd.Attributes["type"].Value != "none")
+                            item.HasTailArrow = true;
+                    }
+                }
+            }
+
+            // Check bodyPr or txbx for text
+            XmlNode txbx = wsp.SelectSingleNode("./*[local-name()='txbx']/*[local-name()='txbxContent']")
+                        ?? wsp.SelectSingleNode(".//*[local-name()='txbxContent']")
+                        ?? wsp.SelectSingleNode("./*[local-name()='txBody']");
+            if (txbx != null)
+            {
+                // If it's a textbox with no explicit fill/style, default to white or transparent
+                if (spPr != null && spPr.SelectSingleNode("./*[local-name()='solidFill']") == null && spPr.SelectSingleNode("./*[local-name()='noFill']") == null && !styleHasFill)
+                {
+                    item.FillColor = Color.White;
+                    item.HasFill = true;
+                }
+
+                List<string> lines = new List<string>();
+                XmlNodeList pNodes = txbx.SelectNodes("./*[local-name()='p']");
+                bool gotStyle = false;
+                if (pNodes != null)
+                {
+                    foreach (XmlNode pNode in pNodes)
+                    {
+                        if (!gotStyle)
+                        {
+                            XmlNode jc = pNode.SelectSingleNode("./*[local-name()='pPr']/*[local-name()='jc']");
+                            if (jc != null && jc.Attributes != null)
+                            {
+                                XmlAttribute jcVal = jc.Attributes["w:val"] ?? jc.Attributes["val"];
+                                if (jcVal != null)
+                                {
+                                    string v = jcVal.Value.ToLower();
+                                    if (v == "left" || v == "start") item.HAlign = StringAlignment.Near;
+                                    else if (v == "right" || v == "end") item.HAlign = StringAlignment.Far;
+                                    else item.HAlign = StringAlignment.Center;
+                                }
+                            }
+                        }
+
+                        StringBuilder lineSb = new StringBuilder();
+                        XmlNodeList rNodes = pNode.SelectNodes("./*[local-name()='r']");
+                        if (rNodes != null)
+                        {
+                            foreach (XmlNode rNode in rNodes)
+                            {
+                                if (!gotStyle)
+                                {
+                                    XmlNode rPr = rNode.SelectSingleNode("./*[local-name()='rPr']");
+                                    if (rPr != null)
+                                    {
+                                        XmlNode bNode = rPr.SelectSingleNode("./*[local-name()='b']");
+                                        if (bNode != null)
+                                        {
+                                            XmlAttribute bv = bNode.Attributes["w:val"] ?? bNode.Attributes["val"];
+                                            item.Bold = (bv == null || (bv.Value != "0" && bv.Value.ToLower() != "false"));
+                                        }
+                                        XmlNode iNode = rPr.SelectSingleNode("./*[local-name()='i']");
+                                        if (iNode != null)
+                                        {
+                                            XmlAttribute iv = iNode.Attributes["w:val"] ?? iNode.Attributes["val"];
+                                            item.Italic = (iv == null || (iv.Value != "0" && iv.Value.ToLower() != "false"));
+                                        }
+                                        XmlNode szNode = rPr.SelectSingleNode("./*[local-name()='sz']") ?? rPr.SelectSingleNode("./*[local-name()='szCs']");
+                                        if (szNode != null && szNode.Attributes != null)
+                                        {
+                                            XmlAttribute sv = szNode.Attributes["w:val"] ?? szNode.Attributes["val"];
+                                            int halfPts;
+                                            if (sv != null && int.TryParse(sv.Value, out halfPts) && halfPts > 0)
+                                                item.FontSizePt = halfPts / 2.0f;
+                                        }
+                                        XmlNode colNode = rPr.SelectSingleNode("./*[local-name()='color']");
+                                        if (colNode != null && colNode.Attributes != null)
+                                        {
+                                            XmlAttribute cv = colNode.Attributes["w:val"] ?? colNode.Attributes["val"];
+                                            if (cv != null && cv.Value.ToLower() != "auto")
+                                            {
+                                                int rgb;
+                                                if (int.TryParse(cv.Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out rgb))
+                                                {
+                                                    defaultFontCol = Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+                                                }
+                                            }
+                                        }
+                                        gotStyle = true;
+                                    }
+                                }
+                                XmlNodeList tNodes = rNode.SelectNodes("./*[local-name()='t']");
+                                if (tNodes != null)
+                                {
+                                    foreach (XmlNode tn in tNodes) lineSb.Append(tn.InnerText);
+                                }
+                            }
+                        }
+                        string lStr = lineSb.ToString().Trim();
+                        if (!string.IsNullOrEmpty(lStr)) lines.Add(lStr);
+                    }
+                }
+                item.Text = string.Join("\n", lines.ToArray());
+                if (defaultFontCol == Color.Black && item.HasFill)
+                {
+                    double lum = item.FillColor.R * 0.299 + item.FillColor.G * 0.587 + item.FillColor.B * 0.114;
+                    if (lum < 125) defaultFontCol = Color.White;
+                }
+                item.TextColor = defaultFontCol;
+            }
+
+            return item;
+        }
+
+        private static void CollectGroupShapesRecursive(XmlNode grpNode, float destX, float destY, float destW, float destH, Dictionary<string, Color> palette, XmlNamespaceManager nsmgr, List<WordDrawingShapeItem> outItems)
+        {
+            if (grpNode == null) return;
+            XmlNode grpSpPr = grpNode.SelectSingleNode("./*[local-name()='grpSpPr']");
+            XmlNode xfrm = grpSpPr != null ? grpSpPr.SelectSingleNode("./*[local-name()='xfrm']") : null;
+
+            float chOffX = 0, chOffY = 0, chExtX = destW, chExtY = destH;
+            if (xfrm != null)
+            {
+                XmlNode chOff = xfrm.SelectSingleNode("./*[local-name()='chOff']");
+                XmlNode chExt = xfrm.SelectSingleNode("./*[local-name()='chExt']");
+                if (chOff != null && chOff.Attributes != null)
+                {
+                    if (chOff.Attributes["x"] != null) float.TryParse(chOff.Attributes["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out chOffX);
+                    if (chOff.Attributes["y"] != null) float.TryParse(chOff.Attributes["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out chOffY);
+                }
+                if (chExt != null && chExt.Attributes != null)
+                {
+                    if (chExt.Attributes["cx"] != null) float.TryParse(chExt.Attributes["cx"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out chExtX);
+                    if (chExt.Attributes["cy"] != null) float.TryParse(chExt.Attributes["cy"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out chExtY);
+                }
+            }
+            if (chExtX <= 0) chExtX = Math.Max(1f, destW);
+            if (chExtY <= 0) chExtY = Math.Max(1f, destH);
+
+            foreach (XmlNode child in grpNode.ChildNodes)
+            {
+                string ln = child.LocalName;
+                if (ln == "wsp" || ln == "sp" || ln == "cxnSp")
+                {
+                    XmlNode spPr = child.SelectSingleNode("./*[local-name()='spPr']");
+                    XmlNode cXfrm = spPr != null ? spPr.SelectSingleNode("./*[local-name()='xfrm']") : null;
+                    if (cXfrm == null) continue;
+                    XmlNode off = cXfrm.SelectSingleNode("./*[local-name()='off']");
+                    XmlNode ext = cXfrm.SelectSingleNode("./*[local-name()='ext']");
+                    if (off == null || ext == null || off.Attributes == null || ext.Attributes == null) continue;
+
+                    float ox = 0, oy = 0, cx = 0, cy = 0;
+                    if (off.Attributes["x"] != null) float.TryParse(off.Attributes["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out ox);
+                    if (off.Attributes["y"] != null) float.TryParse(off.Attributes["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out oy);
+                    if (ext.Attributes["cx"] != null) float.TryParse(ext.Attributes["cx"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out cx);
+                    if (ext.Attributes["cy"] != null) float.TryParse(ext.Attributes["cy"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out cy);
+
+                    float mappedX = destX + ((ox - chOffX) / chExtX) * destW;
+                    float mappedY = destY + ((oy - chOffY) / chExtY) * destH;
+                    float mappedW = (cx / chExtX) * destW;
+                    float mappedH = (cy / chExtY) * destH;
+
+                    WordDrawingShapeItem item = ParseSingleWpsShape(child, mappedX, mappedY, Math.Max(1f, mappedW), Math.Max(1f, mappedH), palette, nsmgr);
+                    if (item != null) outItems.Add(item);
+                }
+                else if (ln == "grpSp" || ln == "wgp")
+                {
+                    XmlNode subGrpPr = child.SelectSingleNode("./*[local-name()='grpSpPr']");
+                    XmlNode subXfrm = subGrpPr != null ? subGrpPr.SelectSingleNode("./*[local-name()='xfrm']") : null;
+                    float mappedX = destX, mappedY = destY, mappedW = destW, mappedH = destH;
+                    if (subXfrm != null)
+                    {
+                        XmlNode off = subXfrm.SelectSingleNode("./*[local-name()='off']");
+                        XmlNode ext = subXfrm.SelectSingleNode("./*[local-name()='ext']");
+                        if (off != null && ext != null && off.Attributes != null && ext.Attributes != null)
+                        {
+                            float ox = 0, oy = 0, cx = 0, cy = 0;
+                            if (off.Attributes["x"] != null) float.TryParse(off.Attributes["x"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out ox);
+                            if (off.Attributes["y"] != null) float.TryParse(off.Attributes["y"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out oy);
+                            if (ext.Attributes["cx"] != null) float.TryParse(ext.Attributes["cx"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out cx);
+                            if (ext.Attributes["cy"] != null) float.TryParse(ext.Attributes["cy"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out cy);
+                            mappedX = destX + ((ox - chOffX) / chExtX) * destW;
+                            mappedY = destY + ((oy - chOffY) / chExtY) * destH;
+                            mappedW = (cx / chExtX) * destW;
+                            mappedH = (cy / chExtY) * destH;
+                        }
+                    }
+                    CollectGroupShapesRecursive(child, mappedX, mappedY, mappedW, mappedH, palette, nsmgr, outItems);
+                }
+            }
+        }
+
+        private static string RenderWordDrawingShapeItemsToPng(List<WordDrawingShapeItem> items, int targetW, int targetH)
+        {
+            if (items == null || items.Count == 0) return null;
+            try
+            {
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var it in items)
+                {
+                    if (it.X < minX) minX = it.X;
+                    if (it.Y < minY) minY = it.Y;
+                    if (it.X + it.W > maxX) maxX = it.X + it.W;
+                    if (it.Y + it.H > maxY) maxY = it.Y + it.H;
+                }
+                float totalW = Math.Max(10f, maxX - minX);
+                float totalH = Math.Max(10f, maxY - minY);
+
+                float dpiScale = 2.0f;
+                int outW = Math.Max(120, targetW > 0 ? targetW : (int)(totalW / 9525f));
+                int outH = Math.Max(50, targetH > 0 ? targetH : (int)(totalH / 9525f));
+                int bmpW = (int)Math.Ceiling(outW * dpiScale);
+                int bmpH = (int)Math.Ceiling(outH * dpiScale);
+
+                float pad = 6f * dpiScale;
+                float scaleX = (bmpW - 2f * pad) / totalW;
+                float scaleY = (bmpH - 2f * pad) / totalH;
+                float scale = Math.Min(scaleX, scaleY);
+                float offsetX = pad + ((bmpW - 2f * pad) - totalW * scale) * 0.5f;
+                float offsetY = pad + ((bmpH - 2f * pad) - totalH * scale) * 0.5f;
+
+                string tempPath = Path.Combine(Path.GetTempPath(), "genoffice_wgp_" + Guid.NewGuid().ToString("N") + ".png");
+                using (Bitmap bmp = new Bitmap(bmpW, bmpH))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.Clear(Color.Transparent);
+
+                    foreach (var s in items)
+                    {
+                        float rx = offsetX + (s.X - minX) * scale;
+                        float ry = offsetY + (s.Y - minY) * scale;
+                        float rw = s.W * scale;
+                        float rh = s.H * scale;
+
+                        bool isLine = s.Geom == "line" || s.Geom.StartsWith("straightConnector") || s.Geom.StartsWith("bentConnector") || s.Geom.StartsWith("curvedConnector");
+                        if (isLine)
+                        {
+                            float x1 = s.FlipH ? (rx + rw) : rx;
+                            float y1 = s.FlipV ? (ry + rh) : ry;
+                            float x2 = s.FlipH ? rx : (rx + rw);
+                            float y2 = s.FlipV ? ry : (ry + rh);
+
+                            using (Pen lp = new Pen(s.LineColor, Math.Max(1.2f, s.LineWidthPt * dpiScale)))
+                            {
+                                if (s.HasHeadArrow)
+                                {
+                                    lp.CustomStartCap = new AdjustableArrowCap(4f, 4f, true);
+                                }
+                                if (s.HasTailArrow)
+                                {
+                                    lp.CustomEndCap = new AdjustableArrowCap(4f, 4f, true);
+                                }
+                                g.DrawLine(lp, x1, y1, x2, y2);
+                            }
+                            continue;
+                        }
+
+                        RectangleF rf = new RectangleF(rx, ry, Math.Max(2f, rw), Math.Max(2f, rh));
+                        GraphicsPath path = null;
+                        if (s.CustGeomNode != null)
+                        {
+                            path = CreateDrawingMLPath(s.CustGeomNode, rf, s.W, s.H);
+                        }
+                        if (path == null)
+                        {
+                            if (s.Geom == "rightArrow" && rf.Width > rf.Height * 2.5f)
+                            {
+                                // Proportional timeline arrow shaft + head
+                                path = new GraphicsPath();
+                                float headW = Math.Min(rf.Height * 1.15f, rf.Width * 0.25f);
+                                float shaftHalfH = rf.Height * 0.25f;
+                                float cy = rf.Top + rf.Height * 0.5f;
+                                PointF[] pts = new PointF[]
+                                {
+                                    new PointF(rf.Left, cy - shaftHalfH),
+                                    new PointF(rf.Right - headW, cy - shaftHalfH),
+                                    new PointF(rf.Right - headW, rf.Top),
+                                    new PointF(rf.Right, cy),
+                                    new PointF(rf.Right - headW, rf.Bottom),
+                                    new PointF(rf.Right - headW, cy + shaftHalfH),
+                                    new PointF(rf.Left, cy + shaftHalfH)
+                                };
+                                path.AddPolygon(pts);
+                            }
+                            else
+                            {
+                                path = CreatePresetGeometryPath(s.Geom, rf);
+                            }
+                        }
+
+                        using (path)
+                        {
+                            if (s.HasFill)
+                            {
+                                using (SolidBrush fb = new SolidBrush(s.FillColor))
+                                    g.FillPath(fb, path);
+                            }
+                            if (s.HasLine)
+                            {
+                                using (Pen lp = new Pen(s.LineColor, Math.Max(1.0f, s.LineWidthPt * dpiScale)))
+                                    g.DrawPath(lp, path);
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(s.Text))
+                        {
+                            FontStyle fs = FontStyle.Regular;
+                            if (s.Bold) fs |= FontStyle.Bold;
+                            if (s.Italic) fs |= FontStyle.Italic;
+
+                            float fontPx = Math.Max(7.5f, Math.Min(s.FontSizePt * dpiScale * 0.92f, rf.Height * 0.55f));
+                            RectangleF textRect = new RectangleF(rf.X + 3f * dpiScale, rf.Y + 2f * dpiScale, Math.Max(4f, rf.Width - 6f * dpiScale), Math.Max(4f, rf.Height - 4f * dpiScale));
+
+                            while (fontPx > 6.5f * dpiScale)
+                            {
+                                using (Font tf = new Font("Times New Roman", fontPx, fs, GraphicsUnit.Pixel))
+                                {
+                                    SizeF sz = g.MeasureString(s.Text, tf, (int)Math.Ceiling(textRect.Width));
+                                    if (sz.Height <= rf.Height + 2f * dpiScale && sz.Width <= rf.Width + 4f * dpiScale)
+                                        break;
+                                }
+                                fontPx -= 1.0f;
+                            }
+
+                            using (Font f = new Font("Times New Roman", fontPx, fs, GraphicsUnit.Pixel))
+                            using (SolidBrush tb = new SolidBrush(s.TextColor))
+                            using (StringFormat sf = new StringFormat { Alignment = s.HAlign, LineAlignment = StringAlignment.Center })
+                            {
+                                g.DrawString(s.Text, f, tb, textRect, sf);
+                            }
+                        }
+                    }
+
+                    bmp.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
+                return tempPath;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DocShapeObject ConvertWordShapeItemToDocShape(WordDrawingShapeItem it, float groupMinX, float groupMinY)
+        {
+            DocShapeObject child = new DocShapeObject();
+            string sType = "Rectangle";
+            if (it.Geom == "roundRect") sType = "RoundedRectangle";
+            else if (it.Geom == "ellipse") sType = "Oval";
+            else if (it.Geom == "line" || it.Geom.StartsWith("straightConnector"))
+            {
+                sType = (it.HasTailArrow || it.HasHeadArrow) ? "ArrowLine" : "Line";
+            }
+            else if (it.Geom.StartsWith("bentConnector")) sType = "ElbowConnector";
+            else if (it.Geom.StartsWith("curvedConnector")) sType = "CurvedConnector";
+            else if (it.Geom == "rightArrow") sType = "RightArrow";
+            else if (it.Geom == "leftArrow") sType = "LeftArrow";
+            else if (it.Geom == "upArrow") sType = "UpArrow";
+            else if (it.Geom == "downArrow") sType = "DownArrow";
+            else if (!string.IsNullOrEmpty(it.Geom)) sType = it.Geom;
+
+            child.ShapeType = sType;
+            child.PageX = (int)Math.Round((it.X - groupMinX) / 9525f);
+            child.PageY = (int)Math.Round((it.Y - groupMinY) / 9525f);
+            child.BaseWidth = Math.Max(4, (int)Math.Round(it.W / 9525f));
+            child.BaseHeight = Math.Max(4, (int)Math.Round(it.H / 9525f));
+            child.HasFill = it.HasFill;
+            child.FillColor = it.HasFill ? it.FillColor : Color.Transparent;
+            child.HasLine = it.HasLine;
+            child.OutlineColor = it.HasLine ? it.LineColor : Color.Transparent;
+            child.OutlineWidth = it.HasLine ? Math.Max(0.5f, it.LineWidthPt) : 0f;
+            child.FlipH = it.FlipH;
+            child.FlipV = it.FlipV;
+            child.HasHeadArrow = it.HasHeadArrow;
+            child.HasTailArrow = it.HasTailArrow;
+            child.RotationAngle = it.RotationDeg;
+            child.TextContent = it.Text ?? "";
+            child.TextColor = it.TextColor;
+            child.FontSize = it.FontSizePt > 0 ? it.FontSizePt : 10.5f;
+            child.Bold = it.Bold;
+            child.Italic = it.Italic;
+            child.TextAlignment = it.HAlign;
+            child.TextLineAlignment = StringAlignment.Center;
+            if (it.Adj1 > 0f) child.AdjustValue1 = it.Adj1;
+
+            return child;
+        }
+
+        private static bool TryRenderWordGroupShape(XmlNode drawingNode, XmlNamespaceManager nsmgr, ZipArchive archive, int targetW, int targetH, out string renderedPngPath, out List<DocShapeObject> groupChildren)
+        {
+            renderedPngPath = null;
+            groupChildren = null;
+            if (drawingNode == null) return false;
+
+            XmlNode wgp = drawingNode.SelectSingleNode(".//*[local-name()='wgp' or local-name()='grpSp']");
+            if (wgp == null) return false;
+
+            try
+            {
+                Dictionary<string, Color> palette = BuildDocxThemePalette(archive);
+                float extW = targetW > 0 ? targetW * 9525f : 5000000f;
+                float extH = targetH > 0 ? targetH * 9525f : 1500000f;
+                XmlNode extent = drawingNode.SelectSingleNode(".//*[local-name()='extent']");
+                if (extent != null && extent.Attributes != null)
+                {
+                    if (extent.Attributes["cx"] != null) float.TryParse(extent.Attributes["cx"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out extW);
+                    if (extent.Attributes["cy"] != null) float.TryParse(extent.Attributes["cy"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out extH);
+                }
+
+                List<WordDrawingShapeItem> items = new List<WordDrawingShapeItem>();
+                CollectGroupShapesRecursive(wgp, 0f, 0f, extW, extH, palette, nsmgr, items);
+                if (items.Count == 0) return false;
+
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var it in items)
+                {
+                    if (it.X < minX) minX = it.X;
+                    if (it.Y < minY) minY = it.Y;
+                    if (it.X + it.W > maxX) maxX = it.X + it.W;
+                    if (it.Y + it.H > maxY) maxY = it.Y + it.H;
+                }
+                if (minX == float.MaxValue) { minX = 0; minY = 0; maxX = extW; maxY = extH; }
+
+                groupChildren = new List<DocShapeObject>();
+                foreach (var it in items)
+                {
+                    groupChildren.Add(ConvertWordShapeItemToDocShape(it, minX, minY));
+                }
+
+                renderedPngPath = RenderWordDrawingShapeItemsToPng(items, targetW, targetH);
+                return groupChildren.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryRenderWordGroupShape(XmlNode drawingNode, XmlNamespaceManager nsmgr, ZipArchive archive, int targetW, int targetH, out string renderedPngPath)
+        {
+            List<DocShapeObject> dummy;
+            return TryRenderWordGroupShape(drawingNode, nsmgr, archive, targetW, targetH, out renderedPngPath, out dummy);
+        }
+
+        private static bool TryRenderCompositeAnchoredShapes(List<Tuple<XmlNode, float>> anchorDrawingsWithYOffsets, XmlNamespaceManager nsmgr, ZipArchive archive, StringBuilder sb, List<FormattedRun> runs, bool inTableCell)
+        {
+            if (anchorDrawingsWithYOffsets == null || anchorDrawingsWithYOffsets.Count < 2) return false;
+            try
+            {
+                Dictionary<string, Color> palette = BuildDocxThemePalette(archive);
+                List<WordDrawingShapeItem> allItems = new List<WordDrawingShapeItem>();
+
+                foreach (var tuple in anchorDrawingsWithYOffsets)
+                {
+                    XmlNode dNode = tuple.Item1;
+                    float baseOffsetY = tuple.Item2;
+                    float posX = 0f, posY = baseOffsetY, extW = 914400f, extH = 457200f;
+                    XmlNode posH = dNode.SelectSingleNode(".//*[local-name()='positionH']/*[local-name()='posOffset']");
+                    XmlNode posV = dNode.SelectSingleNode(".//*[local-name()='positionV']/*[local-name()='posOffset']");
+                    XmlNode ext = dNode.SelectSingleNode(".//*[local-name()='extent']");
+                    if (posH != null) float.TryParse(posH.InnerText.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out posX);
+                    if (posV != null)
+                    {
+                        float parsedV;
+                        if (float.TryParse(posV.InnerText.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out parsedV))
+                            posY += parsedV;
+                    }
+                    if (ext != null && ext.Attributes != null)
+                    {
+                        if (ext.Attributes["cx"] != null) float.TryParse(ext.Attributes["cx"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out extW);
+                        if (ext.Attributes["cy"] != null) float.TryParse(ext.Attributes["cy"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out extH);
+                    }
+
+                    XmlNode wgp = dNode.SelectSingleNode(".//*[local-name()='wgp' or local-name()='grpSp']");
+                    if (wgp != null)
+                    {
+                        CollectGroupShapesRecursive(wgp, posX, posY, extW, extH, palette, nsmgr, allItems);
+                    }
+                    else
+                    {
+                        XmlNode wsp = dNode.SelectSingleNode(".//*[local-name()='wsp' or local-name()='sp' or local-name()='cxnSp']");
+                        if (wsp != null)
+                        {
+                            WordDrawingShapeItem item = ParseSingleWpsShape(wsp, posX, posY, extW, extH, palette, nsmgr);
+                            if (item != null) allItems.Add(item);
+                        }
+                    }
+                }
+
+                if (allItems.Count < 2) return false;
+
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var it in allItems)
+                {
+                    if (it.X < minX) minX = it.X;
+                    if (it.Y < minY) minY = it.Y;
+                    if (it.X + it.W > maxX) maxX = it.X + it.W;
+                    if (it.Y + it.H > maxY) maxY = it.Y + it.H;
+                }
+                int wPx = Math.Max(120, Math.Min(600, (int)((maxX - minX) / 9525f) + 12));
+                int hPx = Math.Max(50, Math.Min(800, (int)((maxY - minY) / 9525f) + 12));
+
+                string pngPath = RenderWordDrawingShapeItemsToPng(allItems, wPx, hPx);
+
+                List<DocShapeObject> compChildren = new List<DocShapeObject>();
+                foreach (var it in allItems)
+                {
+                    compChildren.Add(ConvertWordShapeItemToDocShape(it, minX, minY));
+                }
+
+                string shapeId = "grp_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                string serChildren = DocShapeObject.SerializeGroupChildren(compChildren);
+                string tag = string.Format("![SHAPE:ID={0}:TYPE=Group:PATH={1}:X=80:Y=160:W={2}:H={3}:WRAP=0:PAGE=-1:YREL=0:CHILDREN={4}]",
+                    shapeId, pngPath ?? "", wPx, hPx, serChildren);
+
+                DocShapeTagProperties prop = new DocShapeTagProperties
+                {
+                    GroupChildren = compChildren
+                };
+                DocShapeObject.TagCache[shapeId] = prop;
+
+                if (inTableCell)
+                {
+                    sb.Append(tag);
+                }
+                else
+                {
+                    int start = sb.Length;
+                    sb.Append(tag);
+                    if (runs != null)
+                        runs.Add(new FormattedRun(start, tag.Length, "Times New Roman", 11f, false, false, false, false, Color.Black, Color.Transparent));
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryRenderCompositeAnchoredShapes(List<XmlNode> anchorDrawings, XmlNamespaceManager nsmgr, ZipArchive archive, StringBuilder sb, List<FormattedRun> runs, bool inTableCell)
+        {
+            if (anchorDrawings == null) return false;
+            var list = new List<Tuple<XmlNode, float>>();
+            foreach (var node in anchorDrawings) list.Add(Tuple.Create(node, 0f));
+            return TryRenderCompositeAnchoredShapes(list, nsmgr, archive, sb, runs, inTableCell);
+        }
+
+        private static bool TryParseDocxChart(XmlNode drawingNode, XmlNamespaceManager nsmgr, ZipArchive archive, Dictionary<string, string> relsToTarget, int w, int h, int wrapMode, int x, int y, int yRel, out string chartTag)
+        {
+            chartTag = null;
+            if (drawingNode == null || archive == null) return false;
+
+            XmlNode chartRef = drawingNode.SelectSingleNode(".//*[local-name()='chart']");
+            if (chartRef == null) return false;
+
+            string rId = null;
+            if (chartRef.Attributes != null)
+            {
+                foreach (XmlAttribute attr in chartRef.Attributes)
+                {
+                    if (attr.LocalName == "id" || attr.Name == "r:id")
+                    {
+                        rId = attr.Value;
+                        break;
+                    }
+                }
+            }
+
+            ZipArchiveEntry chartEntry = null;
+            if (!string.IsNullOrEmpty(rId) && relsToTarget != null && relsToTarget.ContainsKey(rId))
+            {
+                chartEntry = FindZipEntry(archive, relsToTarget[rId]);
+            }
+            if (chartEntry == null)
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.FullName.StartsWith("word/charts/", StringComparison.OrdinalIgnoreCase) && entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        chartEntry = entry;
+                        break;
+                    }
+                }
+            }
+            if (chartEntry == null) return false;
+
+            try
+            {
+                XmlDocument cDoc = new XmlDocument();
+                using (Stream cs = chartEntry.Open()) cDoc.Load(cs);
+
+                string chartType = "Column_Clustered";
+                XmlNode plotArea = cDoc.SelectSingleNode("//*[local-name()='plotArea']");
+                XmlNode chartTypeNode = null;
+                if (plotArea != null)
+                {
+                    foreach (XmlNode child in plotArea.ChildNodes)
+                    {
+                        string ln = child.LocalName;
+                        if (ln.EndsWith("Chart", StringComparison.OrdinalIgnoreCase))
+                        {
+                            chartTypeNode = child;
+                            if (ln.StartsWith("pie", StringComparison.OrdinalIgnoreCase)) chartType = "Pie";
+                            else if (ln.StartsWith("doughnut", StringComparison.OrdinalIgnoreCase)) chartType = "Doughnut";
+                            else if (ln.StartsWith("line", StringComparison.OrdinalIgnoreCase)) chartType = "Line";
+                            else if (ln.StartsWith("area", StringComparison.OrdinalIgnoreCase)) chartType = "Area";
+                            else if (ln.StartsWith("radar", StringComparison.OrdinalIgnoreCase)) chartType = "Radar";
+                            else if (ln.StartsWith("scatter", StringComparison.OrdinalIgnoreCase)) chartType = "Line";
+                            else if (ln.StartsWith("bar", StringComparison.OrdinalIgnoreCase))
+                            {
+                                XmlNode barDir = child.SelectSingleNode("./*[local-name()='barDir']");
+                                if (barDir != null && barDir.Attributes != null && barDir.Attributes["val"] != null && barDir.Attributes["val"].Value == "bar")
+                                    chartType = "Bar";
+                                else
+                                    chartType = "Column_Clustered";
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                DocChartData data = new DocChartData();
+                data.ChartType = chartType;
+                data.Title = "";
+
+                XmlNode titleNode = cDoc.SelectSingleNode("//*[local-name()='chart']/*[local-name()='title']");
+                if (titleNode != null)
+                {
+                    StringBuilder tSb = new StringBuilder();
+                    XmlNodeList tRuns = titleNode.SelectNodes(".//*[local-name()='t']");
+                    if (tRuns != null)
+                    {
+                        foreach (XmlNode tr in tRuns) tSb.Append(tr.InnerText);
+                    }
+                    data.Title = tSb.ToString().Trim();
+                }
+                data.ShowTitle = !string.IsNullOrEmpty(data.Title);
+
+                List<string> categories = new List<string>();
+                List<string> seriesNames = new List<string>();
+                List<List<double>> seriesValuesList = new List<List<double>>();
+
+                XmlNodeList serNodes = (chartTypeNode ?? cDoc.DocumentElement).SelectNodes(".//*[local-name()='ser']");
+                if (serNodes != null && serNodes.Count > 0)
+                {
+                    int sIdx = 0;
+                    foreach (XmlNode ser in serNodes)
+                    {
+                        sIdx++;
+                        string sName = "Chuỗi " + sIdx;
+                        XmlNode txV = ser.SelectSingleNode("./*[local-name()='tx']//*[local-name()='v']");
+                        if (txV != null && !string.IsNullOrWhiteSpace(txV.InnerText))
+                            sName = txV.InnerText.Trim();
+                        seriesNames.Add(sName);
+
+                        if (categories.Count == 0)
+                        {
+                            XmlNode catNode = ser.SelectSingleNode("./*[local-name()='cat'] | ./*[local-name()='xVal']");
+                            if (catNode != null)
+                            {
+                                XmlNodeList catPts = catNode.SelectNodes(".//*[local-name()='pt']");
+                                if (catPts != null && catPts.Count > 0)
+                                {
+                                    foreach (XmlNode pt in catPts)
+                                    {
+                                        XmlNode vNode = pt.SelectSingleNode("./*[local-name()='v']");
+                                        if (vNode != null) categories.Add(vNode.InnerText.Trim());
+                                    }
+                                }
+                            }
+                        }
+
+                        List<double> sVals = new List<double>();
+                        XmlNode valNode = ser.SelectSingleNode("./*[local-name()='val'] | ./*[local-name()='yVal']");
+                        if (valNode != null)
+                        {
+                            XmlNodeList valPts = valNode.SelectNodes(".//*[local-name()='pt']");
+                            if (valPts != null && valPts.Count > 0)
+                            {
+                                foreach (XmlNode pt in valPts)
+                                {
+                                    XmlNode vNode = pt.SelectSingleNode("./*[local-name()='v']");
+                                    double dv = 0;
+                                    if (vNode != null)
+                                        double.TryParse(vNode.InnerText.Trim().Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out dv);
+                                    sVals.Add(dv);
+                                }
+                            }
+                        }
+                        seriesValuesList.Add(sVals);
+                    }
+                }
+
+                if (seriesValuesList.Count > 0)
+                {
+                    int maxCatCount = categories.Count;
+                    foreach (var sv in seriesValuesList)
+                    {
+                        if (sv.Count > maxCatCount) maxCatCount = sv.Count;
+                    }
+                    while (categories.Count < maxCatCount)
+                    {
+                        categories.Add("Danh mục " + (categories.Count + 1));
+                    }
+
+                    data.Categories = categories;
+                    data.SeriesNames = seriesNames;
+                    data.Values = new List<List<double>>();
+                    for (int c = 0; c < maxCatCount; c++)
+                    {
+                        List<double> row = new List<double>();
+                        for (int s = 0; s < seriesValuesList.Count; s++)
+                        {
+                            double v = c < seriesValuesList[s].Count ? seriesValuesList[s][c] : 0.0;
+                            row.Add(v);
+                        }
+                        data.Values.Add(row);
+                    }
+                    data.CategoriesVisible = new List<bool>();
+                    for (int c = 0; c < categories.Count; c++) data.CategoriesVisible.Add(true);
+                    data.SeriesVisible = new List<bool>();
+                    for (int s = 0; s < seriesNames.Count; s++) data.SeriesVisible.Add(true);
+                }
+                else
+                {
+                    data = DocChartData.CreateDefault(chartType);
+                }
+
+                string chartId = "ch_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                DocChartObject cachedObj = new DocChartObject
+                {
+                    Id = chartId,
+                    Data = data,
+                    BaseWidth = Math.Max(220, w),
+                    BaseHeight = Math.Max(140, h),
+                    WrapMode = 0, // Render inline cleanly in document flow
+                    PageX = x,
+                    PageY = y
+                };
+                DocChartObject.ParsedChartCache[chartId] = cachedObj;
+
+                chartTag = string.Format("![CHART:ID={0}:TYPE={1}]", chartId, chartType);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private class WmfTextPiece
@@ -4645,15 +5935,19 @@ namespace ZenQOffice.Format
 
         private static void ParseBorderAttributes(XmlNode borderNode, out bool hasBorder, out string style, out float widthPt, out Color color, Color defaultColor)
         {
+            if (borderNode == null)
+            {
+                hasBorder = false;
+                style = "none";
+                widthPt = 0;
+                color = defaultColor;
+                return;
+            }
+
             hasBorder = true;
             style = "single";
             widthPt = 0.5f;
             color = defaultColor;
-
-            if (borderNode == null)
-            {
-                return;
-            }
 
             XmlAttribute valAttr = borderNode.Attributes["val", "http://schemas.openxmlformats.org/wordprocessingml/2006/main"] ?? borderNode.Attributes["w:val"] ?? borderNode.Attributes["val"];
             if (valAttr == null && borderNode.Attributes != null)
@@ -4835,12 +6129,20 @@ namespace ZenQOffice.Format
             }
 
             XmlNode tblBorders = tblPr != null ? (tblPr.SelectSingleNode(".//w:tblBorders", nsmgr) ?? tblPr.SelectSingleNode(".//*[local-name()='tblBorders']")) : null;
+            XmlNode tblStyleNode = tblPr != null ? (tblPr.SelectSingleNode(".//w:tblStyle", nsmgr) ?? tblPr.SelectSingleNode(".//*[local-name()='tblStyle']")) : null;
+            string tblStyleVal = tblStyleNode != null && tblStyleNode.Attributes != null && (tblStyleNode.Attributes["w:val"] != null || tblStyleNode.Attributes["val"] != null)
+                ? (tblStyleNode.Attributes["w:val"] ?? tblStyleNode.Attributes["val"]).Value : "";
+            bool isGridStyle = !string.IsNullOrEmpty(tblStyleVal) && (tblStyleVal.IndexOf("Grid", StringComparison.OrdinalIgnoreCase) >= 0 || tblStyleVal.IndexOf("TableGrid", StringComparison.OrdinalIgnoreCase) >= 0);
+            bool defHasBorders = (tblBorders != null) || isGridStyle;
+
             Color defBorderColor = Color.Black;
 
-            bool tblHasTop = true, tblHasBottom = true, tblHasLeft = true, tblHasRight = true;
-            bool tblHasInsideH = true, tblHasInsideV = true;
-            string tblTopStyle = "single", tblBottomStyle = "single", tblLeftStyle = "single", tblRightStyle = "single", tblIHStyle = "single", tblIVStyle = "single";
-            float tblTopW = 0.5f, tblBottomW = 0.5f, tblLeftW = 0.5f, tblRightW = 0.5f, tblIHW = 0.5f, tblIVW = 0.5f;
+            bool tblHasTop = defHasBorders, tblHasBottom = defHasBorders, tblHasLeft = defHasBorders, tblHasRight = defHasBorders;
+            bool tblHasInsideH = defHasBorders, tblHasInsideV = defHasBorders;
+            string defStyle = defHasBorders ? "single" : "none";
+            float defW = defHasBorders ? 0.5f : 0f;
+            string tblTopStyle = defStyle, tblBottomStyle = defStyle, tblLeftStyle = defStyle, tblRightStyle = defStyle, tblIHStyle = defStyle, tblIVStyle = defStyle;
+            float tblTopW = defW, tblBottomW = defW, tblLeftW = defW, tblRightW = defW, tblIHW = defW, tblIVW = defW;
             Color tblTopClr = defBorderColor, tblBottomClr = defBorderColor, tblLeftClr = defBorderColor, tblRightClr = defBorderColor, tblIHClr = defBorderColor, tblIVClr = defBorderColor;
 
             if (tblBorders != null)
@@ -4905,6 +6207,10 @@ namespace ZenQOffice.Format
                 XmlNode trPr = tr.SelectSingleNode(".//w:trPr", nsmgr) ?? tr.SelectSingleNode(".//*[local-name()='trPr']");
                 if (trPr != null)
                 {
+                    var cantSplit = trPr.SelectSingleNode("./w:cantSplit", nsmgr);
+                    tableRow.CantSplit = cantSplit != null && cantSplit.Attributes?["w:val"]?.Value != "0" && cantSplit.Attributes?["w:val"]?.Value != "false";
+                    var repeatHeader = trPr.SelectSingleNode("./w:tblHeader", nsmgr);
+                    tableRow.RepeatHeader = repeatHeader != null && repeatHeader.Attributes?["w:val"]?.Value != "0" && repeatHeader.Attributes?["w:val"]?.Value != "false";
                     XmlNode trHeight = trPr.SelectSingleNode(".//w:trHeight", nsmgr) ?? trPr.SelectSingleNode(".//*[local-name()='trHeight']");
                     if (trHeight != null)
                     {
@@ -4963,6 +6269,13 @@ namespace ZenQOffice.Format
                                 cellObj.BorderTopWidthPt = wPt;
                                 cellObj.BorderTopColor = clr;
                             }
+                            else
+                            {
+                                cellObj.HasBorderTop = false;
+                                cellObj.BorderTopStyle = "none";
+                                cellObj.BorderTopWidthPt = 0;
+                            }
+
                             XmlNode bottomB = tcBorders.SelectSingleNode(".//w:bottom", nsmgr) ?? tcBorders.SelectSingleNode(".//*[local-name()='bottom']");
                             if (bottomB != null)
                             {
@@ -4973,6 +6286,13 @@ namespace ZenQOffice.Format
                                 cellObj.BorderBottomWidthPt = wPt;
                                 cellObj.BorderBottomColor = clr;
                             }
+                            else
+                            {
+                                cellObj.HasBorderBottom = false;
+                                cellObj.BorderBottomStyle = "none";
+                                cellObj.BorderBottomWidthPt = 0;
+                            }
+
                             XmlNode leftB = tcBorders.SelectSingleNode(".//w:left", nsmgr) ?? tcBorders.SelectSingleNode(".//*[local-name()='left']");
                             if (leftB != null)
                             {
@@ -4983,6 +6303,13 @@ namespace ZenQOffice.Format
                                 cellObj.BorderLeftWidthPt = wPt;
                                 cellObj.BorderLeftColor = clr;
                             }
+                            else
+                            {
+                                cellObj.HasBorderLeft = false;
+                                cellObj.BorderLeftStyle = "none";
+                                cellObj.BorderLeftWidthPt = 0;
+                            }
+
                             XmlNode rightB = tcBorders.SelectSingleNode(".//w:right", nsmgr) ?? tcBorders.SelectSingleNode(".//*[local-name()='right']");
                             if (rightB != null)
                             {
@@ -4992,6 +6319,12 @@ namespace ZenQOffice.Format
                                 cellObj.BorderRightStyle = st;
                                 cellObj.BorderRightWidthPt = wPt;
                                 cellObj.BorderRightColor = clr;
+                            }
+                            else
+                            {
+                                cellObj.HasBorderRight = false;
+                                cellObj.BorderRightStyle = "none";
+                                cellObj.BorderRightWidthPt = 0;
                             }
                         }
 
@@ -5063,12 +6396,53 @@ namespace ZenQOffice.Format
                     }
 
                     StringBuilder cellSb = new StringBuilder();
-                    XmlNodeList pList = tc.SelectNodes(".//w:p", nsmgr);
+                    XmlNodeList pList = tc.SelectNodes("./w:p | ./*[local-name()='p']", nsmgr);
                     if (pList != null)
                     {
-                        foreach (XmlNode p in pList)
+                        // Check for multi-paragraph composite anchored diagrams across the entire table cell
+                        List<Tuple<XmlNode, float>> allCellAnchorShapes = new List<Tuple<XmlNode, float>>();
+                        HashSet<XmlNode> handledCellDrawings = new HashSet<XmlNode>();
+                        float emusPerLine = 189865f; // Standard ~13-14pt line spacing
+
+                        for (int pIdx = 0; pIdx < pList.Count; pIdx++)
                         {
+                            XmlNode pCandidate = pList[pIdx];
+                            List<XmlNode> pDrawings = SelectUniqueDrawingsInNode(pCandidate, nsmgr);
+                            if (pDrawings != null)
+                            {
+                                foreach (XmlNode dNode in pDrawings)
+                                {
+                                    bool hasAnchor = dNode.SelectSingleNode(".//wp:anchor | .//*[local-name()='anchor']", nsmgr) != null;
+                                    bool hasBlip = dNode.SelectSingleNode(".//a:blip | .//*[local-name()='blip'] | .//v:imagedata | .//*[local-name()='imagedata']", nsmgr) != null;
+                                    if (hasAnchor && !hasBlip)
+                                    {
+                                        allCellAnchorShapes.Add(Tuple.Create(dNode, pIdx * emusPerLine));
+                                    }
+                                }
+                            }
+                        }
+
+                        bool cellCompositeDone = false;
+                        StringBuilder compositeTagSb = new StringBuilder();
+                        if (allCellAnchorShapes.Count > 1)
+                        {
+                            List<FormattedRun> dummyRuns = new List<FormattedRun>();
+                            cellCompositeDone = TryRenderCompositeAnchoredShapes(allCellAnchorShapes, nsmgr, archive, compositeTagSb, dummyRuns, true);
+                            if (cellCompositeDone)
+                            {
+                                foreach (var t in allCellAnchorShapes) handledCellDrawings.Add(t.Item1);
+                            }
+                        }
+
+                        for (int pIdx = 0; pIdx < pList.Count; pIdx++)
+                        {
+                            XmlNode p = pList[pIdx];
                             StringBuilder pSb = new StringBuilder();
+                            if (pIdx == 0 && cellCompositeDone)
+                            {
+                                pSb.Append(compositeTagSb.ToString());
+                            }
+
                             foreach (XmlNode child in p.ChildNodes)
                             {
                                 if (child.LocalName == "r")
@@ -5090,18 +6464,26 @@ namespace ZenQOffice.Format
                                 }
                                 else if (child.LocalName == "oMath" || child.LocalName == "oMathPara")
                                 {
-                                    ExtractMathNodeRecursive(child, nsmgr, pSb);
+                                    pSb.Append(WriterMath.Register(child));
                                 }
                             }
 
-                            // Extract drawing and object nodes within table cells
-                            XmlNodeList inlineNodes = p.SelectNodes(".//w:drawing | .//w:pict | .//w:object | .//*[local-name()='drawing'] | .//*[local-name()='pict'] | .//*[local-name()='object']", nsmgr);
-                            if (inlineNodes != null)
+                            // Extract remaining unhandled drawings in this paragraph
+                            List<XmlNode> inlineNodes = SelectUniqueDrawingsInNode(p, nsmgr);
+                            if (inlineNodes != null && inlineNodes.Count > 0)
                             {
+                                List<FormattedRun> dummyRuns = new List<FormattedRun>();
                                 foreach (XmlNode inlineNode in inlineNodes)
                                 {
-                                    List<FormattedRun> dummyRuns = new List<FormattedRun>();
-                                    ExtractDrawingImage(inlineNode, nsmgr, archive, relsToTarget, pSb, dummyRuns);
+                                    if (handledCellDrawings.Contains(inlineNode)) continue;
+                                    StringBuilder singleSb = new StringBuilder();
+                                    ExtractDrawingImage(inlineNode, nsmgr, archive, relsToTarget, singleSb, dummyRuns);
+                                    string singleTag = singleSb.ToString().Trim();
+                                    if (!string.IsNullOrEmpty(singleTag))
+                                    {
+                                        singleTag = System.Text.RegularExpressions.Regex.Replace(singleTag, @":WRAP=\d+", ":WRAP=0");
+                                        pSb.Append(singleTag);
+                                    }
                                 }
                             }
                             string pStr = pSb.ToString();
@@ -5250,6 +6632,7 @@ namespace ZenQOffice.Format
                                 {
                                     foreach (XmlNode rNode in rList)
                                     {
+                                        if (IsNodeInsideDrawingOrTextbox(rNode, p)) continue;
                                         int rLen = 0;
                                         XmlNodeList rtNodes = rNode.SelectNodes(".//w:t", nsmgr);
                                         if (rtNodes != null)
@@ -5465,6 +6848,124 @@ namespace ZenQOffice.Format
         /// <summary>
         /// Saves document as standard OpenXML (.docx) ZIP Package compatible with MS Word, LibreOffice, etc.
         /// </summary>
+        private static void WriteWordprocessingGroupShape(StreamWriter sw, DocShapeObject groupShape, long cxEmu, long cyEmu, int mediaCount)
+        {
+            sw.WriteLine("    <w:p>");
+            sw.WriteLine("      <w:pPr><w:jc w:val=\"center\"/></w:pPr>");
+            sw.WriteLine("      <w:r>");
+            sw.WriteLine("        <w:drawing>");
+            sw.WriteLine("          <wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">");
+            sw.WriteLine(string.Format("            <wp:extent cx=\"{0}\" cy=\"{1}\"/>", cxEmu, cyEmu));
+            sw.WriteLine("            <wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>");
+            sw.WriteLine(string.Format("            <wp:docPr id=\"{0}\" name=\"Group {0}\"/>", mediaCount));
+            sw.WriteLine("            <a:graphic xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">");
+            sw.WriteLine("              <a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\">");
+            sw.WriteLine("                <wpg:wgp>");
+            sw.WriteLine("                  <wpg:cNvGrpSpPr><a:grpSpLocks/></wpg:cNvGrpSpPr>");
+            sw.WriteLine("                  <wpg:grpSpPr>");
+            sw.WriteLine("                    <a:xfrm>");
+            sw.WriteLine("                      <a:off x=\"0\" y=\"0\"/>");
+            sw.WriteLine(string.Format("                      <a:ext cx=\"{0}\" cy=\"{1}\"/>", cxEmu, cyEmu));
+            sw.WriteLine("                      <a:chOff x=\"0\" y=\"0\"/>");
+            sw.WriteLine(string.Format("                      <a:chExt cx=\"{0}\" cy=\"{1}\"/>", cxEmu, cyEmu));
+            sw.WriteLine("                    </a:xfrm>");
+            sw.WriteLine("                  </wpg:grpSpPr>");
+
+            int childId = 100;
+            foreach (var child in groupShape.GroupChildren)
+            {
+                if (child == null) continue;
+                childId++;
+                long cOffX = (long)(child.PageX * 9525L);
+                long cOffY = (long)(child.PageY * 9525L);
+                long cExtX = Math.Max(9525L, (long)((child.BaseWidth + child.WidthDelta) * 9525L));
+                long cExtY = Math.Max(9525L, (long)((child.BaseHeight + child.HeightDelta) * 9525L));
+
+                string geom = "rect";
+                if (child.ShapeType == "RoundedRectangle") geom = "roundRect";
+                else if (child.ShapeType == "Oval") geom = "ellipse";
+                else if (child.ShapeType == "Line" || child.ShapeType == "ArrowLine") geom = "straightConnector1";
+                else if (child.ShapeType == "ElbowConnector") geom = "bentConnector3";
+                else if (child.ShapeType == "CurvedConnector") geom = "curvedConnector3";
+                else if (child.ShapeType == "RightArrow") geom = "rightArrow";
+                else if (!string.IsNullOrEmpty(child.ShapeType)) geom = child.ShapeType;
+
+                sw.WriteLine("                  <wps:wsp>");
+                sw.WriteLine(string.Format("                    <wps:cNvSpPr><a:spLocks noChangeAspect=\"0\"/></wps:cNvSpPr>"));
+                sw.WriteLine("                    <wps:spPr>");
+                sw.WriteLine(string.Format("                      <a:xfrm{0}{1}>", child.FlipH ? " flipH=\"1\"" : "", child.FlipV ? " flipV=\"1\"" : ""));
+                sw.WriteLine(string.Format("                        <a:off x=\"{0}\" y=\"{1}\"/>", cOffX, cOffY));
+                sw.WriteLine(string.Format("                        <a:ext cx=\"{0}\" cy=\"{1}\"/>", cExtX, cExtY));
+                sw.WriteLine("                      </a:xfrm>");
+                sw.WriteLine(string.Format("                      <a:prstGeom prst=\"{0}\"><a:avLst/></a:prstGeom>", geom));
+
+                if (child.HasFill && child.FillColor != Color.Transparent)
+                {
+                    string fHex = string.Format("{0:X2}{1:X2}{2:X2}", child.FillColor.R, child.FillColor.G, child.FillColor.B);
+                    sw.WriteLine(string.Format("                      <a:solidFill><a:srgbClr val=\"{0}\"/></a:solidFill>", fHex));
+                }
+                else
+                {
+                    sw.WriteLine("                      <a:noFill/>");
+                }
+
+                if (child.HasLine && child.OutlineWidth > 0 && child.OutlineColor != Color.Transparent)
+                {
+                    long lnW = (long)(child.OutlineWidth * 12700L);
+                    string lHex = string.Format("{0:X2}{1:X2}{2:X2}", child.OutlineColor.R, child.OutlineColor.G, child.OutlineColor.B);
+                    sw.WriteLine(string.Format("                      <a:ln w=\"{0}\"><a:solidFill><a:srgbClr val=\"{1}\"/></a:solidFill>", lnW, lHex));
+                    if (child.HasTailArrow || child.ShapeType == "ArrowLine")
+                        sw.WriteLine("                        <a:tailEnd type=\"triangle\"/>");
+                    if (child.HasHeadArrow)
+                        sw.WriteLine("                        <a:headEnd type=\"triangle\"/>");
+                    sw.WriteLine("                      </a:ln>");
+                }
+                else
+                {
+                    sw.WriteLine("                      <a:ln><a:noFill/></a:ln>");
+                }
+                sw.WriteLine("                    </wps:spPr>");
+
+                if (!string.IsNullOrEmpty(child.TextContent))
+                {
+                    string alignStr = child.TextAlignment == StringAlignment.Center ? "center" : (child.TextAlignment == StringAlignment.Far ? "right" : "left");
+                    int szHalfPt = (int)Math.Round(child.FontSize * 2);
+                    string tHex = string.Format("{0:X2}{1:X2}{2:X2}", child.TextColor.R, child.TextColor.G, child.TextColor.B);
+
+                    sw.WriteLine("                    <wps:txbx>");
+                    sw.WriteLine("                      <w:txbxContent>");
+                    string[] lines = child.TextContent.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+                    foreach (var l in lines)
+                    {
+                        sw.WriteLine("                        <w:p>");
+                        sw.WriteLine(string.Format("                          <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", alignStr));
+                        sw.WriteLine("                          <w:r>");
+                        sw.WriteLine("                            <w:rPr>");
+                        if (child.Bold) sw.WriteLine("                              <w:b/>");
+                        if (child.Italic) sw.WriteLine("                              <w:i/>");
+                        sw.WriteLine(string.Format("                              <w:sz w:val=\"{0}\"/>", szHalfPt));
+                        sw.WriteLine(string.Format("                              <w:color w:val=\"{0}\"/>", tHex));
+                        sw.WriteLine("                            </w:rPr>");
+                        string esc = l.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                        sw.WriteLine(string.Format("                            <w:t xml:space=\"preserve\">{0}</w:t>", esc));
+                        sw.WriteLine("                          </w:r>");
+                        sw.WriteLine("                        </w:p>");
+                    }
+                    sw.WriteLine("                      </w:txbxContent>");
+                    sw.WriteLine("                    </wps:txbx>");
+                }
+                sw.WriteLine("                  </wps:wsp>");
+            }
+
+            sw.WriteLine("                </wpg:wgp>");
+            sw.WriteLine("              </a:graphicData>");
+            sw.WriteLine("            </a:graphic>");
+            sw.WriteLine("          </wp:inline>");
+            sw.WriteLine("        </w:drawing>");
+            sw.WriteLine("      </w:r>");
+            sw.WriteLine("    </w:p>");
+        }
+
         public static bool SaveDocxFile(
             string filepath,
             string textContent,
@@ -5774,7 +7275,7 @@ namespace ZenQOffice.Format
                     using (StreamWriter sw = new StreamWriter(docEntry.Open(), Encoding.UTF8))
                     {
                         sw.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
-                        sw.WriteLine("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">");
+                        sw.WriteLine("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\" xmlns:wpg=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\" xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\">");
                         sw.WriteLine("  <w:body>");
 
                         string[] paras = (textContent ?? "").Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -5843,6 +7344,18 @@ namespace ZenQOffice.Format
                                     string bColor = (docTbl != null && docTbl.BorderColor != Color.Empty && docTbl.BorderColor != Color.Transparent) 
                                         ? string.Format("{0:X2}{1:X2}{2:X2}", docTbl.BorderColor.R, docTbl.BorderColor.G, docTbl.BorderColor.B) 
                                         : "000000";
+
+                                    bool allCellsBorderless = docTbl != null && docTbl.Rows != null && docTbl.Rows.Count > 0 &&
+                                        docTbl.Rows.TrueForAll(r => r.Cells != null && r.Cells.TrueForAll(c => !c.HasBorderTop && !c.HasBorderBottom && !c.HasBorderLeft && !c.HasBorderRight));
+                                    if (allCellsBorderless && docTbl != null)
+                                    {
+                                        docTbl.HasBorderTop = false;
+                                        docTbl.HasBorderBottom = false;
+                                        docTbl.HasBorderLeft = false;
+                                        docTbl.HasBorderRight = false;
+                                        docTbl.HasBorderInsideH = false;
+                                        docTbl.HasBorderInsideV = false;
+                                    }
 
                                     string topStyle = (docTbl != null && !docTbl.HasBorderTop) ? "none" : ((docTbl != null && !string.IsNullOrEmpty(docTbl.BorderTopStyle)) ? docTbl.BorderTopStyle : "single");
                                     int topSz = (docTbl != null && docTbl.BorderTopWidthPt > 0) ? Math.Max(2, (int)(docTbl.BorderTopWidthPt * 8)) : 4;
@@ -5913,15 +7426,17 @@ namespace ZenQOffice.Format
                                     for (int rIdx = 0; rIdx < rows.Count; rIdx++)
                                     {
                                         var row = rows[rIdx];
-                                        bool isHeaderRow = (docTbl != null && docTbl.RepeatHeaderRow && rIdx == 0);
+                                        bool isHeaderRow = docTbl != null && ((docTbl.RepeatHeaderRow && rIdx == 0) || (rIdx < docTbl.Rows.Count && docTbl.Rows[rIdx].RepeatHeader));
+                                        bool cantSplitRow = docTbl != null && rIdx < docTbl.Rows.Count && docTbl.Rows[rIdx].CantSplit;
                                         int rowHPt = (docTbl != null && rIdx < docTbl.Rows.Count) ? docTbl.Rows[rIdx].HeightPt : 0;
 
                                         sw.WriteLine("      <w:tr>");
-                                        if (isHeaderRow || rowHPt > 0)
+                                        if (isHeaderRow || rowHPt > 0 || cantSplitRow)
                                         {
                                             sw.WriteLine("        <w:trPr>");
                                             if (rowHPt > 0) sw.WriteLine(string.Format("          <w:trHeight w:val=\"{0}\" w:hRule=\"atLeast\"/>", rowHPt * 20));
                                             if (isHeaderRow) sw.WriteLine("          <w:tblHeader/>");
+                                            if (cantSplitRow) sw.WriteLine("          <w:cantSplit/>");
                                             sw.WriteLine("        </w:trPr>");
                                         }
 
@@ -5981,29 +7496,95 @@ namespace ZenQOffice.Format
                                             }
                                             sw.WriteLine(string.Format("            <w:vAlign w:val=\"{0}\"/>", vAlign));
                                             sw.WriteLine("          </w:tcPr>");
-                                            sw.WriteLine("          <w:p>");
-                                            sw.WriteLine(string.Format("            <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", alignVal));
-                                            sw.WriteLine("            <w:r>");
-                                            sw.WriteLine("              <w:rPr>");
-                                            sw.WriteLine(string.Format("                <w:rFonts w:ascii=\"{0}\" w:hAnsi=\"{0}\" w:cs=\"{0}\"/>", EscapeXml(fontName)));
-                                            if (isBold) { sw.WriteLine("                <w:b/>"); sw.WriteLine("                <w:bCs/>"); }
-                                            if (isItalic) { sw.WriteLine("                <w:i/>"); sw.WriteLine("                <w:iCs/>"); }
-                                            if (!string.IsNullOrEmpty(textHex) && textHex != "000000")
-                                            {
-                                                sw.WriteLine(string.Format("                <w:color w:val=\"{0}\"/>", textHex));
-                                            }
-                                            sw.WriteLine(string.Format("                <w:sz w:val=\"{0}\"/>", halfPtSize));
-                                            sw.WriteLine(string.Format("                <w:szCs w:val=\"{0}\"/>", halfPtSize));
-                                            sw.WriteLine("              </w:rPr>");
                                             string cellText = (cObj != null && !string.IsNullOrEmpty(cObj.Text)) ? cObj.Text : cell;
                                             string[] cellLines = (cellText ?? "").Replace("\r\n", "\n").Split('\n');
-                                            for (int cl = 0; cl < cellLines.Length; cl++)
+                                            bool containsShapeTag = false;
+                                            for (int cli = 0; cli < cellLines.Length; cli++)
                                             {
-                                                if (cl > 0) sw.WriteLine("              <w:br/>");
-                                                sw.WriteLine("              <w:t xml:space=\"preserve\">" + EscapeXml(cellLines[cl]) + "</w:t>");
+                                                if (cellLines[cli].StartsWith("![SHAPE:") || cellLines[cli].StartsWith("![IMAGE:"))
+                                                {
+                                                    containsShapeTag = true;
+                                                    break;
+                                                }
                                             }
-                                            sw.WriteLine("            </w:r>");
-                                            sw.WriteLine("          </w:p>");
+
+                                            if (containsShapeTag)
+                                            {
+                                                for (int cli = 0; cli < cellLines.Length; cli++)
+                                                {
+                                                    string cline = cellLines[cli];
+                                                    if (cline.StartsWith("![SHAPE:") || cline.StartsWith("![IMAGE:"))
+                                                    {
+                                                        string shapeId = "";
+                                                        string shapeType = "Image";
+                                                        string imgPath = "";
+                                                        int tagX = -1, tagY = -1, tagW = -1, tagH = -1, tagWrap = -1, tagPage = -1, tagStyle = -1, tagYRel = 0;
+                                                        DocShapeObject.ParseShapeTag(cline, out shapeId, out shapeType, out imgPath, out tagX, out tagY, out tagW, out tagH, out tagWrap, out tagPage, out tagStyle, out tagYRel);
+
+                                                        DocShapeObject cellShapeObj = (shapes != null) ? shapes.Find(s => s.Id == shapeId) : null;
+                                                        if (cellShapeObj == null && !string.IsNullOrEmpty(shapeId))
+                                                        {
+                                                            cellShapeObj = new DocShapeObject(shapeType, tagX > 0 ? tagX : 50, tagY > 0 ? tagY : 50, tagW > 0 ? tagW : 240, tagH > 0 ? tagH : 160);
+                                                            cellShapeObj.Id = shapeId;
+                                                            cellShapeObj.ApplyCachedTagMetadata();
+                                                        }
+
+                                                        if (cellShapeObj != null && cellShapeObj.ShapeType == "Group" && cellShapeObj.GroupChildren != null && cellShapeObj.GroupChildren.Count > 0)
+                                                        {
+                                                            mediaCount++;
+                                                            int wVal = tagW > 0 ? tagW : (cellShapeObj.BaseWidth + cellShapeObj.WidthDelta);
+                                                            int hVal = tagH > 0 ? tagH : (cellShapeObj.BaseHeight + cellShapeObj.HeightDelta);
+                                                            long cxEmu = Math.Max(95250L, (long)wVal * 9525L);
+                                                            long cyEmu = Math.Max(95250L, (long)hVal * 9525L);
+                                                            WriteWordprocessingGroupShape(sw, cellShapeObj, cxEmu, cyEmu, mediaCount);
+                                                        }
+                                                    }
+                                                    else if (!string.IsNullOrEmpty(cline))
+                                                    {
+                                                        sw.WriteLine("          <w:p>");
+                                                        sw.WriteLine(string.Format("            <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", alignVal));
+                                                        sw.WriteLine("            <w:r>");
+                                                        sw.WriteLine("              <w:rPr>");
+                                                        sw.WriteLine(string.Format("                <w:rFonts w:ascii=\"{0}\" w:hAnsi=\"{0}\" w:cs=\"{0}\"/>", EscapeXml(fontName)));
+                                                        if (isBold) { sw.WriteLine("                <w:b/>"); sw.WriteLine("                <w:bCs/>"); }
+                                                        if (isItalic) { sw.WriteLine("                <w:i/>"); sw.WriteLine("                <w:iCs/>"); }
+                                                        if (!string.IsNullOrEmpty(textHex) && textHex != "000000")
+                                                        {
+                                                            sw.WriteLine(string.Format("                <w:color w:val=\"{0}\"/>", textHex));
+                                                        }
+                                                        sw.WriteLine(string.Format("                <w:sz w:val=\"{0}\"/>", halfPtSize));
+                                                        sw.WriteLine(string.Format("                <w:szCs w:val=\"{0}\"/>", halfPtSize));
+                                                        sw.WriteLine("              </w:rPr>");
+                                                        sw.WriteLine("              <w:t xml:space=\"preserve\">" + EscapeXml(cline) + "</w:t>");
+                                                        sw.WriteLine("            </w:r>");
+                                                        sw.WriteLine("          </w:p>");
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                sw.WriteLine("          <w:p>");
+                                                sw.WriteLine(string.Format("            <w:pPr><w:jc w:val=\"{0}\"/></w:pPr>", alignVal));
+                                                sw.WriteLine("            <w:r>");
+                                                sw.WriteLine("              <w:rPr>");
+                                                sw.WriteLine(string.Format("                <w:rFonts w:ascii=\"{0}\" w:hAnsi=\"{0}\" w:cs=\"{0}\"/>", EscapeXml(fontName)));
+                                                if (isBold) { sw.WriteLine("                <w:b/>"); sw.WriteLine("                <w:bCs/>"); }
+                                                if (isItalic) { sw.WriteLine("                <w:i/>"); sw.WriteLine("                <w:iCs/>"); }
+                                                if (!string.IsNullOrEmpty(textHex) && textHex != "000000")
+                                                {
+                                                    sw.WriteLine(string.Format("                <w:color w:val=\"{0}\"/>", textHex));
+                                                }
+                                                sw.WriteLine(string.Format("                <w:sz w:val=\"{0}\"/>", halfPtSize));
+                                                sw.WriteLine(string.Format("                <w:szCs w:val=\"{0}\"/>", halfPtSize));
+                                                sw.WriteLine("              </w:rPr>");
+                                                for (int cl = 0; cl < cellLines.Length; cl++)
+                                                {
+                                                    if (cl > 0) sw.WriteLine("              <w:br/>");
+                                                    sw.WriteLine("              <w:t xml:space=\"preserve\">" + EscapeXml(cellLines[cl]) + "</w:t>");
+                                                }
+                                                sw.WriteLine("            </w:r>");
+                                                sw.WriteLine("          </w:p>");
+                                            }
                                             sw.WriteLine("        </w:tc>");
                                         }
                                         sw.WriteLine("      </w:tr>");
@@ -6155,7 +7736,11 @@ namespace ZenQOffice.Format
                                         ? string.Format(" descr=\"{0}\"", docPrDescr.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;"))
                                         : "";
 
-                                    if (wrapMode == 0) // In-Line with Text
+                                    if (shapeObj != null && shapeObj.ShapeType == "Group" && shapeObj.GroupChildren != null && shapeObj.GroupChildren.Count > 0)
+                                    {
+                                        WriteWordprocessingGroupShape(sw, shapeObj, cxEmu, cyEmu, mediaCount);
+                                    }
+                                    else if (wrapMode == 0) // In-Line with Text
                                     {
                                         sw.WriteLine("    <w:p>");
                                         sw.WriteLine("      <w:pPr><w:jc w:val=\"center\"/></w:pPr>");
@@ -6580,6 +8165,7 @@ namespace ZenQOffice.Format
                         }
                     }
                 }
+                WriterMath.RestoreOmml(filepath);
                 return true;
             }
             catch (Exception)
@@ -7433,7 +9019,11 @@ namespace ZenQOffice.Format
                     }
                     else
                     {
-                        sw.WriteLine(string.Format("          <a:prstGeom prst=\"{0}\"><a:avLst/></a:prstGeom>", GetOpenXmlGeomName(shape.Type)));
+                        string geometry=shape.Type==ShapeType.Line?shape.ConnectorGeometry:GetOpenXmlGeomName(shape.Type);
+                        sw.WriteLine("<a:prstGeom prst=\""+EscapeXml(geometry??"line")+"\"><a:avLst>");
+                        if(shape.Type==ShapeType.Line&&shape.ConnectorAdjustments!=null)
+                            for(int i=0;i<shape.ConnectorAdjustments.Count;i++)sw.WriteLine("<a:gd name=\"adj"+(i+1)+"\" fmla=\"val "+(int)Math.Round(shape.ConnectorAdjustments[i]*100000)+"\"/>");
+                        sw.WriteLine("</a:avLst></a:prstGeom>");
                     }
 
                     // Fill
@@ -7486,7 +9076,11 @@ namespace ZenQOffice.Format
                     // Stroke
                     if (shape.StrokeWidth > 0.01f)
                     {
-                        sw.WriteLine(string.Format("          <a:ln w=\"{0}\"><a:solidFill><a:srgbClr val=\"{1:X6}\"/></a:solidFill></a:ln>", (int)(shape.StrokeWidth * exportScaleX * 12700.0f), shape.StrokeColor & 0xFFFFFF));
+                        int strokeAlpha = (int)Math.Round(Math.Clamp(shape.StrokeOpacity, 0f, 1f) * 100000);
+                        sw.WriteLine(string.Format("          <a:ln w=\"{0}\"><a:solidFill><a:srgbClr val=\"{1:X6}\"><a:alpha val=\"{2}\"/></a:srgbClr></a:solidFill>", (int)Math.Round(shape.StrokeWidth * exportScaleX * 9525.0f), shape.StrokeColor & 0xFFFFFF, strokeAlpha));
+                        if (shape.LineStartArrowType != "none") sw.WriteLine("<a:headEnd type=\"" + System.Security.SecurityElement.Escape(shape.LineStartArrowType) + "\"/>");
+                        if (shape.LineEndArrowType != "none") sw.WriteLine("<a:tailEnd type=\"" + System.Security.SecurityElement.Escape(shape.LineEndArrowType) + "\"/>");
+                        sw.WriteLine("</a:ln>");
                     }
 
                     if (shape.SoftEdgeRadius > 0.01f || shape.BlurRadius > 0.01f || shape.HasShadow)
@@ -7551,6 +9145,17 @@ namespace ZenQOffice.Format
                         int tInsEmu = shape.MarginTop.HasValue ? (int)(shape.MarginTop.Value * exportScaleY * 9525.0f) : 45720;
                         int bInsEmu = shape.MarginBottom.HasValue ? (int)(shape.MarginBottom.Value * exportScaleY * 9525.0f) : 45720;
 
+                        string textShadowXml = "";
+                        if (shape.HasTextShadow)
+                        {
+                            double dist = Math.Sqrt(shape.ShadowOffsetX * shape.ShadowOffsetX + shape.ShadowOffsetY * shape.ShadowOffsetY);
+                            double angle = Math.Atan2(shape.ShadowOffsetY, shape.ShadowOffsetX) * 180.0 / Math.PI;
+                            if (angle < 0) angle += 360;
+                            textShadowXml = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                "<a:effectLst><a:outerShdw blurRad=\"{0}\" dist=\"{1}\" dir=\"{2}\" algn=\"ctr\"><a:srgbClr val=\"{3:X6}\"><a:alpha val=\"{4}\"/></a:srgbClr></a:outerShdw></a:effectLst>",
+                                (long)(shape.ShadowBlur * 9525), (long)(dist * 9525), (long)(angle * 60000), shape.ShadowColor & 0xFFFFFF,
+                                (int)(Math.Clamp(shape.ShadowOpacity, 0, 1) * 100000));
+                        }
                         sw.WriteLine("        <p:txBody>");
                         sw.WriteLine(string.Format("          <a:bodyPr anchor=\"{0}\" wrap=\"square\" lIns=\"{1}\" rIns=\"{2}\" tIns=\"{3}\" bIns=\"{4}\"/>", ancStr, lInsEmu, rInsEmu, tInsEmu, bInsEmu));
                         sw.WriteLine("          <a:lstStyle/>");
@@ -7588,10 +9193,11 @@ namespace ZenQOffice.Format
                             }
                             if (currentP.Count > 0) paragraphs.Add(currentP);
 
+                            int paragraphIndex=0;
                             foreach (var p in paragraphs)
                             {
                                 sw.WriteLine("          <a:p>");
-                                sw.WriteLine(string.Format("            <a:pPr algn=\"{0}\">{1}</a:pPr>", algnStr, lnSpcXml));
+                                PptxParagraphStyles.Write(sw,shape,paragraphIndex++,algnStr,lnSpcXml,exportScaleX);
                                 foreach (var run in p)
                                 {
                                     float rFontPt = (run.FontSize / Math.Max(0.001f, normScale)) * (72.0f / 96.0f);
@@ -7630,6 +9236,7 @@ namespace ZenQOffice.Format
                                             sw.WriteLine(string.Format("                <a:highlight><a:srgbClr val=\"{0:X6}\"/></a:highlight>", run.HighlightColor & 0xFFFFFF));
                                         }
                                         sw.WriteLine(string.Format("                <a:latin typeface=\"{0}\"/>", EscapeXml(run.FontName ?? shape.FontName ?? "Calibri")));
+                                        sw.WriteLine(textShadowXml);
                                         sw.WriteLine("              </a:rPr>");
                                     }
                                     else
@@ -7641,7 +9248,7 @@ namespace ZenQOffice.Format
                                             run.Italic ? "1" : "0",
                                             run.Underline ? "sng" : "none",
                                             run.TextColor & 0xFFFFFF,
-                                            hlTag,
+                                            hlTag + textShadowXml,
                                             EscapeXml(run.FontName ?? shape.FontName ?? "Calibri")));
                                     }
                                     sw.WriteLine(string.Format("              <a:t>{0}</a:t>", EscapeXml(run.Text)));
@@ -7652,19 +9259,20 @@ namespace ZenQOffice.Format
                         }
                         else
                         {
+                            int paragraphIndex=0;
                             string[] lines = shape.Text.Split('\n');
                             foreach (string line in lines)
                             {
                                 sw.WriteLine("          <a:p>");
-                                sw.WriteLine(string.Format("            <a:pPr algn=\"{0}\">{1}</a:pPr>", algnStr, lnSpcXml));
+                                PptxParagraphStyles.Write(sw,shape,paragraphIndex++,algnStr,lnSpcXml,exportScaleX);
                                 sw.WriteLine("            <a:r>");
-                                sw.WriteLine(string.Format("              <a:rPr sz=\"{0}\" b=\"{1}\" i=\"{2}\" u=\"{3}\"><a:solidFill><a:srgbClr val=\"{4:X6}\"/></a:solidFill><a:latin typeface=\"{5}\"/></a:rPr>",
+                                sw.WriteLine(string.Format("              <a:rPr sz=\"{0}\" b=\"{1}\" i=\"{2}\" u=\"{3}\"><a:solidFill><a:srgbClr val=\"{4:X6}\"/></a:solidFill>{6}<a:latin typeface=\"{5}\"/></a:rPr>",
                                     szPt100,
                                     shape.Bold ? "1" : "0",
                                     shape.Italic ? "1" : "0",
                                     shape.Underline ? "sng" : "none",
                                     shape.TextColor & 0xFFFFFF,
-                                    EscapeXml(shape.FontName ?? "Calibri")));
+                                    EscapeXml(shape.FontName ?? "Calibri"), textShadowXml));
                                 sw.WriteLine(string.Format("              <a:t>{0}</a:t>", EscapeXml(line)));
                                 sw.WriteLine("            </a:r>");
                                 sw.WriteLine("          </a:p>");
@@ -7748,12 +9356,19 @@ namespace ZenQOffice.Format
                 advAttr += string.Format(" advTm=\"{0}\"", (int)(slide.AutoAdvanceSeconds * 1000));
             }
 
+            int durationMs=(int)((slide.TransitionDuration>.05f?slide.TransitionDuration:1.5f)*1000);
+            advAttr += string.Format(CultureInfo.InvariantCulture," xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" p14:dur=\"{0}\"",durationMs);
+            if(slide.Transition==TransitionType.GenOffice_ColorWipe||slide.Transition==TransitionType.GenOffice_SmoothFlow)
+            {
+                string colors=string.Join(",",(slide.TransitionColors??new List<int>()).Take(4).Select(c=>(c&0xffffff).ToString("X6",CultureInfo.InvariantCulture)));
+                advAttr+=" xmlns:zq=\"urn:zenqoffice:transition:1\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"zq\" zq:effect=\""+slide.Transition+"\" zq:direction=\""+slide.TransitionDirection+"\" zq:colors=\""+colors+"\"";
+            }
             if (slide.Transition == TransitionType.Morph)
             {
                 string modeStr = (slide.MorphMode == MorphType.Words) ? "byWord" : ((slide.MorphMode == MorphType.Characters) ? "byChar" : "byObject");
                 sw.WriteLine("  <mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">");
                 sw.WriteLine("    <mc:Choice xmlns:p159=\"http://schemas.microsoft.com/office/powerpoint/2015/09/main\" Requires=\"p159\">");
-                sw.WriteLine(string.Format("      <p:transition spd=\"med\" xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" p14:dur=\"2000\" {0}>", advAttr));
+                sw.WriteLine(string.Format("      <p:transition spd=\"med\" {0}>", advAttr));
                 sw.WriteLine(string.Format("        <p159:morph option=\"{0}\"/>", modeStr));
                 sw.WriteLine("      </p:transition>");
                 sw.WriteLine("    </mc:Choice>");
@@ -7772,6 +9387,8 @@ namespace ZenQOffice.Format
             {
                 case TransitionType.Flash: p14Name = "flash"; break;
                 case TransitionType.Curtains: p14Name = "curtains"; break;
+                case TransitionType.Drape: p14Name = "drape"; break;
+                case TransitionType.FallOver: p14Name = "fallOver"; break;
                 case TransitionType.Wind: p14Name = "wind"; break;
                 case TransitionType.Prestige: p14Name = "prestige"; break;
                 case TransitionType.Fracture: p14Name = "fracture"; break;
@@ -7808,7 +9425,6 @@ namespace ZenQOffice.Format
                 case TransitionType.GenOffice_HologramGlitch: p14Name = "shred pattern=\"strip\""; break;
                 case TransitionType.GenOffice_Kaleidoscope: p14Name = "honeycomb"; break;
                 case TransitionType.GenOffice_Starlight: p14Name = "flythrough"; break;
-                case TransitionType.GenOffice_SmoothFlow: p14Name = "ripple"; break;
             }
 
             if (p14Name != null)
@@ -7832,11 +9448,19 @@ namespace ZenQOffice.Format
             sw.WriteLine(string.Format("  <p:transition spd=\"med\" {0}>", advAttr));
             switch (slide.Transition)
             {
+                case TransitionType.Random:
+                    sw.WriteLine("    <p:random/>");
+                    break;
                 case TransitionType.Fade:
                     sw.WriteLine("    <p:fade/>");
                     break;
                 case TransitionType.Push:
                     sw.WriteLine("    <p:push dir=\"r\"/>");
+                    break;
+                case TransitionType.GenOffice_ColorWipe:
+                case TransitionType.GenOffice_SmoothFlow:
+                    string canvaDir=slide.TransitionDirection switch{TransitionDirection.FromLeft or TransitionDirection.FromTopLeft or TransitionDirection.FromBottomLeft=>"r",TransitionDirection.FromTop=>"d",TransitionDirection.FromBottom=>"u",_=>"l"};
+                    sw.WriteLine("    <p:push dir=\""+canvaDir+"\"/>");
                     break;
                 case TransitionType.Wipe:
                 case TransitionType.GenOffice_GoldenRibbon:
@@ -7893,90 +9517,7 @@ namespace ZenQOffice.Format
 
         private static void WriteTimingXml(StreamWriter sw, SlideNode slide, Dictionary<ShapeNode, int> shapeIdMap)
         {
-            sw.WriteLine("  <p:timing>");
-            sw.WriteLine("    <p:tnLst>");
-            sw.WriteLine("      <p:par>");
-            sw.WriteLine("        <p:cTn id=\"1\" dur=\"indefinite\" restart=\"never\" nodeType=\"tmRoot\">");
-            sw.WriteLine("          <p:childTnLst>");
-            sw.WriteLine("            <p:seq concurrent=\"1\" nextAc=\"seek\">");
-            sw.WriteLine("              <p:cTn id=\"2\" dur=\"indefinite\" nodeType=\"mainSeq\">");
-            sw.WriteLine("                <p:childTnLst>");
-
-            for (int i = 0; i < slide.Animations.Count; i++)
-            {
-                ShapeAnimation anim = slide.Animations[i];
-                int targetSpId = 2;
-                if (!string.IsNullOrEmpty(anim.ShapeId))
-                {
-                    foreach (var kvp in shapeIdMap)
-                    {
-                        if (kvp.Key.Id == anim.ShapeId)
-                        {
-                            targetSpId = kvp.Value;
-                            break;
-                        }
-                    }
-                }
-
-                int durMs = Math.Max(100, (int)(anim.Duration * 1000));
-                int delayMs = (int)(anim.Delay * 1000);
-                string filterName = "fade";
-                string transitionMode = anim.IsExit ? "out" : "in";
-
-                switch (anim.Type)
-                {
-                    case AnimationType.FlyIn: filterName = "fly"; transitionMode = "in"; break;
-                    case AnimationType.FlyOut: filterName = "fly"; transitionMode = "out"; break;
-                    case AnimationType.WipeIn: filterName = "wipe"; transitionMode = "in"; break;
-                    case AnimationType.WipeOut: filterName = "wipe"; transitionMode = "out"; break;
-                    case AnimationType.ZoomIn: filterName = "zoom"; transitionMode = "in"; break;
-                    case AnimationType.ZoomOut: filterName = "zoom"; transitionMode = "out"; break;
-                    case AnimationType.SplitIn: filterName = "split"; transitionMode = "in"; break;
-                    case AnimationType.SplitOut: filterName = "split"; transitionMode = "out"; break;
-                    case AnimationType.WheelIn: filterName = "wheel"; transitionMode = "in"; break;
-                    case AnimationType.WheelOut: filterName = "wheel"; transitionMode = "out"; break;
-                    case AnimationType.Bounce: filterName = "bounce"; transitionMode = "in"; break;
-                    case AnimationType.FadeOut: filterName = "fade"; transitionMode = "out"; break;
-                    default: filterName = "fade"; break;
-                }
-
-                int baseId = 10 + i * 5;
-                sw.WriteLine("                  <p:par>");
-                sw.WriteLine(string.Format("                    <p:cTn id=\"{0}\" fill=\"hold\">", baseId));
-                sw.WriteLine("                      <p:stCondLst>");
-                sw.WriteLine(string.Format("                        <p:cond delay=\"{0}\"/>", delayMs));
-                sw.WriteLine("                      </p:stCondLst>");
-                sw.WriteLine("                      <p:childTnLst>");
-                sw.WriteLine("                        <p:par>");
-                sw.WriteLine(string.Format("                          <p:cTn id=\"{0}\" fill=\"hold\">", baseId + 1));
-                sw.WriteLine("                            <p:stCondLst><p:cond delay=\"0\"/></p:stCondLst>");
-                sw.WriteLine("                            <p:childTnLst>");
-                sw.WriteLine(string.Format("                              <p:animEffect transition=\"{0}\" filter=\"{1}\">", transitionMode, filterName));
-                sw.WriteLine("                                <p:cBhvr>");
-                sw.WriteLine(string.Format("                                  <p:cTn id=\"{0}\" dur=\"{1}\"/>", baseId + 2, durMs));
-                sw.WriteLine("                                  <p:tgtEl>");
-                sw.WriteLine(string.Format("                                    <p:spTgt spid=\"{0}\"/>", targetSpId));
-                sw.WriteLine("                                  </p:tgtEl>");
-                sw.WriteLine("                                </p:cBhvr>");
-                sw.WriteLine("                              </p:animEffect>");
-                sw.WriteLine("                            </p:childTnLst>");
-                sw.WriteLine("                          </p:cTn>");
-                sw.WriteLine("                        </p:par>");
-                sw.WriteLine("                      </p:childTnLst>");
-                sw.WriteLine("                    </p:cTn>");
-                sw.WriteLine("                  </p:par>");
-            }
-
-            sw.WriteLine("                </p:childTnLst>");
-            sw.WriteLine("              </p:cTn>");
-            sw.WriteLine("              <p:prevCondLst><p:cond evt=\"onPrev\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>");
-            sw.WriteLine("              <p:nextCondLst><p:cond evt=\"onNext\" delay=\"0\"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>");
-            sw.WriteLine("            </p:seq>");
-            sw.WriteLine("          </p:childTnLst>");
-            sw.WriteLine("        </p:cTn>");
-            sw.WriteLine("      </p:par>");
-            sw.WriteLine("    </p:tnLst>");
-            sw.WriteLine("  </p:timing>");
+            AnimationPptxWriter.Write(sw, slide, shapeIdMap);
         }
 
         private static string GetOpenXmlGeomName(ShapeType type)
@@ -8039,9 +9580,15 @@ namespace ZenQOffice.Format
             return new PresentationRoot();
         }
 
+        [ThreadStatic] private static XmlDocument _currentPptxThemeDoc;
+        [ThreadStatic] private static Dictionary<string, string> _currentPptxMediaPathCache;
+        [ThreadStatic] private static Dictionary<string, Image> _currentPptxMediaImageCache;
+
         public static bool LoadPptx(string filepath, out PresentationRoot pres)
         {
             pres = new PresentationRoot();
+            _currentPptxMediaPathCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            _currentPptxMediaImageCache = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
             if (!File.Exists(filepath)) return false;
 
             try
@@ -8143,6 +9690,7 @@ namespace ZenQOffice.Format
                     string majorFont = "Calibri Light";
                     string minorFont = "Calibri";
                     XmlDocument thDoc = null;
+                    _currentPptxThemeDoc = null;
                     ZipArchiveEntry themeEntry = archive.GetEntry("ppt/theme/theme1.xml");
                     if (themeEntry != null)
                     {
@@ -8150,6 +9698,7 @@ namespace ZenQOffice.Format
                         {
                             thDoc = new XmlDocument();
                             using (Stream ths = themeEntry.Open()) thDoc.Load(ths);
+                            _currentPptxThemeDoc = thDoc;
                             XmlNode majLatin = thDoc.SelectSingleNode("//*[local-name()='fontScheme']/*[local-name()='majorFont']/*[local-name()='latin']");
                             if (majLatin != null && majLatin.Attributes["typeface"] != null && !string.IsNullOrEmpty(majLatin.Attributes["typeface"].Value))
                                 majorFont = majLatin.Attributes["typeface"].Value;
@@ -8386,7 +9935,7 @@ namespace ZenQOffice.Format
                             }
 
                             // 2d. Import OpenXML Slide Animations & Timing (<p:timing>)
-                            ParseSlideAnimations(sDoc, slide);
+                            ParseSlideAnimations(sDoc, slide, pres.CanvasWidth, pres.CanvasHeight, pres);
 
                             // 2e. Import Slide Background (<p:bg>)
                             ParseSlideBackground(sDoc, layoutDoc, masterDoc, slide, archive, relEntry, thDoc, pres);
@@ -8746,10 +10295,10 @@ namespace ZenQOffice.Format
             return defaultColor;
         }
 
-        private static GraphicsPath ParseCustGeom(XmlNode custGeomNode, out float pathW, out float pathH)
+        private static GraphicsPath ParseCustGeom(XmlNode custGeomNode, out float pathW, out float pathH, float fallbackWidth = 100f, float fallbackHeight = 100f)
         {
-            pathW = 100f;
-            pathH = 100f;
+            pathW = 0f;
+            pathH = 0f;
             if (custGeomNode == null) return null;
             XmlNodeList pathNodes = custGeomNode.SelectNodes(".//*[local-name()='path']");
             if (pathNodes == null || pathNodes.Count == 0) return null;
@@ -8758,7 +10307,7 @@ namespace ZenQOffice.Format
 
             foreach (XmlNode pathNode in pathNodes)
             {
-                float curW = 100f, curH = 100f;
+                float curW = fallbackWidth, curH = fallbackHeight;
                 if (pathNode.Attributes["w"] != null) float.TryParse(pathNode.Attributes["w"].Value, out curW);
                 if (pathNode.Attributes["h"] != null) float.TryParse(pathNode.Attributes["h"].Value, out curH);
                 if (curW > pathW) pathW = curW;
@@ -8857,6 +10406,7 @@ namespace ZenQOffice.Format
         private static ShapeNode ExtractShapeFromSpNode(XmlNode spNode, XmlDocument layoutDoc, XmlDocument masterDoc, PresentationRoot pres, float offsetX, float offsetY, float scaleX, float scaleY, string majorFont = "Calibri Light", string minorFont = "Calibri", ZipArchive archive = null, ZipArchiveEntry relEntry = null)
         {
             ShapeNode shape = new ShapeNode();
+            shape.HasFill = false;
             shape.FillColor = 0x00FFFFFF; // Transparent by default
             shape.StrokeWidth = 0.0f;     // No border by default
             shape.StrokeColor = 0x000000;
@@ -8866,6 +10416,7 @@ namespace ZenQOffice.Format
             shape.Bold = false;
             shape.Alignment = TextAlignment.Left;
             shape.VerticalAlignment = VerticalTextAlignment.Top;
+            shape.LineSpacing = 1.2f;
 
             XmlNode cNvPr = spNode.SelectSingleNode(".//*[local-name()='cNvPr']");
             if (cNvPr != null)
@@ -8969,7 +10520,11 @@ namespace ZenQOffice.Format
             if (custGeom != null)
             {
                 float pw, ph;
-                GraphicsPath gp = ParseCustGeom(custGeom, out pw, out ph);
+                var geometryExtent=spNode.SelectSingleNode("./*[local-name()='spPr']/*[local-name()='xfrm']/*[local-name()='ext']");
+                float fw=100,fh=100;
+                if(float.TryParse(geometryExtent?.Attributes?["cx"]?.Value,out float extentWidth)&&extentWidth>0)fw=extentWidth;
+                if(float.TryParse(geometryExtent?.Attributes?["cy"]?.Value,out float extentHeight)&&extentHeight>0)fh=extentHeight;
+                GraphicsPath gp = ParseCustGeom(custGeom, out pw, out ph, fw, fh);
                 if (gp != null)
                 {
                     shape.Type = ShapeType.CustomPath;
@@ -8988,6 +10543,12 @@ namespace ZenQOffice.Format
                 if (prstGeom != null && prstGeom.Attributes["prst"] != null)
                 {
                     string pGeom = prstGeom.Attributes["prst"].Value;
+                    if(pGeom.StartsWith("flowChart") || pGeom.StartsWith("actionButton"))
+                    {
+                        shape.CustomPath = ZenQOffice.UI.ShapeRenderer.CreateShapePath(ShapeRenderer.OfficePresetFromOpenXml(pGeom),new Rectangle(0,0,1000,1000));
+                        shape.PathWidth=1000;shape.PathHeight=1000;
+                    }
+
                     if (pGeom == "roundRect" || pGeom.StartsWith("round") || pGeom.StartsWith("snip")) shape.Type = ShapeType.RoundedRectangle;
                     else if (pGeom == "ellipse") shape.Type = ShapeType.Ellipse;
                     else if (pGeom == "triangle") shape.Type = ShapeType.Triangle;
@@ -9028,13 +10589,25 @@ namespace ZenQOffice.Format
                 }
             }
 
-            // Check arrowheads on lines/connectors
-            XmlNode tailEnd = spNode.SelectSingleNode(".//*[local-name()='tailEnd']");
-            XmlNode headEnd = spNode.SelectSingleNode(".//*[local-name()='headEnd']");
-            if ((tailEnd != null && tailEnd.Attributes["type"] != null && tailEnd.Attributes["type"].Value != "none") ||
-                (headEnd != null && headEnd.Attributes["type"] != null && headEnd.Attributes["type"].Value != "none"))
+            if(shape.CustomPath != null && shape.Type != ShapeType.Line)shape.Type=ShapeType.CustomPath;
+            if (shape.Type == ShapeType.Line)
             {
-                if (shape.Type == ShapeType.Line) shape.Type = ShapeType.Arrow;
+                var geom = spNode.SelectSingleNode("./*[local-name()='spPr']/*[local-name()='prstGeom']");
+                shape.ConnectorGeometry = geom?.Attributes?["prst"]?.Value ?? "line";
+                var adjustments = geom?.SelectNodes("./*[local-name()='avLst']/*[local-name()='gd']");
+                if (adjustments != null) foreach (XmlNode gd in adjustments)
+                {
+                    string value = gd.Attributes?["fmla"]?.Value ?? "";
+                    if (value.StartsWith("val ") && float.TryParse(value.Substring(4),NumberStyles.Float,CultureInfo.InvariantCulture,out float amount)) shape.ConnectorAdjustments.Add(amount/100000f);
+                }
+            }
+            // Endpoint decorations do not change a connector into a filled block arrow.
+            if (shape.Type == ShapeType.Line)
+            {
+                var head = spNode.SelectSingleNode("./*[local-name()='spPr']/*[local-name()='ln']/*[local-name()='headEnd']");
+                var tail = spNode.SelectSingleNode("./*[local-name()='spPr']/*[local-name()='ln']/*[local-name()='tailEnd']");
+                shape.LineStartArrowType = head?.Attributes?["type"]?.Value ?? "none";
+                shape.LineEndArrowType = tail?.Attributes?["type"]?.Value ?? "none";
             }
 
             // Transform Coordinates, Rotation & Flips
@@ -9190,7 +10763,7 @@ namespace ZenQOffice.Format
                                             int renderW = Math.Max(1200, (int)Math.Max(shape.Transform.Width * 2, 800));
                                             int renderH = Math.Max(1200, (int)Math.Max(shape.Transform.Height * 2, 800));
                                             shape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
-                                            if (shape.CachedImage != null) shape.OriginalRasterBitmap = new Bitmap(shape.CachedImage);
+                                            // GDI Elimination: do not clone duplicate OriginalRasterBitmap to save 50% RAM
                                             shape.IsSvg = true;
                                             shape.IsGraphic = true;
                                             shape.SvgContent = svgText;
@@ -9208,12 +10781,24 @@ namespace ZenQOffice.Format
                                         }
                                         else
                                         {
-                                            using (Image rawImg = Image.FromStream(ms))
+                                            if (_currentPptxMediaPathCache != null && _currentPptxMediaPathCache.TryGetValue(target, out string cachedPath) && _currentPptxMediaImageCache != null && _currentPptxMediaImageCache.TryGetValue(target, out Image cachedImg))
                                             {
-                                                shape.CachedImage = new Bitmap(rawImg);
-                                                shape.OriginalRasterBitmap = new Bitmap(rawImg);
+                                                shape.ImagePath = cachedPath;
+                                                shape.CachedImage = cachedImg;
                                             }
-                                            shape.ImagePath = target;
+                                            else
+                                            {
+                                                string imgExt = Path.GetExtension(target);
+                                                if (string.IsNullOrEmpty(imgExt)) imgExt = ".png";
+                                                string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
+                                                if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                                                string tempImgPath = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + imgExt);
+                                                File.WriteAllBytes(tempImgPath, ms.ToArray());
+                                                shape.ImagePath = tempImgPath;
+                                                try { shape.CachedImage = Image.FromFile(tempImgPath); } catch { }
+                                                if (_currentPptxMediaPathCache != null) _currentPptxMediaPathCache[target] = tempImgPath;
+                                                if (_currentPptxMediaImageCache != null && shape.CachedImage != null) _currentPptxMediaImageCache[target] = shape.CachedImage;
+                                            }
                                             if (shape.Type == ShapeType.Rectangle) shape.Type = ShapeType.Image;
                                         }
                                     }
@@ -9229,6 +10814,7 @@ namespace ZenQOffice.Format
             XmlNode shpGradFill = spNode.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='gradFill']");
             if (shpGradFill != null)
             {
+                shape.HasFill = true;
                 shape.HasGradientFill = true;
                 var gsList = shpGradFill.SelectNodes(".//*[local-name()='gs']");
                 if (gsList != null && gsList.Count >= 2)
@@ -9273,8 +10859,30 @@ namespace ZenQOffice.Format
             XmlNode solidFill = spNode.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='solidFill']");
             if (solidFill != null)
             {
+                shape.HasFill = true;
                 shape.FillColor = ParseColorVal(solidFill, 0x00FFFFFF, pres);
                 shape.FillOpacity = ParseAlphaVal(solidFill, 1.0f);
+            }
+
+            // Shape No Fill
+            XmlNode shpNoFill = spNode.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='noFill']");
+            if (shpNoFill != null)
+            {
+                shape.HasFill = false;
+                shape.FillOpacity = 0.0f;
+            }
+
+            var lineReference = spNode.SelectSingleNode("./*[local-name()='style']/*[local-name()='lnRef']");
+            if (int.TryParse(lineReference?.Attributes?["idx"]?.Value, out int lineStyleIndex) && lineStyleIndex > 0)
+            {
+                var lineStyles = _currentPptxThemeDoc?.SelectNodes("//*[local-name()='lnStyleLst']/*[local-name()='ln']");
+                var inherited = lineStyles != null && lineStyleIndex <= lineStyles.Count ? lineStyles[lineStyleIndex-1] : null;
+                if (inherited != null && inherited.SelectSingleNode("./*[local-name()='noFill']") == null)
+                {
+                    shape.StrokeWidth = float.TryParse(inherited.Attributes?["w"]?.Value, out float w) ? w / 9525f * scaleX : 1f;
+                    int referenceColor = ParseColorVal(lineReference,0x4472C4,pres);
+                    shape.StrokeColor = ParseColorVal(inherited,referenceColor,pres,referenceColor);
+                }
             }
 
             // Shape Border
@@ -9286,19 +10894,19 @@ namespace ZenQOffice.Format
                 XmlNode lnGradFill = lnNode.SelectSingleNode(".//*[local-name()='gradFill']");
                 bool isLineType = (shape.Type == ShapeType.Line || shape.Type == ShapeType.Arrow);
 
-                if (!hasNoFill && (lnSolidFill != null || lnGradFill != null || isLineType))
+                if (!hasNoFill)
                 {
                     if (lnNode.Attributes["w"] != null)
                     {
                         long lnW;
                         if (long.TryParse(lnNode.Attributes["w"].Value, out lnW))
                         {
-                            shape.StrokeWidth = Math.Max(0.5f, lnW / 12700.0f);
+                            shape.StrokeWidth = Math.Max(0f, lnW / 9525.0f * scaleX);
                         }
                     }
                     else
                     {
-                        shape.StrokeWidth = 1.0f;
+                        if (shape.StrokeWidth <= 0) shape.StrokeWidth = 1.0f;
                     }
 
                     XmlNode prstDash = lnNode.SelectSingleNode(".//*[local-name()='prstDash']");
@@ -9315,6 +10923,7 @@ namespace ZenQOffice.Format
                     if (lnSolidFill != null)
                     {
                         shape.StrokeColor = ParseColorVal(lnSolidFill, isLineType ? 0x4472C4 : 0x000000, pres);
+                        shape.StrokeOpacity = ParseAlphaVal(lnSolidFill,1);
                     }
                     else if (lnGradFill != null)
                     {
@@ -9322,7 +10931,7 @@ namespace ZenQOffice.Format
                     }
                     else
                     {
-                        shape.StrokeColor = ParseColorVal(lnNode, isLineType ? 0x4472C4 : 0x000000, pres);
+                        shape.StrokeColor = ParseColorVal(lnNode, shape.StrokeWidth > 0 ? shape.StrokeColor : (isLineType ? 0x4472C4 : 0x000000), pres);
                     }
                 }
                 else
@@ -9333,7 +10942,7 @@ namespace ZenQOffice.Format
             }
             else
             {
-                if (shape.Type == ShapeType.Line || shape.Type == ShapeType.Arrow)
+                if ((shape.Type == ShapeType.Line || shape.Type == ShapeType.Arrow) && shape.StrokeWidth <= 0)
                 {
                     shape.StrokeWidth = 1.5f;
                     shape.StrokeColor = 0x4472C4;
@@ -9342,7 +10951,7 @@ namespace ZenQOffice.Format
 
             // Shape Effects (<a:effectLst>)
             XmlNode spEffectLst = spNode.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='effectLst']");
-            if (spEffectLst == null) spEffectLst = spNode.SelectSingleNode(".//*[local-name()='effectLst']");
+
             if (spEffectLst != null)
             {
                 XmlNode softEdge = spEffectLst.SelectSingleNode(".//*[local-name()='softEdge']");
@@ -9364,6 +10973,7 @@ namespace ZenQOffice.Format
                 {
                     shape.HasShadow = true;
                     shape.ShadowColor = ParseColorVal(outerShdw, 0x000000, pres);
+                    shape.ShadowOpacity = ParseAlphaVal(outerShdw, 0.35f);
                     long dist = 0, blurVal = 0, dir = 0;
                     if (outerShdw.Attributes["dist"] != null) long.TryParse(outerShdw.Attributes["dist"].Value, out dist);
                     if (outerShdw.Attributes["blurRad"] != null) long.TryParse(outerShdw.Attributes["blurRad"].Value, out blurVal);
@@ -9374,6 +10984,25 @@ namespace ZenQOffice.Format
                     shape.ShadowOffsetX = distPx * (float)Math.Cos(angleRad);
                     shape.ShadowOffsetY = distPx * (float)Math.Sin(angleRad);
                     shape.ShadowBlur = blurVal / 9525.0f;
+                }
+            }
+
+            // Text-run effects belong to glyphs, never to the enclosing rectangle.
+            XmlNode textShadow = spNode.SelectSingleNode("./*[local-name()='txBody']//*[local-name()='rPr' or local-name()='defRPr']/*[local-name()='effectLst']/*[local-name()='outerShdw']");
+            if (textShadow != null)
+            {
+                shape.HasTextShadow = true;
+                if (!shape.HasShadow)
+                {
+                    shape.ShadowColor = ParseColorVal(textShadow, 0x000000, pres);
+                    shape.ShadowOpacity = ParseAlphaVal(textShadow, 0.35f);
+                    long.TryParse(textShadow.Attributes?["dist"]?.Value, out long dist);
+                    long.TryParse(textShadow.Attributes?["blurRad"]?.Value, out long blur);
+                    long.TryParse(textShadow.Attributes?["dir"]?.Value, out long dir);
+                    double angle = dir / 60000.0 * Math.PI / 180.0;
+                    shape.ShadowOffsetX = dist / 9525f * (float)Math.Cos(angle);
+                    shape.ShadowOffsetY = dist / 9525f * (float)Math.Sin(angle);
+                    shape.ShadowBlur = blur / 9525f;
                 }
             }
 
@@ -9406,6 +11035,26 @@ namespace ZenQOffice.Format
                         shape.MarginTop = (insVal / 9525.0f) * scaleY;
                     if (bodyPr.Attributes["bIns"] != null && long.TryParse(bodyPr.Attributes["bIns"].Value, out insVal))
                         shape.MarginBottom = (insVal / 9525.0f) * scaleY;
+
+                    // PowerPoint "Resize shape to fit text" (spAutoFit): height hugs text content
+                    bool hasSpAutoFit = bodyPr.SelectSingleNode(".//*[local-name()='spAutoFit']") != null;
+                    bool hasNoAutoFit = bodyPr.SelectSingleNode(".//*[local-name()='noAutofit']") != null;
+                    bool hasNormAutoFit = bodyPr.SelectSingleNode(".//*[local-name()='normAutofit']") != null;
+                    if (hasSpAutoFit) shape.AutoFitHeight = true;
+                    else if (hasNoAutoFit || hasNormAutoFit) shape.AutoFitHeight = false;
+                    else if (shape.Type == ShapeType.TextBox) shape.AutoFitHeight = true;
+                    shape.AutoFitWidth = false;
+
+                    if (bodyPr.Attributes["wrap"] != null)
+                    {
+                        string wrapVal = bodyPr.Attributes["wrap"].Value.ToLowerInvariant();
+                        shape.WordWrap = (wrapVal != "none");
+                    }
+                    else
+                    {
+                        // In ECMA-376 DrawingML, if 'wrap' attribute is omitted, default is 'square' (wrapping enabled)
+                        shape.WordWrap = true;
+                    }
                 }
 
                 StringBuilder sbText = new StringBuilder();
@@ -9427,6 +11076,7 @@ namespace ZenQOffice.Format
                         bool pUnderline = shape.Underline;
                         int pTextColor = shape.TextColor;
                         string pFontName = shape.FontName;
+                        float pCharacterSpacing = shape.CharacterSpacing;
 
                         XmlNode pPr = pNode.SelectSingleNode(".//*[local-name()='pPr']");
                         if (pPr != null)
@@ -9514,6 +11164,15 @@ namespace ZenQOffice.Format
                                     pUnderline = (defRPr.Attributes["u"].Value != "none");
                                     shape.Underline = pUnderline;
                                 }
+                                if (defRPr.Attributes["spc"] != null)
+                                {
+                                    float spcVal;
+                                    if (float.TryParse(defRPr.Attributes["spc"].Value, out spcVal))
+                                    {
+                                        pCharacterSpacing = (spcVal / 100.0f) * (96.0f / 72.0f) * scaleX;
+                                        shape.CharacterSpacing = pCharacterSpacing;
+                                    }
+                                }
                                 XmlNode defSolid = defRPr.SelectSingleNode(".//*[local-name()='solidFill']");
                                 if (defSolid != null)
                                 {
@@ -9539,6 +11198,22 @@ namespace ZenQOffice.Format
                             shape.LineSpacing = pLineSpacing.Value;
                         }
 
+                        var paragraphStyle = new SlideParagraphStyle { Index=pIdx };
+                        if (pPr != null)
+                        {
+                            int.TryParse(pPr.Attributes?["lvl"]?.Value,out int level); paragraphStyle.Level=level;
+                            if(float.TryParse(pPr.Attributes?["marL"]?.Value,out float left)) paragraphStyle.LeftMargin=left/9525f*scaleX;
+                            if(float.TryParse(pPr.Attributes?["marR"]?.Value,out float right)) paragraphStyle.RightMargin=right/9525f*scaleX;
+                            if(float.TryParse(pPr.Attributes?["indent"]?.Value,out float indent)) paragraphStyle.Indent=indent/9525f*scaleX;
+                            paragraphStyle.Bullet=pPr.SelectSingleNode("./*[local-name()='buChar']")?.Attributes?["char"]?.Value;
+                            paragraphStyle.BulletFont=pPr.SelectSingleNode("./*[local-name()='buFont']")?.Attributes?["typeface"]?.Value;
+                            var numbering=pPr.SelectSingleNode("./*[local-name()='buAutoNum']");paragraphStyle.Numbering=numbering?.Attributes?["type"]?.Value;
+                            if(int.TryParse(numbering?.Attributes?["startAt"]?.Value,out int startAt))paragraphStyle.StartAt=startAt;
+                            if(float.TryParse(pPr.SelectSingleNode("./*[local-name()='buSzPct']")?.Attributes?["val"]?.Value,out float size))paragraphStyle.BulletSize=size/100000f;
+                            var bulletColor=pPr.SelectSingleNode("./*[local-name()='buClr']");if(bulletColor!=null)paragraphStyle.BulletColor=ParseColorVal(bulletColor,pTextColor,pres);
+                        }
+                        shape.ParagraphStyles.Add(paragraphStyle);
+
                         // Process runs and line breaks in document order
                         int runsAddedInP = 0;
                         XmlNodeList rNodes = pNode.SelectNodes(".//*[local-name()='r' or local-name()='br']");
@@ -9556,7 +11231,8 @@ namespace ZenQOffice.Format
                                         ParaLineSpacing = pLineSpacing,
                                         ParaSpaceBefore = pSpaceBefore,
                                         ParaSpaceAfter = pSpaceAfter,
-                                        ParaAlignment = pAlignment
+                                        ParaAlignment = pAlignment,
+                                        CharacterSpacing = pCharacterSpacing
                                     });
                                     runsAddedInP++;
                                     continue;
@@ -9568,6 +11244,7 @@ namespace ZenQOffice.Format
                                 bool rUnderline = pUnderline;
                                 int rTextColor = pTextColor;
                                 string rFontName = pFontName;
+                                float rCharacterSpacing = pCharacterSpacing;
                                 bool rHasGradient = false;
                                 int rGradientColor2 = pTextColor;
                                 float rGradientAngle = 0f;
@@ -9601,6 +11278,15 @@ namespace ZenQOffice.Format
                                     {
                                         rUnderline = (rPr.Attributes["u"].Value != "none");
                                         shape.Underline = rUnderline;
+                                    }
+                                    if (rPr.Attributes["spc"] != null)
+                                    {
+                                        float spcVal;
+                                        if (float.TryParse(rPr.Attributes["spc"].Value, out spcVal))
+                                        {
+                                            rCharacterSpacing = (spcVal / 100.0f) * (96.0f / 72.0f) * scaleX;
+                                            shape.CharacterSpacing = rCharacterSpacing;
+                                        }
                                     }
 
                                     XmlNode txtClr = rPr.SelectSingleNode(".//*[local-name()='solidFill']");
@@ -9688,7 +11374,8 @@ namespace ZenQOffice.Format
                                         ParaLineSpacing = pLineSpacing,
                                         ParaSpaceBefore = pSpaceBefore,
                                         ParaSpaceAfter = pSpaceAfter,
-                                        ParaAlignment = pAlignment
+                                        ParaAlignment = pAlignment,
+                                        CharacterSpacing = rCharacterSpacing
                                     });
                                     runsAddedInP++;
                                 }
@@ -9711,7 +11398,8 @@ namespace ZenQOffice.Format
                                             ParaLineSpacing = pLineSpacing,
                                             ParaSpaceBefore = pSpaceBefore,
                                             ParaSpaceAfter = pSpaceAfter,
-                                            ParaAlignment = pAlignment
+                                            ParaAlignment = pAlignment,
+                                            CharacterSpacing = pCharacterSpacing
                                         });
                                         runsAddedInP++;
                                     }
@@ -9729,7 +11417,8 @@ namespace ZenQOffice.Format
                                 ParaLineSpacing = pLineSpacing,
                                 ParaSpaceBefore = pSpaceBefore,
                                 ParaSpaceAfter = pSpaceAfter,
-                                ParaAlignment = pAlignment
+                                ParaAlignment = pAlignment,
+                                CharacterSpacing = pCharacterSpacing
                             });
                         }
                     }
@@ -10234,6 +11923,7 @@ namespace ZenQOffice.Format
                 if (outerShdw != null)
                 {
                     picShape.HasShadow = true;
+                    picShape.ShadowOpacity = ParseAlphaVal(outerShdw, 0.35f);
                     long dist = 0, blurVal = 0, dir = 0;
                     if (outerShdw.Attributes["dist"] != null) long.TryParse(outerShdw.Attributes["dist"].Value, out dist);
                     if (outerShdw.Attributes["blurRad"] != null) long.TryParse(outerShdw.Attributes["blurRad"].Value, out blurVal);
@@ -10306,7 +11996,7 @@ namespace ZenQOffice.Format
                                         int renderW = Math.Max(1200, (int)Math.Max(picShape.Transform.Width * 2, 800));
                                         int renderH = Math.Max(1200, (int)Math.Max(picShape.Transform.Height * 2, 800));
                                         picShape.CachedImage = ZenQOffice.Core.SvgRasterizer.RenderSvgToBitmap(svgText, renderW, renderH);
-                                        if (picShape.CachedImage != null) picShape.OriginalRasterBitmap = new Bitmap(picShape.CachedImage);
+                                        // GDI Elimination: do not clone duplicate OriginalRasterBitmap to save 50% RAM
                                         picShape.IsSvg = true;
                                         picShape.IsGraphic = true;
                                         picShape.SvgContent = svgText;
@@ -10323,12 +12013,24 @@ namespace ZenQOffice.Format
                                     }
                                     else
                                     {
-                                        using (Image rawImg = Image.FromStream(ms))
+                                        if (_currentPptxMediaPathCache != null && _currentPptxMediaPathCache.TryGetValue(target, out string cachedPicPath) && _currentPptxMediaImageCache != null && _currentPptxMediaImageCache.TryGetValue(target, out Image cachedPicImg))
                                         {
-                                            picShape.CachedImage = new Bitmap(rawImg);
-                                            picShape.OriginalRasterBitmap = new Bitmap(rawImg);
+                                            picShape.ImagePath = cachedPicPath;
+                                            picShape.CachedImage = cachedPicImg;
                                         }
-                                        picShape.ImagePath = target;
+                                        else
+                                        {
+                                            string imgExt = Path.GetExtension(target);
+                                            if (string.IsNullOrEmpty(imgExt)) imgExt = ".png";
+                                            string tempDir = Path.Combine(Path.GetTempPath(), "ZenQOffice", "Media");
+                                            if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                                            string tempImgPath = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + imgExt);
+                                            File.WriteAllBytes(tempImgPath, ms.ToArray());
+                                            picShape.ImagePath = tempImgPath;
+                                            try { picShape.CachedImage = Image.FromFile(tempImgPath); } catch { }
+                                            if (_currentPptxMediaPathCache != null) _currentPptxMediaPathCache[target] = tempImgPath;
+                                            if (_currentPptxMediaImageCache != null && picShape.CachedImage != null) _currentPptxMediaImageCache[target] = picShape.CachedImage;
+                                        }
                                     }
                                 }
                             }
@@ -10968,8 +12670,51 @@ namespace ZenQOffice.Format
 
         private static void ParseSlideTransition(XmlDocument doc, SlideNode slide)
         {
+            if (doc == null || slide == null) return;
             slide.Transition = TransitionType.None;
 
+            // Parse Duration & Speed from <p:transition>
+            XmlNode transNode = doc.SelectSingleNode("//*[local-name()='transition']");
+            if (transNode != null)
+            {
+                float durSec = 0f;
+                if (transNode.Attributes != null)
+                {
+                    foreach (XmlAttribute attr in transNode.Attributes)
+                    {
+                        if (attr.LocalName.Equals("dur", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (int.TryParse(attr.Value, out int ms) && ms > 0)
+                            {
+                                durSec = ms / 1000.0f;
+                                break;
+                            }
+                        }
+                    }
+                    if (durSec <= 0.05f)
+                    {
+                        XmlAttribute spdAttr = transNode.Attributes["spd"];
+                        if (spdAttr != null)
+                        {
+                            string spdVal = spdAttr.Value.ToLower();
+                            if (spdVal == "slow") durSec = 2.0f;
+                            else if (spdVal == "med") durSec = 1.5f;
+                            else if (spdVal == "fast") durSec = 1.0f;
+                        }
+                    }
+                }
+                if (durSec > 0.05f) slide.TransitionDuration = durSec;
+            }
+
+            const string transitionNs="urn:zenqoffice:transition:1";
+            if(Enum.TryParse<TransitionType>(transNode?.Attributes?["effect",transitionNs]?.Value,out var customEffect)&&(customEffect==TransitionType.GenOffice_ColorWipe||customEffect==TransitionType.GenOffice_SmoothFlow))
+            {
+                slide.Transition=customEffect;
+                if(Enum.TryParse<TransitionDirection>(transNode.Attributes?["direction",transitionNs]?.Value,out var customDirection)&&Enum.IsDefined(customDirection))slide.TransitionDirection=customDirection;
+                var colors=new List<int>();foreach(string value in (transNode.Attributes?["colors",transitionNs]?.Value??"").Split(','))if(int.TryParse(value,NumberStyles.HexNumber,CultureInfo.InvariantCulture,out int rgb))colors.Add(rgb&0xffffff);
+                if(colors.Count>0)slide.TransitionColors=colors.Take(4).ToList();
+                return;
+            }
             XmlNode morphNode = doc.SelectSingleNode("//*[local-name()='morph']");
             if (morphNode != null)
             {
@@ -10991,10 +12736,14 @@ namespace ZenQOffice.Format
                 if (m.Contains("word")) slide.MorphMode = MorphType.Words;
                 else if (m.Contains("char")) slide.MorphMode = MorphType.Characters;
                 else slide.MorphMode = MorphType.Objects;
+
+                if (slide.TransitionDuration <= 0.05f)
+                {
+                    slide.TransitionDuration = 2.0f; // PowerPoint 365 default Morph duration is 2.0 seconds
+                }
                 return;
             }
 
-            XmlNode transNode = doc.SelectSingleNode("//*[local-name()='transition']");
             if (transNode != null)
             {
                 if (transNode.SelectSingleNode(".//*[local-name()='fade']") != null) slide.Transition = TransitionType.Fade;
@@ -11015,6 +12764,9 @@ namespace ZenQOffice.Format
                 else if (transNode.SelectSingleNode(".//*[local-name()='comb']") != null) slide.Transition = TransitionType.Comb;
                 else if (transNode.SelectSingleNode(".//*[local-name()='flash']") != null) slide.Transition = TransitionType.Flash;
                 else if (transNode.SelectSingleNode(".//*[local-name()='curtains']") != null) slide.Transition = TransitionType.Curtains;
+                else if (transNode.SelectSingleNode(".//*[local-name()='drape']") != null) slide.Transition = TransitionType.Drape;
+                else if (transNode.SelectSingleNode(".//*[local-name()='fallOver']") != null) slide.Transition = TransitionType.FallOver;
+                else if (transNode.SelectSingleNode(".//*[local-name()='random']") != null) slide.Transition = TransitionType.Random;
                 else if (transNode.SelectSingleNode(".//*[local-name()='wind']") != null) slide.Transition = TransitionType.Wind;
                 else if (transNode.SelectSingleNode(".//*[local-name()='prestige']") != null) slide.Transition = TransitionType.Prestige;
                 else if (transNode.SelectSingleNode(".//*[local-name()='fracture']") != null) slide.Transition = TransitionType.Fracture;
@@ -11045,7 +12797,7 @@ namespace ZenQOffice.Format
             }
         }
 
-        private static void ParseSlideAnimations(XmlDocument doc, SlideNode slide)
+        private static void ParseSlideAnimations(XmlDocument doc, SlideNode slide, float canvasWidth = 1280, float canvasHeight = 720, PresentationRoot colors = null)
         {
             if (doc == null || slide == null) return;
             slide.Animations.Clear();
@@ -11073,33 +12825,37 @@ namespace ZenQOffice.Format
                         if (durStr != "indefinite")
                         {
                             long durMs;
-                            if (long.TryParse(durStr, out durMs) && durMs > 0) dur = durMs / 1000.0f;
+                            if (long.TryParse(durStr, out durMs) && durMs >= 0) dur = Math.Max(.001f, durMs / 1000.0f);
                         }
                     }
 
-                    float delay = 0.0f;
-                    XmlNode condNode = cTn.SelectSingleNode(".//*[local-name()='cond']");
-                    if (condNode != null && condNode.Attributes["delay"] != null)
+                    // Effect wrappers are usually indefinite; the behavior carries the real duration.
+                    var behaviorTimes = cTn.SelectNodes(".//*[local-name()='cBhvr']/*[local-name()='cTn'][@dur]");
+                    float behaviorDuration = 0;
+                    foreach (XmlNode timing in behaviorTimes)
+                        if (float.TryParse(timing.Attributes["dur"].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float milliseconds))
+                            behaviorDuration = Math.Max(behaviorDuration, milliseconds / 1000f);
+                    if (behaviorDuration > 0) dur = behaviorDuration;
+                    float absoluteStart = 0;
+                    for (XmlNode parent = cTn; parent != null && parent != timingNode; parent = parent.ParentNode)
                     {
-                        long delMs;
-                        if (long.TryParse(condNode.Attributes["delay"].Value, out delMs) && delMs > 0) delay = delMs / 1000.0f;
+                        if (parent.LocalName != "cTn") continue;
+                        string kind = parent.Attributes?["nodeType"]?.Value;
+                        if (kind == "mainSeq" || kind == "interactiveSeq" || kind == "tmRoot") break;
+                        var condition = parent.SelectSingleNode("./*[local-name()='stCondLst']/*[local-name()='cond']");
+                        if (float.TryParse(condition?.Attributes?["delay"]?.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float milliseconds)) absoluteStart += milliseconds / 1000f;
                     }
+                    float delay = absoluteStart;
 
                     XmlNode spTgt = cTn.SelectSingleNode(".//*[local-name()='spTgt']");
                     string spid = (spTgt != null && spTgt.Attributes["spid"] != null) ? spTgt.Attributes["spid"].Value : "";
 
                     string targetShapeId = "";
-                    if (!string.IsNullOrEmpty(spid))
-                    {
+                    foreach (ShapeNode sh in slide.Shapes)
+                        if (sh.RawSpid == spid || sh.Id == spid) { targetShapeId = sh.Id; break; }
+                    if (string.IsNullOrEmpty(targetShapeId))
                         foreach (ShapeNode sh in slide.Shapes)
-                        {
-                            if (sh.Id == spid || sh.RawSpid == spid || sh.Name == spid || sh.Name == "Shape " + spid || (sh.Name != null && sh.Name.EndsWith(" " + spid)))
-                            {
-                                targetShapeId = sh.Id;
-                                break;
-                            }
-                        }
-                    }
+                            if (sh.Name == spid || sh.Name == "Shape " + spid) { targetShapeId = sh.Id; break; }
                     if (string.IsNullOrEmpty(targetShapeId))
                     {
                         continue;
@@ -11142,26 +12898,94 @@ namespace ZenQOffice.Format
                         }
                     }
 
-                    if (pClass == "mediacall" || isMediaTargetShape)
+                    if (pClass == "mediacall")
                     {
                         continue;
                     }
 
                     AnimationType aType = MapOpenXmlPresetToAnimationType(pClass, pId, cTn);
+                    string triggerShapeId = "";
+                    XmlNode clickTarget = cTn.SelectSingleNode("ancestor::*[local-name()='seq']/*[local-name()='cTn'][@nodeType='interactiveSeq']/*[local-name()='stCondLst']/*[local-name()='cond'][@evt='onClick']/*[local-name()='tgtEl']/*[local-name()='spTgt']");
+                    if (clickTarget != null)
+                        foreach (var sh in slide.Shapes) if (sh.RawSpid == clickTarget.Attributes?["spid"]?.Value) { triggerShapeId = sh.Id; break; }
                     AnimationTrigger trigger = AnimationTrigger.OnClick;
                     if (nodeType.IndexOf("with", StringComparison.OrdinalIgnoreCase) >= 0) trigger = AnimationTrigger.WithPrevious;
                     else if (nodeType.IndexOf("after", StringComparison.OrdinalIgnoreCase) >= 0) trigger = AnimationTrigger.AfterPrevious;
-                    else if (slide.Animations.Count > 0 && delay > 0 && trigger == AnimationTrigger.OnClick) trigger = AnimationTrigger.AfterPrevious;
+                    if (trigger != AnimationTrigger.OnClick && slide.Animations.Count > 0)
+                    {
+                        AnimationTimeline.Build(slide, out var starts, out var durations, out var steps);
+                        int previous = -1;
+                        for (int j=slide.Animations.Count-1;j>=0;j--)
+                            if ((slide.Animations[j].TriggerShapeId ?? "") == triggerShapeId) { previous=j;break; }
+                        if (previous>=0) delay = Math.Max(0, absoluteStart - starts[previous] - (trigger == AnimationTrigger.AfterPrevious ? durations[previous] : 0));
+                    }
+                    int.TryParse(cTn.Attributes["presetSubtype"]?.Value, out int subtype);
+                    TransitionDirection direction = subtype switch
+                    {
+                        1 => TransitionDirection.FromTop, 2 => TransitionDirection.FromRight,
+                        4 => TransitionDirection.FromBottom, 8 => TransitionDirection.FromLeft,
+                        21 or 37 => TransitionDirection.Vertical, 26 or 42 => TransitionDirection.Horizontal,
+                        10 => TransitionDirection.Horizontal, 5 => TransitionDirection.Vertical,
+                        _ => TransitionDirection.FromBottom
+                    };
 
+                    if (pId == 47 && (pClass == "entr" || pClass == "exit")) direction = TransitionDirection.FromTop;
                     ShapeAnimation anim = new ShapeAnimation
                     {
                         ShapeId = targetShapeId,
                         Type = aType,
                         Trigger = trigger,
-                        Duration = Math.Max(0.1f, dur),
+                        Duration = Math.Max(.001f, dur),
+                        Direction = direction,
+                        TriggerShapeId = triggerShapeId,
+                        SourceEffectFilter = cTn.SelectSingleNode(".//*[local-name()='animEffect']")?.Attributes?["filter"]?.Value,
+                        SourcePresetClass = pClass, SourcePresetId = pId, SourcePresetSubtype = subtype,
+                        SourceAnimationType = aType, SourceDirection = direction,
                         Delay = delay,
                         OrderIndex = slide.Animations.Count
                     };
+                    var reversed = cTn.SelectSingleNode("self::*[@autoRev] | .//*[local-name()='cBhvr']/*[local-name()='cTn'][@autoRev]");
+                    anim.AutoReverse = reversed?.Attributes?["autoRev"]?.Value is "1" or "true";
+                    var rotation = cTn.SelectSingleNode(".//*[local-name()='animRot'][@by]");
+                    if (float.TryParse(rotation?.Attributes?["by"]?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float angleAmount)) anim.RotationDegrees = angleAmount / 60000f;
+                    var scaleBy = cTn.SelectSingleNode(".//*[local-name()='animScale']/*[local-name()='to' or local-name()='by']");
+                    if (scaleBy != null)
+                    {
+                        if(float.TryParse(scaleBy.Attributes?["x"]?.Value,NumberStyles.Float,CultureInfo.InvariantCulture,out float gx))anim.GrowScaleX=gx/100000f;
+                        if(float.TryParse(scaleBy.Attributes?["y"]?.Value,NumberStyles.Float,CultureInfo.InvariantCulture,out float gy))anim.GrowScaleY=gy/100000f;
+                    }
+                    var paragraphRange = spTgt?.SelectSingleNode("./*[local-name()='txEl']/*[local-name()='pRg']");
+                    if (paragraphRange != null)
+                    {
+                        if(int.TryParse(paragraphRange.Attributes?["st"]?.Value,out int start))anim.TargetParagraphStart=start;
+                        if(int.TryParse(paragraphRange.Attributes?["end"]?.Value,out int end))anim.TargetParagraphEnd=end;
+                    }
+                    var characterRange = spTgt?.SelectSingleNode("./*[local-name()='txEl']/*[local-name()='charRg']");
+                    if (characterRange != null)
+                    {
+                        if(int.TryParse(characterRange.Attributes?["st"]?.Value,out int start))anim.TargetCharacterStart=start;
+                        if(int.TryParse(characterRange.Attributes?["end"]?.Value,out int end))anim.TargetCharacterEnd=end+1;
+                    }
+                    XmlNode colorTarget = cTn.SelectSingleNode(".//*[local-name()='animClr']/*[local-name()='to']");
+                    if (colorTarget != null) anim.EmphasisTargetColor = ParseColorVal(colorTarget, 0, colors);
+                    XmlNode motion = cTn.SelectSingleNode(".//*[local-name()='animMotion']");
+                    if (motion?.Attributes?["path"] != null)
+                    {
+                        anim.SourceMotionPath = motion.Attributes["path"].Value;
+                        anim.CustomPoints = PptxMotionPath.Parse(anim.SourceMotionPath, canvasWidth, canvasHeight);
+                        if (anim.CustomPoints.Count > 0)
+                        {
+                            anim.EndOffsetX = anim.CustomPoints[anim.CustomPoints.Count-1].X;
+                            anim.EndOffsetY = anim.CustomPoints[anim.CustomPoints.Count-1].Y;
+                            anim.HasCustomEndOffset = true;
+                        }
+                    }
+                    XmlNode triggerTarget = cTn.SelectSingleNode("ancestor::*[local-name()='seq']/*[local-name()='cTn'][@nodeType='interactiveSeq']/*[local-name()='stCondLst']/*[local-name()='cond'][@evt='onClick']/*[local-name()='tgtEl']/*[local-name()='spTgt']");
+                    if (triggerTarget != null)
+                    {
+                        string raw = triggerTarget.Attributes?["spid"]?.Value;
+                        foreach (var sh in slide.Shapes) if (sh.RawSpid == raw) { anim.TriggerShapeId = sh.Id; break; }
+                    }
                     slide.Animations.Add(anim);
                 }
             }
@@ -11266,86 +13090,36 @@ namespace ZenQOffice.Format
             }
             catch { }
         }
-
         private static AnimationType MapOpenXmlPresetToAnimationType(string pClass, int pId, XmlNode cTn)
         {
-            if (pClass == "entr")
+            if (pClass == "emph") return pId switch
             {
-                switch (pId)
-                {
-                    case 1: return AnimationType.Appear;
-                    case 2: return AnimationType.FlyIn;
-                    case 3: return AnimationType.FloatIn;
-                    case 9: return AnimationType.SplitIn;
-                    case 10: return AnimationType.FadeIn;
-                    case 13: return AnimationType.RandomBarsIn;
-                    case 15: return AnimationType.WheelIn;
-                    case 16: return AnimationType.WipeIn;
-                    case 18: return AnimationType.ZoomIn;
-                    case 20: return AnimationType.Swivel;
-                    case 21: return AnimationType.Bounce;
-                    case 22: return AnimationType.GrowAndTurn;
-                    default: return AnimationType.FadeIn;
-                }
-            }
-            else if (pClass == "emph")
+                1 => AnimationType.FillColor, 3 => AnimationType.FontColor, 4 or 6 => AnimationType.GrowShrink,
+                7 => AnimationType.LineColor, 8 => AnimationType.Spin, 9 => AnimationType.Transparency,
+                10 => AnimationType.BoldFlash, 15 => AnimationType.BoldReveal, 16 => AnimationType.BrushColor,
+                18 => AnimationType.Underline, 19 or 20 => AnimationType.ColorPulse, 21 or 22 => AnimationType.ComplementaryColor,
+                24 => AnimationType.Darken, 25 => AnimationType.Desaturate, 30 => AnimationType.Lighten,
+                32 => AnimationType.Teeter, 34 => AnimationType.Wave, _ => AnimationType.Pulse
+            };
+            if (pClass == "path") return AnimationType.MotionCustom;
+            bool exit = pClass == "exit";
+            return pId switch
             {
-                switch (pId)
-                {
-                    case 23: return AnimationType.Spin;
-                    case 24: return AnimationType.GrowShrink;
-                    case 25: return AnimationType.Transparency;
-                    case 26: return AnimationType.Teeter;
-                    case 27: return AnimationType.ColorPulse;
-                    case 28: return AnimationType.Pulse;
-                    case 29: return AnimationType.Desaturate;
-                    case 30: return AnimationType.Darken;
-                    case 31: return AnimationType.Lighten;
-                    case 32: return AnimationType.ObjectColor;
-                    case 33: return AnimationType.ComplementaryColor;
-                    case 34: return AnimationType.LineColor;
-                    case 35: return AnimationType.FillColor;
-                    case 36: return AnimationType.BrushColor;
-                    case 37: return AnimationType.FontColor;
-                    case 38: return AnimationType.Underline;
-                    case 39: return AnimationType.BoldFlash;
-                    case 40: return AnimationType.BoldReveal;
-                    case 41: return AnimationType.Wave;
-                    default: return AnimationType.Pulse;
-                }
-            }
-            else if (pClass == "exit")
-            {
-                switch (pId)
-                {
-                    case 1: return AnimationType.Disappear;
-                    case 2: return AnimationType.FlyOut;
-                    case 3: return AnimationType.FloatOut;
-                    case 9: return AnimationType.SplitOut;
-                    case 10: return AnimationType.FadeOut;
-                    case 13: return AnimationType.RandomBarsOut;
-                    case 15: return AnimationType.WheelOut;
-                    case 16: return AnimationType.WipeOut;
-                    case 18: return AnimationType.ZoomOut;
-                    case 20: return AnimationType.SwivelOut;
-                    case 21: return AnimationType.BounceOut;
-                    case 22: return AnimationType.ShrinkAndTurn;
-                    default: return AnimationType.FadeOut;
-                }
-            }
-            else if (pClass == "path")
-            {
-                switch (pId)
-                {
-                    case 1: return AnimationType.MotionLine;
-                    case 2: return AnimationType.MotionArc;
-                    case 3: return AnimationType.MotionTurn;
-                    case 4: return AnimationType.MotionShape;
-                    case 5: return AnimationType.MotionLoop;
-                    default: return AnimationType.MotionCustom;
-                }
-            }
-            return AnimationType.FadeIn;
+                1 => exit ? AnimationType.Disappear : AnimationType.Appear,
+                2 => exit ? AnimationType.FlyOut : AnimationType.FlyIn,
+                10 => exit ? AnimationType.FadeOut : AnimationType.FadeIn,
+                14 => exit ? AnimationType.RandomBarsOut : AnimationType.RandomBarsIn,
+                16 => exit ? AnimationType.SplitOut : AnimationType.SplitIn,
+                19 or 45 => exit ? AnimationType.SwivelOut : AnimationType.Swivel,
+                21 => exit ? AnimationType.WheelOut : AnimationType.WheelIn,
+                22 => exit ? AnimationType.WipeOut : AnimationType.WipeIn,
+                23 or 53 => exit ? AnimationType.ZoomOut : AnimationType.ZoomIn,
+                26 => exit ? AnimationType.BounceOut : AnimationType.Bounce,
+                30 or 42 or 47 => exit ? AnimationType.FloatOut : AnimationType.FloatIn,
+                31 => exit ? AnimationType.ShrinkAndTurn : AnimationType.GrowAndTurn,
+                4 or 6 or 8 or 13 => exit ? AnimationType.ShapeOut : AnimationType.ShapeIn,
+                _ => exit ? AnimationType.FadeOut : AnimationType.FadeIn
+            };
         }
 
         private static int ExtractSlideNum(string name)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -1022,234 +1022,149 @@ namespace ZenQOffice.UI
     /// </summary>
     public class GlassDropDownPopup : Form
     {
-        private List<string> _items;
-        private int _selectedIndex;
+        private readonly List<string> _items;
+        private readonly int _selectedIndex;
         private int _hoverIndex = -1;
-        private Font _itemFont;
-        private Font _itemFontBold;
-        private int _itemHeight = 36;
-        private int _cornerRadius = 12;
-        private int _padV = 6;
-
+        private int _firstVisible;
+        private readonly Font _itemFont;
+        private readonly Font _itemFontBold;
+        private const int ItemHeight = 36;
+        private const int Pad = 6;
         public event EventHandler<IndexEventArgs> ItemSelected;
 
-        [DllImport("user32.dll")]
-        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int x, int y, int w, int h, int cx, int cy);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
         public GlassDropDownPopup(List<string> items, int selectedIndex, Font baseFont, int minWidth)
         {
             _items = items;
             _selectedIndex = selectedIndex;
-            _itemFont = new Font("Segoe UI", 9.8f);
-            _itemFontBold = new Font("Segoe UI", 9.8f, FontStyle.Bold);
-
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.StartPosition = FormStartPosition.Manual;
-            this.ShowInTaskbar = false;
-            this.TopMost = true;
-            this.DoubleBuffered = true;
-            this.BackColor = Color.Magenta;
-            this.TransparencyKey = Color.Magenta;
-
-            int contentW = Math.Max(minWidth, 200);
-            using (Graphics gm = Graphics.FromHwnd(IntPtr.Zero))
-            {
-                for (int i = 0; i < _items.Count; i++)
-                {
-                    SizeF sz = gm.MeasureString(_items[i], _itemFont);
-                    contentW = Math.Max(contentW, (int)sz.Width + 60);
-                }
-            }
-            int contentH = _items.Count * _itemHeight + _padV * 2;
-            this.Size = new Size(contentW, contentH);
-
-            this.SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            _itemFont = new Font(baseFont.FontFamily, baseFont.Size);
+            _itemFontBold = new Font(baseFont.FontFamily, baseFont.Size, FontStyle.Bold);
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition = FormStartPosition.Manual;
+            ShowInTaskbar = false;
+            DoubleBuffered = false;
+            BackColor = Color.FromArgb(252, 253, 255);
+            int contentWidth = Math.Max(minWidth, 200);
+            foreach (string item in items)
+                contentWidth = Math.Max(contentWidth, TextRenderer.MeasureText(item, _itemFont).Width + 58);
+            Size = new Size(contentWidth, Math.Min(420, items.Count * ItemHeight + Pad * 2));
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
         }
 
         protected override CreateParams CreateParams
         {
-            get
+            get { var cp = base.CreateParams; cp.ExStyle |= 0x80; cp.ClassStyle |= 0x20000; return cp; }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            // Native composition rounds the opaque HWND: no chroma-key fringe or jagged GDI mask.
+            try
             {
-                CreateParams cp = base.CreateParams;
-                cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW
-                cp.ClassStyle |= 0x00020000; // CS_DROPSHADOW
-                return cp;
+                int round = 2;
+                DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int));
+                int border = 0x00E8DDD5;
+                DwmSetWindowAttribute(Handle, 34, ref border, sizeof(int));
             }
+            catch (DllNotFoundException) { }
         }
 
         protected override void OnShown(EventArgs e)
         {
+            Rectangle work = Screen.FromPoint(Location).WorkingArea;
+            Width = Math.Min(Width, work.Width - 16);
+            Height = Math.Min(Height, work.Height - 16);
+            Left = Math.Clamp(Left, work.Left + 8, work.Right - Width - 8);
+            Top = Math.Clamp(Top, work.Top + 8, work.Bottom - Height - 8);
+            _hoverIndex = _selectedIndex;
+            EnsureVisible(_selectedIndex);
             base.OnShown(e);
-            // Replaced SetWindowRgn with TransparencyKey for High DPI support
         }
 
-        protected override void OnDeactivate(EventArgs e)
+        private int VisibleRows => Math.Max(1, (Height - Pad * 2) / ItemHeight);
+        private void EnsureVisible(int index)
         {
-            base.OnDeactivate(e);
-            this.Close();
+            if (index < _firstVisible) _firstVisible = Math.Max(0, index);
+            if (index >= _firstVisible + VisibleRows) _firstVisible = index - VisibleRows + 1;
+            _firstVisible = Math.Clamp(_firstVisible, 0, Math.Max(0, _items.Count - VisibleRows));
         }
-
+        private int GetItemIndexAt(int y)
+        {
+            if (y < Pad || y >= Height - Pad) return -1;
+            int index = _firstVisible + (y - Pad) / ItemHeight;
+            return index < _items.Count ? index : -1;
+        }
+        protected override void OnDeactivate(EventArgs e) { base.OnDeactivate(e); Close(); }
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            int newHover = GetItemIndexAt(e.Y);
-            if (newHover != _hoverIndex)
-            {
-                _hoverIndex = newHover;
-                Invalidate();
-            }
+            int index = GetItemIndexAt(e.Y);
+            if (index != _hoverIndex) { _hoverIndex = index; Invalidate(); }
         }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-            _hoverIndex = -1;
-            Invalidate();
-        }
-
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hoverIndex = -1; Invalidate(); }
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
-            int idx = GetItemIndexAt(e.Y);
-            if (idx >= 0 && idx < _items.Count)
-            {
-                if (ItemSelected != null) ItemSelected(this, new IndexEventArgs(idx));
-                this.Close();
-            }
+            int index = GetItemIndexAt(e.Y);
+            if (e.Button == MouseButtons.Left && index >= 0) SelectItem(index);
         }
-
-        private int GetItemIndexAt(int y)
+        private void SelectItem(int index) { ItemSelected?.Invoke(this, new IndexEventArgs(index)); Close(); }
+        protected override void OnMouseWheel(MouseEventArgs e)
         {
-            int idx = (y - _padV) / _itemHeight;
-            if (idx < 0 || idx >= _items.Count) return -1;
-            return idx;
+            _firstVisible = Math.Clamp(_firstVisible - Math.Sign(e.Delta) * 3, 0, Math.Max(0, _items.Count - VisibleRows));
+            Invalidate();
         }
-
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape) { Close(); return true; }
+            if (keyData == Keys.Enter && _hoverIndex >= 0) { SelectItem(_hoverIndex); return true; }
+            if (keyData == Keys.Up || keyData == Keys.Down || keyData == Keys.Home || keyData == Keys.End)
+            {
+                _hoverIndex = keyData == Keys.Home ? 0 : keyData == Keys.End ? _items.Count - 1
+                    : Math.Clamp(_hoverIndex + (keyData == Keys.Up ? -1 : 1), 0, _items.Count - 1);
+                EnsureVisible(_hoverIndex); Invalidate(); return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+        protected override void OnPaintBackground(PaintEventArgs e) { }
         protected override void OnPaint(PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-            RectangleF bounds = new RectangleF(0, 0, this.Width, this.Height);
-            float r = _cornerRadius;
-
-            using (GraphicsPath path = AiVectorGlassRenderer.CreateRoundedPath(bounds, r))
-            {
-                // A. Opaque frosted glass base
-                using (SolidBrush baseBrush = new SolidBrush(Color.FromArgb(248, 250, 255)))
-                {
-                    g.FillPath(baseBrush, path);
-                }
-
-                // B. Glass sheen gradient
-                using (LinearGradientBrush glassBrush = new LinearGradientBrush(bounds,
-                    Color.FromArgb(120, 255, 255, 255), Color.FromArgb(30, 220, 232, 250), 90f))
-                {
-                    g.FillPath(glassBrush, path);
-                }
-
-                // C. Top specular highlight
-                RectangleF glossRect = new RectangleF(2, 1, this.Width - 4, Math.Min(20f, this.Height * 0.15f));
-                if (glossRect.Height > 4)
-                {
-                    using (GraphicsPath gp = AiVectorGlassRenderer.CreateRoundedPath(glossRect, r - 1))
-                    using (LinearGradientBrush gb = new LinearGradientBrush(glossRect,
-                        Color.FromArgb(130, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90f))
-                    {
-                        g.FillPath(gb, gp);
-                    }
-                }
-            }
-
-            // D. Draw items
-            for (int i = 0; i < _items.Count; i++)
-            {
-                int itemY = _padV + i * _itemHeight;
-                RectangleF itemRect = new RectangleF(_padV, itemY, this.Width - _padV * 2, _itemHeight);
-                bool isSelected = (i == _selectedIndex);
-                bool isHovered = (i == _hoverIndex);
-
-                if (isHovered)
-                {
-                    using (GraphicsPath hp = AiVectorGlassRenderer.CreateRoundedPath(itemRect, 8f))
-                    using (SolidBrush hb = new SolidBrush(Color.FromArgb(40, 99, 102, 241)))
-                    {
-                        g.FillPath(hb, hp);
-                    }
-                }
-
-                if (isSelected && !isHovered)
-                {
-                    using (GraphicsPath sp = AiVectorGlassRenderer.CreateRoundedPath(itemRect, 8f))
-                    using (SolidBrush sb = new SolidBrush(Color.FromArgb(18, 99, 102, 241)))
-                    {
-                        g.FillPath(sb, sp);
-                    }
-                }
-
-                string displayText = _items[i];
-                bool isBlank = string.IsNullOrEmpty(displayText);
-                if (isBlank) displayText = "<Chưa đặt tên>";
-
-                Font f = isSelected ? _itemFontBold : _itemFont;
-                if (isBlank) f = new Font(_itemFont.FontFamily, _itemFont.Size, FontStyle.Italic);
-                
-                Color textCol = isSelected ? Color.FromArgb(79, 70, 229)
-                    : (isHovered ? Color.FromArgb(55, 48, 163) : (isBlank ? Color.FromArgb(148, 163, 184) : Color.FromArgb(30, 41, 59)));
-
-                RectangleF textRect = new RectangleF(itemRect.X + 14, itemRect.Y, itemRect.Width - 40, itemRect.Height);
-                using (SolidBrush tb = new SolidBrush(textCol))
-                {
-                    StringFormat sf = new StringFormat
-                    {
-                        Alignment = StringAlignment.Near,
-                        LineAlignment = StringAlignment.Center,
-                        FormatFlags = StringFormatFlags.NoWrap,
-                        Trimming = StringTrimming.EllipsisCharacter
-                    };
-                    g.DrawString(displayText, f, tb, textRect, sf);
-                }
-                if (isBlank) f.Dispose();
-
-                if (isSelected)
-                {
-                    float checkX = itemRect.Right - 26;
-                    float checkY = itemRect.Y + (itemRect.Height - 12) / 2f;
-                    using (Pen cp = new Pen(Color.FromArgb(79, 70, 229), 2.2f))
-                    {
-                        cp.StartCap = LineCap.Round;
-                        cp.EndCap = LineCap.Round;
-                        g.DrawLine(cp, checkX, checkY + 6, checkX + 4, checkY + 10);
-                        g.DrawLine(cp, checkX + 4, checkY + 10, checkX + 11, checkY + 2);
-                    }
-                }
-            }
-
-            // E. Outer border
-            using (GraphicsPath bp = AiVectorGlassRenderer.CreateRoundedPath(
-                new RectangleF(0.5f, 0.5f, this.Width - 1f, this.Height - 1f), r))
-            {
-                using (Pen ig = new Pen(Color.FromArgb(140, 255, 255, 255), 2f))
-                {
-                    g.DrawPath(ig, bp);
-                }
-                using (Pen ob = new Pen(Color.FromArgb(60, 99, 102, 241), 1f))
-                {
-                    g.DrawPath(ob, bp);
-                }
-            }
+            using var frame = AiGpuPaint.Begin(this, e);
+            DrawContent(frame.Graphics);
         }
-
+        internal void DrawContent(D2DGraphics g)
+        {
+            g.Clear(BackColor);
+            for (int i = _firstVisible; i < Math.Min(_items.Count, _firstVisible + VisibleRows); i++)
+            {
+                var bounds = new RectangleF(Pad, Pad + (i - _firstVisible) * ItemHeight, Width - Pad * 2, ItemHeight);
+                bool selected = i == _selectedIndex;
+                bool hovered = i == _hoverIndex;
+                if (selected || hovered)
+                {
+                    using var brush = new SolidBrush(hovered ? Color.FromArgb(232, 240, 249) : Color.FromArgb(239, 244, 250));
+                    g.FillRoundedRectangle(brush, bounds, 7f);
+                }
+                var textBounds = Rectangle.Round(new RectangleF(bounds.X + 12, bounds.Y, bounds.Width - 42, bounds.Height));
+                AiGpuPaint.DrawText(g, string.IsNullOrEmpty(_items[i]) ? "<Chưa đặt tên>" : _items[i],
+                    selected ? _itemFontBold : _itemFont, textBounds,
+                    selected ? Color.FromArgb(29, 91, 157) : Color.FromArgb(40, 53, 69), TextFormatFlags.VerticalCenter);
+                if (selected)
+                {
+                    using var pen = new Pen(Color.FromArgb(32, 108, 186), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+                    float x = bounds.Right - 24, y = bounds.Y + 12;
+                    g.DrawLines(pen, new PointF[] { new(x, y + 6), new(x + 4, y + 10), new(x + 12, y + 2) });
+                }
+            }
+            using var border = new Pen(Color.FromArgb(213, 221, 232), 1f);
+            g.DrawRoundedRectangle(border, new RectangleF(.5f, .5f, Width - 1, Height - 1), 8f);
+        }
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
-            {
-                if (_itemFont != null) _itemFont.Dispose();
-                if (_itemFontBold != null) _itemFontBold.Dispose();
-            }
+            if (disposing) { _itemFont.Dispose(); _itemFontBold.Dispose(); }
             base.Dispose(disposing);
         }
     }

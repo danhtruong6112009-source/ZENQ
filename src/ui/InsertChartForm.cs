@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -397,7 +397,7 @@ namespace ZenQOffice.UI
             };
 
             // Left Category List (Exact MS Excel Categories)
-            lstAllCategories = new ListBox
+            lstAllCategories = new ZenQOffice.UI.FluentListBox
             {
                 Location = new Point(16, 12),
                 Size = new Size(185, 460),

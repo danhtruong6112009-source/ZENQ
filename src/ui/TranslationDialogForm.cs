@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Net.Http;
@@ -113,7 +113,7 @@ namespace ZenQOffice.UI
             lblTarget.ForeColor = Color.FromArgb(50, 49, 48);
             this.Controls.Add(lblTarget);
 
-            cboTargetLang = new ComboBox();
+            cboTargetLang = new ZenQOffice.UI.FluentComboBox();
             cboTargetLang.DropDownStyle = ComboBoxStyle.DropDownList;
             cboTargetLang.Location = new Point(88, 196);
             cboTargetLang.Size = new Size(170, 26);

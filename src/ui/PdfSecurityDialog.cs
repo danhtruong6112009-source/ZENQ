@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -243,7 +243,7 @@ namespace ZenQOffice.UI
             Label lblEnc = new Label { Text = "Thuật toán:", Location = new Point(14, 28), AutoSize = true };
             grpEnc.Controls.Add(lblEnc);
 
-            cboKeyLength = new ComboBox
+            cboKeyLength = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(120, 24),
@@ -332,13 +332,13 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtOpenPass.Text))
                 {
-                    MessageBox.Show(this, "Vui lòng nhập mật khẩu mở tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập mật khẩu mở tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtOpenPass.Focus();
                     return;
                 }
                 if (txtOpenPass.Text != txtConfirmOpenPass.Text)
                 {
-                    MessageBox.Show(this, "Mật khẩu mở tài liệu xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Mật khẩu mở tài liệu xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtConfirmOpenPass.Focus();
                     return;
                 }
@@ -348,13 +348,13 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtPermPass.Text))
                 {
-                    MessageBox.Show(this, "Vui lòng nhập mật khẩu quyền hạn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập mật khẩu quyền hạn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtPermPass.Focus();
                     return;
                 }
                 if (txtPermPass.Text != txtConfirmPermPass.Text)
                 {
-                    MessageBox.Show(this, "Mật khẩu quyền hạn xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Mật khẩu quyền hạn xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtConfirmPermPass.Focus();
                     return;
                 }
@@ -362,7 +362,7 @@ namespace ZenQOffice.UI
 
             if (!chkOpenPass.Checked && !chkPermPass.Checked)
             {
-                MessageBox.Show(this, "Vui lòng chọn ít nhất một hình thức bảo mật (Mật khẩu mở hoặc Mật khẩu quyền hạn)!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn ít nhất một hình thức bảo mật (Mật khẩu mở hoặc Mật khẩu quyền hạn)!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 

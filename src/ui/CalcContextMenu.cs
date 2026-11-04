@@ -397,7 +397,7 @@ namespace ZenQOffice.UI
                     break;
 
                 case 11: // Align ≡ ▾
-                    ContextMenuStrip aMenu = new ContextMenuStrip();
+                    ContextMenuStrip aMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                     aMenu.Items.Add("Căn trái (Left)", null, (s, e) => { _calcView.SetSelectedCellAlign(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Items.Add("Căn giữa (Center)", null, (s, e) => { _calcView.SetSelectedCellAlign(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Items.Add("Căn phải (Right)", null, (s, e) => { _calcView.SetSelectedCellAlign(2); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
@@ -429,7 +429,7 @@ namespace ZenQOffice.UI
                     break;
 
                 case 14: // Borders ⊞ ▾
-                    ContextMenuStrip bdrMenu = new ContextMenuStrip();
+                    ContextMenuStrip bdrMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                     bdrMenu.ShowImageMargin = true;
                     bdrMenu.Items.Add("Viền dưới (Bottom Border)", RibbonBar.CreateExcelBorderIcon(0), (s, e) => { _calcView.ApplyBorderPreset(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     bdrMenu.Items.Add("Viền trên (Top Border)", RibbonBar.CreateExcelBorderIcon(1), (s, e) => { _calcView.ApplyBorderPreset(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
@@ -483,10 +483,10 @@ namespace ZenQOffice.UI
         {
             if (calcView == null) return;
 
-            ContextMenuStrip cms = new ContextMenuStrip();
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.ShowImageMargin = true;
             cms.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
-            cms.Renderer = new ExcelMenuRenderer();
+            cms.Renderer = FluentUi.MenuRenderer;
 
             // 1. Mini-Toolbar Host
             CalcMiniToolbarControl toolbar = new CalcMiniToolbarControl(calcView, ribbon, parentForm, cms);
@@ -667,19 +667,19 @@ namespace ZenQOffice.UI
             {
                 CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
                 string val = cd != null ? (cd.EvaluatedStr ?? cd.RawValue ?? "") : "";
-                MessageBox.Show("Đã lọc bảng tính theo giá trị: \"" + val + "\"", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc bảng tính theo giá trị: \"" + val + "\"", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Color", null, (s, e) =>
             {
-                MessageBox.Show("Đã lọc theo màu nền ô.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo màu nền ô.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Font Color", null, (s, e) =>
             {
-                MessageBox.Show("Đã lọc theo màu chữ.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo màu chữ.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Icon", null, (s, e) =>
             {
-                MessageBox.Show("Đã lọc theo biểu tượng điều kiện.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo biểu tượng điều kiện.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             cms.Items.Add(filterMenu);
 
@@ -741,7 +741,7 @@ namespace ZenQOffice.UI
                 }
                 if (vals.Count > 0)
                 {
-                    ContextMenuStrip pMenu = new ContextMenuStrip();
+                    ContextMenuStrip pMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                     foreach (string v in vals)
                     {
                         string curVal = v;
@@ -763,7 +763,7 @@ namespace ZenQOffice.UI
                 string name = PromptInput("Đặt tên đại diện cho vùng chọn:", "Define Name", "Range1");
                 if (!string.IsNullOrEmpty(name))
                 {
-                    MessageBox.Show("Đã gán tên đại diện \"" + name + "\" cho vùng chọn!", "Define Name", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã gán tên đại diện \"" + name + "\" cho vùng chọn!", "Define Name", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }));
 

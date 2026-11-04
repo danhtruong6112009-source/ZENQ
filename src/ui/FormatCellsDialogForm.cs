@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -95,7 +95,7 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
             this.BackColor = Color.FromArgb(243, 244, 246);
 
-            _tabControl = new TabControl
+            _tabControl = new ZenQOffice.UI.FluentTabControl
             {
                 Location = new Point(12, 12),
                 Size = new Size(540, 415),
@@ -179,7 +179,7 @@ namespace ZenQOffice.UI
             Label lblCat = new Label { Text = "Loại định dạng (Category):", Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             tab.Controls.Add(lblCat);
 
-            _lstCategory = new ListBox { Location = new Point(16, 36), Size = new Size(160, 260) };
+            _lstCategory = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 36), Size = new Size(160, 260) };
             _lstCategory.Items.AddRange(new object[] {
                 "Chung (General)",
                 "Số (Number)",
@@ -216,7 +216,7 @@ namespace ZenQOffice.UI
             Label lblSymbol = new Label { Text = "Ký hiệu tiền tệ:", Location = new Point(0, 46), AutoSize = true };
             _pnlNumberOptions.Controls.Add(lblSymbol);
 
-            _cboCurrencySymbol = new ComboBox { Location = new Point(120, 44), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboCurrencySymbol = new ZenQOffice.UI.FluentComboBox { Location = new Point(120, 44), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboCurrencySymbol.Items.AddRange(new object[] { "₫ (VND)", "$ (USD)", "€ (EUR)", "¥ (JPY)", "£ (GBP)", "None (Không)" });
             _cboCurrencySymbol.SelectedIndex = 0;
             _cboCurrencySymbol.SelectedIndexChanged += (s, e) => UpdateSamplePreview();
@@ -289,7 +289,7 @@ namespace ZenQOffice.UI
             Label lblH = new Label { Text = "Căn lề ngang (Horizontal):", Location = new Point(16, 30), AutoSize = true };
             grpAlign.Controls.Add(lblH);
 
-            _cboHAlign = new ComboBox { Location = new Point(180, 26), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboHAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 26), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboHAlign.Items.AddRange(new object[] { "Mặc định (General)", "Trái (Left)", "Giữa (Center)", "Phải (Right)" });
             _cboHAlign.SelectedIndex = 0;
             grpAlign.Controls.Add(_cboHAlign);
@@ -303,7 +303,7 @@ namespace ZenQOffice.UI
             Label lblV = new Label { Text = "Căn lề dọc (Vertical):", Location = new Point(16, 76), AutoSize = true };
             grpAlign.Controls.Add(lblV);
 
-            _cboVAlign = new ComboBox { Location = new Point(180, 72), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboVAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 72), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboVAlign.Items.AddRange(new object[] { "Trên (Top)", "Giữa (Middle)", "Dưới (Bottom)" });
             _cboVAlign.SelectedIndex = 1;
             grpAlign.Controls.Add(_cboVAlign);
@@ -332,7 +332,7 @@ namespace ZenQOffice.UI
             _txtFontName = new TextBox { Location = new Point(16, 32), Size = new Size(180, 24), Text = "Calibri" };
             tab.Controls.Add(_txtFontName);
 
-            _lstFontName = new ListBox { Location = new Point(16, 58), Size = new Size(180, 160) };
+            _lstFontName = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 58), Size = new Size(180, 160) };
             string[] commonFonts = new string[] { "Calibri", "Aptos", "Arial", "Segoe UI", "Times New Roman", "Tahoma", "Verdana", "Georgia", "Courier New", "Trebuchet MS", "Consolas" };
             _lstFontName.Items.AddRange(commonFonts);
             _lstFontName.SelectedIndex = 0;
@@ -349,7 +349,7 @@ namespace ZenQOffice.UI
             _txtFontStyle = new TextBox { Location = new Point(208, 32), Size = new Size(120, 24), Text = "Thường" };
             tab.Controls.Add(_txtFontStyle);
 
-            _lstFontStyle = new ListBox { Location = new Point(208, 58), Size = new Size(120, 160) };
+            _lstFontStyle = new ZenQOffice.UI.FluentListBox { Location = new Point(208, 58), Size = new Size(120, 160) };
             _lstFontStyle.Items.AddRange(new object[] { "Thường (Regular)", "Nghiêng (Italic)", "Đậm (Bold)", "Đậm Nghiêng (Bold Italic)" });
             _lstFontStyle.SelectedIndex = 0;
             _lstFontStyle.SelectedIndexChanged += (s, e) => {
@@ -365,7 +365,7 @@ namespace ZenQOffice.UI
             _txtFontSize = new TextBox { Location = new Point(340, 32), Size = new Size(60, 24), Text = "11" };
             tab.Controls.Add(_txtFontSize);
 
-            _lstFontSize = new ListBox { Location = new Point(340, 58), Size = new Size(60, 160) };
+            _lstFontSize = new ZenQOffice.UI.FluentListBox { Location = new Point(340, 58), Size = new Size(60, 160) };
             _lstFontSize.Items.AddRange(new object[] { 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72 });
             _lstFontSize.SelectedIndex = 3; // 11
             _lstFontSize.SelectedIndexChanged += (s, e) => {
@@ -474,7 +474,7 @@ namespace ZenQOffice.UI
             Label lblStyle = new Label { Text = "Kiểu nét vẽ:", Location = new Point(20, 110), AutoSize = true };
             grpBorder.Controls.Add(lblStyle);
 
-            _cboBorderStyle = new ComboBox { Location = new Point(100, 106), Size = new Size(120, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            _cboBorderStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(100, 106), Size = new Size(120, 26), DropDownStyle = ComboBoxStyle.DropDownList };
             _cboBorderStyle.Items.AddRange(new object[] { "Mảnh (Thin)", "Trung bình (Medium)", "Đậm (Thick)", "Nét đứt (Dashed)", "Nét đôi (Double)" });
             _cboBorderStyle.SelectedIndex = 0;
             grpBorder.Controls.Add(_cboBorderStyle);

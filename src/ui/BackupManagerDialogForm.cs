@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -416,7 +416,7 @@ namespace ZenQOffice.UI
             var item = GetSelectedBackup();
             if (item == null)
             {
-                MessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -425,7 +425,7 @@ namespace ZenQOffice.UI
             if (ok)
             {
                 string msg = $"Đã {actionName.ToLower()} bản sao lưu ra thành công:\n{finalPath}\n\nBạn có muốn mở thư mục chứa tệp ngay bây giờ không?";
-                if (MessageBox.Show(this, msg, "Hoàn thành", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                if (ZenQOffice.UI.FluentMessageBox.Show(this, msg, "Hoàn thành", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                 {
                     try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{finalPath}\"") { UseShellExecute = true }); } catch { }
                 }
@@ -433,7 +433,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                MessageBox.Show(this, "Không thể di chuyển tệp. Vui lòng kiểm tra quyền truy cập thư mục.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể di chuyển tệp. Vui lòng kiểm tra quyền truy cập thư mục.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -442,7 +442,7 @@ namespace ZenQOffice.UI
             var item = GetSelectedBackup();
             if (item == null)
             {
-                MessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -452,7 +452,7 @@ namespace ZenQOffice.UI
                 fbd.UseDescriptionForTitle = true;
                 if (fbd.ShowDialog(this) == DialogResult.OK)
                 {
-                    var opt = MessageBox.Show(this, "Bạn muốn Cắt (Di chuyển) hay Sao chép tệp sang thư mục này?\n\n• Nhấn [Yes] để CẮT (Xóa khỏi kho backup, chuyển hẳn sang thư mục mới)\n• Nhấn [No] để SAO CHÉP (Giữ nguyên trong kho backup)", "Tùy chọn di chuyển", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                    var opt = ZenQOffice.UI.FluentMessageBox.Show(this, "Bạn muốn Cắt (Di chuyển) hay Sao chép tệp sang thư mục này?\n\n• Nhấn [Yes] để CẮT (Xóa khỏi kho backup, chuyển hẳn sang thư mục mới)\n• Nhấn [No] để SAO CHÉP (Giữ nguyên trong kho backup)", "Tùy chọn di chuyển", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                     if (opt == DialogResult.Cancel) return;
                     bool cut = (opt == DialogResult.Yes);
                     RelocateSelected(cut, fbd.SelectedPath);
@@ -465,17 +465,17 @@ namespace ZenQOffice.UI
             var item = GetSelectedBackup();
             if (item == null)
             {
-                MessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một tệp sao lưu trong danh sách.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             string warn = $"Bạn có chắc chắn muốn khôi phục tệp sao lưu ghi đè trở lại đường dẫn gốc:\n{item.OriginalPath}\n\nThao tác này sẽ thay thế hoàn toàn tệp hiện tại bằng bản sao lưu lúc {item.BackupTime:dd/MM/yyyy HH:mm:ss}.";
-            if (MessageBox.Show(this, warn, "Xác nhận khôi phục", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            if (ZenQOffice.UI.FluentMessageBox.Show(this, warn, "Xác nhận khôi phục", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 bool ok = BackupManager.RestoreToOriginal(item);
                 if (ok)
                 {
-                    MessageBox.Show(this, "Đã khôi phục tệp gốc thành công!\nNếu tệp đang mở trong ứng dụng, vui lòng mở lại để nạp nội dung đã khôi phục.", "Khôi phục thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã khôi phục tệp gốc thành công!\nNếu tệp đang mở trong ứng dụng, vui lòng mở lại để nạp nội dung đã khôi phục.", "Khôi phục thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     if (_onOpenDocumentCallback != null)
                     {
                         _onOpenDocumentCallback(item.OriginalPath);
@@ -484,7 +484,7 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    MessageBox.Show(this, "Không thể khôi phục tệp. Có thể tệp gốc đang được mở bởi ứng dụng khác.", "Lỗi khôi phục", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể khôi phục tệp. Có thể tệp gốc đang được mở bởi ứng dụng khác.", "Lỗi khôi phục", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
@@ -507,25 +507,25 @@ namespace ZenQOffice.UI
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Không thể mở tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể mở tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
 
         private void ShowPruneMenu()
         {
-            ContextMenuStrip menu = new ContextMenuStrip();
+            ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Items.Add("Dọn dẹp bản sao lưu cũ hơn 7 ngày", null, (s, e) =>
             {
                 int count = BackupManager.PruneBackupsOlderThan(7);
-                MessageBox.Show(this, $"Đã dọn dẹp {count} bản sao lưu cũ hơn 7 ngày.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã dọn dẹp {count} bản sao lưu cũ hơn 7 ngày.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadData();
             });
 
             menu.Items.Add("Dọn dẹp bản sao lưu cũ hơn 30 ngày", null, (s, e) =>
             {
                 int count = BackupManager.PruneBackupsOlderThan(30);
-                MessageBox.Show(this, $"Đã dọn dẹp {count} bản sao lưu cũ hơn 30 ngày.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã dọn dẹp {count} bản sao lưu cũ hơn 30 ngày.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadData();
             });
 
@@ -534,7 +534,7 @@ namespace ZenQOffice.UI
             var sel = GetSelectedBackup();
             var delItem = menu.Items.Add(sel != null ? $"Xóa bản sao lưu đang chọn ('{sel.OriginalFileName}')" : "Xóa bản sao lưu đang chọn", FluentIconRenderer.GetGlyphBitmap('\uE74D', 16, 16, Color.FromArgb(100, 116, 139)), (s, e) =>
             {
-                if (sel != null && MessageBox.Show(this, "Bạn có chắc chắn muốn xóa bản sao lưu này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (sel != null && ZenQOffice.UI.FluentMessageBox.Show(this, "Bạn có chắc chắn muốn xóa bản sao lưu này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     BackupManager.DeleteBackup(sel);
                     LoadData();
@@ -546,10 +546,10 @@ namespace ZenQOffice.UI
 
             var clearAllItem = menu.Items.Add("Xóa toàn bộ kho sao lưu (Giải phóng toàn bộ dung lượng)", FluentIconRenderer.GetGlyphBitmap('\uE74D', 16, 16, Color.FromArgb(220, 38, 38)), (s, e) =>
             {
-                if (MessageBox.Show(this, "Bạn có chắc chắn muốn xóa toàn bộ tất cả bản sao lưu trong kho?\nThao tác này không thể hoàn tác.", "Cảnh báo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                if (ZenQOffice.UI.FluentMessageBox.Show(this, "Bạn có chắc chắn muốn xóa toàn bộ tất cả bản sao lưu trong kho?\nThao tác này không thể hoàn tác.", "Cảnh báo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                 {
                     int count = BackupManager.ClearAllBackups();
-                    MessageBox.Show(this, $"Đã xóa {count} bản sao lưu. Kho sao lưu đã được giải phóng hoàn toàn.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, $"Đã xóa {count} bản sao lưu. Kho sao lưu đã được giải phóng hoàn toàn.", "Dọn dẹp hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     LoadData();
                 }
             });

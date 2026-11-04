@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -51,7 +51,7 @@ namespace ZenQOffice.UI
             // Color Preset Selector Panel
             Panel pnlColor = new Panel { Dock = DockStyle.Top, Height = 48, Padding = new Padding(16, 8, 16, 4) };
             Label lblColor = new Label { Text = "🎨 Bảng màu sắc:", AutoSize = true, Location = new Point(16, 12), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
-            _cboColorTheme = new ComboBox
+            _cboColorTheme = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(140, 9),

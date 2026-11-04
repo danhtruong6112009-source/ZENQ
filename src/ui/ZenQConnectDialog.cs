@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -169,7 +169,7 @@ namespace ZenQOffice.UI
                 try
                 {
                     Clipboard.SetText(ZenQConnectServer.Instance.ActiveUrl);
-                    MessageBox.Show(this, "Đã sao chép liên kết vào Clipboard!\nBạn có thể gửi liên kết này sang điện thoại qua tin nhắn, Zalo hoặc mở trực tiếp trên trình duyệt.", "ZenQ Connect", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã sao chép liên kết vào Clipboard!\nBạn có thể gửi liên kết này sang điện thoại qua tin nhắn, Zalo hoặc mở trực tiếp trên trình duyệt.", "ZenQ Connect", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch { }
             };
@@ -263,7 +263,7 @@ namespace ZenQOffice.UI
             };
             cardConfig.Controls.Add(lblSelectIp);
 
-            _cboIpAddresses = new ComboBox
+            _cboIpAddresses = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(14, 78),
@@ -332,7 +332,7 @@ namespace ZenQOffice.UI
             Button btnHelp = CreateNeutralButton("Lưu ý kết nối", new Point(16, 16), new Size(130, 30), '\uE897');
             btnHelp.Click += (s, e) =>
             {
-                MessageBox.Show(this,
+                ZenQOffice.UI.FluentMessageBox.Show(this,
                     "Lưu ý để kết nối thành công:\n\n" +
                     "1. Máy tính và Điện thoại cùng kết nối vào một mạng Wi-Fi (hoặc Điện thoại bật Điểm phát sóng cá nhân / Hotspot cho máy tính).\n" +
                     "2. Không cần cài đặt ứng dụng: mở Camera hoặc trình duyệt Safari (iOS) / Chrome (Android) để quét mã QR.\n" +

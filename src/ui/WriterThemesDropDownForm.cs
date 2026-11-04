@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -254,11 +254,11 @@ namespace ZenQOffice.UI
 
                             var importedTheme = new WriterThemeItem(tName, hf, bf, cols);
                             if (OnThemeSelected != null) OnThemeSelected(importedTheme);
-                            MessageBox.Show("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Lỗi khi nhập tệp chủ đề: " + ex.Message, "Lỗi nhập chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi nhập tệp chủ đề: " + ex.Message, "Lỗi nhập chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -292,11 +292,11 @@ namespace ZenQOffice.UI
                         {
                             string json = string.Format("{{\n  \"Name\": \"{0}\",\n  \"HeadingFont\": \"Calibri Light\",\n  \"BodyFont\": \"Calibri\",\n  \"Colors\": [\"#4472C4\", \"#ED7D31\", \"#A5A5A5\", \"#FFC000\"]\n}}", _activeThemeName ?? "Office");
                             System.IO.File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
-                            MessageBox.Show("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Lỗi khi xuất tệp chủ đề: " + ex.Message, "Lỗi xuất chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất tệp chủ đề: " + ex.Message, "Lỗi xuất chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }

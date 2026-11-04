@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -128,7 +128,7 @@ namespace ZenQOffice.UI
                 }
                 if (SelectedSlideIndices.Count == 0)
                 {
-                    MessageBox.Show("Vui lòng chọn ít nhất một trang chiếu hoặc phân phần để chèn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn ít nhất một trang chiếu hoặc phân phần để chèn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     DialogResult = DialogResult.None;
                     return;
                 }

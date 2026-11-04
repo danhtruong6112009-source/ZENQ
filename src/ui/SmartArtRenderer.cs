@@ -12,18 +12,35 @@ namespace ZenQOffice.UI
     {
         public static bool SuppressNodeBodies = false;
 
+        private sealed class NodeCapture
+        {
+            internal string[] Texts;internal int Next;internal Rectangle Bounds;
+            internal List<RectangleF> Rectangles=new List<RectangleF>();
+        }
+        [ThreadStatic]private static NodeCapture _nodeCapture;
+        public static DocShapeObject CreateDefaultSmartArt(string type,string name)
+        {
+            return new DocShapeObject
+            {
+                ShapeType="SmartArt",SmartArtType=type,SmartArtTitle=name,
+                TextContent=string.Join("|",GetSmartArtNodeList(type,"")),BaseWidth=480,BaseHeight=220,
+                FillColor=Color.FromArgb(248,250,252),OutlineColor=Color.FromArgb(0,120,215),OutlineWidth=(type=="List_BasicBlock"||type=="Process_StepDown")?0:1.5f,StylePresetIndex=0,
+                ResolvedThemePalette=(type=="List_BasicBlock"||type=="Process_StepDown")?new[]{Color.FromArgb(68,114,196)}:null
+            };
+        }
+
         public static string[] GetSmartArtNodeList(string smartArtType, string textContent)
         {
             if (!string.IsNullOrEmpty(textContent))
             {
-                string[] parts = textContent.Split(new char[] { '|', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                string[] parts = textContent.Split(new char[] { '|', '\n', '\r' }, StringSplitOptions.None);
                 if (parts != null && parts.Length > 0)
                 {
                     List<string> clean = new List<string>();
                     for (int i = 0; i < parts.Length; i++)
                     {
                         string t = parts[i].Trim();
-                        if (!string.IsNullOrEmpty(t) && !t.StartsWith("🗺️") && !t.StartsWith("❖") && !t.StartsWith("=="))
+                        if (!t.StartsWith("🗺️") && !t.StartsWith("❖") && !t.StartsWith("=="))
                         {
                             clean.Add(t);
                         }
@@ -33,6 +50,7 @@ namespace ZenQOffice.UI
             }
 
             string type = smartArtType ?? "Hierarchy_Labeled";
+            if(type=="List_BasicBlock")return new[]{"(Text)","(Text)","(Text)","(Text)","(Text)"};
             if (type.StartsWith("Hierarchy_") || type.Contains("Org") || type.Contains("Tree"))
             {
                 return new string[] { "(Text)", "(Text)", "(Text)", "(Text)" };
@@ -175,7 +193,8 @@ namespace ZenQOffice.UI
 
             // ==================== LIST (38 TEMPLATES) ====================
             Action<Graphics, Rectangle, string[], Color[], float> listBlocks = (g, r, t, c, s) => DrawListBlocks(g, r, t, c, s);
-            renderDispatch["List_BasicBlock"] = listBlocks;
+            renderDispatch["List_BasicBlock"] = DrawBasicBlockList;
+            renderDispatch["List_VaryingWidth"] = DrawVaryingWidthList;
             renderDispatch["List_VerticalBlock"] = listBlocks;
             renderDispatch["List_VerticalBox"] = listBlocks;
             renderDispatch["List_VerticalBullet"] = listBlocks;
@@ -255,7 +274,7 @@ namespace ZenQOffice.UI
             renderDispatch["Process_ArrowRibbon"] = (g, r, t, c, s) => DrawArrowsOpposing(g, r, t, c, s);
 
             Action<Graphics, Rectangle, string[], Color[], float> procStep = (g, r, t, c, s) => DrawStepDown(g, r, t, c, s);
-            renderDispatch["Process_StepDown"] = procStep;
+            renderDispatch["Process_StepDown"] = DrawWordStepDownProcess;
             renderDispatch["Process_Descending"] = procStep;
             renderDispatch["Process_Staggered"] = procStep;
             renderDispatch["Process_StepUp"] = procStep;
@@ -615,7 +634,12 @@ namespace ZenQOffice.UI
                 PopulateSubShapeBounds(bounds, type, nodes.Length, shape);
             }
 
-            DrawSmartArt(g, bounds, type, shape.SmartArtTitle, colors, nodes, shape.IsSelected, zoomLevel);
+            if(string.IsNullOrEmpty(shape.TextContent)&&shape.SubNodeTexts!=null&&shape.SubNodeTexts.Count==1)
+                nodes=new[]{shape.SubNodeTexts[0]??""};
+            var priorCapture=_nodeCapture;var capture=new NodeCapture{Texts=nodes,Bounds=bounds};_nodeCapture=capture;
+            try{DrawSmartArt(g, bounds, type, shape.SmartArtTitle, colors, nodes, shape.IsSelected, zoomLevel);}
+            finally{_nodeCapture=priorCapture;}
+            if(capture.Next==nodes.Length&&nodes.Length>0)shape.SubShapeRelativeBounds=capture.Rectangles;
 
             if (shape.OutlineWidth > 0 && shape.OutlineColor != Color.Transparent && shape.OutlineColor != Color.Empty)
             {
@@ -962,6 +986,12 @@ namespace ZenQOffice.UI
 
         private static void DrawAutoFitText(Graphics g, string text, Rectangle rect, Color color, float maxFontSize = 14f, float minFontSize = 6.5f)
         {
+            if(_nodeCapture!=null&&_nodeCapture.Next<_nodeCapture.Texts.Length&&text==_nodeCapture.Texts[_nodeCapture.Next])
+            {
+                var b=_nodeCapture.Bounds;
+                _nodeCapture.Rectangles.Add(new RectangleF((rect.X-b.X)/(float)b.Width,(rect.Y-b.Y)/(float)b.Height,rect.Width/(float)b.Width,rect.Height/(float)b.Height));
+                _nodeCapture.Next++;
+            }
             if (string.IsNullOrEmpty(text) || rect.Width <= 4 || rect.Height <= 4) return;
             float fSize = Math.Max(minFontSize, Math.Min(maxFontSize, rect.Height * 0.24f));
             while (fSize > minFontSize)
@@ -1258,6 +1288,37 @@ namespace ZenQOffice.UI
         }
 
         // ==================== 5. LIST BLOCKS ====================
+        private static void DrawBasicBlockList(Graphics g,Rectangle r,string[] nodes,Color[] colors,float zoom)
+        {
+            if(SuppressNodeBodies||nodes.Length==0)return;
+            int cols=Math.Max(1,(int)Math.Ceiling(Math.Sqrt(nodes.Length*r.Width/(float)Math.Max(1,r.Height)*.6f)));
+            int rows=(nodes.Length+cols-1)/cols;float gap=Math.Max(4,12*zoom);
+            float width=(r.Width-gap*(cols-1))/cols,height=(r.Height-gap*(rows-1))/rows;
+            if(width<=0||height<=0)return;
+            for(int i=0;i<nodes.Length;i++)
+            {
+                int row=i/cols,column=i%cols,inRow=Math.Min(cols,nodes.Length-row*cols);
+                float left=r.X+(r.Width-(width*inRow+gap*(inRow-1)))/2;
+                var rect=new Rectangle((int)(left+column*(width+gap)),(int)(r.Y+row*(height+gap)),(int)width,(int)height);
+                using var fill=new SolidBrush(colors[i%colors.Length]);g.FillRectangle(fill,rect);
+                DrawAutoFitText(g,nodes[i],rect,Color.White,24f,8f);
+            }
+        }
+
+        private static void DrawVaryingWidthList(Graphics g,Rectangle r,string[] nodes,Color[] colors,float zoom)
+        {
+            if(SuppressNodeBodies||nodes.Length==0)return;
+            float gap=Math.Max(4,10*zoom),height=(r.Height-gap*(nodes.Length-1))/nodes.Length;
+            if(height<=0)return;
+            for(int i=0;i<nodes.Length;i++)
+            {
+                float factor=.45f+.55f*(i+1)/nodes.Length;
+                var rect=new Rectangle(r.X,(int)(r.Y+i*(height+gap)),Math.Max(1,(int)(r.Width*factor)),Math.Max(1,(int)height));
+                FillFluentCard(g,rect,colors[i%colors.Length],2,0,zoom);
+                DrawAutoFitText(g,nodes[i],rect,Color.White,15f,8f);
+            }
+        }
+
         private static void DrawListBlocks(Graphics g, Rectangle r, string[] nodes, Color[] colors, float zoom)
         {
             if (SuppressNodeBodies) return;
@@ -2424,6 +2485,30 @@ namespace ZenQOffice.UI
         }
 
         // ==================== 29. STEP DOWN ====================
+        private static void DrawWordStepDownProcess(Graphics g,Rectangle r,string[] nodes,Color[] colors,float zoom)
+        {
+            if(SuppressNodeBodies||nodes.Length==0)return;
+            int count=nodes.Length;
+            float w=Math.Min(r.Width*.28f,r.Width/Math.Max(1,count*.85f+.4f));
+            float h=Math.Min(r.Height/(count+.2f),w*.65f);
+            float dx=count>1?Math.Min(w*.85f,(r.Width-w)/(count-1)):0;
+            float dy=count>1?(r.Height-h)/(count-1):0;
+            var boxes=new List<Rectangle>();
+            for(int i=0;i<count;i++)boxes.Add(new Rectangle((int)(r.X+r.Width*.04f+i*dx),(int)(r.Y+i*dy),Math.Max(2,(int)w),Math.Max(2,(int)h)));
+            for(int i=1;i<count;i++)
+            {
+                var previous=boxes[i-1];var next=boxes[i];Color c=colors[(i-1)%colors.Length];
+                using var pen=new Pen(Color.FromArgb(190+(c.R*65/255),190+(c.G*65/255),190+(c.B*65/255)),Math.Max(3,10*zoom)){LineJoin=LineJoin.Miter,EndCap=LineCap.ArrowAnchor};
+                g.DrawLines(pen,new[]{new PointF(previous.X+previous.Width*.22f,previous.Bottom),new PointF(previous.X+previous.Width*.22f,next.Y+next.Height/2f),new PointF(next.Left-3*zoom,next.Y+next.Height/2f)});
+            }
+            for(int i=0;i<count;i++)
+            {
+                var box=boxes[i];using var fill=new SolidBrush(colors[i%colors.Length]);
+                using var path=GetRoundedPath(box,Math.Max(2,(int)(9*zoom)));g.FillPath(fill,path);
+                DrawAutoFitText(g,nodes[i],box,Color.White,20f,8f);
+            }
+        }
+
         private static void DrawStepDown(Graphics g, Rectangle r, string[] nodes, Color[] colors, float zoom)
         {
             if (SuppressNodeBodies) return;

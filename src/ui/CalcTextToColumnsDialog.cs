@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -146,7 +146,7 @@ namespace ZenQOffice.UI
             lblQual.AutoSize = true;
             grpDelim.Controls.Add(lblQual);
 
-            cboQualifier = new ComboBox();
+            cboQualifier = new ZenQOffice.UI.FluentComboBox();
             cboQualifier.DropDownStyle = ComboBoxStyle.DropDownList;
             cboQualifier.Location = new Point(160, 69);
             cboQualifier.Size = new Size(90, 22);
@@ -351,7 +351,7 @@ namespace ZenQOffice.UI
 
             if (hasCollision)
             {
-                DialogResult dr = MessageBox.Show(this,
+                DialogResult dr = ZenQOffice.UI.FluentMessageBox.Show(this,
                     "Vùng dữ liệu đích đã có sẵn dữ liệu. Bạn có muốn ghi đè lên các ô này không?",
                     "Cảnh báo ghi đè", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (dr != DialogResult.Yes) return;

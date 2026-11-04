@@ -1018,7 +1018,7 @@ namespace ZenQOffice.UI
         public void ShowSheetTabContextMenu(int x, int y, int sheetIndex, Control parentControl)
         {
             if (sheetIndex < 0 || sheetIndex >= SheetNames.Count) return;
-            ContextMenuStrip cms = new ContextMenuStrip();
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
             cms.Items.Add("✏️ Đổi tên Sheet (Rename)...", null, (s, e) =>
@@ -1045,10 +1045,10 @@ namespace ZenQOffice.UI
             {
                 if (Sheets.Count <= 1)
                 {
-                    MessageBox.Show("Bảng tính phải có ít nhất 1 sheet!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show("Bảng tính phải có ít nhất 1 sheet!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                if (MessageBox.Show(string.Format("Bạn có chắc chắn muốn xóa sheet \"{0}\"?", SheetNames[sheetIndex]), "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (ZenQOffice.UI.FluentMessageBox.Show(string.Format("Bạn có chắc chắn muốn xóa sheet \"{0}\"?", SheetNames[sheetIndex]), "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     DeleteSheet(sheetIndex);
                     if (parentControl != null) parentControl.Invalidate();
@@ -3568,7 +3568,7 @@ namespace ZenQOffice.UI
         public void ShowChartContextMenu(int x, int y, DocShapeObject shape, Control parentControl)
         {
             if (shape == null) return;
-            ContextMenuStrip cms = new ContextMenuStrip();
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
             cms.Items.Add("📊 Chỉnh sửa số liệu biểu đồ...", null, (s, e) =>
@@ -3622,7 +3622,7 @@ namespace ZenQOffice.UI
         public void ShowSmartArtContextMenu(int x, int y, DocShapeObject shape, Control parentControl)
         {
             if (shape == null) return;
-            ContextMenuStrip cms = new ContextMenuStrip();
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
             cms.Items.Add("✏️ Chỉnh sửa nội dung chữ SmartArt...", null, (s, e) =>
@@ -5212,7 +5212,7 @@ namespace ZenQOffice.UI
             float[] stdSizes = new float[] { 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72 };
             CalcSelectionFormat summary = GetSelectionFormat();
             float cur = summary.FontSize > 0 ? summary.FontSize : 11.0f;
-            float next = 72f;
+            float next = Math.Min(1638f, cur + 4f);
             for (int i = 0; i < stdSizes.Length; i++)
             {
                 if (stdSizes[i] > cur + 0.1f)
@@ -5293,7 +5293,7 @@ namespace ZenQOffice.UI
                 var items = dvRule.GetListItems(CurrentSheet);
                 if (items != null && items.Count > 0)
                 {
-                    ContextMenuStrip menu = new ContextMenuStrip();
+                    ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
                     menu.Font = new Font("Segoe UI", 9.5f);
                     foreach (var item in items)
                     {
@@ -6476,12 +6476,12 @@ namespace ZenQOffice.UI
                 {
                     if (dvRule.ErrorStyle == DataValidationErrorStyle.Stop)
                     {
-                        MessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                        ZenQOffice.UI.FluentMessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Stop);
                         if (preventOnStop) return false;
                     }
                     else if (dvRule.ErrorStyle == DataValidationErrorStyle.Warning)
                     {
-                        var dr = MessageBox.Show(valRes.ErrorMessage + "\n\nBạn có muốn tiếp tục áp dụng không?", dvRule.ErrorTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        var dr = ZenQOffice.UI.FluentMessageBox.Show(valRes.ErrorMessage + "\n\nBạn có muốn tiếp tục áp dụng không?", dvRule.ErrorTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                         if (dr == DialogResult.No)
                         {
                             if (preventOnStop) return false;
@@ -6489,7 +6489,7 @@ namespace ZenQOffice.UI
                     }
                     else if (dvRule.ErrorStyle == DataValidationErrorStyle.Information)
                     {
-                        MessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(valRes.ErrorMessage, dvRule.ErrorTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -7438,7 +7438,7 @@ namespace ZenQOffice.UI
                     {
                         IsSheetProtected = true;
                         ProtectPassword = dlg.EnteredPassword;
-                        MessageBox.Show("Đã bật chế độ Bảo vệ Sheet thành công!\nCác ô tính hiện đang ở chế độ chỉ đọc để tránh vô tình chỉnh sửa.", "Bảo Vệ Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show("Đã bật chế độ Bảo vệ Sheet thành công!\nCác ô tính hiện đang ở chế độ chỉ đọc để tránh vô tình chỉnh sửa.", "Bảo Vệ Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -7454,11 +7454,11 @@ namespace ZenQOffice.UI
                             {
                                 IsSheetProtected = false;
                                 ProtectPassword = "";
-                                MessageBox.Show("Mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                ZenQOffice.UI.FluentMessageBox.Show("Mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             }
                             else
                             {
-                                MessageBox.Show("Mật khẩu không chính xác! Không thể mở khóa trang tính.", "Lỗi Mật Khẩu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show("Mật khẩu không chính xác! Không thể mở khóa trang tính.", "Lỗi Mật Khẩu", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
@@ -7466,7 +7466,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     IsSheetProtected = false;
-                    MessageBox.Show("Đã mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Đã mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             if (parentForm != null) parentForm.Invalidate();
@@ -7626,7 +7626,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                MessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "ZenQ Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "ZenQ Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

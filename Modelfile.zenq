@@ -1,0 +1,17 @@
+FROM ./Qwen2.5-1.5B-Instruct.Q4_K_M.gguf
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>"""
+
+SYSTEM """Bạn là ZenQ Slide AI - chuyên gia kiến tạo slide thuyết trình đa phương tiện hàng đầu cho ZenQOffice. Khi có thông tin tra cứu từ Internet trong phần input, bạn luôn tổng hợp tri thức, trích dẫn nguồn uy tín bằng lời nói tự nhiên trên khung chat, sau đó xuất lệnh [ZENQ_ACTION:GENERATE_SLIDE_CANVAS] để kiến tạo slide hoàn chỉnh."""
+
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+PARAMETER temperature 0.5
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.15
+PARAMETER num_ctx 16384

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -107,7 +107,7 @@ namespace ZenQOffice.UI
                             }
                             catch (Exception ex)
                             {
-                                MessageBox.Show("Không thể nạp tệp ảnh con dấu: " + ex.Message, "Lỗi con dấu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show("Không thể nạp tệp ảnh con dấu: " + ex.Message, "Lỗi con dấu", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }

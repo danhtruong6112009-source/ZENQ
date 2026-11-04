@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -34,22 +34,8 @@ namespace ZenQOffice.UI
             // 0. None (Không có)
             AddNoneCategory(scrollPanel, ref curY, currentAnimation);
 
-            // 1. 🌟 Độc Quyền ZenQ (ZenQ Exclusive Animations - Tím/Vàng Kim 🌟)
-            AddCategory(scrollPanel, ref curY, "Hiệu ứng Độc quyền ZenQ (Exclusive Animations)", currentAnimation, new Tuple<AnimationType, string>[] {
-                Tuple.Create(AnimationType.GenOffice_NeonPulse, "Neon Glow"),
-                Tuple.Create(AnimationType.GenOffice_LiquidMorph, "Liquid Fluid"),
-                Tuple.Create(AnimationType.GenOffice_Cinematic3DFlip, "3D Flip & Flare"),
-                Tuple.Create(AnimationType.GenOffice_GlitchHologram, "Cyber Hologram"),
-                Tuple.Create(AnimationType.GenOffice_KineticSnap, "Kinetic Snap"),
-                Tuple.Create(AnimationType.GenOffice_VortexSpiral, "Cosmic Vortex"),
-                Tuple.Create(AnimationType.GenOffice_OrigamiUnfold, "3D Origami"),
-                Tuple.Create(AnimationType.GenOffice_StarlightAssembly, "Starlight Burst"),
-                Tuple.Create(AnimationType.GenOffice_ElasticJellyPop, "Jelly Pop"),
-                Tuple.Create(AnimationType.GenOffice_GoldenRibbonSwirl, "Golden Ribbon")
-            }, "Exclusive");
-
             // 2. Entrance (Xuất hiện - Màu xanh lá 🟢)
-            AddCategory(scrollPanel, ref curY, "Entrance", currentAnimation, new Tuple<AnimationType, string>[] {
+            AddCategory(scrollPanel, ref curY, "Xuất hiện (Entrance)", currentAnimation, new Tuple<AnimationType, string>[] {
                 Tuple.Create(AnimationType.Appear, "Appear"),
                 Tuple.Create(AnimationType.FadeIn, "Fade"),
                 Tuple.Create(AnimationType.FlyIn, "Fly In"),
@@ -66,7 +52,7 @@ namespace ZenQOffice.UI
             }, "Entrance");
 
             // 3. Emphasis (Nhấn mạnh - Màu vàng cam 🟡)
-            AddCategory(scrollPanel, ref curY, "Emphasis", currentAnimation, new Tuple<AnimationType, string>[] {
+            AddCategory(scrollPanel, ref curY, "Nhấn mạnh (Emphasis)", currentAnimation, new Tuple<AnimationType, string>[] {
                 Tuple.Create(AnimationType.Pulse, "Pulse"),
                 Tuple.Create(AnimationType.ColorPulse, "Color Pulse"),
                 Tuple.Create(AnimationType.Teeter, "Teeter"),
@@ -89,7 +75,7 @@ namespace ZenQOffice.UI
             }, "Emphasis");
 
             // 4. Exit (Thoát / Biến mất - Màu đỏ 🔴)
-            AddCategory(scrollPanel, ref curY, "Exit", currentAnimation, new Tuple<AnimationType, string>[] {
+            AddCategory(scrollPanel, ref curY, "Thoát (Exit)", currentAnimation, new Tuple<AnimationType, string>[] {
                 Tuple.Create(AnimationType.Disappear, "Disappear"),
                 Tuple.Create(AnimationType.FadeOut, "Fade"),
                 Tuple.Create(AnimationType.FlyOut, "Fly Out"),
@@ -106,7 +92,7 @@ namespace ZenQOffice.UI
             }, "Exit");
 
             // 5. Motion Paths (Đường chuyển động 🔵)
-            AddCategory(scrollPanel, ref curY, "Motion Paths", currentAnimation, new Tuple<AnimationType, string>[] {
+            AddCategory(scrollPanel, ref curY, "Đường di chuyển (Motion Paths)", currentAnimation, new Tuple<AnimationType, string>[] {
                 Tuple.Create(AnimationType.MotionLine, "Lines"),
                 Tuple.Create(AnimationType.MotionArc, "Arcs"),
                 Tuple.Create(AnimationType.MotionTurn, "Turns"),
@@ -114,6 +100,20 @@ namespace ZenQOffice.UI
                 Tuple.Create(AnimationType.MotionLoop, "Loops"),
                 Tuple.Create(AnimationType.MotionCustom, "Custom Path")
             }, "MotionPaths");
+
+            // 1. 🌟 Độc Quyền ZenQ (ZenQ Exclusive Animations - Tím/Vàng Kim 🌟)
+            AddCategory(scrollPanel, ref curY, "Hiệu ứng Độc quyền ZenQ (Exclusive Animations)", currentAnimation, new Tuple<AnimationType, string>[] {
+                Tuple.Create(AnimationType.GenOffice_NeonPulse, "Neon Glow"),
+                Tuple.Create(AnimationType.GenOffice_LiquidMorph, "Liquid Fluid"),
+                Tuple.Create(AnimationType.GenOffice_Cinematic3DFlip, "3D Flip & Flare"),
+                Tuple.Create(AnimationType.GenOffice_GlitchHologram, "Cyber Hologram"),
+                Tuple.Create(AnimationType.GenOffice_KineticSnap, "Kinetic Snap"),
+                Tuple.Create(AnimationType.GenOffice_VortexSpiral, "Cosmic Vortex"),
+                Tuple.Create(AnimationType.GenOffice_OrigamiUnfold, "3D Origami"),
+                Tuple.Create(AnimationType.GenOffice_StarlightAssembly, "Starlight Burst"),
+                Tuple.Create(AnimationType.GenOffice_ElasticJellyPop, "Jelly Pop"),
+                Tuple.Create(AnimationType.GenOffice_GoldenRibbonSwirl, "Golden Ribbon")
+            }, "Exclusive");
 
             // 6. Footer Links (More Effects...)
             AddFooterLinks(scrollPanel, ref curY);

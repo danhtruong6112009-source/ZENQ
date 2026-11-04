@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -66,7 +66,7 @@ namespace ZenQOffice.UI
             Label lblPresets = new Label { Text = "Chọn kiểu dáng Mục lục:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblPresets);
 
-            lstPresets = new ListBox { Location = new Point(20, 38), Size = new Size(445, 110), BorderStyle = BorderStyle.FixedSingle };
+            lstPresets = new ZenQOffice.UI.FluentListBox { Location = new Point(20, 38), Size = new Size(445, 110), BorderStyle = BorderStyle.FixedSingle };
             lstPresets.Items.Add("1. Mục lục Cổ điển (Đường chấm dẫn ................. Trang 1)");
             lstPresets.Items.Add("2. Mục lục Hiện đại (Đường gạch nối ---------------- Trang 1)");
             lstPresets.Items.Add("3. Mục lục Tối giản (Khoảng trắng trống            Trang 1)");
@@ -82,7 +82,7 @@ namespace ZenQOffice.UI
             Label lblLeader = new Label { Text = "Đường dẫn tab (Tab leader):", Location = new Point(20, 215), AutoSize = true };
             this.Controls.Add(lblLeader);
 
-            cboTabLeader = new ComboBox { Location = new Point(190, 212), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+            cboTabLeader = new ZenQOffice.UI.FluentComboBox { Location = new Point(190, 212), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
             cboTabLeader.Items.AddRange(new object[] { ".................... (Chấm)", "-------------------- (Gạch)", "____________________ (Gạch dưới)", "(Không có)" });
             cboTabLeader.SelectedIndex = 0;
             this.Controls.Add(cboTabLeader);
@@ -105,7 +105,7 @@ namespace ZenQOffice.UI
             {
                 if (_tocEntries == null || _tocEntries.Count == 0)
                 {
-                    MessageBox.Show("Chưa tìm thấy tiêu đề (Heading) nào trong tài liệu.\n\nVui lòng định dạng các đề mục trong bài viết bằng kiểu Heading 1, Heading 2 hoặc số thứ tự (1., 1.1...) trước khi tạo Mục lục tự động.", "Mục Lục Tự Động", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show("Chưa tìm thấy tiêu đề (Heading) nào trong tài liệu.\n\nVui lòng định dạng các đề mục trong bài viết bằng kiểu Heading 1, Heading 2 hoặc số thứ tự (1., 1.1...) trước khi tạo Mục lục tự động.", "Mục Lục Tự Động", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     this.DialogResult = DialogResult.None;
                     return;
                 }

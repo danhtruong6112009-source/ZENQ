@@ -49,7 +49,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Tùy chọn - ZENQ OFFICE 5.8";
+            this.Text = "Tùy chọn - ZENQ OFFICE 6.0";
             this.Size = new Size(760, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -145,7 +145,7 @@ namespace ZenQOffice.UI
             bottomPanel.Controls.Add(btnCancel);
 
             // 3. Left Navigation Rail
-            _navListBox = new ListBox
+            _navListBox = new ZenQOffice.UI.FluentListBox
             {
                 Dock = DockStyle.Left,
                 Width = 205,
@@ -295,7 +295,7 @@ namespace ZenQOffice.UI
             Label lblInt = new Label { Text = "Khoảng thời gian tự động lưu:", Location = new Point(16, 68), Size = new Size(190, 22), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
             grpSave.Controls.Add(lblInt);
 
-            _cboAutoSaveInterval = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(210, 65), Size = new Size(150, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
+            _cboAutoSaveInterval = new ZenQOffice.UI.FluentComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(210, 65), Size = new Size(150, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
             _cboAutoSaveInterval.Items.AddRange(new object[] { "1 phút (Khuyến nghị)", "3 phút", "5 phút", "10 phút" });
             _cboAutoSaveInterval.SelectedIndex = 0;
             grpSave.Controls.Add(_cboAutoSaveInterval);
@@ -329,7 +329,7 @@ namespace ZenQOffice.UI
             _chkAutoCorrectVi = new CheckBox { Text = "Tự động hỗ trợ gõ tiếng Việt Telex/VNI chuẩn xác", Location = new Point(16, 148), Size = new Size(430, 24), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
 
             Label lblZoom = new Label { Text = "Mức thu phóng mặc định:", Location = new Point(16, 186), Size = new Size(160, 22), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
-            _cboDefaultZoom = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(180, 183), Size = new Size(120, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
+            _cboDefaultZoom = new ZenQOffice.UI.FluentComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(180, 183), Size = new Size(120, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
             _cboDefaultZoom.Items.AddRange(new object[] { "100%", "125%", "150%" });
             _cboDefaultZoom.SelectedIndex = 0;
 
@@ -359,7 +359,7 @@ namespace ZenQOffice.UI
             Label lblProv = new Label { Text = "Mô hình AI mặc định:", Location = new Point(16, 70), Size = new Size(150, 22), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
             grpAi.Controls.Add(lblProv);
 
-            _cboAiProvider = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(170, 67), Size = new Size(200, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
+            _cboAiProvider = new ZenQOffice.UI.FluentComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(170, 67), Size = new Size(200, 26), Font = new Font("Segoe UI", 9.0f, FontStyle.Regular) };
             _cboAiProvider.Items.AddRange(new object[] { "Google Gemini Pro", "OpenAI GPT-4o", "DeepSeek-V3", "Ollama Local (Offline)" });
             _cboAiProvider.SelectedIndex = 0;
             grpAi.Controls.Add(_cboAiProvider);
@@ -458,11 +458,11 @@ namespace ZenQOffice.UI
                 try
                 {
                     FileAssociationManager.RegisterAllFileAssociations();
-                    MessageBox.Show(this, "Đã đăng ký ZenQ Office làm ứng dụng mặc định cho các định dạng Word (.docx, .doc), Excel (.xlsx, .csv), PowerPoint (.pptx), PDF (.pdf) thành công!\nBiểu tượng tệp tin và menu ngữ cảnh Windows đã được cập nhật.", "Đăng ký mặc định thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã đăng ký ZenQ Office làm ứng dụng mặc định cho các định dạng Word (.docx, .doc), Excel (.xlsx, .csv), PowerPoint (.pptx), PDF (.pdf) thành công!\nBiểu tượng tệp tin và menu ngữ cảnh Windows đã được cập nhật.", "Đăng ký mặc định thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Không thể đăng ký: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể đăng ký: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
             grpAssoc.Controls.Add(btnSetDefault);
@@ -535,11 +535,11 @@ namespace ZenQOffice.UI
                 try
                 {
                     DesktopShortcutManager.CreateAllShortcuts();
-                    MessageBox.Show(this, "Đã tạo đầy đủ 5 lối tắt ngoài Desktop:\n1. ZenQ Office (App mẹ: có giao diện Home & chia tab)\n2. ZenQ Writer (Soạn thảo văn bản riêng biệt)\n3. ZenQ Calc (Bảng tính điện tử riêng biệt)\n4. ZenQ Slides (Trình chiếu slide riêng biệt)\n5. ZenQ PDF (Đọc & ký tài liệu PDF riêng biệt)", "Tạo lối tắt thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã tạo đầy đủ 5 lối tắt ngoài Desktop:\n1. ZenQ Office (App mẹ: có giao diện Home & chia tab)\n2. ZenQ Writer (Soạn thảo văn bản riêng biệt)\n3. ZenQ Calc (Bảng tính điện tử riêng biệt)\n4. ZenQ Slides (Trình chiếu slide riêng biệt)\n5. ZenQ PDF (Đọc & ký tài liệu PDF riêng biệt)", "Tạo lối tắt thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
             grpDesktop.Controls.Add(btnCreateAll);
@@ -566,11 +566,11 @@ namespace ZenQOffice.UI
                 try
                 {
                     DesktopShortcutManager.CreateMainHubShortcut();
-                    MessageBox.Show(this, "Đã tạo lối tắt 'ZenQ Office' (App mẹ) ra Desktop!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã tạo lối tắt 'ZenQ Office' (App mẹ) ra Desktop!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
             grpDesktop.Controls.Add(btnCreateHubOnly);
@@ -597,11 +597,11 @@ namespace ZenQOffice.UI
                 try
                 {
                     DesktopShortcutManager.CreateAllBranchShortcuts();
-                    MessageBox.Show(this, "Đã tạo 4 lối tắt App nhánh (Writer, Calc, Slides, PDF) ra Desktop!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã tạo 4 lối tắt App nhánh (Writer, Calc, Slides, PDF) ra Desktop!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, "Không thể tạo lối tắt: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
             grpDesktop.Controls.Add(btnCreateBranchesOnly);
@@ -658,7 +658,7 @@ namespace ZenQOffice.UI
             GroupBox grpAbout = new GroupBox { Text = "Thông tin bản quyền & Đơn vị phát triển", Location = new Point(10, curY), Size = new Size(470, 95), Font = new Font("Segoe UI", 9.25f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             Label lblAbout = new Label
             {
-                Text = "ZENQ OFFICE - PHIÊN BẢN 5.8 (BUILD 2026)\nPhát triển bởi: NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh\nTối ưu cho Windows 10/11 với hiệu năng Direct2D siêu tốc.",
+                Text = "ZENQ OFFICE - PHIÊN BẢN 6.0 (BUILD 2026)\nPhát triển bởi: NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh\nTối ưu cho Windows 10/11 với hiệu năng Direct2D siêu tốc.",
                 Location = new Point(16, 26),
                 Size = new Size(430, 56),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),

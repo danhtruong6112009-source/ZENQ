@@ -37,6 +37,13 @@ namespace ZenQOffice.UI
         public int SubFilter = 0; // 0: Tất cả, 1: Gần đây, 2: Đã gắn dấu sao, 10..14: Bộ lọc Tài liệu của tôi
         public float SmoothScrollY = 0f;
         public float TargetScrollY = 0f;
+        public bool IsTemplateDiscoveryMode { get; set; } = false;
+        private TemplateDiscoveryView _templateDiscoveryView = new TemplateDiscoveryView();
+        public TemplateDiscoveryView TemplateDiscovery => _templateDiscoveryView;
+
+        public int LastMouseX = 0;
+        public int LastMouseY = 0;
+
         public int HoverCardIndex = -1;
         public int HoverRowIndex = -1;
         public int HoverTabIndex = -1;
@@ -52,6 +59,7 @@ namespace ZenQOffice.UI
         public bool HoverStorageManage = false;
         public int HoverTemplateIndex = -1;
         public int HoverRowStar = -1;
+        public int HoverRowTrash = -1;
         public bool HoverMyDocsOpenFileBtn = false;
         public int HoverPillIndex = -1;
         public bool HoverRightPanelUpdateBtn = false;
@@ -77,10 +85,24 @@ namespace ZenQOffice.UI
         {
             get
             {
+                if (IsTemplateDiscoveryMode)
+                {
+                    bool tmplHand = false;
+                    if (_templateDiscoveryView != null)
+                    {
+                        tmplHand = _templateDiscoveryView.HoverBackButton || _templateDiscoveryView.HoverUploadButton ||
+                                   _templateDiscoveryView.HoveredCardIndex >= 0 || _templateDiscoveryView.HoverTrendingLeftBtn ||
+                                   _templateDiscoveryView.HoverTrendingRightBtn || _templateDiscoveryView.HoverForYouLeftBtn ||
+                                   _templateDiscoveryView.HoverForYouRightBtn;
+                    }
+                    return tmplHand || HoverTabIndex >= 0 || HoverSidebarApp >= 0 ||
+                           HoverHelpBtn || HoverUpdateBtn || HoverPromoBtn ||
+                           HoverStorageManage || HoverRightPanelUpdateBtn;
+                }
                 return HoverTabIndex >= 0 || HoverCardIndex >= 0 || HoverRowIndex >= 0 ||
                        HoverHelpBtn || HoverUpdateBtn || HoverSidebarDoc || HoverSidebarRecent ||
                        HoverSidebarStar || HoverSidebarApp >= 0 || HoverPromoBtn ||
-                       HoverStorageManage || HoverTemplateIndex >= 0 || HoverRowStar >= 0 ||
+                       HoverStorageManage || HoverTemplateIndex >= 0 || HoverRowStar >= 0 || HoverRowTrash >= 0 ||
                        HoverMyDocsOpenFileBtn || HoverPillIndex >= 0 || HoverRightPanelUpdateBtn;
             }
         }
@@ -139,6 +161,11 @@ namespace ZenQOffice.UI
             int maxScroll = GetMaxScroll(h, w);
             TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(TargetScrollY)));
             bool isAnimating = false;
+
+            if (_templateDiscoveryView != null && IsTemplateDiscoveryMode)
+            {
+                if (_templateDiscoveryView.UpdateAnimation()) isAnimating = true;
+            }
 
             int prevInt = (int)Math.Round(SmoothScrollY);
             int targetInt = (int)TargetScrollY;
@@ -281,6 +308,7 @@ namespace ZenQOffice.UI
 
         public bool HandleScrollBarMouseDown(int mouseX, int mouseY, int width, int height)
         {
+            if (ActiveTab == 0 && IsTemplateDiscoveryMode) return false;
             if (ScrollBarBounds.IsEmpty) return false;
             if (ScrollBarBounds.Contains(mouseX, mouseY))
             {
@@ -315,6 +343,7 @@ namespace ZenQOffice.UI
 
         public bool HandleScrollBarMouseMove(int mouseX, int mouseY, int width, int height)
         {
+            if (ActiveTab == 0 && IsTemplateDiscoveryMode) return false;
             if (IsDraggingScrollBar)
             {
                 float barH = ScrollBarBounds.Height;
@@ -361,8 +390,8 @@ namespace ZenQOffice.UI
         {
             float contentLeft = SidebarWidth + 24f;
             float rightEdge = width - RightPanelWidth - 24f;
-            float searchW = Math.Min(480f, rightEdge - contentLeft - 180f);
-            if (searchW < 200f) searchW = 200f;
+            float searchW = Math.Min(480f, rightEdge - contentLeft - 140f);
+            if (searchW < 220f) searchW = 220f;
             return new RectangleF(contentLeft, 16f, searchW, 38f);
         }
 
@@ -374,8 +403,7 @@ namespace ZenQOffice.UI
 
         public RectangleF GetUpdateBtnBounds(int width, int scrollY = 0)
         {
-            float btnSize = 36f;
-            return new RectangleF(width - RightPanelWidth - 24f - btnSize, 17f, btnSize, btnSize);
+            return RectangleF.Empty;
         }
 
         public RectangleF GetFeaturesTabBounds(int width, int scrollY = 0)
@@ -385,12 +413,17 @@ namespace ZenQOffice.UI
 
         public RectangleF GetMyDocsTabBounds(int width, int scrollY = 0)
         {
-            return new RectangleF(12f, 70f, SidebarWidth - 24f, 38f);
+            return new RectangleF(12f, 70f, SidebarWidth - 24f, 34f);
+        }
+
+        public RectangleF GetTemplateDiscoveryNavBounds(int width, int scrollY = 0)
+        {
+            return new RectangleF(12f, 108f, SidebarWidth - 24f, 34f);
         }
 
         public RectangleF GetOpenDocNavBounds(int width, int scrollY = 0)
         {
-            return new RectangleF(12f, 114f, SidebarWidth - 24f, 38f);
+            return new RectangleF(12f, 146f, SidebarWidth - 24f, 34f);
         }
 
         public RectangleF GetRecentNavBounds(int width, int scrollY = 0)
@@ -405,20 +438,20 @@ namespace ZenQOffice.UI
 
         public RectangleF GetTrashTabBounds(int width, int scrollY = 0)
         {
-            return new RectangleF(12f, 158f, SidebarWidth - 24f, 38f);
+            return new RectangleF(12f, 184f, SidebarWidth - 24f, 34f);
         }
 
         public RectangleF GetAppNavBounds(int appIndex, int width, int scrollY = 0)
         {
-            float appNavY = 236f + appIndex * 36f;
-            return new RectangleF(12f, appNavY, SidebarWidth - 24f, 32f);
+            float appNavY = 250f + appIndex * 34f;
+            return new RectangleF(12f, appNavY, SidebarWidth - 24f, 30f);
         }
 
         public RectangleF GetPromoBtnBounds(int width)
         {
             float panelX = width - RightPanelWidth;
             float px = panelX + 20f;
-            return new RectangleF(px + 14f, 150f, 120f, 26f);
+            return new RectangleF(px + 14f, 150f, 130f, 28f);
         }
 
         public RectangleF GetStorageManageBounds(int width)
@@ -429,14 +462,7 @@ namespace ZenQOffice.UI
             return new RectangleF(px + pw - 48f, 204f, 48f, 20f);
         }
 
-        public RectangleF GetTemplateCardBounds(int index, int width)
-        {
-            float panelX = width - RightPanelWidth;
-            float px = panelX + 20f;
-            float pw = RightPanelWidth - 40f;
-            float curY = 294f + index * 44f;
-            return new RectangleF(px, curY, pw, 40f);
-        }
+
 
         public RectangleF GetBugReportTabBounds(int width, int scrollY = 0)
         {
@@ -508,6 +534,7 @@ namespace ZenQOffice.UI
             ActiveTab = 0;
 
             LoadRecentDocs();
+            _templateDiscoveryView.RecentDocsProvider = () => RecentDocs;
 
             try
             {
@@ -563,17 +590,9 @@ namespace ZenQOffice.UI
                             bool isStarred = false;
                             if (n.Attributes["starred"] != null) bool.TryParse(n.Attributes["starred"].Value, out isStarred);
 
-                            // Loại bỏ các tệp mẫu ảo cũ không tồn tại
-                            bool isDummy = false;
-                            for (int d = 0; d < DummyTitles.Length; d++)
-                            {
-                                if (string.Equals(title, DummyTitles[d], StringComparison.OrdinalIgnoreCase) && !File.Exists(fpath))
-                                {
-                                    isDummy = true;
-                                    break;
-                                }
-                            }
-                            if (!isDummy)
+                            // Loại bỏ triệt để các tệp mẫu ảo, chỉ giữ tệp thật tồn tại trên máy
+                            bool isFake = fpath.Contains("Templates\\Don_Xin") || fpath.Contains("Templates\\Bang_Cham") || fpath.Contains("Templates\\Bao_Cao") || fpath.Contains("Templates\\Ke_Hoach") || fpath.Contains("Templates\\Mau_") || !File.Exists(fpath);
+                            if (!isFake)
                             {
                                 RecentDocs.Add(new RecentDocItem(title, fpath, (OfficeAppMode)modeVal, date, isStarred));
                             }
@@ -609,6 +628,11 @@ namespace ZenQOffice.UI
                     }
                 }
                 catch { }
+            }
+
+            if (RecentDocs.Count == 0)
+            {
+                ScanDeviceForDocuments();
             }
 
             // Lưu lại phiên bản đã dọn sạch tệp ảo
@@ -1707,207 +1731,6 @@ namespace ZenQOffice.UI
             );
         }
 
-        public string EnsureTemplateLeaveRequest()
-        {
-            try
-            {
-                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
-                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
-                string fPath = Path.Combine(tDir, "Don_Xin_Nghi_Phep.docx");
-
-                // Chuẩn hóa văn bản hành chính theo Nghị định 30/2020/NĐ-CP:
-                // - Quốc hiệu, Tiêu ngữ, Tiêu đề: Căn giữa (Center), in đậm
-                // - Nội dung: Giãn cách chuẩn, văn phong hành chính trang trọng
-                // - Địa danh, ngày tháng & Chữ ký: Căn phải (Right) ở góc dưới cùng bên phải
-                List<TemplateLineInfo> lines = new List<TemplateLineInfo>
-                {
-                    new TemplateLineInfo("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", 1, true, false, 13f),
-                    new TemplateLineInfo("Độc lập - Tự do - Hạnh phúc", 1, true, false, 14f),
-                    new TemplateLineInfo("--------------------------------", 1, true, false, 12f),
-                    new TemplateLineInfo("", 1, false, false, 13f),
-                    new TemplateLineInfo("ĐƠN XIN NGHỈ PHÉP", 1, true, false, 16f),
-                    new TemplateLineInfo("", 1, false, false, 13f),
-                    new TemplateLineInfo("Kính gửi: Ban Giám đốc cùng Phòng Hành chính - Nhân sự", 0, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("Tôi tên là: [Họ và tên nhân viên]", 0, false, false, 13f),
-                    new TemplateLineInfo("Chức vụ: [Chức danh / Vị trí công tác]", 0, false, false, 13f),
-                    new TemplateLineInfo("Bộ phận / Phòng ban: [Phòng ban làm việc]", 0, false, false, 13f),
-                    new TemplateLineInfo("Mã số nhân viên: [Mã NV]", 0, false, false, 13f),
-                    new TemplateLineInfo("Số điện thoại liên hệ: [Số điện thoại]", 0, false, false, 13f),
-                    new TemplateLineInfo("Email liên hệ: [Địa chỉ email cá nhân / công ty]", 0, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("Nay tôi làm đơn này kính xin Ban Giám đốc và Phòng Hành chính - Nhân sự cho phép tôi được nghỉ phép:", 0, false, false, 13f),
-                    new TemplateLineInfo("- Thời gian nghỉ phép: Từ ngày .../.../2026 đến hết ngày .../.../2026", 0, false, false, 13f),
-                    new TemplateLineInfo("- Tổng số ngày xin nghỉ: ... ngày làm việc (bằng chữ: ... ngày).", 0, false, false, 13f),
-                    new TemplateLineInfo("- Lý do xin nghỉ phép: [Giải quyết việc cá nhân gia đình / Nghỉ phép năm theo quy định].", 0, false, false, 13f),
-                    new TemplateLineInfo("- Địa chỉ và số điện thoại liên hệ khi cần: [Địa chỉ cư trú / Số điện thoại khẩn cấp].", 0, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("Trong thời gian nghỉ phép, tôi đã bàn giao đầy đủ công việc tồn đọng và hồ sơ tài liệu liên quan cho đồng nghiệp: [Họ và tên người nhận bàn giao] - Bộ phận: [Bộ phận]. Người nhận bàn giao cam kết sẽ hỗ trợ xử lý kịp thời các công việc phát sinh liên quan.", 3, false, false, 13f),
-                    new TemplateLineInfo("Tôi cam kết sẽ có mặt làm việc đúng thời hạn quy định và hoàn thành đầy đủ nhiệm vụ được giao sau kỳ nghỉ.", 3, false, false, 13f),
-                    new TemplateLineInfo("Kính mong Ban Giám đốc và Phòng Hành chính - Nhân sự xem xét và tạo điều kiện phê duyệt!", 3, false, false, 13f),
-                    new TemplateLineInfo("Tôi xin chân thành cảm ơn!", 0, false, true, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("..., ngày ... tháng ... năm 2026", 2, false, true, 13f),
-                    new TemplateLineInfo("Người làm đơn", 2, true, false, 13f),
-                    new TemplateLineInfo("(Ký và ghi rõ họ tên)", 2, false, true, 12f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("[Họ và tên nhân viên]", 2, true, false, 13f)
-                };
-
-                SaveFormattedTemplateDocx(fPath, lines);
-                return fPath;
-            }
-            catch { return null; }
-        }
-
-        public string EnsureTemplateProjectReport()
-        {
-            try
-            {
-                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
-                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
-                string fPath = Path.Combine(tDir, "Bao_Cao_Tien_Do_Du_An.docx");
-
-                List<TemplateLineInfo> lines = new List<TemplateLineInfo>
-                {
-                    new TemplateLineInfo("BÁO CÁO TIẾN ĐỘ DỰ ÁN", 1, true, false, 16f),
-                    new TemplateLineInfo("Tháng 09/2026 • Ban Quản lý Dự án ZENQ OFFICE", 1, false, true, 12f),
-                    new TemplateLineInfo("----------------------------------------------------------------", 1, false, false, 12f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("1. THÔNG TIN CHUNG DỰ ÁN", 0, true, false, 13.5f),
-                    new TemplateLineInfo("• Tên dự án: Triển khai Hệ thống Văn phòng Thông minh ZENQ OFFICE", 0, false, false, 13f),
-                    new TemplateLineInfo("• Quản trị dự án (PM): [Họ và tên PM]", 0, false, false, 13f),
-                    new TemplateLineInfo("• Giai đoạn: Thử nghiệm diện rộng (Pilot Phase)", 0, false, false, 13f),
-                    new TemplateLineInfo("• Tình trạng hiện tại: ĐÚNG TIẾN ĐỘ (On Track)", 0, true, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("2. MỤC TIÊU & KẾT QUẢ ĐÃ ĐẠT ĐƯỢC", 0, true, false, 13.5f),
-                    new TemplateLineInfo("- Hoàn tất tích hợp bộ công cụ Soạn thảo (Writer), Bảng tính (Calc), Trình chiếu (Slides) và PDF.", 3, false, false, 13f),
-                    new TemplateLineInfo("- Tích hợp thành công Trợ lý AI Copilot hỗ trợ người dùng phân tích văn bản.", 3, false, false, 13f),
-                    new TemplateLineInfo("- Tối ưu hóa hiệu năng render mượt mà 60 FPS trên máy tính cấu hình tiêu chuẩn.", 3, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("3. RỦI RO & GIẢI PHÁP ĐỀ XUẤT", 0, true, false, 13.5f),
-                    new TemplateLineInfo("- Rủi ro về dung lượng bộ nhớ khi xử lý file lớn -> Đã áp dụng phân trang ảo (Virtual Rendering).", 3, false, false, 13f),
-                    new TemplateLineInfo("- Đề xuất tăng cường thử nghiệm bảo mật cho các tệp văn bản mã hóa.", 3, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("4. KẾ HOẠCH HÀNH ĐỘNG TUẦN TIẾP THEO", 0, true, false, 13.5f),
-                    new TemplateLineInfo("- Kiểm thử lần cuối và phát hành phiên bản chính thức đến người dùng.", 3, false, false, 13f),
-                    new TemplateLineInfo("- Tổ chức buổi đào tạo hướng dẫn sử dụng các phím tắt và tính năng AI.", 3, false, false, 13f),
-                    new TemplateLineInfo("", 0, false, false, 13f),
-                    new TemplateLineInfo("..., ngày ... tháng ... năm 2026", 2, false, true, 13f),
-                    new TemplateLineInfo("Người lập báo cáo", 2, true, false, 13f),
-                    new TemplateLineInfo("(Ký và ghi rõ họ tên)", 2, false, true, 12f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("", 2, false, false, 13f),
-                    new TemplateLineInfo("[Họ và tên người lập]", 2, true, false, 13f)
-                };
-
-                SaveFormattedTemplateDocx(fPath, lines);
-                return fPath;
-            }
-            catch { return null; }
-        }
-
-        public string EnsureTemplateBusinessPlan()
-        {
-            try
-            {
-                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
-                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
-                string fPath = Path.Combine(tDir, "Ke_Hoach_Kinh_Doanh.pptx");
-                if (!File.Exists(fPath))
-                {
-                    PresentationRoot pres = new PresentationRoot();
-                    pres.Title = "Kế hoạch Kinh doanh Chiến lược";
-
-                    float cw = pres.CanvasWidth;
-                    float ch = pres.CanvasHeight;
-
-                    SlideNode s1 = new SlideNode { Layout = SlideLayoutType.TitleSlide, Title = "KẾ HOẠCH KINH DOANH CHIẾN LƯỢC" };
-                    s1.Shapes.Add(new ShapeNode
-                    {
-                        Type = ShapeType.TextBox,
-                        Name = "Tiêu đề Chính",
-                        Transform = new Transform2D(cw * 0.1f, ch * 0.28f, cw * 0.8f, 100f),
-                        Text = "KẾ HOẠCH KINH DOANH CHIẾN LƯỢC",
-                        FontSize = 36f,
-                        Bold = true,
-                        Alignment = TextAlignment.Center,
-                        VerticalAlignment = VerticalTextAlignment.Middle,
-                        TextColor = 0x0F172A,
-                        FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
-                    });
-                    s1.Shapes.Add(new ShapeNode
-                    {
-                        Type = ShapeType.TextBox,
-                        Name = "Tiêu đề Phụ",
-                        Transform = new Transform2D(cw * 0.15f, ch * 0.52f, cw * 0.7f, 60f),
-                        Text = "Định hướng Phát triển Doanh nghiệp 2026 - 2030",
-                        FontSize = 20f,
-                        Alignment = TextAlignment.Center,
-                        VerticalAlignment = VerticalTextAlignment.Middle,
-                        TextColor = 0x64748B,
-                        FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
-                    });
-                    pres.Slides.Add(s1);
-
-                    SlideNode s2 = new SlideNode { Layout = SlideLayoutType.TitleAndContent, Title = "TỔNG QUAN THỊ TRƯỜNG & MỤC TIÊU" };
-                    s2.Shapes.Add(new ShapeNode
-                    {
-                        Type = ShapeType.TextBox,
-                        Name = "Tiêu đề",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.08f, cw * 0.88f, 70f),
-                        Text = "TỔNG QUAN THỊ TRƯỜNG & MỤC TIÊU",
-                        FontSize = 30f,
-                        Bold = true,
-                        Alignment = TextAlignment.Left,
-                        VerticalAlignment = VerticalTextAlignment.Middle,
-                        TextColor = 0x0F172A,
-                        FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
-                    });
-                    s2.Shapes.Add(new ShapeNode
-                    {
-                        Type = ShapeType.TextBox,
-                        Name = "Nội dung",
-                        Transform = new Transform2D(cw * 0.06f, ch * 0.26f, cw * 0.88f, ch * 0.62f),
-                        Text = "• Nhu cầu chuyển đổi số trong văn phòng tăng trưởng 35%/năm.\n• Mục tiêu đạt 100.000 người dùng hoạt động hàng tháng (MAU).\n• Doanh thu kỳ vọng năm đầu tiên: 10 tỷ VNĐ.\n• Mở rộng hợp tác chiến lược cùng các đối tác công nghệ.",
-                        FontSize = 18f,
-                        Alignment = TextAlignment.Left,
-                        TextColor = 0x334155,
-                        FillColor = 0x00FFFFFF,
-                        StrokeWidth = 0f
-                    });
-                    pres.Slides.Add(s2);
-
-                    Format.PptxHandler.SavePptx(fPath, pres);
-                }
-                return fPath;
-            }
-            catch { return null; }
-        }
-
-        public string EnsureTemplateTimesheet()
-        {
-            try
-            {
-                string tDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GenOffice", "Templates");
-                if (!Directory.Exists(tDir)) Directory.CreateDirectory(tDir);
-                string fPath = Path.Combine(tDir, "Bang_Cham_Cong_Thang.csv");
-                if (!File.Exists(fPath))
-                {
-                    string csv = "STT,Mã NV,Họ và Tên,Chức vụ,Số ngày công,Nghỉ phép,Nghỉ ốm,Tổng công,Ghi chú\r\n1,NV001,Nguyễn Văn An,Trưởng phòng,22,0,0,22,Đủ công\r\n2,NV002,Trần Thị Bình,Chuyên viên,21,1,0,22,Phép năm\r\n3,NV003,Lê Hoàng Cường,Kỹ sư phần mềm,22,0,0,22,Đủ công\r\n4,NV004,Phạm Thị Dung,Kế toán trưởng,20,2,0,22,Nghỉ việc riêng\r\n5,NV005,Võ Quốc Em,Nhân viên thiết kế,22,0,0,22,Đủ công\r\n";
-                    File.WriteAllText(fPath, csv, System.Text.Encoding.UTF8);
-                }
-                return fPath;
-            }
-            catch { return null; }
-        }
-
         private void DrawRightSidebarPanel(Graphics g, int width, int height)
         {
             float panelX = width - RightPanelWidth;
@@ -1946,11 +1769,12 @@ namespace ZenQOffice.UI
             {
                 g.FillPath(ctaBg, ctap);
             }
-            using (Font ctaFont = new Font("Segoe UI", 8f, FontStyle.Bold))
+            using (Font ctaFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (SolidBrush ctaTxt = new SolidBrush(Color.White))
             {
                 StringFormat csf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString("Khám phá mẫu", ctaFont, ctaTxt, ctaBtn, csf);
+                bool showBackToHome = (ActiveTab == 0 && IsTemplateDiscoveryMode);
+                g.DrawString(showBackToHome ? "⌂ Về Trang chủ" : "🗂 Khám phá mẫu", ctaFont, ctaTxt, ctaBtn, csf);
             }
 
             // ── 2. "Dung lượng lưu trữ" section (DỮ LIỆU THỰC TẾ TỪ Ổ ĐĨA MÁY TÍNH) ──
@@ -2020,108 +1844,6 @@ namespace ZenQOffice.UI
                 g.DrawString(string.Format("{0}%", usedPct), storeInfoFont, storeInfoB, px + pw - 28f, 238f);
             }
 
-            // ── 3. "Mẫu nổi bật" section (CLICKABLE & FUNCTIONAL) ──
-            float tmplHeaderY = 266f;
-            using (Font secFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (SolidBrush secB = new SolidBrush(Color.FromArgb(30, 41, 59)))
-            {
-                g.DrawString("Mẫu nổi bật", secFont, secB, px, tmplHeaderY);
-            }
-            using (Font linkFont = new Font("Segoe UI", 8f, FontStyle.Regular))
-            using (SolidBrush linkB = new SolidBrush(Color.FromArgb(37, 99, 235)))
-            {
-                g.DrawString("Xem tất cả", linkFont, linkB, px + pw - 50f, tmplHeaderY + 2f);
-            }
-
-            // Template cards (Starts at Y=294f, each height 40f with 44f step)
-            string[] templateNames = new string[] { "Đơn xin nghỉ phép", "Kế hoạch kinh doanh", "Báo cáo dự án", "Bảng chấm công" };
-            string[] templateTypes = new string[] { "Mẫu văn bản", "Mẫu thuyết trình", "Mẫu văn bản", "Mẫu bảng tính" };
-            Color[] templateColors = new Color[] { Color.FromArgb(99, 102, 241), Color.FromArgb(249, 115, 22), Color.FromArgb(37, 99, 235), Color.FromArgb(16, 185, 129) };
-            string[] templateLetters = new string[] { "W", "P", "W", "X" };
-            OfficeAppMode[] templateModes = new OfficeAppMode[] { OfficeAppMode.Writer, OfficeAppMode.Slides, OfficeAppMode.Writer, OfficeAppMode.Calc };
-
-            for (int i = 0; i < templateNames.Length; i++)
-            {
-                RectangleF tmplRect = GetTemplateCardBounds(i, width);
-                bool isTmplHover = (HoverTemplateIndex == i);
-
-                if (isTmplHover)
-                {
-                    using (GraphicsPath hovP = CreateRoundedRectanglePath(tmplRect, 6f))
-                    using (SolidBrush hovB = new SolidBrush(Color.FromArgb(241, 245, 249)))
-                    {
-                        g.FillPath(hovB, hovP);
-                    }
-                }
-
-                // Template icon
-                RectangleF tmplIcon = new RectangleF(tmplRect.X + 4f, tmplRect.Y + 6f, 28f, 28f);
-                if (!AppIconRenderer.DrawAppIcon(g, tmplIcon.X, tmplIcon.Y, tmplIcon.Width, templateModes[i]))
-                {
-                    using (GraphicsPath tip = CreateRoundedRectanglePath(tmplIcon, 6f))
-                    using (SolidBrush tib = new SolidBrush(Color.FromArgb(30, templateColors[i].R, templateColors[i].G, templateColors[i].B)))
-                    {
-                        g.FillPath(tib, tip);
-                    }
-                    using (Font tlf = new Font("Segoe UI", 9f, FontStyle.Bold))
-                    using (SolidBrush tlt = new SolidBrush(templateColors[i]))
-                    {
-                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                        g.DrawString(templateLetters[i], tlf, tlt, tmplIcon, sf);
-                    }
-                }
-                // Template text
-                using (Font tnf = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-                using (Font ttf = new Font("Segoe UI", 7.5f, FontStyle.Regular))
-                using (SolidBrush tnb = new SolidBrush(Color.FromArgb(30, 41, 59)))
-                using (SolidBrush ttb = new SolidBrush(Color.FromArgb(148, 163, 184)))
-                {
-                    g.DrawString(templateNames[i], tnf, tnb, tmplRect.X + 38f, tmplRect.Y + 6f);
-                    g.DrawString(templateTypes[i], ttf, ttb, tmplRect.X + 38f, tmplRect.Y + 23f);
-                }
-                // Arrow >
-                using (SolidBrush arB = new SolidBrush(isTmplHover ? Color.FromArgb(37, 99, 235) : Color.FromArgb(148, 163, 184)))
-                using (Font arf = new Font("Segoe UI", 10f, FontStyle.Regular))
-                {
-                    g.DrawString("›", arf, arB, tmplRect.Right - 14f, tmplRect.Y + 10f);
-                }
-
-                // Separator line
-                if (i < templateNames.Length - 1)
-                {
-                    using (Pen sepPen = new Pen(Color.FromArgb(241, 245, 249), 1f))
-                    {
-                        g.DrawLine(sepPen, tmplRect.X, tmplRect.Bottom + 1f, tmplRect.Right, tmplRect.Bottom + 1f);
-                    }
-                }
-            }
-
-            // ── 4. "Tính năng nổi bật" section (TÍNH NĂNG THẬT 100% CỦA GENOFFICE) ──
-            float featY = 482f;
-            using (Font secFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (SolidBrush secB = new SolidBrush(Color.FromArgb(30, 41, 59)))
-            {
-                g.DrawString("Tính năng nổi bật", secFont, secB, px, featY);
-            }
-
-            string[] features = new string[] {
-                "Trợ lý AI Copilot thông minh",
-                "Hỗ trợ DOCX, XLSX, PPTX, PDF",
-                "Ngoại tuyến 100% & Bảo mật cao",
-                "Tự động lưu bản thảo an toàn"
-            };
-            using (Font featFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
-            using (SolidBrush featB = new SolidBrush(Color.FromArgb(71, 85, 105)))
-            using (SolidBrush checkB = new SolidBrush(Color.FromArgb(16, 185, 129)))
-            {
-                for (int i = 0; i < features.Length; i++)
-                {
-                    float fy = featY + 22f + i * 22f;
-                    FluentIconRenderer.DrawGlyph(g, '\uE73E', new RectangleF(px + 2f, fy + 2f, 12f, 12f), Color.FromArgb(16, 185, 129), 11f);
-                    g.DrawString(features[i], featFont, featB, px + 18f, fy);
-                }
-            }
-
             // ── 5. Nút "Cập nhật ngay" nhỏ gọn, bo tròn chuẩn Win11, xích xuống góc dưới cùng ──
             // Nếu phiên bản hiện tại đã là mới nhất (không có bản cập nhật mới), ẩn hoàn toàn nút cập nhật
             bool hasNewUpdate = (UpdateManager.LastReleaseInfo != null && UpdateManager.LastReleaseInfo.HasUpdate);
@@ -2134,7 +1856,7 @@ namespace ZenQOffice.UI
             float btnW = 126f;
             float btnH = 26f;
             float btnX = px + pw - btnW; // Xích sát góc phải
-            float btnY = Math.Max(featY + 22f + features.Length * 22f + 20f, height - 38f); // Xích sát góc đáy
+            float btnY = height - 38f; // Xích sát góc đáy
 
             RightPanelUpdateBtnRect = new RectangleF(btnX, btnY, btnW, btnH);
 
@@ -2212,9 +1934,12 @@ namespace ZenQOffice.UI
                 g.DrawString("ZENQ OFFICE", brandFont, brandBrush, 56f, 18f);
             }
 
-            // 2.2 Nav items (Trang chủ, Tài liệu của tôi, Thùng rác)
+            // 2.2 Nav items (1: Trang chủ, 2: Khám phá mẫu, 3: Tài liệu của tôi, 4: Thùng rác)
             RectangleF tab0Rect = GetMyDocsTabBounds(width, height);
-            DrawSidebarNavItem(g, tab0Rect, "Trang chủ", (gr, ix, iy, isz, icol) => DrawVectorHomeIcon(gr, ix, iy, isz, icol), ActiveTab == 0, HoverTabIndex == 0);
+            DrawSidebarNavItem(g, tab0Rect, "Trang chủ", (gr, ix, iy, isz, icol) => DrawVectorHomeIcon(gr, ix, iy, isz, icol), ActiveTab == 0 && !IsTemplateDiscoveryMode, HoverTabIndex == 0);
+
+            RectangleF tmplNavRect = GetTemplateDiscoveryNavBounds(width, height);
+            DrawSidebarNavItem(g, tmplNavRect, "Khám phá mẫu", (gr, ix, iy, isz, icol) => DrawVectorTemplateIcon(gr, ix, iy, isz, icol), ActiveTab == 0 && IsTemplateDiscoveryMode, HoverTabIndex == 10);
 
             RectangleF navDocRect = GetOpenDocNavBounds(width, height);
             DrawSidebarNavItem(g, navDocRect, "Tài liệu của tôi", (gr, ix, iy, isz, icol) => DrawVectorFolderIcon(gr, ix, iy, isz, icol), ActiveTab == 3, HoverTabIndex == 3 || HoverSidebarDoc);
@@ -2223,7 +1948,7 @@ namespace ZenQOffice.UI
             DrawSidebarNavItem(g, tab1Rect, "Thùng rác", (gr, ix, iy, isz, icol) => DrawVectorTrashIcon(gr, ix, iy, isz, icol), ActiveTab == 1, HoverTabIndex == 1);
 
             // 2.3 "Ứng dụng" section (CLICKABLE SHORTCUTS TO CREATE DOCUMENTS)
-            float appSectionY = 212f;
+            float appSectionY = 226f;
             using (Font secLabelFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (SolidBrush secLabelBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
             {
@@ -2299,10 +2024,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // Top bar icons: bell, help, user avatar
-            float topBarRightX = width - RightPanelWidth - 24f;
-            DrawVectorBellIcon(g, topBarRightX - 120f, 24f, 18f, Color.FromArgb(100, 116, 139));
-
+            // Top bar icons: help
             RectangleF helpRect = GetHelpBtnBounds(width, height);
             if (HoverHelpBtn)
             {
@@ -2313,53 +2035,49 @@ namespace ZenQOffice.UI
             }
             DrawVectorQuestionIcon(g, helpRect.X + helpRect.Width / 2f, helpRect.Y + helpRect.Height / 2f, 16f, Color.FromArgb(100, 116, 139));
 
-            RectangleF updateRect = GetUpdateBtnBounds(width, height);
-            using (SolidBrush avatarBg = new SolidBrush(Color.FromArgb(37, 99, 235)))
-            {
-                g.FillEllipse(avatarBg, updateRect.X + 4f, updateRect.Y + 4f, 28f, 28f);
-            }
-            using (Font avatarFont = new Font("Segoe UI", 9f, FontStyle.Bold))
-            using (SolidBrush avatarTxt = new SolidBrush(Color.White))
-            {
-                StringFormat asf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                RectangleF avatarTextRect = new RectangleF(updateRect.X + 4f, updateRect.Y + 4f, 28f, 28f);
-                g.DrawString("UH", avatarFont, avatarTxt, avatarTextRect, asf);
-            }
-
             // 4. WELCOME BANNER (Tab 0 only)
             if (ActiveTab == 0)
             {
-                RectangleF bannerRect = new RectangleF(startX, 68f, contentW, bannerH);
-                if (!AppIconRenderer.DrawBanner(g, bannerRect))
+                if (IsTemplateDiscoveryMode)
                 {
-                    using (GraphicsPath bp = CreateRoundedRectanglePath(bannerRect, 16f))
-                    using (LinearGradientBrush bannerBg = new LinearGradientBrush(bannerRect, Color.FromArgb(79, 102, 207), Color.FromArgb(105, 126, 218), 135f))
+                    // THAY THẾ BANNER, CÁC APP VÀ PHẦN DƯỚI BẰNG TRANG KHÁM PHÁ MẪU
+                    // Cả 2 thanh bên trái và phải được giữ nguyên hoàn toàn
+                    _templateDiscoveryView.Draw(g, startX, 68f, contentW, height - 68f, LastMouseX, LastMouseY);
+                }
+                else
+                {
+                    RectangleF bannerRect = new RectangleF(startX, 68f, contentW, bannerH);
+                    if (!AppIconRenderer.DrawBanner(g, bannerRect))
                     {
-                        g.FillPath(bannerBg, bp);
-                    }
-                    using (Font bannerTitleFont = new Font("Segoe UI", 16f, FontStyle.Bold))
-                    using (Font bannerSubFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
-                    using (SolidBrush bannerTxtBrush = new SolidBrush(Color.White))
-                    {
-                        g.DrawString("Chào mừng bạn quay trở lại!", bannerTitleFont, bannerTxtBrush, startX + 28f, 96f);
-                        using (SolidBrush bannerSubBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
+                        using (GraphicsPath bp = CreateRoundedRectanglePath(bannerRect, 16f))
+                        using (LinearGradientBrush bannerBg = new LinearGradientBrush(bannerRect, Color.FromArgb(79, 102, 207), Color.FromArgb(105, 126, 218), 135f))
                         {
-                            g.DrawString("Bắt đầu công việc của bạn với các công cụ văn phòng mạnh mẽ và linh hoạt.", bannerSubFont, bannerSubBrush, startX + 28f, 128f);
+                            g.FillPath(bannerBg, bp);
                         }
+                        using (Font bannerTitleFont = new Font("Segoe UI", 16f, FontStyle.Bold))
+                        using (Font bannerSubFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
+                        using (SolidBrush bannerTxtBrush = new SolidBrush(Color.White))
+                        {
+                            g.DrawString("Chào mừng bạn quay trở lại!", bannerTitleFont, bannerTxtBrush, startX + 28f, 96f);
+                            using (SolidBrush bannerSubBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
+                            {
+                                g.DrawString("Bắt đầu công việc của bạn với các công cụ văn phòng mạnh mẽ và linh hoạt.", bannerSubFont, bannerSubBrush, startX + 28f, 128f);
+                            }
+                        }
+                        // Floating icons (All 5 formats)
+                        float iconBlockX = bannerRect.Right - 238f;
+                        float iconBlockY = bannerRect.Y + 28f;
+                        AppIconRenderer.DrawAppIcon(g, iconBlockX, iconBlockY, 50f, OfficeAppMode.Writer);
+                        AppIconRenderer.DrawAppIcon(g, iconBlockX + 44f, iconBlockY + 14f, 50f, OfficeAppMode.Calc);
+                        AppIconRenderer.DrawAppIcon(g, iconBlockX + 88f, iconBlockY - 6f, 50f, OfficeAppMode.Slides);
+                        AppIconRenderer.DrawAppIcon(g, iconBlockX + 132f, iconBlockY + 16f, 46f, OfficeAppMode.Pdf);
+                        AppIconRenderer.DrawAppIcon(g, iconBlockX + 176f, iconBlockY - 2f, 48f, OfficeAppMode.Photo);
                     }
-                    // Floating icons (All 5 formats)
-                    float iconBlockX = bannerRect.Right - 238f;
-                    float iconBlockY = bannerRect.Y + 28f;
-                    AppIconRenderer.DrawAppIcon(g, iconBlockX, iconBlockY, 50f, OfficeAppMode.Writer);
-                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 44f, iconBlockY + 14f, 50f, OfficeAppMode.Calc);
-                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 88f, iconBlockY - 6f, 50f, OfficeAppMode.Slides);
-                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 132f, iconBlockY + 16f, 46f, OfficeAppMode.Pdf);
-                    AppIconRenderer.DrawAppIcon(g, iconBlockX + 176f, iconBlockY - 2f, 48f, OfficeAppMode.Photo);
                 }
             }
 
-            // 5. CREATION CARDS (Chỉ hiển thị tại Trang chủ)
-            if (ActiveTab == 0)
+            // 5. CREATION CARDS (Chỉ hiển thị tại Trang chủ khi không ở chế độ Khám phá mẫu)
+            if (ActiveTab == 0 && !IsTemplateDiscoveryMode)
             {
                 RectangleF c0 = GetCardBounds(0, width, height);
                 RectangleF c1 = GetCardBounds(1, width, height);
@@ -2421,7 +2139,7 @@ namespace ZenQOffice.UI
                     ScrollBarThumbBounds = RectangleF.Empty;
                 }
             }
-            else
+            else if (ActiveTab != 0 || !IsTemplateDiscoveryMode)
             {
                 // File list (fileListY, colHeaderY, listTopY from GetCenterContentMetrics)
                 if (ActiveTab == 3)
@@ -2682,13 +2400,17 @@ namespace ZenQOffice.UI
                                                   (isRowStarHov ? Color.FromArgb(245, 158, 11) : Color.FromArgb(203, 213, 225));
                                 DrawVectorStarIcon(g, starX, dotCY, 7.5f, starColor, doc.IsStarred);
 
-                                // 3 dots
-                                using (SolidBrush dotB = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                                // Nút Thùng rác (Xóa / Chuyển vào Thùng rác)
+                                bool isRowTrashHov = (HoverRowTrash == i);
+                                if (isRowTrashHov)
                                 {
-                                    g.FillEllipse(dotB, dotX, dotCY - 6f, 3f, 3f);
-                                    g.FillEllipse(dotB, dotX, dotCY - 0.5f, 3f, 3f);
-                                    g.FillEllipse(dotB, dotX, dotCY + 5f, 3f, 3f);
+                                    using (SolidBrush hovBg = new SolidBrush(Color.FromArgb(254, 242, 242)))
+                                    {
+                                        g.FillEllipse(hovBg, dotX - 12f, dotCY - 12f, 24f, 24f);
+                                    }
                                 }
+                                Color trashColor = isRowTrashHov ? Color.FromArgb(220, 38, 38) : Color.FromArgb(148, 163, 184);
+                                DrawVectorTrashIcon(g, dotX - 8f, dotCY - 8f, 16f, trashColor);
                             }
                             else
                             {
@@ -3304,6 +3026,16 @@ namespace ZenQOffice.UI
         #region Interaction Handlers
         public bool HandleMouseMove(int x, int y, int width, int height = 800)
         {
+            LastMouseX = x;
+            LastMouseY = y;
+
+            if (ActiveTab == 0 && IsTemplateDiscoveryMode)
+            {
+                if (_templateDiscoveryView.HandleMouseMove(x, y))
+                {
+                    // Vẫn cập nhật thêm trạng thái các sidebar
+                }
+            }
             int prevTab = HoverTabIndex;
             int prevCard = HoverCardIndex;
             int prevRow = HoverRowIndex;
@@ -3317,6 +3049,7 @@ namespace ZenQOffice.UI
             bool prevStorage = HoverStorageManage;
             int prevTmpl = HoverTemplateIndex;
             int prevRowStar = HoverRowStar;
+            int prevRowTrash = HoverRowTrash;
             bool prevUpdBtn = HoverRightPanelUpdateBtn;
 
             HoverTabIndex = -1;
@@ -3328,6 +3061,7 @@ namespace ZenQOffice.UI
             HoverStorageManage = false;
             HoverTemplateIndex = -1;
             HoverRowStar = -1;
+            HoverRowTrash = -1;
             HoverRightPanelUpdateBtn = false;
 
             RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
@@ -3338,7 +3072,9 @@ namespace ZenQOffice.UI
             RectangleF helpRect = GetHelpBtnBounds(width, height);
             RectangleF updateRect = GetUpdateBtnBounds(width, height);
 
+            RectangleF tmplNavTab = GetTemplateDiscoveryNavBounds(width, height);
             if (myDocsTab.Contains(x, y)) HoverTabIndex = 0;
+            else if (tmplNavTab.Contains(x, y)) HoverTabIndex = 10;
             else if (openDocNav.Contains(x, y)) { HoverTabIndex = 3; HoverSidebarDoc = true; }
             else if (trashTab.Contains(x, y)) HoverTabIndex = 1;
             else if (bugReportTab.Contains(x, y)) HoverTabIndex = 4;
@@ -3376,18 +3112,11 @@ namespace ZenQOffice.UI
                 HoverPromoBtn = GetPromoBtnBounds(width).Contains(x, y);
                 HoverStorageManage = GetStorageManageBounds(width).Contains(x, y);
                 HoverRightPanelUpdateBtn = RightPanelUpdateBtnRect.Contains(x, y);
-                for (int t = 0; t < 4; t++)
-                {
-                    if (GetTemplateCardBounds(t, width).Contains(x, y))
-                    {
-                        HoverTemplateIndex = t;
-                        break;
-                    }
-                }
+                HoverTemplateIndex = -1;
             }
 
             HoverCardIndex = -1;
-            if (ActiveTab == 0)
+            if (ActiveTab == 0 && !IsTemplateDiscoveryMode)
             {
                 for (int i = 0; i < 5; i++)
                 {
@@ -3401,7 +3130,7 @@ namespace ZenQOffice.UI
             }
 
             HoverRowIndex = -1;
-            if (ActiveTab == 0 || ActiveTab == 1 || ActiveTab == 3)
+            if ((ActiveTab == 0 && !IsTemplateDiscoveryMode) || ActiveTab == 1 || ActiveTab == 3)
             {
                 List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
                 if (currentList != null && currentList.Count > 0)
@@ -3423,9 +3152,17 @@ namespace ZenQOffice.UI
                             if (r >= 0 && r < currentList.Count && withinRowY <= rowHeight)
                             {
                                 HoverRowIndex = r;
-                                if ((ActiveTab == 0 || ActiveTab == 3) && x >= startX + contentW - 54f && x <= startX + contentW - 30f)
+                                if (ActiveTab == 0 || ActiveTab == 3)
                                 {
-                                    HoverRowStar = r;
+                                    float dotX = startX + contentW - 24f;
+                                    if (x >= dotX - 44f && x <= dotX - 18f)
+                                    {
+                                        HoverRowStar = r;
+                                    }
+                                    else if (x >= dotX - 16f && x <= dotX + 16f)
+                                    {
+                                        HoverRowTrash = r;
+                                    }
                                 }
                             }
                         }
@@ -3474,7 +3211,7 @@ namespace ZenQOffice.UI
                     prevHelp != HoverHelpBtn || prevUpdate != HoverUpdateBtn || prevSideDoc != HoverSidebarDoc ||
                     prevSideRec != HoverSidebarRecent || prevSideStar != HoverSidebarStar ||
                     prevSideApp != HoverSidebarApp || prevPromo != HoverPromoBtn ||
-                    prevStorage != HoverStorageManage || prevTmpl != HoverTemplateIndex || prevRowStar != HoverRowStar ||
+                    prevStorage != HoverStorageManage || prevTmpl != HoverTemplateIndex || prevRowStar != HoverRowStar || prevRowTrash != HoverRowTrash ||
                     prevUpdBtn != HoverRightPanelUpdateBtn);
         }
 
@@ -3489,6 +3226,164 @@ namespace ZenQOffice.UI
             docTitle = "";
             openFilePath = null;
             int currentScroll = ScrollY;
+
+            RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
+            RectangleF openDocNav = GetOpenDocNavBounds(width, height);
+            RectangleF trashTab = GetTrashTabBounds(width, height);
+            RectangleF settingsTab = GetSettingsTabBounds(width, height);
+            RectangleF bugReportTab = GetBugReportTabBounds(width, height);
+            RectangleF helpRect = GetHelpBtnBounds(width, height);
+            RectangleF updateRect = GetUpdateBtnBounds(width, height);
+
+            if (ActiveTab == 0 && IsTemplateDiscoveryMode)
+            {
+                // A. Kiểm tra nhấp vào Sidebar bên trái (x < SidebarWidth)
+
+                if (myDocsTab.Contains(x, y))
+                {
+                    ActiveTab = 0;
+                    IsTemplateDiscoveryMode = false;
+                    SubFilter = 0;
+                    IndicatorTargetX = myDocsTab.X;
+                    IndicatorTargetW = myDocsTab.Width;
+                    ScrollY = 0;
+                    TargetScrollY = 0;
+                    return null;
+                }
+                if (openDocNav.Contains(x, y))
+                {
+                    ActiveTab = 3;
+                    IsTemplateDiscoveryMode = false;
+                    SubFilter = 0;
+                    IndicatorTargetX = openDocNav.X;
+                    IndicatorTargetW = openDocNav.Width;
+                    ScrollY = 0;
+                    TargetScrollY = 0;
+                    return null;
+                }
+                if (trashTab.Contains(x, y))
+                {
+                    ActiveTab = 1;
+                    IsTemplateDiscoveryMode = false;
+                    IndicatorTargetX = trashTab.X;
+                    IndicatorTargetW = trashTab.Width;
+                    ScrollY = 0;
+                    return null;
+                }
+                if (bugReportTab.Contains(x, y))
+                {
+                    using (var dlg = new BugReportDialogForm())
+                    {
+                        dlg.ShowDialog();
+                    }
+                    return null;
+                }
+                if (settingsTab.Contains(x, y))
+                {
+                    ActiveTab = 2;
+                    IsTemplateDiscoveryMode = false;
+                    IndicatorTargetX = settingsTab.X;
+                    IndicatorTargetW = settingsTab.Width;
+                    ScrollY = 0;
+                    return null;
+                }
+                if (helpRect.Contains(x, y))
+                {
+                    ShowHelpDialog();
+                    return null;
+                }
+                if (updateRect.Contains(x, y))
+                {
+                    using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
+                    {
+                        dlg.ShowDialog();
+                    }
+                    return null;
+                }
+
+                // Sidebar App Shortcuts (W / X / P / PDF / Photo)
+                if (GetAppNavBounds(0, width, height).Contains(x, y))
+                {
+                    docTitle = "Văn bản Mới.docx";
+                    openFilePath = null;
+                    return OfficeAppMode.Writer;
+                }
+                if (GetAppNavBounds(1, width, height).Contains(x, y))
+                {
+                    docTitle = "Bảng tính Mới.xlsx";
+                    openFilePath = null;
+                    return OfficeAppMode.Calc;
+                }
+                if (GetAppNavBounds(2, width, height).Contains(x, y))
+                {
+                    docTitle = "Trình chiếu Mới.pptx";
+                    openFilePath = null;
+                    return OfficeAppMode.Slides;
+                }
+                if (GetAppNavBounds(3, width, height).Contains(x, y))
+                {
+                    docTitle = "Tài liệu PDF Mới.pdf";
+                    openFilePath = null;
+                    return OfficeAppMode.Pdf;
+                }
+                if (GetAppNavBounds(4, width, height).Contains(x, y))
+                {
+                    docTitle = "Thiết kế Mới 1.svg";
+                    openFilePath = null;
+                    return OfficeAppMode.Photo;
+                }
+
+                // B. Kiểm tra nhấp vào Right Panel bên phải (x > width - RightPanelWidth)
+                if (GetPromoBtnBounds(width).Contains(x, y))
+                {
+                    IsTemplateDiscoveryMode = false;
+                    TargetScrollY = 0f;
+                    SmoothScrollY = 0f;
+                    return null;
+                }
+                if (GetStorageManageBounds(width).Contains(x, y))
+                {
+                    try
+                    {
+                        string sysPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        string root = Path.GetPathRoot(sysPath);
+                        System.Diagnostics.Process.Start("explorer.exe", !string.IsNullOrEmpty(root) ? root : "C:\\");
+                    }
+                    catch { }
+                    return null;
+                }
+                if (RightPanelUpdateBtnRect.Contains(x, y))
+                {
+                    using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
+                    {
+                        dlg.ShowDialog();
+                    }
+                    return null;
+                }
+
+                // C. Toàn bộ vùng trung tâm thuộc quyền quản lý của TemplateDiscoveryView
+                bool exitToHome;
+                var tmplMode = _templateDiscoveryView.HandleClick(x, y, out openFilePath, out docTitle, out exitToHome);
+                if (exitToHome)
+                {
+                    IsTemplateDiscoveryMode = false;
+                    TargetScrollY = 0f;
+                    SmoothScrollY = 0f;
+                    return null;
+                }
+                if (tmplMode.HasValue)
+                {
+                    if (!string.IsNullOrEmpty(openFilePath))
+                    {
+                        AddRecentDocument(openFilePath, tmplMode.Value, docTitle);
+                        SaveRecentDocs();
+                    }
+                    return tmplMode.Value;
+                }
+
+                // KHÓA CHẶT: Tuyệt đối không để sự kiện rơi xuống các thẻ tạo file hay danh sách tệp cũ của Trang chủ!
+                return null;
+            }
 
             // Search Box
             RectangleF searchBoxRect = GetSearchBoxBounds(width);
@@ -3509,7 +3404,6 @@ namespace ZenQOffice.UI
             }
 
             // Help button
-            RectangleF helpRect = GetHelpBtnBounds(width, height);
             if (helpRect.Contains(x, y))
             {
                 ShowHelpDialog();
@@ -3517,7 +3411,6 @@ namespace ZenQOffice.UI
             }
 
             // User avatar / Update button area
-            RectangleF updateRect = GetUpdateBtnBounds(width, height);
             if (updateRect.Contains(x, y))
             {
                 using (UpdateDialogForm dlg = new UpdateDialogForm(UpdateManager.LastReleaseInfo))
@@ -3528,7 +3421,7 @@ namespace ZenQOffice.UI
             }
 
             // Creation cards (Chỉ có ở Trang chủ)
-            if (ActiveTab == 0)
+            if (ActiveTab == 0 && !IsTemplateDiscoveryMode)
             {
                 for (int i = 0; i < 5; i++)
                 {
@@ -3546,14 +3439,11 @@ namespace ZenQOffice.UI
             }
 
             // Sidebar Tabs & Navigation Links (Trang chủ, Tài liệu của tôi, Thùng rác, Cài đặt)
-            RectangleF myDocsTab = GetMyDocsTabBounds(width, height);
-            RectangleF openDocNav = GetOpenDocNavBounds(width, height);
-            RectangleF trashTab = GetTrashTabBounds(width, height);
-            RectangleF settingsTab = GetSettingsTabBounds(width, height);
 
             if (myDocsTab.Contains(x, y))
             {
                 ActiveTab = 0;
+                IsTemplateDiscoveryMode = false;
                 SubFilter = 0;
                 IndicatorTargetX = myDocsTab.X;
                 IndicatorTargetW = myDocsTab.Width;
@@ -3561,9 +3451,22 @@ namespace ZenQOffice.UI
                 TargetScrollY = 0;
                 return null;
             }
+            RectangleF tmplNavTab = GetTemplateDiscoveryNavBounds(width, height);
+            if (tmplNavTab.Contains(x, y))
+            {
+                ActiveTab = 0;
+                IsTemplateDiscoveryMode = true;
+                SubFilter = 0;
+                IndicatorTargetX = tmplNavTab.X;
+                IndicatorTargetW = tmplNavTab.Width;
+                ScrollY = 0;
+                TargetScrollY = 0;
+                return null;
+            }
             if (openDocNav.Contains(x, y))
             {
                 ActiveTab = 3;
+                IsTemplateDiscoveryMode = false;
                 SubFilter = 0;
                 IndicatorTargetX = openDocNav.X;
                 IndicatorTargetW = openDocNav.Width;
@@ -3574,12 +3477,12 @@ namespace ZenQOffice.UI
             if (trashTab.Contains(x, y))
             {
                 ActiveTab = 1;
+                IsTemplateDiscoveryMode = false;
                 IndicatorTargetX = trashTab.X;
                 IndicatorTargetW = trashTab.Width;
                 ScrollY = 0;
                 return null;
             }
-            RectangleF bugReportTab = GetBugReportTabBounds(width, height);
             if (bugReportTab.Contains(x, y))
             {
                 using (var dlg = new BugReportDialogForm())
@@ -3592,6 +3495,7 @@ namespace ZenQOffice.UI
             if (settingsTab.Contains(x, y))
             {
                 ActiveTab = 2;
+                IsTemplateDiscoveryMode = false;
                 IndicatorTargetX = settingsTab.X;
                 IndicatorTargetW = settingsTab.Width;
                 ScrollY = 0;
@@ -3633,17 +3537,21 @@ namespace ZenQOffice.UI
             // Right Panel Clicks
             if (ActiveTab != 2)
             {
-                // Promo Button -> Mở mẫu đơn xin nghỉ phép
+                // Promo Button -> Chuyển đổi Khám phá mẫu / Trang chủ (KHÔNG mở Writer!)
                 if (GetPromoBtnBounds(width).Contains(x, y))
                 {
-                    string tPath = EnsureTemplateLeaveRequest();
-                    if (!string.IsNullOrEmpty(tPath))
+                    if (ActiveTab == 0 && IsTemplateDiscoveryMode)
                     {
-                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Đơn xin nghỉ phép.docx");
-                        docTitle = "Mẫu - Đơn xin nghỉ phép.docx";
-                        openFilePath = tPath;
-                        return OfficeAppMode.Writer;
+                        IsTemplateDiscoveryMode = false;
                     }
+                    else
+                    {
+                        ActiveTab = 0;
+                        IsTemplateDiscoveryMode = true;
+                    }
+                    TargetScrollY = 0f;
+                    SmoothScrollY = 0f;
+                    return null;
                 }
 
                 // Quản lý ổ đĩa -> Mở Explorer
@@ -3659,66 +3567,7 @@ namespace ZenQOffice.UI
                     return null;
                 }
 
-                // "Xem tất cả" bên cạnh "Mẫu nổi bật" -> Mở Tài liệu của tôi
-                float pxAll = (width - RightPanelWidth) + 20f;
-                float pwAll = RightPanelWidth - 40f;
-                float tmplHeaderY = 266f;
-                RectangleF viewAllTemplatesRect = new RectangleF(pxAll + pwAll - 65f, tmplHeaderY - 4f, 65f, 24f);
-                if (viewAllTemplatesRect.Contains(x, y))
-                {
-                    ActiveTab = 3;
-                    SubFilter = 0;
-                    ScrollY = 0;
-                    TargetScrollY = 0;
-                    return null;
-                }
-
-                // 4 Mẫu nổi bật (Templates)
-                if (GetTemplateCardBounds(0, width).Contains(x, y))
-                {
-                    string tPath = EnsureTemplateLeaveRequest();
-                    if (!string.IsNullOrEmpty(tPath))
-                    {
-                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Đơn xin nghỉ phép.docx");
-                        docTitle = "Mẫu - Đơn xin nghỉ phép.docx";
-                        openFilePath = tPath;
-                        return OfficeAppMode.Writer;
-                    }
-                }
-                if (GetTemplateCardBounds(1, width).Contains(x, y))
-                {
-                    string tPath = EnsureTemplateBusinessPlan();
-                    if (!string.IsNullOrEmpty(tPath))
-                    {
-                        AddRecentDocument(tPath, OfficeAppMode.Slides, "Mẫu - Kế hoạch kinh doanh.pptx");
-                        docTitle = "Mẫu - Kế hoạch kinh doanh.pptx";
-                        openFilePath = tPath;
-                        return OfficeAppMode.Slides;
-                    }
-                }
-                if (GetTemplateCardBounds(2, width).Contains(x, y))
-                {
-                    string tPath = EnsureTemplateProjectReport();
-                    if (!string.IsNullOrEmpty(tPath))
-                    {
-                        AddRecentDocument(tPath, OfficeAppMode.Writer, "Mẫu - Báo cáo tiến độ dự án.docx");
-                        docTitle = "Mẫu - Báo cáo tiến độ dự án.docx";
-                        openFilePath = tPath;
-                        return OfficeAppMode.Writer;
-                    }
-                }
-                if (GetTemplateCardBounds(3, width).Contains(x, y))
-                {
-                    string tPath = EnsureTemplateTimesheet();
-                    if (!string.IsNullOrEmpty(tPath))
-                    {
-                        AddRecentDocument(tPath, OfficeAppMode.Calc, "Mẫu - Bảng chấm công.csv");
-                        docTitle = "Mẫu - Bảng chấm công.csv";
-                        openFilePath = tPath;
-                        return OfficeAppMode.Calc;
-                    }
-                }
-
+                // "Xem tất cả" bên cạnh "Mẫu nổi bật" -> Mở trang Khám phá mẫu
                 // Nút "Cập nhật ngay" ở góc dưới bên phải (dưới Tự động lưu bản thảo an toàn)
                 if (RightPanelUpdateBtnRect.Contains(x, y))
                 {
@@ -3804,7 +3653,7 @@ namespace ZenQOffice.UI
             }
 
             // File list clicks
-            if (ActiveTab == 0 || ActiveTab == 1 || ActiveTab == 3)
+            if ((ActiveTab == 0 && !IsTemplateDiscoveryMode) || ActiveTab == 1 || ActiveTab == 3)
             {
                 List<RecentDocItem> currentList = GetFilteredDocs(ActiveTab);
                 float startX, contentW, bannerH, cardY, fileListY, colHeaderY, listTopY;
@@ -3837,8 +3686,8 @@ namespace ZenQOffice.UI
                                     return null;
                                 }
 
-                                // Click on dots area -> move to trash
-                                if (x >= dotX - 16f)
+                                // Click on Trash can icon -> move to trash
+                                if (x >= dotX - 16f && x <= dotX + 16f)
                                 {
                                     RecentDocs.Remove(item);
                                     if (TrashDocs == null) TrashDocs = new List<RecentDocItem>();
@@ -3933,6 +3782,17 @@ namespace ZenQOffice.UI
         }
         #endregion
 
+        private void DrawVectorTemplateIcon(Graphics g, float x, float y, float size, Color c)
+        {
+            using (Pen pen = new Pen(c, 1.4f))
+            {
+                float cell = (size - 3f) / 2f;
+                g.DrawRectangle(pen, x, y, cell, cell);
+                g.DrawRectangle(pen, x + cell + 3f, y, cell, cell);
+                g.DrawRectangle(pen, x, y + cell + 3f, cell, cell);
+                g.DrawRectangle(pen, x + cell + 3f, y + cell + 3f, cell, cell);
+            }
+        }
 
-    }
+            }
 }

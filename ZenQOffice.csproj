@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,6 +6,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <AssemblyName>ZenQOffice</AssemblyName>
+    <OutputPath>$(MSBuildProjectDirectory)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <ApplicationIcon>ZenQOffice.ico</ApplicationIcon>
     <StartupObject>ZenQOffice.Program</StartupObject>
     <LangVersion>latest</LangVersion>
@@ -29,6 +32,8 @@
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
   
+    <Reference Include="Vortice.Direct3D11"><HintPath>Vortice.Direct3D11.dll</HintPath></Reference>
+    <Reference Include="Vortice.MediaFoundation"><HintPath>Vortice.MediaFoundation.dll</HintPath></Reference>
     <Reference Include="Vortice.Direct2D1"><HintPath>Vortice.Direct2D1.dll</HintPath></Reference>
     <Reference Include="Vortice.Mathematics"><HintPath>Vortice.Mathematics.dll</HintPath></Reference>
     <Reference Include="Vortice.DXGI"><HintPath>Vortice.DXGI.dll</HintPath></Reference>
@@ -41,6 +46,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="icon\*_new.svg"><LogicalName>icon.%(Filename).svg</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="assets\apps\zenq-utility-atlas-v1.png"><LogicalName>apps.zenq-utility-atlas.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="assets\transitions\*.svg">
+      <LogicalName>transitions.%(Filename).svg</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="ZENQOFFICE.png">
       <LogicalName>app_logo.png</LogicalName>
     </EmbeddedResource>
@@ -62,8 +72,20 @@
     <EmbeddedResource Include="icon\vector.png">
       <LogicalName>icon_vector.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="icon\AIicon.png">
+      <LogicalName>icon_ai.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\ai.ico">
+      <LogicalName>icon_ai.ico</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="icon\banner.png">
       <LogicalName>banner.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\bannernew.png">
+      <LogicalName>bannernew.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icon\zenqofficenew.png">
+      <LogicalName>zenqofficenew.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="fonts\SegoeIcons.ttf">
       <LogicalName>SegoeIcons.ttf</LogicalName>
@@ -95,15 +117,15 @@
     <None Update="data\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="icon\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="fonts\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
-  <Target Name="CopyToRoot" AfterTargets="Build">
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.exe" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.exe')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.dll" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.runtimeconfig.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.runtimeconfig.json')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.deps.json" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.deps.json')" />
-    <Copy SourceFiles="$(TargetDir)ZenQOffice.pdb" DestinationFolder="$(MSBuildProjectDirectory)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" ContinueOnError="true" Retries="0" RetryDelayMilliseconds="0" Condition="Exists('$(TargetDir)ZenQOffice.pdb')" />
-  </Target>
+
 
 </Project>
 

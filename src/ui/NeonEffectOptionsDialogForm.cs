@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -149,7 +149,7 @@ namespace ZenQOffice.UI
             pnlBottom.Controls.Add(btnClose);
 
             // 3. TabControl for Clean & Compact Layout
-            TabControl tabMain = new TabControl
+            TabControl tabMain = new ZenQOffice.UI.FluentTabControl
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9.0f),
@@ -489,7 +489,7 @@ namespace ZenQOffice.UI
             };
             page.Controls.Add(lblRepeatCount);
 
-            cboRepeatCount = new ComboBox
+            cboRepeatCount = new ZenQOffice.UI.FluentComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(185, curY),

@@ -20,7 +20,11 @@ mkdir temp_dist
 mkdir temp_dist\x64
 mkdir temp_dist\x86
 
-copy /y bin\Release\net10.0-windows\* temp_dist\ >nul
+copy /y ZenQOffice.exe temp_dist\ >nul
+copy /y ZenQOffice.dll temp_dist\ >nul
+copy /y ZenQOffice.deps.json temp_dist\ >nul
+copy /y ZenQOffice.runtimeconfig.json temp_dist\ >nul
+copy /y *.dll temp_dist\ >nul
 
 :: Remove any stray pdb or xml documentation to keep payload clean and protect privacy
 del /s /q temp_dist\*.pdb >nul 2>&1
@@ -47,6 +51,9 @@ if exist data\images.json (
 if exist icon (
     if not exist temp_dist\icon mkdir temp_dist\icon >nul 2>&1
     copy /y icon\* temp_dist\icon\ >nul
+    if exist temp_dist\icon\*backup* del /q temp_dist\icon\*backup* >nul 2>&1
+    if exist temp_dist\icon\bannernew.png del /q temp_dist\icon\bannernew.png >nul 2>&1
+    if exist temp_dist\icon\*.md del /q temp_dist\icon\*.md >nul 2>&1
 )
 if exist img (
     if not exist temp_dist\img mkdir temp_dist\img >nul 2>&1
@@ -57,7 +64,7 @@ if exist fonts (
     copy /y fonts\* temp_dist\fonts\ >nul
 )
 
-powershell -Command "Compress-Archive -Path 'temp_dist\*' -DestinationPath 'payload.zip' -Force"
+python -c "import zipfile, os; z = zipfile.ZipFile('payload.zip', 'w', zipfile.ZIP_DEFLATED, compresslevel=9); [z.write(os.path.join(r, f), os.path.relpath(os.path.join(r, f), 'temp_dist')) for r, d, fs in os.walk('temp_dist') for f in fs]; z.close()"
 rmdir /s /q temp_dist
 
 echo Payload zip created: payload.zip
